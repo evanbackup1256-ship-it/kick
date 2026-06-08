@@ -35,7 +35,6 @@ type GameBuildInfo = {
 	Name: string,
 	Updated: string,
 	PlaceVersion: number,
-	
 	KnownUpdated: string,
 	KnownPlaceVersion: number,
 	Changed: boolean,
