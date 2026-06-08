@@ -1898,7 +1898,7 @@ local function rebuildUpgradeBase()
 	state.TUpgradeBase = {}
 	for _, name in ipairs(listFromSelection(state.TUpgrade)) do
 		local base = tostring(name):gsub("^%[Lv%.%d+%]%s*", "")
-		if not table.find(state.TUpgradeBase, base) then
+		if not tableFind(state.TUpgradeBase, base) then
 			table.insert(state.TUpgradeBase, base)
 		end
 	end
