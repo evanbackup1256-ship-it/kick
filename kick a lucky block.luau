@@ -847,7 +847,18 @@ local function patchStarlightSource(source: string): string
 	return before .. block .. after
 end
 
+-- Load priority:
+--   1. New local rewrite (starlight_repo/Source.lua) — preferred; no network, no model deps
+--   2. Old remote library from GitHub (patched) — fallback for executor envs with HTTP
+--   3. Local backup copies bundled alongside this script
 local function loadStarlight(): any?
+	-- Try the new pure-code rewrite first
+	local rewriteResult = loadLocalLua("starlight_repo/Source.lua", "Starlight v3 (local rewrite)")
+	if rewriteResult and type(rewriteResult.CreateWindow) == "function" then
+		return rewriteResult
+	end
+
+	-- Try the patched remote library
 	local ok, result = safeCall("LoadStarlightRemote", function()
 		return loadstring(patchStarlightSource(game:HttpGet(STARLIGHT_SOURCE_URL)), "@" .. "Starlight")()
 	end)
@@ -859,11 +870,13 @@ local function loadStarlight(): any?
 	else
 		logError("Starlight", "Remote Starlight returned an invalid library.")
 	end
-	local localResult = loadLocalLua("new_ui_library_luxy_backup.lua", "Starlight Interface Suite local")
-	if localResult and type(localResult.CreateWindow) == "function" then
-		return localResult
+
+	-- Local bundle fallbacks
+	local luxyBackup = loadLocalLua("new_ui_library_luxy_backup.lua", "Starlight local backup")
+	if luxyBackup and type(luxyBackup.CreateWindow) == "function" then
+		return luxyBackup
 	end
-	return loadLocalLua("new_ui_library.lua", "Starlight Interface Suite fallback")
+	return loadLocalLua("new_ui_library.lua", "Starlight local fallback")
 end
 
 local starlight = loadStarlight()
