@@ -813,7 +813,7 @@ local STARLIGHT_SOURCE_URL =
 -- Fetches the latest script version from a remote source and runs it if newer.
 -- The script acts as its own launcher: always run the bleeding-edge version.
 local SCRIPT_SOURCE_URL =
-	"https://raw.githubusercontent.com/Omnie7/Alleral-Core/main/Alleral.luau"
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kick%20a%20lucky%20block.luau"
 
 local function autoUpdate()
 	if Executor.hasHttp and not getgenv().Alleral_Updated then
@@ -930,7 +930,7 @@ end
 runtime.ui = starlight
 
 local gameData = loadRemoteLua(
-	"https://raw.githubusercontent.com/Omnie7/Alleral-Core/main/Data/KickBlox.luau",
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kickblox.lua",
 	"game data"
 ) or { BrainrotOptions = {}, RarityOptions = {}, MutationOptions = {} }
 
