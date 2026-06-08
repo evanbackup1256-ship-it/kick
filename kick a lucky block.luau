@@ -288,7 +288,7 @@ local function safeFileApi(name: string): any?
 			executorName = tostring(identifyexecutor()):lower()
 		end)
 	end
-	if executorName:find("yub") or executorName:find("yubx") then
+	if executorName:find("yub") then
 		return nil
 	end
 	local envGetter = getgenv or getfenv
@@ -893,7 +893,12 @@ local function mainFilterMatches(brainrot: any, mutation: any): boolean
 	local brainrotOk = selectionMatches(state.TBrainrot, brainrot, normalizeText)
 	local rarityOk = selectionMatches(state.TRarity, rarityFor(brainrot, "Unknown"), normalizeText)
 	local mutationOk = selectionMatches(state.TMutation, mutation, normalizeMutation)
-	if not hasWildcard(state.TMutation) and normalizeMutation(mutation) == "None" then
+	-- Suppress non-mutated brainrots only when the filter is not a wildcard AND
+	-- the user has not explicitly selected "None" in the filter list.
+	if not hasWildcard(state.TMutation)
+		and normalizeMutation(mutation) == "None"
+		and not tableFind(listFromSelection(state.TMutation), "None")
+	then
 		mutationOk = false
 	end
 	return brainrotOk and rarityOk and mutationOk
@@ -904,11 +909,13 @@ local function parseNumber(value: any): number
 		return value
 	end
 	local text = tostring(value or ""):gsub("[,%s%$]", "")
-	local mantissa, exponent = text:match("^(%-?[%d%.]+)%s*,%s*(%-?%d+)$")
+	-- Standard scientific notation: e.g. "1.5e3" → 1500
+	local mantissa, exponent = text:match("^(%-?[%d%.]+)[eE](%-?%d+)$")
 	if mantissa and exponent then
 		return (tonumber(mantissa) or 0) * (10 ^ (tonumber(exponent) or 0))
 	end
-	local number, suffix = text:match("^([%d%.]+)(%a*)$")
+	-- Number with optional K/M/B/T/… suffix; allow leading minus
+	local number, suffix = text:match("^(%-?[%d%.]+)(%a*)$")
 	local valueNumber = tonumber(number or text) or 0
 	local powers: { [string]: number } = { K = 3, M = 6, B = 9, T = 12, Q = 15, Qi = 18, S = 21, Sp = 24, O = 27, N = 30, D = 33 }
 	if suffix and powers[suffix] then
@@ -1232,9 +1239,9 @@ local function selectedDropdownKeys(selection)
 end
 
 local function selectedDropdownValue(selection, fallback)
-	local values = listFromSelection(selection)
-	if values[1] ~= nil and values[1] ~= "" then
-		return values[1]
+	local items = listFromSelection(selection)
+	if items[1] ~= nil and items[1] ~= "" then
+		return items[1]
 	end
 	if type(selection) == "string" or type(selection) == "number" or type(selection) == "boolean" then
 		return tostring(selection)
@@ -1535,18 +1542,15 @@ local function autoPlaceBest()
 		local slotNumber = tonumber(slot.Name:match("%d+"))
 		if slotNumber and not (recentPlaceSlots[slotNumber] and tick() - recentPlaceSlots[slotNumber] < 5) then
 			local placed = slot:FindFirstChild("PlacedPart")
-			local placedName = placedBrainrotInfo(placed)
-			if not placed or not placedName then
+			local name, mutation, level = placedBrainrotInfo(placed)
+			if not name then
 				emptySlot = emptySlot or slotNumber
 			else
-				local name, mutation, level = placedBrainrotInfo(placed)
-				if name then
-					if not isProtectedBrainrot(name, mutation) then
-						local cps = brainrotCps(name, mutation, level) or 0
-						if cps < weakestCps then
-							weakestCps = cps
-							weakestSlot = slotNumber
-						end
+				if not isProtectedBrainrot(name, mutation) then
+					local cps = brainrotCps(name, mutation, level) or 0
+					if cps < weakestCps then
+						weakestCps = cps
+						weakestSlot = slotNumber
 					end
 				end
 			end
@@ -1840,7 +1844,7 @@ local function buySpeedUpgrade()
 	local coins = currentCoins()
 	for _, tier in ipairs({ 3, 2, 1 }) do
 		local cost = speedUpgradeCost(tier)
-		if not cost or coins >= cost then
+		if cost and coins >= cost then
 			local before = currentCoins()
 			safeCall("BuySpeedUpgrade", function()
 				remotes.speedUpgrade:FireServer(tier)
@@ -1954,7 +1958,7 @@ local function handleClaimedTool(tool)
 	local matches = selectionMatches(state.WBBrainrot, name, normalizeText)
 		and selectionMatches(state.WBRarity, rarity, normalizeText)
 		and selectionMatches(state.WBMutation, mutation, normalizeMutation)
-	if matches and state.AWebhook and state.WebhookURL ~= "" then
+	if matches then
 		local cps = brainrotCps(name, mutation, 1)
 		sendWebhook(state.WebhookURL, {
 			username = "Luxy Hub",
@@ -3346,12 +3350,12 @@ if LocalPlayer.Character then
 	)
 end
 
-makeSupervisor("RefreshData", 5, function()
+makeSupervisor("RefreshData", 8, function()
 	refreshRemotes()
 	updatePlotLists(protectedDropdown, upgradeDropdown)
 end)
 
-makeSupervisor("Prediction", 0.3, function()
+makeSupervisor("Prediction", 1, function()
 	if not state.APredict or not predictionStatus then
 		return
 	end
@@ -3374,7 +3378,7 @@ makeSupervisor("Prediction", 0.3, function()
 	predictionStatus:Update("CPS Value", cps and (formatNumber(cps) .. "/s") or "N/A")
 end)
 
-makeSupervisor("AutoKick", 0.2, function()
+makeSupervisor("AutoKick", 0.3, function()
 	local battleStatus = currentBattleStatus()
 	local battleActive = state.AAutoBattle and (battleStatus == "Battle" or battleTimerVisible())
 	if not state.AFarm and not battleActive then
@@ -3468,7 +3472,7 @@ makeSupervisor("AutoKick", 0.2, function()
 	end
 end)
 
-makeSupervisor("Train", 0.45, function()
+makeSupervisor("Train", 0.75, function()
 	if not state.ATrain and not state.ATrainCollect then
 		return
 	end
@@ -3491,7 +3495,7 @@ makeSupervisor("Train", 0.45, function()
 	end
 end)
 
-makeSupervisor("AutoClaim2x", 0.6, function()
+makeSupervisor("AutoClaim2x", 2, function()
 	local connectionFetcher = getConnectionFetcher()
 	if not (state.A2xTrain or state.ATrainCollect) or state.IsFlashCollecting or not connectionFetcher then
 		return
@@ -3515,7 +3519,7 @@ makeSupervisor("AutoClaim2x", 0.6, function()
 	end
 end)
 
-makeSupervisor("CollectCash", 1, function()
+makeSupervisor("CollectCash", 1.5, function()
 	local battleStatus = currentBattleStatus()
 	local safeBattleCollect = state.AAutoBattle
 		and (battleStatus == "Lobby" or battleStatus == "Create" or battleStatus == nil)
@@ -3530,7 +3534,7 @@ makeSupervisor("CollectCash", 1, function()
 	collectFromPlot()
 end)
 
-makeSupervisor("TrainCollect", 0.5, function()
+makeSupervisor("TrainCollect", 1, function()
 	if not state.ATrainCollect or tick() < (state.NextFlashCollect or 0) then
 		return
 	end
@@ -3565,11 +3569,11 @@ makeSupervisor("TrainCollect", 0.5, function()
 	state.IsFlashCollecting = false
 end)
 
-makeSupervisor("AutoPlaceBest", 1.25, function()
+makeSupervisor("AutoPlaceBest", 1.5, function()
 	autoPlaceBest()
 end)
 
-makeSupervisor("Economy", 1, function()
+makeSupervisor("Economy", 2, function()
 	refreshRemotes()
 	if state.ABuySpeed and tick() >= (runtime.nextSpeedBuyAttempt or 0) then
 		if not buySpeedUpgrade() then
@@ -3596,7 +3600,7 @@ makeSupervisor("Economy", 1, function()
 	end
 end)
 
-makeSupervisor("AutoUpgrade", 0.8, function()
+makeSupervisor("AutoUpgrade", 1.5, function()
 	if not state.AAutoUpgrade then
 		return
 	end
@@ -3627,7 +3631,7 @@ makeSupervisor("AutoUpgrade", 0.8, function()
 	end
 end)
 
-makeSupervisor("AutoFavorite", 1.25, function()
+makeSupervisor("AutoFavorite", 4, function()
 	if not state.AAutoFav then
 		return
 	end
@@ -3650,7 +3654,7 @@ makeSupervisor("AutoFavorite", 1.25, function()
 	end)
 end)
 
-makeSupervisor("WebhookStatus", 2, function()
+makeSupervisor("WebhookStatus", 5, function()
 	if not state.AutoStatusWebhook and runtime.nextStatusWebhook ~= 0 then
 		return
 	end
@@ -3713,7 +3717,7 @@ makeSupervisor("WebhookStatus", 2, function()
 	end
 end)
 
-makeSupervisor("Battle", 3, function()
+makeSupervisor("Battle", 4, function()
 	if not state.AAutoBattle then
 		return
 	end
@@ -3745,8 +3749,8 @@ makeSupervisor("Battle", 3, function()
 		end
 		local playersInLobby = 0
 		local countedPlayers = {}
-		local battleGui = LocalPlayer:FindFirstChild("PlayerGui")
-			and LocalPlayer.PlayerGui:FindFirstChild("KickBattles")
+		local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+		local battleGui = playerGui and playerGui:FindFirstChild("KickBattles")
 		if battleGui then
 			for _, label in ipairs(battleGui:GetDescendants()) do
 				if label:IsA("TextLabel") and label.Visible and label.Text ~= "" then
@@ -3778,7 +3782,7 @@ makeSupervisor("Battle", 3, function()
 	end
 end)
 
-makeSupervisor("AcceptBattle", 2, function()
+makeSupervisor("AcceptBattle", 4, function()
 	local connectionFetcher = getConnectionFetcher()
 	if not state.AAutoAcceptBattle or not connectionFetcher then
 		return
@@ -3813,7 +3817,7 @@ makeSupervisor("AcceptBattle", 2, function()
 	end
 end)
 
-makeSupervisor("Mastery", 0.6, function()
+makeSupervisor("Mastery", 1, function()
 	if not state.AAutoMastery then
 		runtime.masteryBusy = false
 		return
@@ -3988,7 +3992,7 @@ local function canSummonWeather(recipe)
 	return true
 end
 
-makeSupervisor("Weather", 2, function()
+makeSupervisor("Weather", 5, function()
 	if not state.AAutoSummonWeather or state.TTargetWeatherEvent == "None" then
 		return
 	end
