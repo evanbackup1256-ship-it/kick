@@ -1,60 +1,12 @@
-getgenv().LuxyHub_State = getgenv().LuxyHub_State or {}
+getgenv().Alleral_State = getgenv().Alleral_State or {}
 
 local VERSION = "5.3"
 
-type AnyMap = { [any]: any }
-type StringList = { string }
-type Callback = (...any) -> any
-type RuntimeState = {
-	[string]: any,
-	seenWebhookGuids: { [string]: boolean },
-	seenWebhookOrder: StringList,
-	favoriteQueue: StringList,
-	favoriteTools: AnyMap,
-	lastAutoKickActivity: number,
-	lastAutoKickMatch: number,
-	nextAutoKickReset: number,
-	autoKickSession: number,
-	flashCollectSession: number,
-	cachedWeights: any?,
-	cachedPlot: any?,
-	cachedPlotAt: number,
-	nextPlotLookup: number,
-	cachedRemotesAt: number,
-	cachedBattleStatus: any?,
-	cachedBattleStatusAt: number,
-	nextWeightBuyAttempt: { [string]: number },
-	nextKickStyleAttempt: number,
-	remoteLookupCache: AnyMap,
-	errorLog: StringList,
-	errorCounts: { [string]: number },
-	errorLastSeen: { [string]: number },
-	performanceMode: string,
-}
-type GameBuildInfo = {
-	Name: string,
-	Updated: string,
-	PlaceVersion: number,
-	KnownUpdated: string,
-	KnownPlaceVersion: number,
-	Changed: boolean,
-	CheckedAt: string,
-}
-type ScriptState = {
-	[string]: any,
-	HubRunning: boolean?,
-	Version: string?,
-	NotifyOnError: boolean?,
-	KnownGameUpdated: string?,
-	KnownPlaceVersion: number?,
-	UIQuietMode: boolean?,
-}
-
-local state: ScriptState = getgenv().LuxyHub_State
-local connections: AnyMap = {}
-local loops: AnyMap = {}
-local loopControllers: AnyMap = {}
-local runtime: RuntimeState = {
+local state = getgenv().Alleral_State
+local connections = {}
+local loops = {}
+local loopControllers = {}
+local runtime = {
 	seenWebhookGuids = {},
 	seenWebhookOrder = {},
 	favoriteQueue = {},
@@ -100,11 +52,11 @@ local VirtualUser = game:GetService("VirtualUser")
 local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
-if state.LuxyHub_Unload then
-	pcall(state.LuxyHub_Unload)
+if state.Alleral_Unload then
+	pcall(state.Alleral_Unload)
 end
 
-local defaults: AnyMap = {
+local defaults = {
 	HubRunning = true,
 	Version = VERSION,
 	AFarm = false,
@@ -188,7 +140,7 @@ local defaults: AnyMap = {
 	AutoSellMaxBackpack = 25,
 }
 
-local savedKeys: StringList = {
+local savedKeys = {
 	"AFarm",
 	"APredict",
 	"TBrainrot",
@@ -260,7 +212,7 @@ local savedKeys: StringList = {
 	"AutoSellMaxBackpack",
 }
 
-local function copyValue(value: any): any
+local function copyValue(value)
 	if type(value) ~= "table" then
 		return value
 	end
@@ -279,15 +231,15 @@ end
 state.HubRunning = true
 state.Version = VERSION
 
-local function trim(value: any): string
+local function trim(value)
 	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
 end
 
-local function notify(title: string?, text: string?, duration: number?)
+local function notify(title, text, duration)
 	if runtime.ui and runtime.ui.Notification then
 		pcall(function()
 			runtime.ui:Notification({
-				Title = title or "Luxy Hub",
+				Title = title or "Alleral",
 				Content = text or "",
 				Duration = duration or 4,
 			})
@@ -296,7 +248,7 @@ local function notify(title: string?, text: string?, duration: number?)
 	end
 	pcall(function()
 		StarterGui:SetCore("SendNotification", {
-			Title = title or "Luxy Hub",
+			Title = title or "Alleral",
 			Text = text or "",
 			Duration = duration or 4,
 		})
@@ -309,17 +261,17 @@ end
 -- We probe namespaces and known globals rather than relying solely on the name
 -- string, since many executors lie, truncate, or don't expose identifyexecutor.
 local Executor = (function()
-	local env: AnyMap = {}
+	local env = {}
 	pcall(function()
 		local g = getgenv or getfenv
 		if g then env = g() or {} end
 	end)
 
-	local function fn(k: string): any?
+	local function fn(k)
 		local v = env[k]
 		return type(v) == "function" and v or nil
 	end
-	local function tbl(k: string): any?
+	local function tbl(k)
 		local v = env[k]
 		return type(v) == "table" and v or nil
 	end
@@ -358,8 +310,25 @@ local Executor = (function()
 			name = "oxygenu"
 		elseif tbl("Electron") then
 			name = "electron"
+		elseif tbl("Wave") and type(env.Wave.setclipboard) == "function" then
+			name = "wave"
+		elseif tbl("shared") and type(env.shared.solara) == "table" then
+			name = "solara"
+		elseif tbl("Xeno") then
+			name = "xeno"
+		elseif tbl("Volt") and type(env.Volt.request) == "function" then
+			name = "volt"
+		elseif tbl("Potassium") then
+			name = "potassium"
+		elseif tbl("Madium") then
+			name = "madium"
+		elseif tbl("Velocity") then
+			name = "velocity"
+		elseif tbl("Codex") then
+			name = "codex"
+		elseif tbl("Ronix") then
+			name = "ronix"
 		elseif fn("queue_on_teleport") and fn("getgc") then
-			-- old Synapse X didn't expose identifyexecutor but had these
 			name = "synapse"
 		else
 			name = "unknown"
@@ -368,7 +337,7 @@ local Executor = (function()
 
 	-- Executors whose file-system implementations are known broken/unsafe.
 	-- We simply skip those APIs rather than letting them silently corrupt data.
-	local FS_BROKEN: { [string]: boolean } = {
+	local FS_BROKEN = {
 		yub = true,
 		yubx = true,
 		arceus = true,
@@ -396,7 +365,7 @@ end)()
 
 -- Retrieve a callable from the executor env. Pass noFs=true to block it on
 -- executors whose file APIs are broken (avoids silent corruption).
-local function execFunc(name: string, noFs: boolean?): any?
+local function execFunc(name, noFs)
 	if noFs and not Executor.fsOk then
 		return nil
 	end
@@ -413,11 +382,11 @@ local deleteFile  = execFunc("delfile",    true)
 local listFiles   = execFunc("listfiles",  true)
 local appendFile  = execFunc("appendfile", true)
 local setClipboard = execFunc("setclipboard") or execFunc("toclipboard")
-local settingsFolder = "LuxyHub_Configs"
+local settingsFolder = "Alleral_Configs"
 local settingsFile = string.format("%s/KickBlox_v4_%s.json", settingsFolder, tostring(LocalPlayer.UserId))
 local logFile = string.format("%s/KickBlox_v4_%s.log", settingsFolder, tostring(LocalPlayer.UserId))
 
-local function shortError(message: any): string
+local function shortError(message)
 	message = tostring(message or "Unknown error"):gsub("%s+", " ")
 	if #message > 220 then
 		message = message:sub(1, 217) .. "..."
@@ -425,7 +394,7 @@ local function shortError(message: any): string
 	return message
 end
 
-local function logError(scope: string?, err: any, details: any?): string
+local function logError(scope, err, details)
 	local message = shortError(err)
 	local label = tostring(scope or "Runtime")
 	local timestamp = os.date("%H:%M:%S")
@@ -443,7 +412,7 @@ local function logError(scope: string?, err: any, details: any?): string
 		while #runtime.errorLog > 12 do
 			table.remove(runtime.errorLog)
 		end
-		warn("[Luxy Hub] " .. line)
+		warn("[Alleral] " .. line)
 	end
 	if appendFile then
 		pcall(function()
@@ -456,12 +425,12 @@ local function logError(scope: string?, err: any, details: any?): string
 	return message
 end
 
-local function safeCall(scope: string, callback: Callback, notifyUser: boolean?): (boolean, any?)
+local function safeCall(scope, callback, notifyUser)
 	local ok, result = pcall(callback)
 	if not ok then
 		local message = logError(scope, result)
 		if notifyUser and state.NotifyOnError then
-			notify("Luxy Hub", tostring(scope or "Runtime") .. ": " .. message, 4)
+			notify("Alleral", tostring(scope or "Runtime") .. ": " .. message, 4)
 		end
 		return false, result
 	end
@@ -472,7 +441,7 @@ local function saveSettings()
 	if not writeFile then
 		return
 	end
-	local output: AnyMap = {}
+	local output = {}
 	for _, key in ipairs(savedKeys) do
 		output[key] = state[key]
 	end
@@ -538,7 +507,7 @@ clampSettings()
 
 -- Uses Executor.env so we don't need to reference bare globals that might not
 -- exist at parse time on strict executor environments.
-local function requestFunction(): any?
+local function requestFunction()
 	local e = Executor.env
 	local candidates = {
 		-- executor-specific namespaces first (most reliable)
@@ -564,7 +533,7 @@ local function requestFunction(): any?
 	return nil
 end
 
-local function getConnectionFetcher(): any?
+local function getConnectionFetcher()
 	local e = Executor.env
 	local candidates = {
 		e.getconnections,
@@ -581,7 +550,7 @@ local function getConnectionFetcher(): any?
 	return nil
 end
 
-local function normalizeWebhookUrl(url: any): (string?, string?)
+local function normalizeWebhookUrl(url)
 	url = trim(url)
 	if url == "" then
 		return nil, "Webhook URL is empty."
@@ -600,7 +569,7 @@ local function normalizeWebhookUrl(url: any): (string?, string?)
 	return url, nil
 end
 
-local function sendWebhook(url: string, payload: any): (boolean, string?)
+local function sendWebhook(url, payload)
 	local sender = requestFunction()
 	if not sender then
 		return false, "Executor HTTP request function is unavailable."
@@ -627,7 +596,7 @@ local function sendWebhook(url: string, payload: any): (boolean, string?)
 	return true, nil
 end
 
-local function formatRobloxTimestamp(value: any): string
+local function formatRobloxTimestamp(value)
 	local text = tostring(value or "")
 	if text == "" then
 		return "Unknown"
@@ -636,7 +605,7 @@ local function formatRobloxTimestamp(value: any): string
 	return text
 end
 
-local function checkGameBuild(forceNotify: boolean?, acceptCurrent: boolean?): GameBuildInfo
+local function checkGameBuild(forceNotify, acceptCurrent)
 	local ok, info = safeCall("GameBuildCheck", function()
 		return MarketplaceService:GetProductInfo(game.PlaceId)
 	end)
@@ -676,13 +645,13 @@ local function checkGameBuild(forceNotify: boolean?, acceptCurrent: boolean?): G
 	return runtime.gameBuild
 end
 
-local function acceptCurrentGameBuild(): GameBuildInfo
+local function acceptCurrentGameBuild()
 	local build = checkGameBuild(false, true)
 	notify("Game Check", "Current game build saved as reviewed.", 5)
 	return build
 end
 
-local function track(connection: any, key: any?): any?
+local function track(connection, key)
 	if not connection then
 		return nil
 	end
@@ -699,7 +668,7 @@ local function track(connection: any, key: any?): any?
 	return connection
 end
 
-local function safeFindRemote(network: any, aliases: StringList): any?
+local function safeFindRemote(network, aliases)
 	for _, alias in ipairs(aliases) do
 		local cached = runtime.remoteLookupCache[alias]
 		if cached and cached.Parent then
@@ -717,7 +686,7 @@ local function safeFindRemote(network: any, aliases: StringList): any?
 	return nil
 end
 
-local function untrack(connection: any)
+local function untrack(connection)
 	if not connection then
 		return
 	end
@@ -733,7 +702,7 @@ local function untrack(connection: any)
 	end
 end
 
-state.LuxyHub_Unload = function()
+state.Alleral_Unload = function()
 	state.HubRunning = false
 	for name, controller in pairs(loopControllers) do
 		if controller then
@@ -761,7 +730,7 @@ state.LuxyHub_Unload = function()
 	end)
 end
 
-local function loadLuaSource(source: string?, label: string): any?
+local function loadLuaSource(source, label)
 	if not source or source == "" then
 		logError("Loader", "Empty source for " .. label .. ".")
 		return nil
@@ -780,12 +749,12 @@ local function loadLuaSource(source: string?, label: string): any?
 	end
 	if getgenv then
 		local env = getgenv()
-		return env.Starlight or env.Library or env.LuxyLib
+		return env.Starlight or env.Library or env.AlleralLib
 	end
 	return nil
 end
 
-local function loadLocalLua(path: string, label: string): any?
+local function loadLocalLua(path, label)
 	if loadfile then
 		local ok, chunk = safeCall("LoadFile:" .. tostring(label), function()
 			return loadfile(path)
@@ -798,7 +767,7 @@ local function loadLocalLua(path: string, label: string): any?
 				end
 				if getgenv then
 					local env = getgenv()
-					return env.Starlight or env.Library or env.LuxyLib
+					return env.Starlight or env.Library or env.AlleralLib
 				end
 				return nil
 			end
@@ -826,7 +795,7 @@ local function loadLocalLua(path: string, label: string): any?
 	return loadLuaSource(source, label)
 end
 
-local function loadRemoteLua(url: string, label: string): any?
+local function loadRemoteLua(url, label)
 	local ok, source = safeCall("FetchLua:" .. tostring(label), function()
 		return game:HttpGet(url)
 	end)
@@ -844,18 +813,18 @@ local STARLIGHT_SOURCE_URL =
 -- Fetches the latest script version from a remote source and runs it if newer.
 -- The script acts as its own launcher: always run the bleeding-edge version.
 local SCRIPT_SOURCE_URL =
-	"https://raw.githubusercontent.com/Omnie7/Luxy-Core/main/LuxyHub.luau"
+	"https://raw.githubusercontent.com/Omnie7/Alleral-Core/main/Alleral.luau"
 
-local function autoUpdate(): boolean
-	if Executor.hasHttp and not getgenv().LuxyHub_Updated then
+local function autoUpdate()
+	if Executor.hasHttp and not getgenv().Alleral_Updated then
 		local ok, source = safeCall("AutoUpdate", function()
 			return game:HttpGet(SCRIPT_SOURCE_URL)
 		end)
 		if ok and source and source ~= "" and not source:find("404: Not Found") then
 			local remoteVersion = source:match('VERSION%s*=%s*"([^"]+)"')
 			if remoteVersion and remoteVersion ~= VERSION then
-				getgenv().LuxyHub_Updated = true
-				local chunk, err = loadstring(source, "@LuxyHub (latest)")
+				getgenv().Alleral_Updated = true
+				local chunk, err = loadstring(source, "@Alleral (latest)")
 				if chunk then
 					local runOk, runErr = pcall(chunk)
 					if runOk then
@@ -876,7 +845,7 @@ if autoUpdate() then
 end
 -- ── End auto-update ───────────────────────────────────────────────────────────
 
-local function patchStarlightSource(source: string): string
+local function patchStarlightSource(source)
 	source = source:gsub(
 		"function Tab:Show%(%)[\r\n]+%s*if Library%.ActiveTab then",
 		"function Tab:Show()\n\t\t\tif Library.ActiveTab == Tab then\n\t\t\t\treturn\n\t\t\tend\n\t\t\tif Library.ActiveTab then"
@@ -925,7 +894,7 @@ end
 local function closeLoadingGui() end
 local function loadingStep(text) end
 
-local function loadStarlight(): any?
+local function loadStarlight()
 	-- Try the new pure-code rewrite first
 	local rewriteResult = loadLocalLua("starlight_repo/Source.lua", "Starlight v3 (local rewrite)")
 	if rewriteResult and type(rewriteResult.CreateWindow) == "function" then
@@ -961,12 +930,12 @@ end
 runtime.ui = starlight
 
 local gameData = loadRemoteLua(
-	"https://raw.githubusercontent.com/Omnie7/Luxy-Core/main/Data/KickBlox.luau",
+	"https://raw.githubusercontent.com/Omnie7/Alleral-Core/main/Data/KickBlox.luau",
 	"game data"
 ) or { BrainrotOptions = {}, RarityOptions = {}, MutationOptions = {} }
 
-local function withAny(options: { any }?): StringList
-	local output: StringList = { "Any" }
+local function withAny(options)
+	local output = { "Any" }
 	local seen = { Any = true, All = true, None = true, ["--"] = true }
 	for _, option in ipairs(options or {}) do
 		if not seen[option] then
@@ -977,24 +946,21 @@ local function withAny(options: { any }?): StringList
 	return output
 end
 
-safeCall("LoadMutationData", function()
-	local mutationData = require(ReplicatedStorage.Shared.Data.MutationData)
-	if mutationData and mutationData.ValidMutations then
-		gameData.MutationOptions = mutationData.ValidMutations
-	end
-end)
+if modules.mutationData and modules.mutationData.ValidMutations then
+	gameData.MutationOptions = modules.mutationData.ValidMutations
+end
 gameData.BrainrotOptions = withAny(gameData.BrainrotOptions)
 gameData.RarityOptions = withAny(gameData.RarityOptions)
 gameData.MutationOptions = withAny(gameData.MutationOptions)
 
-local function listFromSelection(selection: any): StringList
+local function listFromSelection(selection)
 	if type(selection) == "string" then
 		return { selection }
 	end
 	if type(selection) ~= "table" then
 		return {}
 	end
-	local output: StringList = {}
+	local output = {}
 	local arrayLike = false
 	for key, value in pairs(selection) do
 		if type(key) == "number" then
@@ -1014,7 +980,7 @@ local function listFromSelection(selection: any): StringList
 	return output
 end
 
-local function tableFind(tbl: any, value: any): boolean
+local function tableFind(tbl, value)
 	if type(tbl) ~= "table" then
 		return false
 	end
@@ -1026,12 +992,12 @@ local function tableFind(tbl: any, value: any): boolean
 	return false
 end
 
-local function hasWildcard(selection: any): boolean
+local function hasWildcard(selection)
 	selection = listFromSelection(selection)
 	return #selection == 0 or tableFind(selection, "Any") or tableFind(selection, "All")
 end
 
-local function normalizeText(value: any): string
+local function normalizeText(value)
 	local text = trim(value)
 	text = text:gsub("[%%[%]%(%){}]", " ")
 	text = text:gsub("[%s_-]+", " ")
@@ -1039,7 +1005,7 @@ local function normalizeText(value: any): string
 end
 
 
-local function normalizeMutation(value: any): string
+local function normalizeMutation(value)
 	local text = normalizeText(value)
 	if text == "" then
 		return "None"
@@ -1055,7 +1021,7 @@ local function normalizeMutation(value: any): string
 	return text
 end
 
-local function selectionMatches(selection: any, value: any, normalizer: (any) -> string): boolean
+local function selectionMatches(selection, value, normalizer: (any) -> string)
 	selection = listFromSelection(selection)
 	if hasWildcard(selection) then
 		return true
@@ -1070,7 +1036,7 @@ local function selectionMatches(selection: any, value: any, normalizer: (any) ->
 end
 
 local rarityFor
-local function mainFilterMatches(brainrot: any, mutation: any): boolean
+local function mainFilterMatches(brainrot, mutation)
 	local brainrotOk = selectionMatches(state.TBrainrot, brainrot, normalizeText)
 	local rarityOk = selectionMatches(state.TRarity, rarityFor(brainrot, "Unknown"), normalizeText)
 	local mutationOk = selectionMatches(state.TMutation, mutation, normalizeMutation)
@@ -1085,7 +1051,7 @@ local function mainFilterMatches(brainrot: any, mutation: any): boolean
 	return brainrotOk and rarityOk and mutationOk
 end
 
-local function parseNumber(value: any): number
+local function parseNumber(value)
 	if type(value) == "number" then
 		return value
 	end
@@ -1098,18 +1064,18 @@ local function parseNumber(value: any): number
 	-- Number with optional K/M/B/T/… suffix; allow leading minus
 	local number, suffix = text:match("^(%-?[%d%.]+)(%a*)$")
 	local valueNumber = tonumber(number or text) or 0
-	local powers: { [string]: number } = { K = 3, M = 6, B = 9, T = 12, Q = 15, Qi = 18, S = 21, Sp = 24, O = 27, N = 30, D = 33 }
+	local powers = { K = 3, M = 6, B = 9, T = 12, Q = 15, Qi = 18, S = 21, Sp = 24, O = 27, N = 30, D = 33 }
 	if suffix and powers[suffix] then
 		return valueNumber * (10 ^ powers[suffix])
 	end
 	return valueNumber
 end
 
-local function mathClamp(value: number, min: number, max: number): number
+local function mathClamp(value, min, max)
 	return math.min(math.max(value, min), max)
 end
 
-local function formatNumber(value: any): string
+local function formatNumber(value)
 	value = parseNumber(value)
 	if value < 1000 then
 		return tostring(math.floor(value))
@@ -1119,7 +1085,7 @@ local function formatNumber(value: any): string
 	return string.format("%.2f%s", value / (10 ^ (index * 3)), suffixes[index] or ""):gsub("%.00", "")
 end
 
-local function coerceNumber(value: any): number
+local function coerceNumber(value)
 	if type(value) == "table" then
 		local first = value.First or value.first or value[1] or 0
 		local second = value.Second or value.second or value[2] or 0
@@ -1128,8 +1094,9 @@ local function coerceNumber(value: any): number
 	return parseNumber(value)
 end
 
-local modules: AnyMap = {
+local modules = {
 	entitiesData = nil,
+	mutationData = nil,
 	weightsData = nil,
 	speedData = nil,
 	rebirthData = nil,
@@ -1140,7 +1107,7 @@ local modules: AnyMap = {
 	weatherService = nil,
 }
 
-local function loadModule(key: string, label: string, resolver: Callback): any?
+local function loadModule(key, label, resolver)
 	local ok, result = safeCall("LoadModule:" .. label, function()
 		local target = resolver()
 		if not target then
@@ -1156,6 +1123,9 @@ end
 
 loadModule("entitiesData", "EntitiesData", function()
 	return ReplicatedStorage.Shared.Data.EntitiesData
+end)
+loadModule("mutationData", "MutationData", function()
+	return ReplicatedStorage.Shared.Data.MutationData
 end)
 loadModule("weightsData", "WeightsData", function()
 	return ReplicatedStorage:FindFirstChild("WeightsData", true)
@@ -1182,13 +1152,13 @@ loadModule("weatherService", "WeatherServiceClient", function()
 	return ReplicatedStorage.Modules.ServicesLoader.WeatherService_Client
 end)
 
-local values: AnyMap = {
+local values = {
 	coins = modules.balanceService and parseNumber(modules.balanceService.Balance) or 0,
 	kickLevel = modules.kickService and modules.kickService.Level or 0,
 	rebirthLevel = modules.rebirthService and modules.rebirthService.RebirthLevel or 0,
 }
 
-local function currentCoins(): number
+local function currentCoins()
 	local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
 	local coins = leaderstats and leaderstats:FindFirstChild("Coins")
 	if coins then
@@ -1213,7 +1183,7 @@ if modules.rebirthService and modules.rebirthService.RebirthChanged then
 	end))
 end
 
-local remotes: AnyMap = {}
+local remotes = {}
 
 local function refreshRemotes()
 	if tick() - runtime.cachedRemotesAt < 5 then
@@ -1350,7 +1320,7 @@ local function brainrotCps(name, mutation, level)
 	-- Level scaling: check for explicit per-level data before falling back to
 	-- simple linear scaling. Many games add a fixed amount per upgrade rather
 	-- than multiplying the whole value.
-	local leveledBase: number
+	local leveledBase
 	if entry.CPSPerLevel or entry.CashPerSecondPerLevel then
 		local perLvl = parseNumber(entry.CPSPerLevel or entry.CashPerSecondPerLevel or 0)
 		leveledBase = base + (lvl - 1) * perLvl
@@ -1364,14 +1334,18 @@ local function brainrotCps(name, mutation, level)
 
 	-- Mutation multiplier
 	local multiplier = 1
-	local mutationData = modules.entitiesData and modules.entitiesData.Mutations
-	if mutationData and mutationData[mutation] then
-		multiplier = parseNumber(mutationData[mutation].Multiplier or mutationData[mutation].Boost or 1)
-	elseif mutation and mutation:lower():match("^x%d+$") then
-		multiplier = tonumber(mutation:sub(2)) or 1
-	elseif mutation and mutation:lower():match("^%d+x$") then
-		-- "2x" style (normaliser converts it, but guard here just in case)
-		multiplier = tonumber(mutation:match("^(%d+)")) or 1
+	local mutData = modules.mutationData
+	if mutData and mutData.Mutations and mutData.Mutations[mutation] then
+		multiplier = parseNumber(mutData.Mutations[mutation].Multiplier or 1)
+	else
+		local entitiesMut = modules.entitiesData and modules.entitiesData.Mutations
+		if entitiesMut and entitiesMut[mutation] then
+			multiplier = parseNumber(entitiesMut[mutation].Multiplier or entitiesMut[mutation].Boost or 1)
+		elseif mutation and mutation:lower():match("^x%d+$") then
+			multiplier = tonumber(mutation:sub(2)) or 1
+		elseif mutation and mutation:lower():match("^%d+x$") then
+			multiplier = tonumber(mutation:match("^(%d+)")) or 1
+		end
 	end
 
 	return leveledBase * multiplier
@@ -1379,7 +1353,7 @@ end
 
 -- Sum of CPS for all brainrots currently placed in the player's plot.
 -- Returns 0 when the plot is inaccessible (used for UI display only).
-local function totalPlotCps(): number
+local function totalPlotCps()
 	local plot = findPlot()
 	if not plot or not plot:FindFirstChild("Slots") then return 0 end
 	local total = 0
@@ -1424,7 +1398,7 @@ end
 
 -- Fire a remote regardless of whether it is a RemoteEvent or RemoteFunction.
 -- Tries FireServer first (the common case), falls back to InvokeServer.
-local function fireRemote(remote: any, ...): boolean
+local function fireRemote(remote, ...)
 	if not remote then return false end
 	local ok = pcall(function() remote:FireServer(...) end)
 	if not ok then
@@ -1433,11 +1407,11 @@ local function fireRemote(remote: any, ...): boolean
 	return ok
 end
 
-local function currentBattleStatus(): string?
+local function currentBattleStatus()
 	if tick() - runtime.cachedBattleStatusAt < 0.75 then
 		return runtime.cachedBattleStatus
 	end
-	local status: string? = nil
+	local status = nil
 	-- Primary: read from the KickBattles UI module
 	safeCall("BattleStatus", function()
 		local m = require(ReplicatedStorage.Modules.UILoader.KickBattlesUI)
@@ -1520,7 +1494,7 @@ local function selectedDropdownValue(selection, fallback)
 	return fallback
 end
 
-local intervalKeys: { [string]: string } = {
+local intervalKeys = {
 	AutoKick = "AutoKickInterval",
 	AutoPlaceBest = "AutoPlaceInterval",
 	Mastery = "MasteryInterval",
@@ -1528,7 +1502,7 @@ local intervalKeys: { [string]: string } = {
 	AutoFavorite = "FavoriteScanInterval",
 }
 
-local minimumLoopIntervals: { [string]: number } = {
+local minimumLoopIntervals = {
 	RefreshData = 8,
 	Prediction = 1,
 	AutoKick = 0.3,
@@ -1547,9 +1521,9 @@ local minimumLoopIntervals: { [string]: number } = {
 	Weather = 5,
 }
 
-local supervisorEnabled: { [string]: () -> boolean }
+local supervisorEnabled = {}
 
-local function activeAutomationCount(): number
+local function activeAutomationCount()
 	local count = 0
 	for _, enabled in pairs(supervisorEnabled) do
 		if enabled() then
@@ -1559,7 +1533,7 @@ local function activeAutomationCount(): number
 	return count
 end
 
-local function refreshPerformanceMode(): string
+local function refreshPerformanceMode()
 	local fps = tonumber(runtime.currentFps) or 60
 	local active = activeAutomationCount()
 	local nextMode = "Balanced"
@@ -1574,14 +1548,14 @@ local function refreshPerformanceMode(): string
 	return nextMode
 end
 
-local performanceMultipliers: { [string]: number } = {
+local performanceMultipliers = {
 	Aggressive = 0.9,
 	Balanced = 1,
 	Performance = 1.25,
 	Safe = 1.6,
 }
 
-local function currentLoopInterval(name: string, fallback: number): number
+local function currentLoopInterval(name, fallback)
 	local key = intervalKeys[name]
 	local value = key and tonumber(state[key])
 	local minimum = minimumLoopIntervals[name] or 0
@@ -1592,7 +1566,7 @@ local function currentLoopInterval(name: string, fallback: number): number
 	return math.max(minimum, fallback * multiplier)
 end
 
-local function shouldThrottleForFps(name: string): boolean
+local function shouldThrottleForFps(name)
 	if not runtime.currentFps or runtime.currentFps >= 28 then
 		return false
 	end
@@ -1652,7 +1626,7 @@ supervisorEnabled = {
 	end,
 }
 
-local function makeSupervisor(name: string, interval: number, callback: Callback): AnyMap
+local function makeSupervisor(name, interval, callback)
 	if loopControllers[name] then
 		loopControllers[name].enabled = false
 		loopControllers[name] = nil
@@ -1687,7 +1661,7 @@ local function makeSupervisor(name: string, interval: number, callback: Callback
 					loopState.errors = loopState.errors + 1
 					if state.NotifyOnError and tick() >= (loopState.nextErrorNotify or 0) then
 						loopState.nextErrorNotify = tick() + (state.UIQuietMode and 20 or 10)
-						notify("Luxy Hub", name .. " recovered: " .. tostring(err), 3)
+						notify("Alleral", name .. " recovered: " .. tostring(err), 3)
 					end
 					task.wait(math.min(5, 0.5 + loopState.errors))
 				else
@@ -2232,7 +2206,7 @@ local function handleClaimedTool(tool)
 	if matches then
 		local cps = brainrotCps(name, mutation, 1)
 		sendWebhook(state.WebhookURL, {
-			username = "Luxy Hub",
+			username = "Alleral",
 			content = "@everyone",
 			embeds = {
 				{
@@ -2249,7 +2223,7 @@ local function handleClaimedTool(tool)
 						},
 						{ name = "Server JobId", value = "```" .. tostring(game.JobId) .. "```", inline = false },
 					},
-					footer = { text = "Luxy Hub" },
+					footer = { text = "Alleral" },
 					timestamp = DateTime.now():ToIsoDate(),
 				},
 			},
@@ -2323,11 +2297,11 @@ end
 
 state.TriggerFavScan = scanTools
 
-local function starlightIcon(icon: any): any?
+local function starlightIcon(icon)
 	return tostring(icon or ""):match("%d+$") or ""
 end
 
-local function starlightWait(predicate: () -> any, timeout: number?): boolean
+local function starlightWait(predicate: () -> any, timeout)
 	local started = tick()
 	repeat
 		if predicate() then
@@ -2338,13 +2312,13 @@ local function starlightWait(predicate: () -> any, timeout: number?): boolean
 	return false
 end
 
-local function starlightId(text: any): string
+local function starlightId(text)
 	return (tostring(text or "Element"):gsub("[^%w_]", "_"))
 end
 
-local function starlightOptions(values: any): StringList
-	local output: StringList = {}
-	local seen: { [string]: boolean } = {}
+local function starlightOptions(values)
+	local output = {}
+	local seen = {}
 	for _, value in ipairs(values or {}) do
 		local normalized = tostring(value)
 		if not seen[normalized] then
@@ -2355,12 +2329,12 @@ local function starlightOptions(values: any): StringList
 	return output
 end
 
-local function starlightSearch(values: any, query: any): StringList
+local function starlightSearch(values, query)
 	query = tostring(query or ""):lower()
 	if query == "" then
 		return starlightOptions(values)
 	end
-	local filtered: StringList = {}
+	local filtered = {}
 	for _, value in ipairs(values or {}) do
 		local text = tostring(value)
 		if text:lower():find(query, 1, true) then
@@ -2372,15 +2346,15 @@ end
 
 local MAX_RENDERED_DROPDOWN_OPTIONS = 80
 
-local function compactStarlightOptions(values: any, selected: any, limit: number?): StringList
+local function compactStarlightOptions(values, selected, limit)
 	values = starlightOptions(values)
 	limit = limit or MAX_RENDERED_DROPDOWN_OPTIONS
 	if #values <= limit then
 		return values
 	end
-	local output: StringList = {}
-	local seen: { [string]: boolean } = {}
-	local function add(value: any)
+	local output = {}
+	local seen = {}
+	local function add(value)
 		value = tostring(value)
 		if value ~= "" and not seen[value] then
 			seen[value] = true
@@ -2407,18 +2381,18 @@ local function compactStarlightOptions(values: any, selected: any, limit: number
 	return output
 end
 
-local function tableClone(source: any): any
+local function tableClone(source)
 	if type(source) ~= "table" then
 		return source
 	end
-	local output: AnyMap = {}
+	local output = {}
 	for key, value in pairs(source) do
 		output[key] = value
 	end
 	return output
 end
 
-local function starlightCurrent(default: any, multi: boolean?): any
+local function starlightCurrent(default, multi)
 	if type(default) == "table" then
 		return tableClone(default)
 	end
@@ -2435,7 +2409,7 @@ local function starlightCurrent(default: any, multi: boolean?): any
 	return tostring(default)
 end
 
-local function setStarlightVisible(element: any, visible: boolean)
+local function setStarlightVisible(element, visible)
 	starlightWait(function()
 		return element and element.Instance
 	end, 1)
@@ -2444,16 +2418,16 @@ local function setStarlightVisible(element: any, visible: boolean)
 	end
 end
 
-local function wrapStarlightGroup(groupbox: any): AnyMap
-	local group: AnyMap = {}
+local function wrapStarlightGroup(groupbox)
+	local group = {}
 	local serial = 0
 
-	local function nextId(label: any): string
+	local function nextId(label)
 		serial = serial + 1
 		return starlightId(label) .. "_" .. serial
 	end
 
-	local function loggedCallback(label: any, callback: Callback?): Callback
+	local function loggedCallback(label, callback)
 		return function(...)
 			if type(callback) ~= "function" then
 				return
@@ -2469,7 +2443,7 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 		end
 	end
 
-	function group:AddDropdown(id: string, options: AnyMap)
+	function group:AddDropdown(id, options)
 		options = options or {}
 		local multi = options.Multi == true or options.MultiSelection == true
 		local values = starlightOptions(options.Values)
@@ -2479,18 +2453,18 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 			Name = options.Text or options.Name or id,
 			Tooltip = options.Tooltip or options.Description,
 		}, id)
-		local handle: AnyMap = {
+		local handle = {
 			Values = values,
 			Selection = current,
 			Dropdown = nil,
 			Label = label,
 			LastSearch = "",
 		}
-		local function safeCallback(selection: any)
+		local function safeCallback(selection)
 			handle.Selection = starlightCurrent(selection, multi)
 			loggedCallback(options.Text or options.Name or id, options.Callback)(selection)
 		end
-		local function rebuild(currentValues: any?)
+		local function rebuild(currentValues)
 			local nextValues = currentValues or handle.Values
 			if options.Searchable then
 				nextValues = compactStarlightOptions(nextValues, handle.Selection)
@@ -2558,7 +2532,7 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 		return handle
 	end
 
-	function group:CreateDropdown(label: string, values: any, default: any, callback: Callback?)
+	function group:CreateDropdown(label, values, default, callback)
 		return self:AddDropdown(nextId(label), {
 			Text = label,
 			Values = values,
@@ -2568,7 +2542,7 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 		})
 	end
 
-	function group:CreateToggle(label: string, default: boolean?, description: string?, callback: Callback?)
+	function group:CreateToggle(label, default, description, callback)
 		return groupbox:CreateToggle({
 			Name = label,
 			CurrentValue = default == true,
@@ -2577,7 +2551,7 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 		}, nextId(label))
 	end
 
-	function group:CreateSlider(label: string, minimum: number, maximum: number, default: number?, callback: Callback?, tooltip: string?)
+	function group:CreateSlider(label, minimum, maximum, default, callback, tooltip)
 		return groupbox:CreateSlider({
 			Name = label,
 			Range = { minimum, maximum },
@@ -2588,7 +2562,7 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 		}, nextId(label))
 	end
 
-	function group:CreateButton(label: string, callback: Callback?, tooltip: string?)
+	function group:CreateButton(label, callback, tooltip)
 		return groupbox:CreateButton({
 			Name = label,
 			Tooltip = tooltip,
@@ -2596,7 +2570,7 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 		}, nextId(label))
 	end
 
-	function group:CreateInput(label: string, placeholder: string?, icon: any?, callback: Callback?, tooltip: string?)
+	function group:CreateInput(label, placeholder, icon, callback, tooltip)
 		return groupbox:CreateInput({
 			Name = label,
 			Icon = starlightIcon(icon),
@@ -2607,8 +2581,8 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 		}, nextId(label))
 	end
 
-	function group:CreateStatus(label: string, fields: AnyMap)
-		local status: AnyMap = {
+	function group:CreateStatus(label, fields)
+		local status = {
 			Labels = {},
 			Visible = true,
 			LastValues = {},
@@ -2620,7 +2594,7 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 				Name = tostring(key) .. ": " .. rendered,
 			}, nextId(label .. "_" .. tostring(key)))
 		end
-		function status:Update(key: any, value: any)
+		function status:Update(key, value)
 			local rendered = tostring(value)
 			if self.LastValues[key] == rendered then
 				return
@@ -2633,7 +2607,7 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 				})
 			end
 		end
-		function status:SetVisible(visible: boolean)
+		function status:SetVisible(visible)
 			self.Visible = visible
 			for _, row in pairs(self.Labels) do
 				setStarlightVisible(row, visible)
@@ -2646,7 +2620,7 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 		return groupbox:CreateDivider()
 	end
 
-	function group:CreateParagraph(name: string, content: string)
+	function group:CreateParagraph(name, content)
 		return groupbox:CreateParagraph({
 			Name = name,
 			Content = content,
@@ -2657,19 +2631,19 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 end
 
 local starlightWindow = starlight:CreateWindow({
-	Name = "Luxy Hub",
+	Name = "Alleral",
 	Subtitle = "Kick a Lucky Block",
 	Icon = 10723407389,
 	LoadingEnabled = false,
 	NotifyOnCallbackError = true,
 	FileSettings = {
-		RootFolder = "LuxyHub_Configs",
+		RootFolder = "Alleral_Configs",
 		ConfigFolder = "Interface",
 	},
 })
-local starlightSection = starlightWindow:CreateTabSection("Luxy Hub", true)
+local starlightSection = starlightWindow:CreateTabSection("Alleral", true)
 
-local function createStarlightTab(name: string, icon: any): any
+local function createStarlightTab(name, icon)
 	return starlightSection:CreateTab({
 		Name = name,
 		Icon = starlightIcon(icon),
@@ -2677,7 +2651,7 @@ local function createStarlightTab(name: string, icon: any): any
 	}, starlightId(name))
 end
 
-local function createStarlightGroup(tab: any, name: string, icon: any, column: number?): AnyMap
+local function createStarlightGroup(tab, name, icon, column)
 	local groupbox = tab:CreateGroupbox({
 		Name = name,
 		Icon = starlightIcon(icon),
@@ -2697,6 +2671,7 @@ local miscTab = createStarlightTab("Tools", "rbxassetid://10734950020")
 local configTab = createStarlightTab("Settings", "rbxassetid://10734950309")
 
 local kickGroup = createStarlightGroup(mainTab, "Kicking", "rbxassetid://10734975692", 1)
+local filterGroup = createStarlightGroup(mainTab, "Filters", "rbxassetid://10734975692", 2)
 local trainGroup = createStarlightGroup(mainTab, "Training", "rbxassetid://10734975692", 2)
 local placeGroup = createStarlightGroup(autoTab, "Placement", "rbxassetid://10734975692", 1)
 local upgradeGroup = createStarlightGroup(autoTab, "Upgrades", "rbxassetid://10734975692", 2)
@@ -2713,8 +2688,8 @@ local recoveryGroup = createStarlightGroup(configTab, "Recovery", "rbxassetid://
 local tuningGroup = createStarlightGroup(configTab, "Timing", "rbxassetid://10734950309", 1)
 local diagnosticsGroup = createStarlightGroup(configTab, "Diagnostics", "rbxassetid://10734950309", 2)
 local profileGroup = createStarlightGroup(configTab, "Profiles", "rbxassetid://10734950309", 1)
-local protectedDropdown: any?
-local upgradeDropdown: any?
+local protectedDropdown
+local upgradeDropdown
 
 local diagnosticsStatus = diagnosticsGroup:CreateStatus("Status", {
 	Executor       = "detecting...",
@@ -2730,12 +2705,12 @@ local diagnosticsStatus = diagnosticsGroup:CreateStatus("Status", {
 	["Log File"]   = appendFile and logFile or "Unavailable",
 })
 
-local profileFolder = "LuxyHub_Configs/Profiles"
-local profileNameInput: string = "default"
-local importBuffer: string = ""
-local availableProfilesDropdown: any?
+local profileFolder = "Alleral_Configs/Profiles"
+local profileNameInput = "default"
+local importBuffer = ""
+local availableProfilesDropdown
 
-local function sanitizeProfileName(name: any): string
+local function sanitizeProfileName(name)
 	name = trim(name):gsub("[^%w_%-%s]", ""):gsub("%s+", "_")
 	if name == "" then
 		name = "default"
@@ -2743,15 +2718,15 @@ local function sanitizeProfileName(name: any): string
 	return name:sub(1, 40)
 end
 
-local function profilePath(name: any): string
+local function profilePath(name)
 	return string.format("%s/%s.json", profileFolder, sanitizeProfileName(name))
 end
 
-local function listProfiles(): StringList
+local function listProfiles()
 	if not listFiles then
 		return { "default" }
 	end
-	local profiles: StringList = {}
+	local profiles = {}
 	local ok, files = safeCall("ListProfiles", function()
 		return listFiles(profileFolder)
 	end)
@@ -2770,7 +2745,7 @@ local function listProfiles(): StringList
 	return profiles
 end
 
-local function refreshProfilesDropdown(defaultValue: any?)
+local function refreshProfilesDropdown(defaultValue)
 	if availableProfilesDropdown and availableProfilesDropdown.Refresh then
 		safeCall("RefreshProfilesDropdown", function()
 			availableProfilesDropdown:Refresh(listProfiles(), defaultValue or profileNameInput)
@@ -2778,8 +2753,8 @@ local function refreshProfilesDropdown(defaultValue: any?)
 	end
 end
 
-local function collectConfigSnapshot(): AnyMap
-	local snapshot: AnyMap = {}
+local function collectConfigSnapshot()
+	local snapshot = {}
 	for _, key in ipairs(savedKeys) do
 		snapshot[key] = copyValue(state[key])
 	end
@@ -2790,7 +2765,7 @@ local function collectConfigSnapshot(): AnyMap
 	return snapshot
 end
 
-local function applyConfigSnapshot(snapshot: any): (boolean, string?)
+local function applyConfigSnapshot(snapshot)
 	if type(snapshot) ~= "table" then
 		return false, "Invalid snapshot."
 	end
@@ -2804,7 +2779,7 @@ local function applyConfigSnapshot(snapshot: any): (boolean, string?)
 	return true, nil
 end
 
-local function saveProfile(name: any): (boolean, string)
+local function saveProfile(name)
 	if not writeFile then
 		return false, "writefile not available."
 	end
@@ -2823,7 +2798,7 @@ local function saveProfile(name: any): (boolean, string)
 	return true, name
 end
 
-local function loadProfile(name: any): (boolean, string?)
+local function loadProfile(name)
 	if not (readFile and isFile) then
 		return false, "readfile/isfile not available."
 	end
@@ -2840,7 +2815,7 @@ local function loadProfile(name: any): (boolean, string?)
 	return applyConfigSnapshot(decoded)
 end
 
-local function deleteProfile(name: any): (boolean, string?)
+local function deleteProfile(name)
 	if not deleteFile then
 		return false, "delfile not available."
 	end
@@ -2905,7 +2880,7 @@ local function clearErrorLog()
 	notify("Diagnostics", "Error log cleared.", 3)
 end
 
-local function totalLoggedErrors(): number
+local function totalLoggedErrors()
 	local total = 0
 	for _, count in pairs(runtime.errorCounts) do
 		total = total + (tonumber(count) or 0)
@@ -2913,10 +2888,10 @@ local function totalLoggedErrors(): number
 	return total
 end
 
-local function supportSummary(): string
+local function supportSummary()
 	local build = runtime.gameBuild or checkGameBuild(false)
 	local lines = {
-		"Luxy Hub " .. VERSION,
+		"Alleral " .. VERSION,
 		"Game: " .. tostring(build and build.Name or game.Name),
 		"PlaceId: " .. tostring(game.PlaceId),
 		"PlaceVersion: " .. tostring(build and build.PlaceVersion or game.PlaceVersion),
@@ -3238,7 +3213,7 @@ kickGroup:CreateSlider(
 )
 kickGroup:CreateDivider()
 -- Forward-declare so the toggle callback below can reference it before assignment
-local predictionStatus: any
+local predictionStatus
 -- Live prediction display
 kickGroup:CreateToggle(
 	"Show Prediction",
@@ -3260,7 +3235,7 @@ predictionStatus = kickGroup:CreateStatus("Prediction", {
 	["Net Gain"]   = "--",
 	Filter         = "--",
 })
-local sessionStatus: any = kickGroup:CreateStatus("Session", {
+local sessionStatus = kickGroup:CreateStatus("Session", {
 	Time         = "0:00",
 	Kicks        = "0",
 	["Kicks/min"]= "0",
@@ -3283,9 +3258,8 @@ kickGroup:CreateButton(
 	end,
 	"Zero out kick/match/reset counters and restart the session timer."
 )
-kickGroup:CreateDivider()
 -- Roll filters (what brainrots to keep vs. reset)
-kickGroup:AddDropdown("FilterBrainrot", {
+filterGroup:AddDropdown("FilterBrainrot", {
 	Text = "Filter: Brainrot",
 	Values = gameData.BrainrotOptions,
 	Default = state.TBrainrot,
@@ -3297,7 +3271,7 @@ kickGroup:AddDropdown("FilterBrainrot", {
 		saveSettings()
 	end,
 })
-kickGroup:AddDropdown("FilterRarity", {
+filterGroup:AddDropdown("FilterRarity", {
 	Text = "Filter: Rarity",
 	Values = gameData.RarityOptions,
 	Default = state.TRarity,
@@ -3309,7 +3283,7 @@ kickGroup:AddDropdown("FilterRarity", {
 		saveSettings()
 	end,
 })
-kickGroup:AddDropdown("FilterMutation", {
+filterGroup:AddDropdown("FilterMutation", {
 	Text = "Filter: Mutation",
 	Values = gameData.MutationOptions,
 	Default = state.TMutation,
@@ -3618,9 +3592,9 @@ favoriteGroup:CreateButton(
 			safeCall("SellAllBrainrots", function()
 				remotes.sellAll:InvokeServer()
 			end, true)
-			notify("Luxy Hub", "Sell All fired.", 3)
+			notify("Alleral", "Sell All fired.", 3)
 		else
-			notify("Luxy Hub", "Sell All remote not found.", 3)
+			notify("Alleral", "Sell All remote not found.", 3)
 		end
 	end,
 	"Fire the Sell All remote to sell every non-favorited brainrot in your backpack."
@@ -3676,8 +3650,8 @@ battleGroup:CreateSlider(
 )
 
 -- Forward-declare so the toggle callback can reference them before they're assigned
-local masteryStatus: any
-local updateMasteryStatus: (string, AnyMap?) -> ()
+local masteryStatus
+local updateMasteryStatus
 
 masteryGroup:CreateToggle(
 	"Auto Farm Mastery",
@@ -3717,7 +3691,7 @@ masteryStatus = masteryGroup:CreateStatus("Mastery Status", {
 	["Reset Method"] = state.MasteryResetMethod,
 	["Last Reset"] = "--",
 })
-updateMasteryStatus = function(status: string, extra: AnyMap?)
+updateMasteryStatus = function(status, extra)
 	if not masteryStatus or not masteryStatus.Update then
 		return
 	end
@@ -3783,7 +3757,7 @@ serverGroup:CreateButton(
 		if jobId and jobId ~= "" then
 			TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LocalPlayer)
 		else
-			notify("Luxy Hub", "Failed to extract JobId.", 3)
+			notify("Alleral", "Failed to extract JobId.", 3)
 		end
 	end,
 	"Teleport to the server whose JobId is entered above."
@@ -3811,13 +3785,13 @@ webhookGroup:CreateInput(
 		state.WebhookURL = normalized
 		saveSettings()
 		local ok, sendError = sendWebhook(state.WebhookURL, {
-			username = "Luxy Hub",
+			username = "Alleral",
 			embeds = {
 				{
 					title = "Webhook Connected",
 					description = "Webhook checks are active.",
 					color = 16733440,
-					footer = { text = "Luxy Hub" },
+					footer = { text = "Alleral" },
 					timestamp = DateTime.now():ToIsoDate(),
 				},
 			},
@@ -4478,13 +4452,13 @@ makeSupervisor("WebhookStatus", 5, function()
 	end
 	table.insert(fields, { name = "Total", value = "```" .. tostring(total) .. " Brainrot```", inline = true })
 	local ok, err = sendWebhook(state.WebhookURL, {
-		username = "Luxy Hub",
+		username = "Alleral",
 		embeds = {
 			{
 				title = "Brainrot Inventory",
 				color = 16733440,
 				fields = fields,
-				footer = { text = "Luxy Hub" },
+				footer = { text = "Alleral" },
 				timestamp = DateTime.now():ToIsoDate(),
 			},
 		},
@@ -4626,7 +4600,7 @@ makeSupervisor("Mastery", 1, function()
 	end
 	runtime.masteryBusy = true
 
-	local function finish(delay: number?)
+	local function finish(delay)
 		runtime.nextMasteryAction = tick() + (delay or 0.6)
 		runtime.masteryBusy = false
 	end
@@ -4823,4 +4797,4 @@ if state.AAutoFav then
 end
 
 closeLoadingGui()
-notify("Luxy Hub", "v" .. VERSION .. " ready.", 5)
+notify("Alleral", "v" .. VERSION .. " ready.", 5)
