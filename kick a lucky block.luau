@@ -833,9 +833,21 @@ local function listFromSelection(selection: any): StringList
 	return output
 end
 
+local function tableFind(tbl: any, value: any): boolean
+	if type(tbl) ~= "table" then
+		return false
+	end
+	for _, item in ipairs(tbl) do
+		if item == value then
+			return true
+		end
+	end
+	return false
+end
+
 local function hasWildcard(selection: any): boolean
 	selection = listFromSelection(selection)
-	return #selection == 0 or table.find(selection, "Any") or table.find(selection, "All")
+	return #selection == 0 or tableFind(selection, "Any") or tableFind(selection, "All")
 end
 
 local function normalizeText(value: any): string
