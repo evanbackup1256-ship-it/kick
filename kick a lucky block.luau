@@ -825,6 +825,8 @@ end
 
 local STARLIGHT_SOURCE_URL =
 	"https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua"
+local STARLIGHT_LOCAL_URL =
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/starlight_repo/Source.lua"
 
 -- --- Auto-update mechanism --------------------------------------------------
 -- Fetches the latest script version from a remote source and runs it if newer.
@@ -918,7 +920,7 @@ local function loadStarlight()
 		return rewriteResult
 	end
 
-	-- Try the patched remote library
+	-- Try the patched remote library (original repo)
 	local ok, result = safeCall("LoadStarlightRemote", function()
 		return loadstring(patchStarlightSource(game:HttpGet(STARLIGHT_SOURCE_URL)), "@" .. "Starlight")()
 	end)
@@ -929,6 +931,19 @@ local function loadStarlight()
 		logError("Starlight", result)
 	else
 		logError("Starlight", "Remote Starlight returned an invalid library.")
+	end
+
+	-- Try Starlight from our repo
+	local ok2, result2 = safeCall("LoadStarlightLocal", function()
+		return loadstring(patchStarlightSource(game:HttpGet(STARLIGHT_LOCAL_URL)), "@" .. "Starlight")()
+	end)
+	if ok2 and type(result2) == "table" and type(result2.CreateWindow) == "function" then
+		return result2
+	end
+	if not ok2 then
+		logError("Starlight", result2)
+	else
+		logError("Starlight", "Local repo Starlight returned an invalid library.")
 	end
 
 	-- Local bundle fallbacks
