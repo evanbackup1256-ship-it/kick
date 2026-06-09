@@ -9,7 +9,7 @@ local RepoRoot = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/
 local BootKey = game:GetService("HttpService"):GenerateGUID(false)
 
 local Games = {
-	[89469502395769] = RepoRoot .. "kick%20a%20lucky%20block.luau",
+	[89469502395769] = RepoRoot .. "kick a lucky block.luau",
 }
 
 local url = Games[game.PlaceId]
@@ -30,15 +30,21 @@ local function fetch(url)
 	local ok, src
 	local env = getgenv and getgenv() or getfenv and getfenv() or {}
 
-	ok, src = pcall(game.HttpGet, game, url)
-	if ok and src and src ~= "" and not src:find("404") and not src:find("Not Found") then
-		return src
+	local function tryHttpGet(f)
+		ok, src = pcall(f)
+		if ok and src and src ~= "" and not src:find("404") and not src:find("Not Found") then
+			return src
+		end
+		return nil
 	end
 
-	ok, src = pcall(game.HttpGetAsync, game, url)
-	if ok and src and src ~= "" and not src:find("404") and not src:find("Not Found") then
-		return src
-	end
+	if #url < 8 then return nil end
+
+	local result = tryHttpGet(function() return game:HttpGet(url) end) or
+		tryHttpGet(function() return game:HttpGet(url:gsub("%%20", " ")) end) or
+		tryHttpGet(function() return game:HttpGetAsync(url) end) or
+		tryHttpGet(function() return game:HttpGetAsync(url:gsub("%%20", " ")) end)
+	if result then return result end
 
 	local requestCandidates = {
 		env.syn and env.syn.request,
@@ -50,26 +56,27 @@ local function fetch(url)
 		env.Request,
 	}
 
-	for _, reqFunc in ipairs(requestCandidates) do
-		if type(reqFunc) == "function" then
-			ok, src = pcall(reqFunc, { Url = url, Method = "GET" })
-			if ok and src and type(src) == "table" and src.Body and src.Body ~= "" then
-				local body = src.Body
-				if not body:find("404") and not body:find("Not Found") then
-					return body
+	local urls = { url, url:gsub("%%20", " ") }
+	for _, u in ipairs(urls) do
+		for _, reqFunc in ipairs(requestCandidates) do
+			if type(reqFunc) == "function" then
+				ok, src = pcall(reqFunc, { Url = u, Method = "GET" })
+				if ok and src and type(src) == "table" and type(src.Body) == "string" and src.Body ~= "" then
+					if not src.Body:find("404") and not src.Body:find("Not Found") then
+						return src.Body
+					end
 				end
 			end
 		end
 	end
 
 	if type(HttpService.RequestAsync) == "function" then
-		ok, src = pcall(HttpService.RequestAsync, HttpService, {
-			Url = url,
-			Method = "GET",
-		})
-		if ok and src and type(src) == "table" and type(src.Body) == "string" and src.Body ~= "" then
-			if not src.Body:find("404") and not src.Body:find("Not Found") then
-				return src.Body
+		for _, u in ipairs(urls) do
+			ok, src = pcall(HttpService.RequestAsync, HttpService, { Url = u, Method = "GET" })
+			if ok and src and type(src) == "table" and type(src.Body) == "string" and src.Body ~= "" then
+				if not src.Body:find("404") and not src.Body:find("Not Found") then
+					return src.Body
+				end
 			end
 		end
 	end

@@ -5,7 +5,7 @@ do
 			local req = http_request or request or syn and syn.request
 			if req then
 				req({
-					Url = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kick%20a%20lucky%20block.luau",
+					Url = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kick a lucky block.luau",
 					Method = "GET",
 				})
 			end
@@ -829,7 +829,7 @@ local STARLIGHT_SOURCE_URL =
 -- Fetches the latest script version from a remote source and runs it if newer.
 -- The script acts as its own launcher: always run the bleeding-edge version.
 local SCRIPT_SOURCE_URL =
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kick%20a%20lucky%20block.luau"
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kick a lucky block.luau"
 
 local function autoUpdate()
 	if Executor.hasHttp and not getgenv().Alleral_Updated then
