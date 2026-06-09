@@ -587,38 +587,43 @@ clampSettings()
 
 local function requestFunction()
 	local e = Executor.env
-	local candidates = {
-		type(e.syn)         == "table" and type(e.syn.request)          == "function" and e.syn.request          or nil,
-		type(e.fluxus)      == "table" and type(e.fluxus.request)       == "function" and e.fluxus.request       or nil,
-		type(e.http)        == "table" and type(e.http.request)         == "function" and e.http.request         or nil,
-		type(e.http_service) == "table" and type(e.http_service.request) == "function" and e.http_service.request or nil,
-		e.http_request,
-		e.request,
-		e.Request,
-		type(HttpService.RequestAsync) == "function" and function(req)
-			return HttpService:RequestAsync(req)
-		end or nil,
-	}
-	for _, candidate in ipairs(candidates) do
-		if type(candidate) == "function" then
-			return candidate
-		end
+	local function pick(prefix, name)
+		local tbl = type(e[prefix]) == "table" and e[prefix]
+		return tbl and type(tbl[name]) == "function" and tbl[name] or nil
 	end
-	return nil
+	local function raw(name)
+		return type(e[name]) == "function" and e[name] or nil
+	end
+	local function each(fns)
+		for _, fn in ipairs(fns) do
+			if fn then
+				local r = fn()
+				if r then return r end
+			end
+		end
+		return nil
+	end
+	return each({
+		function() return pick("syn", "request") end,
+		function() return pick("fluxus", "request") end,
+		function() return pick("http", "request") end,
+		function() return pick("http_service", "request") end,
+		function() return raw("http_request") end,
+		function() return raw("request") end,
+		function() return raw("Request") end,
+		function()
+			return type(HttpService.RequestAsync) == "function"
+				and function(req) return HttpService:RequestAsync(req) end
+				or nil
+		end,
+	})
 end
 
 local function getConnectionFetcher()
 	local e = Executor.env
-	local candidates = {
-		e.getconnections,
-		e.get_signal_cons,
-		e.getconnections2,
-		e.get_signal_connections,
-	}
-	for _, candidate in ipairs(candidates) do
-		if type(candidate) == "function" then
-			return candidate
-		end
+	for _, name in ipairs({ "getconnections", "get_signal_cons", "getconnections2", "get_signal_connections" }) do
+		local fn = e[name]
+		if type(fn) == "function" then return fn end
 	end
 	return nil
 end
@@ -635,6 +640,8 @@ local function normalizeWebhookUrl(url)
 		not (
 			url:match("^https://discord%.com/api/webhooks/%d+/.+")
 			or url:match("^https://discordapp%.com/api/webhooks/%d+/.+")
+			or url:match("^https://canary%.discord%.com/api/webhooks/%d+/.+")
+			or url:match("^https://ptb%.discord%.com/api/webhooks/%d+/.+")
 		)
 	then
 		return nil, "Webhook URL is not a Discord webhook."
@@ -874,35 +881,103 @@ local STARLIGHT_LOCAL_URL =
 
 local SCRIPT_SOURCE_URL =
 	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kick%20a%20lucky%20block.luau"
+local SCRIPT_HUB_URL =
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub.luau"
 
-local function autoUpdate()
-	if Executor.hasHttp and not getgenv().Alleral_Updated then
-		local ok, source = safeCall("AutoUpdate", function()
-			return game:HttpGet(SCRIPT_SOURCE_URL)
-		end)
-		if ok and source and source ~= "" and not source:find("404: Not Found") then
-			local remoteVersion = source:match('VERSION%s*=%s*"([^"]+)"')
-			if remoteVersion and remoteVersion ~= VERSION then
-				getgenv().Alleral_Updated = true
-				local chunk, err = loadstring(source, "@Alleral (latest)")
-				if chunk then
-					local runOk, runErr = pcall(chunk)
-					if runOk then
-						return true
-					end
-					logError("AutoUpdate", runErr)
-				else
-					logError("AutoUpdate", "Failed to compile: " .. tostring(err))
-				end
-			end
-		end
+local function contentStamp(text)
+	if not text then return "" end
+	local a, b = 0, 0
+	for i = 1, #text do
+		local byte = string.byte(text, i)
+		a = (a + byte) % 65521
+		b = (b + a) % 65521
 	end
-	return false
+	return tostring((b * 65536 + a) % 2147483647)
 end
 
-if autoUpdate() then
-	return
+local env = getgenv()
+env._AlReload = env._AlReload or 0
+
+local function fetchRaw(url)
+	if type(game.HttpGet) == "function" then
+		return game:HttpGet(url)
+	end
+	local req = requestFunction()
+	if req then
+		local ok, resp = pcall(req, { Url = url, Method = "GET" })
+		if ok and resp and resp.Body then return resp.Body end
+	end
+	return nil
 end
+
+local function tryReload(raw)
+	if not raw or raw == "" or raw:find("404: Not Found") then return false end
+	env._AlReload = (env._AlReload or 0) + 1
+	if env._AlReload > 3 then return false end
+	local chunk, err = loadstring(raw, "@AlLive")
+	if not chunk then return false end
+	local ok, runErr = pcall(chunk)
+	if not ok then warn("[AlLive] Reload err:", runErr) end
+	return ok
+end
+
+local function hotSwap(raw)
+	if env._AlReloading then return false end
+	env._AlReloading = true
+	task.spawn(function()
+		task.wait(0.3)
+		env._AlReloading = nil
+	end)
+	state.HubRunning = false
+	for _, con in pairs(connections) do
+		pcall(con.Disconnect, con)
+	end
+	for k in pairs(connections) do connections[k] = nil end
+	if starlightWindow and starlightWindow.Instance then
+		pcall(starlightWindow.Instance.Destroy, starlightWindow.Instance)
+	end
+	env.Starlight = nil
+	env.Library = nil
+	env.AlleralLib = nil
+	task.wait(0.15)
+	return tryReload(raw)
+end
+
+local cachedHash = contentStamp(nil)
+local function checkForUpdate()
+	if not Executor.hasHttp then return false end
+	if env._AlReloading then return false end
+	local raw = safeCall("LiveCheck", function()
+		return fetchRaw(SCRIPT_SOURCE_URL .. "?ck=" .. tostring(tick()))
+	end)
+	if not raw then return false end
+	local hash = contentStamp(raw)
+	if hash == cachedHash then return false end
+	if cachedHash == "" then
+		cachedHash = hash
+		return false
+	end
+	return hotSwap(raw)
+end
+
+if not env._AlBootStamp then
+	local initial = safeCall("BootFetch", function()
+		return fetchRaw(SCRIPT_SOURCE_URL .. "?bt=" .. tostring(tick()))
+	end)
+	if initial then
+		cachedHash = contentStamp(initial)
+	end
+	env._AlBootStamp = cachedHash
+end
+
+cachedHash = env._AlBootStamp or cachedHash
+
+task.spawn(function()
+	while task.wait(17 + math.random(0, 8)) do
+		if not state.HubRunning then break end
+		checkForUpdate()
+	end
+end)
 
 	local function patchStarlightSource(source)
 	source = source:gsub(
@@ -2816,21 +2891,45 @@ hubInfoGroup:CreateButton("Copy Support Info", function()
 	notify("Hub", "Support info copied.", 3)
 end)
 hubInfoGroup:CreateDivider()
+local function nukeEverything()
+	state.HubRunning = false
+	for _, con in pairs(connections) do
+		pcall(con.Disconnect, con)
+	end
+	for k in pairs(connections) do connections[k] = nil end
+	for _, ls in pairs(loops) do
+		ls.enabled = false
+	end
+	for _, ctl in pairs(loopControllers) do
+		ctl.enabled = false
+	end
+	for k in pairs(loops) do loops[k] = nil end
+	for k in pairs(loopControllers) do loopControllers[k] = nil end
+	if starlightWindow and starlightWindow.Instance then
+		pcall(starlightWindow.Instance.Destroy, starlightWindow.Instance)
+	end
+	if starlight then
+		pcall(starlight.Unload, starlight)
+	end
+	local env = getgenv()
+	env.Starlight = nil
+	env.Library = nil
+	env.AlleralLib = nil
+	env.Alleral_State = nil
+	env.Alleral_Hub = nil
+	env.Alleral_Boot = nil
+	env.Alleral_Tracked = nil
+	env.Alleral_Hub_Settings = nil
+	env.AlleralAlleral = nil
+	env._AlReload = nil
+	env._AlBootStamp = nil
+	env._AlReloading = nil
+	runtime = nil
+end
+
 hubInfoGroup:CreateButton("Uninject", function()
-	notify("Hub", "Uninjecting...", 3)
-	task.spawn(function()
-		state.HubRunning = false
-		local env = getgenv()
-		env.Starlight = nil
-		env.Library = nil
-		env.AlleralLib = nil
-		env.Alleral_State = nil
-		env.Alleral_Hub = nil
-		env.Alleral_Boot = nil
-		env.Alleral_Tracked = nil
-		env.Alleral_Hub_Settings = nil
-		env.AlleralAlleral = nil
-	end)
+	notify("Hub", "Uninjecting...", 2)
+	task.spawn(nukeEverything)
 end)
 hubInfoGroup:CreateDivider()
 
@@ -2913,6 +3012,10 @@ local diagnosticsStatus = diagnosticsGroup:CreateStatus("Status", {
 	["Last Error"] = "--",
 	["Recent Error"]= "--",
 	["Log File"]   = appendFile and logFile or "Unavailable",
+	Overall        = "--",
+	Passed         = "--",
+	Failed         = "--",
+	["Last Check"] = "--",
 })
 
 local profileFolder = "Alleral_Configs/Profiles"
@@ -3304,6 +3407,82 @@ diagnosticsGroup:CreateButton(
 	end,
 	"Copy a debug summary (version, FPS, errors) to clipboard for bug reports."
 )
+local function runFullDiagnostics()
+	local results = {}
+	local function check(label, ok, detail)
+		table.insert(results, { label = label, ok = ok, detail = detail or "" })
+	end
+
+	check("Script Version", true, VERSION)
+	check("Executor", Executor.isKnown, Executor.name .. " (" .. (Executor.rawName or "") .. ")")
+	check("HTTP", Executor.hasHttp, requestFunction() and "Available" or "Unavailable")
+	check("Filesystem", Executor.hasFilesystem or false, writeFile and "RW Available" or "N/A")
+	check("Clipboard", Executor.hasClipboard or false, "Available")
+	check("Connections API", Executor.hasGetConn or false, "Available")
+	check("FPS", (runtime.currentFps or 0) >= 15, tostring(runtime.currentFps or "--"))
+	check("Performance Mode", true, runtime.performanceMode or "Balanced")
+
+	local remoteCount = 0
+	for _, r in pairs(remotes) do
+		if r then remoteCount = remoteCount + 1 end
+	end
+	check("Remotes Found", remoteCount > 3, tostring(remoteCount) .. " remotes")
+	check("Kick Remote", not not remotes.kick, remotes.kick and remotes.kick.Name or "MISSING")
+	check("Collect Remote", not not remotes.collect, remotes.collect and remotes.collect.Name or "MISSING")
+	check("Place Remote", not not remotes.place, remotes.place and remotes.place.Name or "MISSING")
+
+	for key, mod in pairs(modules) do
+		check("Module: " .. tostring(key), not not mod, mod and "Loaded" or "nil")
+	end
+
+	local _, _, root = characterParts()
+	check("Character Valid", not not root, root and "OK" or "Dead/Respawning")
+	check("HubRunning", state.HubRunning == true, "Running")
+	check("Auto Update", not not env._AlBootStamp, "Hash-tracked: " .. tostring(env._AlBootStamp):sub(1, 8) .. "...")
+
+	if state.WebhookURL and state.WebhookURL ~= "" then
+		local norm, err = normalizeWebhookUrl(state.WebhookURL)
+		check("Webhook URL", not not norm, norm and "Valid" or err)
+	end
+
+	local envTest = getgenv()
+	check("Global State", not not envTest.Alleral_State, "Persistent")
+	check("Total Errors", totalLoggedErrors() == 0, tostring(totalLoggedErrors()) .. " total")
+	check("Session Errors", runtime.sessionErrors == 0, tostring(runtime.sessionErrors) .. " session")
+
+	local pass = 0
+	local fail = 0
+	for _, r in ipairs(results) do
+		if r.ok then pass = pass + 1 else fail = fail + 1 end
+	end
+	local summary = string.format("%d / %d checks passed", pass, pass + fail)
+	check("OVERALL", fail == 0, fail == 0 and "ALL PASSED" or (tostring(fail) .. " FAILURES"))
+
+	local reportLines = {}
+	for _, r in ipairs(results) do
+		local icon = r.ok and "[OK]" or "[FAIL]"
+		table.insert(reportLines, string.format("%s %s: %s", icon, r.label, r.detail))
+	end
+	local report = table.concat(reportLines, "\n")
+	if setClipboard then
+		pcall(setClipboard, report)
+	end
+
+	if diagnosticsStatus and diagnosticsStatus.Update then
+		diagnosticsStatus:Update("Overall", summary)
+		diagnosticsStatus:Update("Passed", tostring(pass))
+		diagnosticsStatus:Update("Failed", tostring(fail))
+		diagnosticsStatus:Update("Last Check", os.date("%H:%M:%S"))
+	end
+	notify("Diagnostics", summary, 5)
+end
+
+diagnosticsGroup:CreateButton(
+	"Run Full Diagnostics",
+	runFullDiagnostics,
+	"Test every feature — remotes, modules, executor APIs, webhooks — and report pass/fail. Also copies the report to clipboard."
+)
+diagnosticsGroup:CreateDivider()
 diagnosticsGroup:CreateButton(
 	"Refresh Status",
 	function()
