@@ -1168,7 +1168,7 @@ local gameData = (function()
 		local seenRarity = { Any = true }
 		for name in pairs(brainrots) do
 			if name ~= "Any" then
-				table.insert(data.BrainrotOptions, name)
+				table.insert(data.BrainrotOptions, tostring(name))
 			end
 			local r = brainrots[name] and brainrots[name].Rarity
 			if r and not seenRarity[r] then
@@ -1186,7 +1186,7 @@ local gameData = (function()
 	if mutations then
 		for name in pairs(mutations) do
 			if name ~= "None" then
-				table.insert(data.MutationOptions, name)
+				table.insert(data.MutationOptions, tostring(name))
 			end
 		end
 		table.sort(data.MutationOptions)
