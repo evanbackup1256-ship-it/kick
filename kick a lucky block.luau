@@ -1423,9 +1423,10 @@ end
 -- Tries FireServer first (the common case), falls back to InvokeServer.
 local function fireRemote(remote, ...)
 	if not remote then return false end
-	local ok = pcall(function() remote:FireServer(...) end)
+	local args = { ... }
+	local ok = pcall(function() remote:FireServer(table.unpack(args)) end)
 	if not ok then
-		ok = pcall(function() remote:InvokeServer(...) end)
+		ok = pcall(function() remote:InvokeServer(table.unpack(args)) end)
 	end
 	return ok
 end
