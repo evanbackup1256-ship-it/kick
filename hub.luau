@@ -8,12 +8,13 @@ do
 	end
 end
 
-local HUB_VERSION = "1.0"
+local HUB_VERSION = "2.0"
 local RAW_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/"
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
 
 local gamesList = {
 	{
@@ -23,6 +24,7 @@ local gamesList = {
 		icon = 10723407389,
 		placeIds = { 89469502395769 },
 		status = "Ready",
+		category = "Farming",
 	},
 }
 
@@ -32,6 +34,22 @@ do
 	local rawName = tostring(identifyexecutor and identifyexecutor() or "")
 	Executor.name = rawName:lower()
 	Executor.env = env
+	Executor.supportsHttp = type(game.HttpGet) == "function"
+		or type(syn and syn.request) == "function"
+		or type(http_request) == "function"
+		or type(request) == "function"
+		or type(http and http.request) == "function"
+end
+
+local Settings = {}
+do
+	local env = getgenv()
+	env.Alleral_Hub_Settings = env.Alleral_Hub_Settings or {}
+	local s = env.Alleral_Hub_Settings
+	s.closeOnLaunch = s.closeOnLaunch ~= false
+	s.minimizeOnLaunch = s.minimizeOnLaunch or false
+	s.favorites = s.favorites or {}
+	Settings.data = s
 end
 
 local function notify(title, text, duration)
@@ -68,10 +86,24 @@ local function safeCall(scope, cb)
 	return ok, r
 end
 
-local starlight
-local starlightWindow
-local starlightSection
-local hubTab
+local function tween(obj, goal, info)
+	local tw = TweenService:Create(obj, info or TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), goal)
+	tw:Play()
+	return tw
+end
+
+local function detectCurrentGame()
+	for _, info in ipairs(gamesList) do
+		if info.placeIds then
+			for _, id in ipairs(info.placeIds) do
+				if id == game.PlaceId then
+					return info
+				end
+			end
+		end
+	end
+	return nil
+end
 
 local function patchStarlightSource(source)
 	source = source:gsub("function Tab:Show%(%)[\r\n]+%s*if Library%.ActiveTab then",
@@ -111,12 +143,6 @@ local function loadStarlight()
 	return nil
 end
 
-local function tween(obj, goal, info)
-	local tw = TweenService:Create(obj, info or TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), goal)
-	tw:Play()
-	return tw
-end
-
 local function launchGame(gameInfo)
 	if not gameInfo then return end
 	local code = fetchUrl(RAW_BASE .. gameInfo.file)
@@ -124,82 +150,125 @@ local function launchGame(gameInfo)
 	if starlightWindow then
 		local wi = starlightWindow.Instance
 		if wi and wi.Parent then
-			tween(wi, {BackgroundTransparency = 1}, TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.In))
-			task.wait(0.35)
-			wi:Destroy()
+			if Settings.data.minimizeOnLaunch then
+				wi.Visible = false
+				task.wait(0.1)
+			else
+				tween(wi, {BackgroundTransparency = 1}, TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.In))
+				task.wait(0.35)
+				wi:Destroy()
+			end
 		end
 	end
-	starlight = nil
-	starlightWindow = nil
-	local env = getgenv()
-	env.Starlight = nil
-	env.Library = nil
-	env.AlleralLib = nil
-	task.wait(0.1)
+	if Settings.data.closeOnLaunch then
+		starlight = nil
+		starlightWindow = nil
+		local env = getgenv()
+		env.Starlight = nil
+		env.Library = nil
+		env.AlleralLib = nil
+		task.wait(0.1)
+	end
 	local fn, err = loadstring(code, "@" .. gameInfo.file)
 	if not fn then notify("Hub Error", "Failed to compile: " .. tostring(err), 5) return end
 	local ok, e2 = pcall(fn)
 	if not ok then notify("Hub Error", tostring(e2), 5) end
 end
 
-local function autoDetectAndLaunch()
-	for _, info in ipairs(gamesList) do
-		if info.placeIds then
-			for _, id in ipairs(info.placeIds) do
-				if id == game.PlaceId then
-					task.wait(0.5)
-					notify("Alleral Hub", "Detected " .. info.name .. "!", 3)
-					task.spawn(launchGame, info)
-					return true
-				end
-			end
-		end
-	end
-	return false
-end
-
-starlight = loadStarlight()
+local starlight = loadStarlight()
 if not starlight then warn("[Hub] Failed to load Starlight UI.") return end
 
-starlightWindow = starlight:CreateWindow({
+local starlightWindow = starlight:CreateWindow({
 	Name = "Alleral Hub",
-	Subtitle = "Game Launcher",
+	Subtitle = "Game Launcher v" .. HUB_VERSION,
 	Icon = 10723407389,
 	LoadingEnabled = false,
 	FileSettings = {RootFolder = "Alleral_Configs", ConfigFolder = "Interface"},
 })
 
-starlightSection = starlightWindow:CreateTabSection("Alleral", true)
-hubTab = starlightSection:CreateTab({Name = "Hub", Icon = 10723407389, Columns = 2}, "HubTab")
+local starlightSection = starlightWindow:CreateTabSection("Alleral", true)
+
+local hubTab = starlightSection:CreateTab({Name = "Hub", Icon = 10723407389, Columns = 2}, "HubTab")
+local settingsTab = starlightSection:CreateTab({Name = "Settings", Icon = 10734950020, Columns = 2}, "SettingsTab")
 
 local execName = Executor.name ~= "" and Executor.name or "Unknown"
+local currentGame = detectCurrentGame()
 
-local welcomeGroup = hubTab:CreateGroupbox({Name = "Welcome", Icon = 10723407389, Column = 1}, "WelcomeGroup")
-welcomeGroup:CreateParagraph({Name = "Alleral Hub", Content = "Select a game to launch.\nVersion " .. HUB_VERSION .. " | Multi-game hub"}, "WelcomeText")
-welcomeGroup:CreateLabel({Name = "Executor: " .. execName}, "ExecLabel")
-welcomeGroup:CreateDivider()
+-- ===== HUB TAB (Column 1) =====
+local overviewGroup = hubTab:CreateGroupbox({Name = "Overview", Icon = 10723407389, Column = 1}, "OverviewGroup")
+overviewGroup:CreateParagraph({Name = "Alleral Hub", Content = "Multi-game script launcher.\nVersion " .. HUB_VERSION .. " | " .. tostring(#gamesList) .. " game(s)"}, "WelcomeText")
+overviewGroup:CreateLabel({Name = "Executor: " .. execName}, "ExecLabel")
+overviewGroup:CreateLabel({Name = "HTTP: " .. (Executor.supportsHttp and "Yes" or "No")}, "HttpLabel")
+overviewGroup:CreateDivider()
 
-local statsGroup = hubTab:CreateGroupbox({Name = "Session", Icon = 10734950020, Column = 1}, "StatsGroup")
-statsGroup:CreateParagraph({Name = "Info", Content = "Hub v" .. HUB_VERSION .. "\nPlaceId: " .. tostring(game.PlaceId) .. "\nGames: " .. tostring(#gamesList)}, "StatsText")
-statsGroup:CreateDivider()
-statsGroup:CreateButton({Name = "Copy Support Info", Callback = function()
+local detectedGroup = hubTab:CreateGroupbox({Name = "Detection", Icon = 10734952479, Column = 1}, "DetectedGroup")
+if currentGame then
+	detectedGroup:CreateParagraph({Name = "Game Detected", Content = "You are in:\n" .. currentGame.name .. "\nPlaceId: " .. tostring(game.PlaceId)}, "DetectedText")
+	detectedGroup:CreateDivider()
+	detectedGroup:CreateButton({Name = "Launch " .. currentGame.name, Callback = function()
+		notify("Hub", "Launching " .. currentGame.name .. "...", 3)
+		task.spawn(launchGame, currentGame)
+	end}, "DetectedLaunchBtn")
+else
+	detectedGroup:CreateParagraph({Name = "Not Detected", Content = "PlaceId " .. tostring(game.PlaceId) .. " is not in the hub's game list.\nSelect a game from the list to launch."}, "NoDetectText")
+end
+
+local quickGroup = hubTab:CreateGroupbox({Name = "Quick Actions", Icon = 10734950020, Column = 1}, "QuickGroup")
+quickGroup:CreateButton({Name = "Copy Support Info", Callback = function()
 	local env = getgenv()
 	local text = "Alleral Hub v" .. HUB_VERSION .. "\nGame: " .. tostring(game.PlaceId) .. "\nExecutor: " .. execName
 	if env.setclipboard then env.setclipboard(text) notify("Hub", "Copied.", 2) else notify("Hub", "Clipboard N/A", 2) end
 end}, "CopyBtn")
 
+-- ===== HUB TAB (Column 2): Game Cards =====
 local gamesGroup = hubTab:CreateGroupbox({Name = "Available Games", Icon = 10734952479, Column = 2}, "GamesGroup")
 
-for idx, gameInfo in ipairs(gamesList) do
+for idx, info in ipairs(gamesList) do
 	if idx > 1 then gamesGroup:CreateDivider() end
-	gamesGroup:CreateParagraph({Name = gameInfo.name, Content = gameInfo.desc}, "GameTitle" .. idx)
-	gamesGroup:CreateLabel({Name = "Status: " .. gameInfo.status}, "GameStatus" .. idx)
-	gamesGroup:CreateDivider()
-	gamesGroup:CreateButton({Name = "Launch " .. gameInfo.name, Callback = function()
-		notify("Hub", "Launching " .. gameInfo.name .. "...", 3)
-		task.spawn(launchGame, gameInfo)
+
+	local isFav = Settings.data.favorites[info.name] == true
+	local starPrefix = isFav and "★ " or "☆ "
+
+	gamesGroup:CreateParagraph({Name = starPrefix .. info.name, Content = info.desc .. "\nCategory: " .. (info.category or "General") .. " | PlaceIds: " .. table.concat(info.placeIds or {}, ", ")}, "GameTitle" .. idx)
+	gamesGroup:CreateLabel({Name = "Status: " .. info.status}, "GameStatus" .. idx)
+	gamesGroup:CreateButton({Name = isFav and "★ Favorited" or "☆ Favorite", Callback = function()
+		local current = Settings.data.favorites[info.name] == true
+		Settings.data.favorites[info.name] = not current
+		notify("Hub", (not current and "Favorited " or "Unfavorited ") .. info.name, 2)
+	end}, "GameFavBtn" .. idx)
+	gamesGroup:CreateButton({Name = "Launch " .. info.name, Callback = function()
+		notify("Hub", "Launching " .. info.name .. "...", 3)
+		task.spawn(launchGame, info)
 	end}, "LaunchBtn" .. idx)
 end
+
+-- ===== SETTINGS TAB =====
+local behavGroup = settingsTab:CreateGroupbox({Name = "Launch Behavior", Icon = 10734950020, Column = 1}, "BehavGroup")
+local closeToggle = behavGroup:CreateToggle({Name = "Close hub after launch", Value = Settings.data.closeOnLaunch, Callback = function(v)
+	Settings.data.closeOnLaunch = v
+end}, "CloseToggle")
+local minimizeToggle = behavGroup:CreateToggle({Name = "Minimize hub on launch", Value = Settings.data.minimizeOnLaunch, Callback = function(v)
+	Settings.data.minimizeOnLaunch = v
+end}, "MinimizeToggle")
+
+local dataGroup = settingsTab:CreateGroupbox({Name = "Data", Icon = 10723407389, Column = 1}, "DataGroup")
+dataGroup:CreateButton({Name = "Clear All Favorites", Callback = function()
+	Settings.data.favorites = {}
+	notify("Hub", "Favorites cleared.", 2)
+end}, "ClearFavBtn")
+dataGroup:CreateButton({Name = "Reset All Settings", Callback = function()
+	local env = getgenv()
+	env.Alleral_Hub_Settings = { closeOnLaunch = true, minimizeOnLaunch = false, favorites = {} }
+	Settings.data = env.Alleral_Hub_Settings
+	pcall(function() closeToggle:SetValue(true) end)
+	pcall(function() minimizeToggle:SetValue(false) end)
+	notify("Hub", "Settings reset.", 2)
+end}, "ResetBtn")
+
+local aboutGroup = settingsTab:CreateGroupbox({Name = "About", Icon = 10723407389, Column = 2}, "AboutGroup")
+aboutGroup:CreateParagraph({Name = "Alleral Hub", Content = "Version: " .. HUB_VERSION .. "\nGames: " .. tostring(#gamesList) .. "\nHTTP: " .. (Executor.supportsHttp and "Available" or "Unavailable")}, "AboutText")
+aboutGroup:CreateDivider()
+aboutGroup:CreateParagraph({Name = "Credits", Content = "Alleral Development\nUI: Starlight Interface Suite"}, "CreditsText")
 
 notify("Alleral Hub", "Launcher ready.", 3)
 
@@ -211,5 +280,3 @@ task.spawn(function()
 		tween(wi, {BackgroundTransparency = 0}, TweenInfo.new(0.6))
 	end
 end)
-
-task.spawn(autoDetectAndLaunch)
