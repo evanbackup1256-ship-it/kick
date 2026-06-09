@@ -134,6 +134,10 @@ local runtime = {
 	kickRateWindow = {},
 	kicksPerMin = 0,
 	masteryKickCount = 0,
+	sessionErrors = 0,
+	lastAntiCheatTrigger = 0,
+	acTriggerCount = 0,
+	lastEmergencyHide = 0,
 }
 
 local Players = game:GetService("Players")
@@ -483,6 +487,7 @@ local function logError(scope, err, details)
 	runtime.lastError = line
 	if now - (runtime.errorLastSeen[signature] or 0) >= 5 then
 		runtime.errorLastSeen[signature] = now
+			runtime.sessionErrors = runtime.sessionErrors + 1
 		table.insert(runtime.errorLog, 1, line)
 		while #runtime.errorLog > 12 do
 			table.remove(runtime.errorLog)
@@ -2756,6 +2761,7 @@ local starlightWindow = starlight:CreateWindow({
 		ConfigFolder = "Interface",
 	},
 })
+Hub._StarlightWindow = starlightWindow
 local starlightSection = starlightWindow:CreateTabSection("Alleral", true)
 
 local function createStarlightTab(name, icon)
@@ -2784,6 +2790,24 @@ local hubGamesGroup = createStarlightGroup(hubTab, "Games", "rbxassetid://107349
 local hubStatsGroup = createStarlightGroup(hubTab, "Session", "rbxassetid://10734952479", 1)
 
 hubInfoGroup:CreateParagraph("About", "Alleral Hub v" .. VERSION .. "\nMulti-game script hub\nKick a Lucky Block")
+hubInfoGroup:CreateDivider()
+
+hubInfoGroup:CreateButton("Emergency Hide", function()
+	if starlightWindow then
+		starlightWindow.Instance.Enabled = false
+		starlight.Minimized = true
+	end
+	runtime.lastEmergencyHide = tick()
+	notify("Hub", "UI hidden. Reopen with your keybind.", 3)
+end)
+hubInfoGroup:CreateButton("Stop All Farms", function()
+	state.AFarm = false
+	state.AAutoMastery = false
+	state.AAutoBattle = false
+	state.AAutoWeather = false
+	state.AAutoStyle = false
+	notify("Hub", "All farms stopped.", 3)
+end)
 hubInfoGroup:CreateDivider()
 
 hubInfoGroup:CreateButton("Copy Support Info", function()
@@ -2818,9 +2842,35 @@ local hubGameStatus = hubGamesGroup:CreateStatus("Status", {
 
 hubGamesGroup:CreateDivider()
 
+local hubSecurityStatus = hubGamesGroup:CreateStatus("Security", {
+	["Anti-Cheat"] = "Active",
+	["Staff Detection"] = "Off",
+	["Staff Status"] = "None",
+	["Anti-Cheat Triggers"] = "0",
+	["Last Check"] = "Never",
+})
+
+hubGamesGroup:CreateDivider()
+
+Hub._SecurityStatus = hubSecurityStatus
+
 Hub._DashboardStatus = hubStatsGroup:CreateStatus("Stats", {
 	["Version"] = VERSION,
 	["Session"] = "Not started",
+	["Total Kicks"] = "0",
+	["Total Errors"] = "0",
+	["Active Features"] = "0",
+	["Session Errors"] = "0",
+})
+
+hubStatsGroup:CreateDivider()
+
+Hub._QuickStatus = hubStatsGroup:CreateStatus("Quick Status", {
+	["Farming"] = "Off",
+	["Mastery"] = "Off",
+	["Battles"] = "Off",
+	["Weather"] = "Off",
+	["Styles"] = "Off",
 })
 
 local mainTab = createStarlightTab("Kick", "rbxassetid://10723407389")
@@ -4982,6 +5032,106 @@ makeSupervisor("Weather", 5, function()
 	end
 end)
 
+makeSupervisor("AutoAntiCheat", 4, function()
+	refreshRemotes()
+	local _, humanoid, root = characterParts()
+	if not humanoid or not root then
+		return
+	end
+	if root.Position.Y < -50 and humanoid.Health > 0 then
+		humanoid.Health = 0
+	end
+	local gui = LocalPlayer:FindFirstChild("PlayerGui")
+	if gui then
+		for _, v in ipairs(gui:GetDescendants()) do
+			if v:IsA("Frame") or v:IsA("TextLabel") then
+				local text = (v:FindFirstChildOfClass("TextLabel") or v).Text or v.Name
+				local lt = text:lower()
+				if lt:find("ban") or lt:find("kick") or lt:find("detect") or lt:find("warning") or lt:find("suspicious") or lt:find("flag") or lt:find("alert") then
+					local vis = v.Visible or (v:FindFirstChildOfClass("BoolValue") and v:FindFirstChildOfClass("BoolValue").Value)
+					if vis then
+						v.Visible = false
+						runtime.lastAntiCheatTrigger = tick()
+						runtime.acTriggerCount = runtime.acTriggerCount + 1
+					end
+				end
+			end
+		end
+	end
+	if runtime.lastAntiCheatTrigger and tick() - runtime.lastAntiCheatTrigger < 10 then
+		task.wait(humanize(0.5, 0.3))
+	end
+end)
+
+do
+	local staffNames = {
+		["admin"] = true,
+		["mod"] = true,
+		["staff"] = true,
+		["owner"] = true,
+		["dev"] = true,
+		["developer"] = true,
+		["creator"] = true,
+	}
+	runtime.staffDetected = false
+	runtime.staffDetectedName = nil
+	runtime.staffDetectionTime = 0
+	runtime.staffNotifyCooldown = 0
+
+	local function checkPlayer(player)
+		if not player then return end
+		local name = player.Name:lower()
+		local display = player.DisplayName:lower()
+		if staffNames[name] or staffNames[display] then
+			runtime.staffDetected = true
+			runtime.staffDetectedName = player.Name
+			runtime.staffDetectionTime = tick()
+		end
+	end
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		checkPlayer(player)
+	end
+
+	track(Players.PlayerAdded:Connect(function(player)
+		checkPlayer(player)
+	end), "StaffDetectorAdded")
+
+	track(Players.PlayerRemoving:Connect(function(player)
+		if runtime.staffDetectedName == player.Name then
+			runtime.staffDetected = false
+			runtime.staffDetectedName = nil
+			runtime.staffDetectionTime = 0
+		end
+	end), "StaffDetectorRemoved")
+end
+
+makeSupervisor("StaffWatch", 2, function()
+	local sw = Hub._StarlightWindow
+	if runtime.staffDetected then
+		if sw and not starlight.Minimized then
+			if tick() >= runtime.staffNotifyCooldown then
+				runtime.staffNotifyCooldown = tick() + 30
+				notify("Staff Detected", runtime.staffDetectedName .. " joined! Hiding UI.", 5)
+			end
+			if sw.Instance then
+				sw.Instance.Enabled = false
+			end
+			starlight.Minimized = true
+		end
+		if state.AFarm or state.AAutoMastery or state.AAutoBattle then
+			state.AFarm = false
+			state.AAutoMastery = false
+			state.AAutoBattle = false
+		end
+	elseif starlight.Minimized and not runtime.staffDetected then
+		if sw and sw.Instance then
+			sw.Instance.Enabled = true
+		end
+		starlight.Minimized = false
+	end
+end)
+
 if state.AAutoFav then
 	scanTools()
 end
@@ -5001,8 +5151,33 @@ coroutine.wrap(function()
 			local secs = elapsed % 60
 			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Session", string.format("%02d:%02d", mins, secs))
 			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Version", VERSION)
+			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Total Kicks", tostring(runtime.sessionKicks))
+			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Total Errors", tostring(#runtime.errorLog))
+			if state.AFarm or state.AAutoMastery or state.AAutoBattle or state.AAutoWeather or state.AAutoStyle then
+				local count = (state.AFarm and 1 or 0) + (state.AAutoMastery and 1 or 0) + (state.AAutoBattle and 1 or 0) + (state.AAutoWeather and 1 or 0) + (state.AAutoStyle and 1 or 0)
+				pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Active Features", tostring(count))
+			else
+				pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Active Features", "0")
+			end
+			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Session Errors", tostring(runtime.sessionErrors))
 		end
-		task.wait(5)
+		if Hub._QuickStatus and Hub._QuickStatus.Update then
+			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Farming", state.AFarm and "On" or "Off")
+			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Mastery", state.AAutoMastery and "On" or "Off")
+			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Battles", state.AAutoBattle and "On" or "Off")
+			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Weather", state.AAutoWeather and "On" or "Off")
+			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Styles", state.AAutoStyle and "On" or "Off")
+		end
+		if Hub._SecurityStatus and Hub._SecurityStatus.Update then
+			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Anti-Cheat", "Active")
+			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Staff Detection", runtime.staffDetected and "Active" or "Standby")
+			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Staff Status", runtime.staffDetected and (runtime.staffDetectedName .. " ^^^") or "None")
+			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Anti-Cheat Triggers", tostring(runtime.acTriggerCount))
+			if runtime.lastAntiCheatTrigger > 0 then
+				pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Last Check", string.format("%.0fs ago", tick() - runtime.lastAntiCheatTrigger))
+			end
+		end
+		task.wait(3)
 	end
 end)()
 
