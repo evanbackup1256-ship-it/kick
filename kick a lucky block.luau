@@ -16,9 +16,7 @@ end
 (function()
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 getgenv().Alleral_Boot = nil
-
 local VERSION = "6.0"
-
 getgenv().Alleral_Hub = getgenv().Alleral_Hub or {}
 local Hub = getgenv().Alleral_Hub
 if not Hub._Initialized then
@@ -31,68 +29,52 @@ if not Hub._Initialized then
 	Hub._SupervisorConnections = {}
 
 	function Hub:RegisterGame(info)
-		if not info or not info.name then
-			return
-		end
+		if not info or not info.name then return end
 		self.Games[info.name] = info
 		if info.placeIds then
 			for _, id in ipairs(info.placeIds) do
 				self.PlaceIds[id] = info.name
 			end
 		end
-		if not self.ActiveGame then
-			self.ActiveGame = info.name
-		end
+		if not self.ActiveGame then self.ActiveGame = info.name end
 	end
-
 	function Hub:GetActiveGame()
 		return self.Games[self.ActiveGame]
 	end
-
 	function Hub:DetectGame()
 		local name = self.PlaceIds[game.PlaceId]
 		if name and self.Games[name] then
 			self.ActiveGame = name
 			return name
 		end
-		return nil
 	end
-
 	function Hub:RegisterSupervisor(name, interval, callback)
 		self._Supervisors[name] = { interval = interval, callback = callback }
 	end
-
 	function Hub:StartSupervisors()
-		for name, sup in pairs(self._Supervisors) do
-			if self._SupervisorConnections[name] then
-				self._SupervisorConnections[name]:Disconnect()
+		for n, sup in pairs(self._Supervisors) do
+			if self._SupervisorConnections[n] then
+				self._SupervisorConnections[n]:Disconnect()
 			end
-			local lastTick = tick()
-			local con
-			con = RunService.Heartbeat:Connect(function()
-				if not state.HubRunning then
-					return
-				end
+			local last = tick()
+			local c = RunService.Heartbeat:Connect(function()
+				if not state.HubRunning then return end
 				local now = tick()
-				if now - lastTick >= sup.interval then
-					lastTick = now
+				if now - last >= sup.interval then
+					last = now
 					local ok, err = pcall(sup.callback)
-					if not ok then
-						logError("Supervisor:" .. name, err)
-					end
+					if not ok then logError("Supervisor:" .. n, err) end
 				end
 			end)
-			self._SupervisorConnections[name] = con
+			self._SupervisorConnections[n] = c
 		end
 	end
-
 	function Hub:StopSupervisors()
-		for name, con in pairs(self._SupervisorConnections) do
+		for _, con in pairs(self._SupervisorConnections) do
 			pcall(con.Disconnect, con)
 		end
 		self._SupervisorConnections = {}
 	end
-
 	Hub._Initialized = true
 end
 
@@ -100,56 +82,56 @@ local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
 local loopControllers = {}
-local runtime = {
-	seenWebhookGuids = {},
-	seenWebhookOrder = {},
-	favoriteQueue = {},
-	favoriteTools = {},
-	lastAutoKickActivity = 0,
-	lastAutoKickMatch = 0,
-	nextAutoKickReset = 0,
-	autoKickSession = 0,
-	flashCollectSession = 0,
-	cachedWeights = nil,
+local rt = {
+	seenHooks = {},
+	hookOrder = {},
+	favQueue = {},
+	favTools = {},
+	lastKickAct = 0,
+	lastKickMatch = 0,
+	nextKickReset = 0,
+	kickSesh = 0,
+	flashSesh = 0,
+	cachedW = nil,
 	cachedPlot = nil,
-	cachedPlotAt = 0,
-	nextPlotLookup = 0,
-	cachedRemotesAt = 0,
-	cachedBattleStatus = nil,
-	cachedBattleStatusAt = 0,
-	nextWeightBuyAttempt = {},
-	nextKickStyleAttempt = 0,
-	remoteLookupCache = {},
-	errorLog = {},
-	errorCounts = {},
-	errorLastSeen = {},
-	performanceMode = "Balanced",
-	sessionStart = tick(),
-	sessionKicks = 0,
-	sessionResets = 0,
-	sessionIndexSkips = 0,
-	sessionMatches = 0,
-	sessionBestCps = 0,
-	sessionBestName = "--",
-	kickRateWindow = {},
-	kicksPerMin = 0,
-	masteryKickCount = 0,
-	sessionErrors = 0,
-	lastAntiCheatTrigger = 0,
-	acTriggerCount = 0,
-	lastEmergencyHide = 0,
+	plotAt = 0,
+	nextPlot = 0,
+	remoteAt = 0,
+	battleStat = nil,
+	battleAt = 0,
+	nextWBuy = {},
+	nextKStyle = 0,
+	remoteCache = {},
+	errLog = {},
+	errCounts = {},
+	errSeen = {},
+	perfMode = "Balanced",
+	seshStart = tick(),
+	seshKicks = 0,
+	seshResets = 0,
+	seshSkips = 0,
+	seshMatches = 0,
+	bestCps = 0,
+	bestName = "--",
+	rateWindow = {},
+	kpm = 0,
+	mastKicks = 0,
+	seshErrs = 0,
+	lastACTick = 0,
+	acHits = 0,
+	lastHide = 0,
 }
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
-local MarketplaceService = game:GetService("MarketplaceService")
-local TeleportService = game:GetService("TeleportService")
-local VirtualUser = game:GetService("VirtualUser")
-local StarterGui = game:GetService("StarterGui")
-local LocalPlayer = Players.LocalPlayer
+local Plrs = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local Ws = game:GetService("Workspace")
+local RunSvc = game:GetService("RunService")
+local HttpSvc = game:GetService("HttpService")
+local MktSvc = game:GetService("MarketplaceService")
+local TeleSvc = game:GetService("TeleportService")
+local VUser = game:GetService("VirtualUser")
+local SGui = game:GetService("StarterGui")
+local LP = Plrs.LocalPlayer
 
 if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
@@ -327,9 +309,9 @@ local function trim(value)
 end
 
 local function notify(title, text, duration)
-	if runtime.ui and runtime.ui.Notification then
+	if rt.ui and rt.ui.Notification then
 		pcall(function()
-			runtime.ui:Notification({
+			rt.ui:Notification({
 				Title = title or "Alleral",
 				Content = text or "",
 				Duration = duration or 4,
@@ -483,14 +465,14 @@ local function logError(scope, err, details)
 	end
 	local signature = label .. "\0" .. message
 	local now = tick()
-	runtime.errorCounts[signature] = (runtime.errorCounts[signature] or 0) + 1
-	runtime.lastError = line
-	if now - (runtime.errorLastSeen[signature] or 0) >= 5 then
-		runtime.errorLastSeen[signature] = now
-			runtime.sessionErrors = runtime.sessionErrors + 1
-		table.insert(runtime.errorLog, 1, line)
-		while #runtime.errorLog > 12 do
-			table.remove(runtime.errorLog)
+	rt.errorCounts[signature] = (rt.errorCounts[signature] or 0) + 1
+	rt.lastError = line
+	if now - (rt.errorLastSeen[signature] or 0) >= 5 then
+		rt.errorLastSeen[signature] = now
+			rt.sessionErrors = rt.sessionErrors + 1
+		table.insert(rt.errorLog, 1, line)
+		while #rt.errorLog > 12 do
+			table.remove(rt.errorLog)
 		end
 		warn("[Alleral] " .. line)
 	end
@@ -709,7 +691,7 @@ local function checkGameBuild(forceNotify, acceptCurrent)
 	if previousPlaceVersion > 0 and placeVersion > 0 and previousPlaceVersion ~= placeVersion then
 		changed = true
 	end
-	runtime.gameBuild = {
+	rt.gameBuild = {
 		Name = (ok and info and info.Name) or game.Name,
 		Updated = updated ~= "" and updated or previousUpdated,
 		PlaceVersion = placeVersion,
@@ -721,9 +703,9 @@ local function checkGameBuild(forceNotify, acceptCurrent)
 	if acceptCurrent or previousUpdated == "" then
 		state.KnownGameUpdated = updated
 		state.KnownPlaceVersion = placeVersion
-		runtime.gameBuild.KnownUpdated = state.KnownGameUpdated
-		runtime.gameBuild.KnownPlaceVersion = state.KnownPlaceVersion
-		runtime.gameBuild.Changed = false
+		rt.gameBuild.KnownUpdated = state.KnownGameUpdated
+		rt.gameBuild.KnownPlaceVersion = state.KnownPlaceVersion
+		rt.gameBuild.Changed = false
 		saveSettings()
 	end
 	if changed then
@@ -731,7 +713,7 @@ local function checkGameBuild(forceNotify, acceptCurrent)
 	elseif forceNotify then
 		notify("Game Check", "Game metadata matches your saved baseline.", 5)
 	end
-	return runtime.gameBuild
+	return rt.gameBuild
 end
 
 local function acceptCurrentGameBuild()
@@ -759,7 +741,7 @@ end
 
 local function safeFindRemote(network, aliases)
 	for _, alias in ipairs(aliases) do
-		local cached = runtime.remoteLookupCache[alias]
+		local cached = rt.remoteLookupCache[alias]
 		if cached and cached.Parent then
 			return cached
 		end
@@ -768,7 +750,7 @@ local function safeFindRemote(network, aliases)
 			remote = ReplicatedStorage:FindFirstChild(alias, true)
 		end
 		if remote then
-			runtime.remoteLookupCache[alias] = remote
+			rt.remoteLookupCache[alias] = remote
 			return remote
 		end
 	end
@@ -947,7 +929,7 @@ local cachedHash = contentStamp(nil)
 local function checkForUpdate()
 	if not Executor.hasHttp then return false end
 	if env._AlReloading then return false end
-	local raw = safeCall("LiveCheck", function()
+	local _, raw = safeCall("LiveCheck", function()
 		return fetchRaw(SCRIPT_SOURCE_URL .. "?ck=" .. tostring(tick()))
 	end)
 	if not raw then return false end
@@ -961,7 +943,7 @@ local function checkForUpdate()
 end
 
 if not env._AlBootStamp then
-	local initial = safeCall("BootFetch", function()
+	local _, initial = safeCall("BootFetch", function()
 		return fetchRaw(SCRIPT_SOURCE_URL .. "?bt=" .. tostring(tick()))
 	end)
 	if initial then
@@ -1071,7 +1053,7 @@ if not starlight or type(starlight.CreateWindow) ~= "function" then
 	logError("Starlight", "Starlight Interface Suite was not available; startup aborted.")
 	return
 end
-runtime.ui = starlight
+rt.ui = starlight
 
 local function listFromSelection(selection)
 	if type(selection) == "string" then
@@ -1374,10 +1356,10 @@ end
 local remotes = {}
 
 local function refreshRemotes()
-	if tick() - runtime.cachedRemotesAt < 5 then
+	if tick() - rt.cachedRemotesAt < 5 then
 		return
 	end
-	runtime.cachedRemotesAt = tick()
+	rt.cachedRemotesAt = tick()
 	local network = ReplicatedStorage:FindFirstChild("Shared")
 	network = network and network:FindFirstChild("Packages")
 	network = network and network:FindFirstChild("Network")
@@ -1420,21 +1402,21 @@ end
 refreshRemotes()
 
 local function findPlot()
-	if runtime.cachedPlot and runtime.cachedPlot.Parent and tick() - runtime.cachedPlotAt < 5 then
-		return runtime.cachedPlot
+	if rt.cachedPlot and rt.cachedPlot.Parent and tick() - rt.cachedPlotAt < 5 then
+		return rt.cachedPlot
 	end
-	if tick() < (runtime.nextPlotLookup or 0) then
+	if tick() < (rt.nextPlotLookup or 0) then
 		return nil
 	end
-	runtime.nextPlotLookup = tick() + 2
+	rt.nextPlotLookup = tick() + 2
 	local ok, plotService = safeCall("FindPlotService", function()
 		return require(ReplicatedStorage.Modules.ServicesLoader.ClientPlotService)
 	end)
 	if ok and plotService and plotService.Model then
-		runtime.cachedPlot = plotService.Model
-		runtime.cachedPlotAt = tick()
-		runtime.nextPlotLookup = 0
-		return runtime.cachedPlot
+		rt.cachedPlot = plotService.Model
+		rt.cachedPlotAt = tick()
+		rt.nextPlotLookup = 0
+		return rt.cachedPlot
 	end
 	local plots = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Plot")
 	if not plots then
@@ -1453,9 +1435,9 @@ local function findPlot()
 			or playerName == LocalPlayer.Name
 			or playerName == userId
 		then
-			runtime.cachedPlot = plot
-			runtime.cachedPlotAt = tick()
-			runtime.nextPlotLookup = 0
+			rt.cachedPlot = plot
+			rt.cachedPlotAt = tick()
+			rt.nextPlotLookup = 0
 			return plot
 		end
 	end
@@ -1578,8 +1560,8 @@ local function fireRemote(remote, ...)
 end
 
 local function currentBattleStatus()
-	if tick() - runtime.cachedBattleStatusAt < 0.75 then
-		return runtime.cachedBattleStatus
+	if tick() - rt.cachedBattleStatusAt < 0.75 then
+		return rt.cachedBattleStatus
 	end
 	local status = nil
 	safeCall("BattleStatus", function()
@@ -1597,8 +1579,8 @@ local function currentBattleStatus()
 	if status == "None" or status == "" then
 		status = nil
 	end
-	runtime.cachedBattleStatus = status
-	runtime.cachedBattleStatusAt = tick()
+	rt.cachedBattleStatus = status
+	rt.cachedBattleStatusAt = tick()
 	return status
 end
 
@@ -1723,7 +1705,7 @@ local function activeAutomationCount()
 end
 
 local function refreshPerformanceMode()
-	local fps = tonumber(runtime.currentFps) or 60
+	local fps = tonumber(rt.currentFps) or 60
 	local active = activeAutomationCount()
 	local nextMode = "Balanced"
 	if fps < 22 or active >= 8 then
@@ -1733,7 +1715,7 @@ local function refreshPerformanceMode()
 	elseif fps >= 48 and active <= 2 then
 		nextMode = "Aggressive"
 	end
-	runtime.performanceMode = nextMode
+	rt.performanceMode = nextMode
 	return nextMode
 end
 
@@ -1748,7 +1730,7 @@ local function currentLoopInterval(name, fallback)
 	local key = intervalKeys[name]
 	local value = key and tonumber(state[key])
 	local minimum = minimumLoopIntervals[name] or 0
-	local multiplier = performanceMultipliers[runtime.performanceMode or "Balanced"] or 1
+	local multiplier = performanceMultipliers[rt.performanceMode or "Balanced"] or 1
 	if value and value > 0 then
 		return math.max(minimum, value * multiplier)
 	end
@@ -1756,7 +1738,7 @@ local function currentLoopInterval(name, fallback)
 end
 
 local function shouldThrottleForFps(name)
-	if not runtime.currentFps or runtime.currentFps >= 28 then
+	if not rt.currentFps or rt.currentFps >= 28 then
 		return false
 	end
 	return name ~= "RefreshData" and name ~= "Prediction" and name ~= "WebhookStatus"
@@ -1845,10 +1827,10 @@ local function makeSupervisor(name, interval, callback)
 						if name == "AutoPlaceBest" then
 							state.IsPlacingPet = false
 						elseif name == "Mastery" then
-							runtime.masteryBusy = false
-							runtime.nextMasteryAction = tick() + 1
+							rt.masteryBusy = false
+							rt.nextMasteryAction = tick() + 1
 						end
-						runtime.lastLoopError = name .. ": " .. shortError(err)
+						rt.lastLoopError = name .. ": " .. shortError(err)
 						logError("Loop:" .. name, err)
 						loopState.errors = loopState.errors + 1
 						if state.NotifyOnError and tick() >= (loopState.nextErrorNotify or 0) then
@@ -2073,11 +2055,11 @@ local function updatePlotLists(protectedDropdown, upgradeDropdown)
 	state.PlotBrainrotList = upgrades
 	local protectedSignature = table.concat(protected, "\0")
 	local upgradeSignature = table.concat(upgrades, "\0")
-	if runtime.lastProtectedSignature == protectedSignature and runtime.lastUpgradeSignature == upgradeSignature then
+	if rt.lastProtectedSignature == protectedSignature and rt.lastUpgradeSignature == upgradeSignature then
 		return
 	end
-	runtime.lastProtectedSignature = protectedSignature
-	runtime.lastUpgradeSignature = upgradeSignature
+	rt.lastProtectedSignature = protectedSignature
+	rt.lastUpgradeSignature = upgradeSignature
 	safeCall("RefreshPlotDropdowns", function()
 		if protectedDropdown and protectedDropdown.Refresh then
 			protectedDropdown:Refresh(protected)
@@ -2095,8 +2077,8 @@ end
 local weightCost
 
 local function getSortedWeights()
-	if runtime.cachedWeights then
-		return runtime.cachedWeights
+	if rt.cachedWeights then
+		return rt.cachedWeights
 	end
 	local weights = {}
 	local weightModels = ReplicatedStorage:FindFirstChild("Objects")
@@ -2111,7 +2093,7 @@ local function getSortedWeights()
 		local costB = weightCost(b)
 		return costA < costB
 	end)
-	runtime.cachedWeights = weights
+	rt.cachedWeights = weights
 	return weights
 end
 
@@ -2199,11 +2181,11 @@ equipWeight = function(weight)
 		equipOwnedWeight(weight)
 		return
 	end
-	runtime.nextWeightBuyAttempt[weight] = runtime.nextWeightBuyAttempt[weight] or 0
-	if tick() < runtime.nextWeightBuyAttempt[weight] then
+	rt.nextWeightBuyAttempt[weight] = rt.nextWeightBuyAttempt[weight] or 0
+	if tick() < rt.nextWeightBuyAttempt[weight] then
 		return
 	end
-	runtime.nextWeightBuyAttempt[weight] = tick() + 6
+	rt.nextWeightBuyAttempt[weight] = tick() + 6
 	safeCall("BuyWeight", function()
 		if remotes.shopBuy then
 			remotes.shopBuy:FireServer("WeightShop", weight)
@@ -2318,10 +2300,10 @@ local function equipKickStyle(styleName)
 	if styleName == "" or styleName == "Default" then
 		return
 	end
-	if tick() < (runtime.nextKickStyleAttempt or 0) then
+	if tick() < (rt.nextKickStyleAttempt or 0) then
 		return
 	end
-	runtime.nextKickStyleAttempt = tick() + 10
+	rt.nextKickStyleAttempt = tick() + 10
 	safeCall("KickStyleBuy", function()
 		if remotes.shopBuy then
 			remotes.shopBuy:FireServer("KickStyles", styleName)
@@ -2362,14 +2344,14 @@ local function webhookSeen(guid)
 	if not guid then
 		return true
 	end
-	if runtime.seenWebhookGuids[guid] then
+	if rt.seenWebhookGuids[guid] then
 		return true
 	end
-	runtime.seenWebhookGuids[guid] = true
-	table.insert(runtime.seenWebhookOrder, guid)
-	while #runtime.seenWebhookOrder > 500 do
-		local old = table.remove(runtime.seenWebhookOrder, 1)
-		runtime.seenWebhookGuids[old] = nil
+	rt.seenWebhookGuids[guid] = true
+	table.insert(rt.seenWebhookOrder, guid)
+	while #rt.seenWebhookOrder > 500 do
+		local old = table.remove(rt.seenWebhookOrder, 1)
+		rt.seenWebhookGuids[old] = nil
 	end
 	return false
 end
@@ -2425,16 +2407,16 @@ local function handleClaimedTool(tool)
 end
 
 local function watchFavoriteTool(tool)
-	if not state.AAutoFav or not tool:IsA("Tool") or runtime.favoriteTools[tool] then
+	if not state.AAutoFav or not tool:IsA("Tool") or rt.favoriteTools[tool] then
 		return
 	end
 	local toolConnections = {}
-	runtime.favoriteTools[tool] = toolConnections
+	rt.favoriteTools[tool] = toolConnections
 	local function cleanup()
 		for _, connection in ipairs(toolConnections) do
 			untrack(connection)
 		end
-		runtime.favoriteTools[tool] = nil
+		rt.favoriteTools[tool] = nil
 	end
 	local function evaluate()
 		if not state.AAutoFav or not tool.Parent then
@@ -2449,8 +2431,8 @@ local function watchFavoriteTool(tool)
 		local matches = selectionMatches(state.TSSellBrainrot, tool.Name, normalizeText)
 			and selectionMatches(state.TSSellRarity, rarity, normalizeText)
 			and selectionMatches(state.TSSellMutation, mutation, normalizeMutation)
-		if matches and tool:GetAttribute("Favorite") ~= true and not tableFind(runtime.favoriteQueue, guid) then
-			table.insert(runtime.favoriteQueue, guid)
+		if matches and tool:GetAttribute("Favorite") ~= true and not tableFind(rt.favoriteQueue, guid) then
+			table.insert(rt.favoriteQueue, guid)
 		end
 	end
 	local function add(connection)
@@ -2872,7 +2854,7 @@ hubInfoGroup:CreateButton("Emergency Hide", function()
 		starlightWindow.Instance.Enabled = false
 		starlight.Minimized = true
 	end
-	runtime.lastEmergencyHide = tick()
+	rt.lastEmergencyHide = tick()
 	notify("Hub", "UI hidden. Reopen with your keybind.", 3)
 end)
 hubInfoGroup:CreateButton("Stop All Farms", function()
@@ -2924,7 +2906,7 @@ local function nukeEverything()
 	env._AlReload = nil
 	env._AlBootStamp = nil
 	env._AlReloading = nil
-	runtime = nil
+	rt = nil
 end
 
 hubInfoGroup:CreateButton("Uninject", function()
@@ -3152,14 +3134,14 @@ end
 local function resetRuntimeLocks()
 	state.IsPlacingPet = false
 	state.IsFlashCollecting = false
-	runtime.masteryBusy = false
-	runtime.nextMasteryAction = 0
-	runtime.nextSpeedBuyAttempt = 0
-	runtime.nextBattleCreate = 0
-	runtime.nextBattleInvite = 0
-	runtime.nextBattleStart = 0
-	runtime.lastProtectedSignature = nil
-	runtime.lastUpgradeSignature = nil
+	rt.masteryBusy = false
+	rt.nextMasteryAction = 0
+	rt.nextSpeedBuyAttempt = 0
+	rt.nextBattleCreate = 0
+	rt.nextBattleInvite = 0
+	rt.nextBattleStart = 0
+	rt.lastProtectedSignature = nil
+	rt.lastUpgradeSignature = nil
 	notify("Runtime", "Recovered stuck locks and cooldowns.", 3)
 end
 
@@ -3184,10 +3166,10 @@ local function pauseAutomation()
 end
 
 local function clearErrorLog()
-	runtime.errorLog = {}
-	runtime.errorCounts = {}
-	runtime.lastError = nil
-	runtime.lastLoopError = nil
+	rt.errorLog = {}
+	rt.errorCounts = {}
+	rt.lastError = nil
+	rt.lastLoopError = nil
 	if deleteFile and isFile and isFile(logFile) then
 		safeCall("ClearErrorLog", function()
 			deleteFile(logFile)
@@ -3198,14 +3180,14 @@ end
 
 local function totalLoggedErrors()
 	local total = 0
-	for _, count in pairs(runtime.errorCounts) do
+	for _, count in pairs(rt.errorCounts) do
 		total = total + (tonumber(count) or 0)
 	end
 	return total
 end
 
 local function supportSummary()
-	local build = runtime.gameBuild or checkGameBuild(false)
+	local build = rt.gameBuild or checkGameBuild(false)
 	local lines = {
 		"Alleral " .. VERSION,
 		"Game: " .. tostring(build and build.Name or game.Name),
@@ -3213,10 +3195,10 @@ local function supportSummary()
 		"PlaceVersion: " .. tostring(build and build.PlaceVersion or game.PlaceVersion),
 		"GameUpdated: " .. tostring(build and formatRobloxTimestamp(build.Updated) or "Unknown"),
 		"BuildStatus: " .. tostring(build and (build.Changed and "Changed" or "Current") or "Unknown"),
-		"RuntimeMode: " .. tostring(runtime.performanceMode or "Balanced"),
-		"FPS: " .. tostring(runtime.currentFps or "--"),
+		"RuntimeMode: " .. tostring(rt.performanceMode or "Balanced"),
+		"FPS: " .. tostring(rt.currentFps or "--"),
 		"Errors: " .. tostring(totalLoggedErrors()),
-		"LastError: " .. tostring(runtime.lastError or runtime.lastLoopError or "None"),
+		"LastError: " .. tostring(rt.lastError or rt.lastLoopError or "None"),
 	}
 	return table.concat(lines, "\n")
 end
@@ -3354,11 +3336,11 @@ recoveryGroup:CreateButton(
 recoveryGroup:CreateButton(
 	"Refresh Remotes & Plot",
 	function()
-		runtime.cachedRemotesAt = 0
-		runtime.cachedPlotAt = 0
-		runtime.nextPlotLookup = 0
-		runtime.cachedPlot = nil
-		runtime.remoteLookupCache = {}
+		rt.cachedRemotesAt = 0
+		rt.cachedPlotAt = 0
+		rt.nextPlotLookup = 0
+		rt.cachedPlot = nil
+		rt.remoteLookupCache = {}
 		refreshRemotes()
 		updatePlotLists(protectedDropdown, upgradeDropdown)
 		notify("Runtime", "Remotes and plot cache refreshed.", 3)
@@ -3368,8 +3350,8 @@ recoveryGroup:CreateButton(
 recoveryGroup:CreateButton(
 	"Clear Webhook Cache",
 	function()
-		runtime.seenWebhookGuids = {}
-		runtime.seenWebhookOrder = {}
+		rt.seenWebhookGuids = {}
+		rt.seenWebhookOrder = {}
 		notify("Webhook", "Seen-item cache cleared.", 3)
 	end,
 	"Reset the seen-GUID list so previously sent webhook items can be sent again."
@@ -3419,8 +3401,8 @@ local function runFullDiagnostics()
 	check("Filesystem", Executor.hasFilesystem or false, writeFile and "RW Available" or "N/A")
 	check("Clipboard", Executor.hasClipboard or false, "Available")
 	check("Connections API", Executor.hasGetConn or false, "Available")
-	check("FPS", (runtime.currentFps or 0) >= 15, tostring(runtime.currentFps or "--"))
-	check("Performance Mode", true, runtime.performanceMode or "Balanced")
+	check("FPS", (rt.currentFps or 0) >= 15, tostring(rt.currentFps or "--"))
+	check("Performance Mode", true, rt.performanceMode or "Balanced")
 
 	local remoteCount = 0
 	for _, r in pairs(remotes) do
@@ -3448,7 +3430,7 @@ local function runFullDiagnostics()
 	local envTest = getgenv()
 	check("Global State", not not envTest.Alleral_State, "Persistent")
 	check("Total Errors", totalLoggedErrors() == 0, tostring(totalLoggedErrors()) .. " total")
-	check("Session Errors", runtime.sessionErrors == 0, tostring(runtime.sessionErrors) .. " session")
+	check("Session Errors", rt.sessionErrors == 0, tostring(rt.sessionErrors) .. " session")
 
 	local pass = 0
 	local fail = 0
@@ -3554,9 +3536,9 @@ kickGroup:CreateToggle(
 	"Kick lucky blocks automatically. Moves to KickReady, fires the kick remote, and resets when a non-matching brainrot is detected.",
 	function(value)
 		state.AFarm = value
-		runtime.autoKickSession = runtime.autoKickSession + 1
-		runtime.nextAutoKickReset = 0
-		runtime.lastAutoKickActivity = tick()
+		rt.autoKickSession = rt.autoKickSession + 1
+		rt.nextAutoKickReset = 0
+		rt.lastAutoKickActivity = tick()
 		restoreCamera(select(2, characterParts()))
 		saveSettings()
 	end
@@ -3636,15 +3618,15 @@ local sessionStatus = kickGroup:CreateStatus("Session", {
 kickGroup:CreateButton(
 	"Reset Session Stats",
 	function()
-		runtime.sessionStart    = tick()
-		runtime.sessionKicks    = 0
-		runtime.sessionMatches  = 0
-		runtime.sessionResets   = 0
-		runtime.sessionIndexSkips = 0
-		runtime.sessionBestCps  = 0
-		runtime.sessionBestName = "--"
-		runtime.kickRateWindow  = {}
-		runtime.kicksPerMin     = 0
+		rt.sessionStart    = tick()
+		rt.sessionKicks    = 0
+		rt.sessionMatches  = 0
+		rt.sessionResets   = 0
+		rt.sessionIndexSkips = 0
+		rt.sessionBestCps  = 0
+		rt.sessionBestName = "--"
+		rt.kickRateWindow  = {}
+		rt.kicksPerMin     = 0
 		notify("Session", "Stats reset.", 2)
 	end,
 	"Zero out kick/match/reset counters and restart the session timer."
@@ -4251,7 +4233,7 @@ webhookGroup:CreateToggle(
 	"Periodically send an inventory summary webhook listing counts by rarity.",
 	function(value)
 		state.AutoStatusWebhook = value
-		runtime.nextStatusWebhook = tick() + (state.AutoStatusInterval * 60)
+		rt.nextStatusWebhook = tick() + (state.AutoStatusInterval * 60)
 		saveSettings()
 	end
 )
@@ -4262,7 +4244,7 @@ webhookGroup:CreateSlider(
 	state.AutoStatusInterval,
 	function(value)
 		state.AutoStatusInterval = value
-		runtime.nextStatusWebhook = tick() + (value * 60)
+		rt.nextStatusWebhook = tick() + (value * 60)
 		saveSettings()
 	end,
 	"How many minutes between automatic inventory status sends."
@@ -4270,7 +4252,7 @@ webhookGroup:CreateSlider(
 webhookGroup:CreateButton(
 	"Send Status Now",
 	function()
-		runtime.nextStatusWebhook = 0
+		rt.nextStatusWebhook = 0
 	end,
 	"Force an immediate inventory summary webhook, bypassing the timer."
 )
@@ -4313,7 +4295,7 @@ track(
 		fpsFrames = fpsFrames + 1
 		local now = tick()
 		if now - fpsStarted >= 1 then
-			runtime.currentFps = math.floor(fpsFrames / math.max(now - fpsStarted, 0.01))
+			rt.currentFps = math.floor(fpsFrames / math.max(now - fpsStarted, 0.01))
 			fpsFrames = 0
 			fpsStarted = now
 		end
@@ -4340,29 +4322,29 @@ task.spawn(function()
 				loopCount = loopCount + 1
 			end
 			diagnosticsStatus:Update("Executor", Executor.isKnown and Executor.name or ("? " .. (Executor.rawName ~= "" and ("(" .. Executor.rawName .. ")") or "unknown")))
-			diagnosticsStatus:Update("FPS", tostring(runtime.currentFps or "--"))
-			diagnosticsStatus:Update("Mode", tostring(runtime.performanceMode or "Balanced"))
+			diagnosticsStatus:Update("FPS", tostring(rt.currentFps or "--"))
+			diagnosticsStatus:Update("Mode", tostring(rt.performanceMode or "Balanced"))
 			diagnosticsStatus:Update("Loops", tostring(loopCount))
 			diagnosticsStatus:Update("Remotes", tostring(remoteCount))
-			local build = runtime.gameBuild
+			local build = rt.gameBuild
 			diagnosticsStatus:Update(
 				"Game Build",
 				build and ((build.Changed and "Changed" or "Current") .. " / v" .. tostring(build.PlaceVersion or "--")) or "--"
 			)
 			diagnosticsStatus:Update("Last Update", build and formatRobloxTimestamp(build.Updated) or "--")
 			diagnosticsStatus:Update("Error Count", tostring(totalLoggedErrors()))
-			diagnosticsStatus:Update("Last Error", runtime.lastError or runtime.lastLoopError or "--")
-			diagnosticsStatus:Update("Recent Error", runtime.errorLog[1] or "--")
+			diagnosticsStatus:Update("Last Error", rt.lastError or rt.lastLoopError or "--")
+			diagnosticsStatus:Update("Recent Error", rt.errorLog[1] or "--")
 
 			if sessionStatus and sessionStatus.Update then
-				local elapsed = math.floor(tick() - (runtime.sessionStart or tick()))
+				local elapsed = math.floor(tick() - (rt.sessionStart or tick()))
 				sessionStatus:Update("Time",    string.format("%d:%02d", math.floor(elapsed / 60), elapsed % 60))
-				sessionStatus:Update("Kicks",   tostring(runtime.sessionKicks  or 0))
-				sessionStatus:Update("Kicks/min", tostring(runtime.kicksPerMin or 0))
-				sessionStatus:Update("Matches", tostring(runtime.sessionMatches or 0))
-				sessionStatus:Update("Resets",  tostring(runtime.sessionResets  or 0))
-				sessionStatus:Update("Index Skips", tostring(runtime.sessionIndexSkips or 0))
-				local bestCps = runtime.sessionBestCps or 0
+				sessionStatus:Update("Kicks",   tostring(rt.sessionKicks  or 0))
+				sessionStatus:Update("Kicks/min", tostring(rt.kicksPerMin or 0))
+				sessionStatus:Update("Matches", tostring(rt.sessionMatches or 0))
+				sessionStatus:Update("Resets",  tostring(rt.sessionResets  or 0))
+				sessionStatus:Update("Index Skips", tostring(rt.sessionIndexSkips or 0))
+				local bestCps = rt.sessionBestCps or 0
 				sessionStatus:Update("Best CPS", bestCps > 0 and (formatNumber(bestCps) .. "/s") or "--")
 			end
 		end
@@ -4414,7 +4396,7 @@ if LocalPlayer.Backpack then
 end
 track(
 	LocalPlayer.CharacterAdded:Connect(function(character)
-		runtime.cachedPlot = nil
+		rt.cachedPlot = nil
 		restoreCamera(character:WaitForChild("Humanoid", 5))
 		track(
 			character.ChildAdded:Connect(function(child)
@@ -4503,9 +4485,9 @@ makeSupervisor("Prediction", 1, function()
 		end
 	end
 
-	if cps1 and cps1 > (runtime.sessionBestCps or 0) then
-		runtime.sessionBestCps = cps1
-		runtime.sessionBestName = name
+	if cps1 and cps1 > (rt.sessionBestCps or 0) then
+		rt.sessionBestCps = cps1
+		rt.sessionBestName = name
 	end
 
 	local matchesFilter = mainFilterMatches(name, mutation)
@@ -4520,7 +4502,7 @@ end)
 	makeSupervisor("AutoKick", 0.3, function()
 	local battleStatus = currentBattleStatus()
 	local battleActive = state.AAutoBattle and (battleStatus == "Battle" or battleTimerVisible())
-	if runtime.battleCooldownUntil and tick() < runtime.battleCooldownUntil then
+	if rt.battleCooldownUntil and tick() < rt.battleCooldownUntil then
 		return
 	end
 	if state.AAutoKickStyle then
@@ -4559,7 +4541,7 @@ end)
 	elseif battleStatus == "Lobby" or battleStatus == "Create" then
 		return
 	end
-	runtime.lastAutoKickActivity = tick()
+	rt.lastAutoKickActivity = tick()
 	local wavesFolder = Workspace:FindFirstChild("Waves")
 	local hasWave = wavesFolder and #wavesFolder:GetChildren() > 0
 	local inGame = LocalPlayer:GetAttribute("InGame") or ""
@@ -4571,19 +4553,19 @@ end)
 			local mutation = normalizeMutation(parts[index + 1] or "None")
 			if brainrot == "" or brainrot == "Unknown" or mainFilterMatches(brainrot, mutation) then
 					if state.AIndexOnly and brainrot ~= "" and brainrot ~= "Unknown" and isBrainrotOwned(brainrot) then
-						runtime.lastIndexSkip = tick()
-						runtime.sessionIndexSkips = (runtime.sessionIndexSkips or 0) + 1
+						rt.lastIndexSkip = tick()
+						rt.sessionIndexSkips = (rt.sessionIndexSkips or 0) + 1
 					else
 						shouldReset = false
-						runtime.lastAutoKickMatch = tick()
-						runtime.sessionMatches = (runtime.sessionMatches or 0) + 1
+						rt.lastAutoKickMatch = tick()
+						rt.sessionMatches = (rt.sessionMatches or 0) + 1
 						break
 					end
 			end
 		end
-		if shouldReset and tick() >= runtime.nextAutoKickReset and tick() - runtime.lastAutoKickMatch > 5 then
-			runtime.nextAutoKickReset = tick() + 10
-			runtime.sessionResets = (runtime.sessionResets or 0) + 1
+		if shouldReset and tick() >= rt.nextAutoKickReset and tick() - rt.lastAutoKickMatch > 5 then
+			rt.nextAutoKickReset = tick() + 10
+			rt.sessionResets = (rt.sessionResets or 0) + 1
 			restoreCamera(humanoid)
 			humanoid.Health = 0
 			return
@@ -4644,13 +4626,13 @@ end)
 		safeCall("AutoKickRemote", function()
 			remotes.kick:FireServer(accuracy, power)
 		end)
-		runtime.sessionKicks = (runtime.sessionKicks or 0) + 1
+		rt.sessionKicks = (rt.sessionKicks or 0) + 1
 		local _now = tick()
-		table.insert(runtime.kickRateWindow, _now)
-		while runtime.kickRateWindow[1] and _now - runtime.kickRateWindow[1] > 60 do
-			table.remove(runtime.kickRateWindow, 1)
+		table.insert(rt.kickRateWindow, _now)
+		while rt.kickRateWindow[1] and _now - rt.kickRateWindow[1] > 60 do
+			table.remove(rt.kickRateWindow, 1)
 		end
-		runtime.kicksPerMin = #runtime.kickRateWindow
+		rt.kicksPerMin = #rt.kickRateWindow
 	end
 end)
 
@@ -4705,11 +4687,11 @@ makeSupervisor("CollectCash", 1.5, function()
 	if not state.ACollect then
 		return
 	end
-	runtime.nextCollect = runtime.nextCollect or 0
-	if tick() < runtime.nextCollect then
+	rt.nextCollect = rt.nextCollect or 0
+	if tick() < rt.nextCollect then
 		return
 	end
-	runtime.nextCollect = tick() + state.CollectDelay
+	rt.nextCollect = tick() + state.CollectDelay
 	collectFromPlot()
 end)
 
@@ -4722,10 +4704,10 @@ makeSupervisor("TrainCollect", 1, function()
 		return
 	end
 	state.IsFlashCollecting = true
-	runtime.flashCollectSession = runtime.flashCollectSession + 1
-	local session = runtime.flashCollectSession
+	rt.flashCollectSession = rt.flashCollectSession + 1
+	local session = rt.flashCollectSession
 	task.delay(20, function()
-		if state.IsFlashCollecting and runtime.flashCollectSession == session then
+		if state.IsFlashCollecting and rt.flashCollectSession == session then
 			state.IsFlashCollecting = false
 			state.NextFlashCollect = tick() + 10
 		end
@@ -4754,9 +4736,9 @@ end)
 
 makeSupervisor("Economy", 2, function()
 	refreshRemotes()
-	if state.ABuySpeed and tick() >= (runtime.nextSpeedBuyAttempt or 0) then
+	if state.ABuySpeed and tick() >= (rt.nextSpeedBuyAttempt or 0) then
 		if not buySpeedUpgrade() then
-			runtime.nextSpeedBuyAttempt = tick() + 5
+			rt.nextSpeedBuyAttempt = tick() + 5
 		end
 	end
 	if state.ABuyBest then
@@ -4812,11 +4794,11 @@ makeSupervisor("AutoFavorite", 4, function()
 		return
 	end
 	refreshRemotes()
-	if tick() >= (runtime.nextFavoriteScan or 0) then
-		runtime.nextFavoriteScan = tick() + math.max(4, tonumber(state.FavoriteScanInterval) or 8)
+	if tick() >= (rt.nextFavoriteScan or 0) then
+		rt.nextFavoriteScan = tick() + math.max(4, tonumber(state.FavoriteScanInterval) or 8)
 		scanTools()
 	end
-	local guid = table.remove(runtime.favoriteQueue, 1)
+	local guid = table.remove(rt.favoriteQueue, 1)
 	if not guid then
 		return
 	end
@@ -4831,17 +4813,17 @@ makeSupervisor("AutoFavorite", 4, function()
 end)
 
 makeSupervisor("WebhookStatus", 5, function()
-	if not state.AutoStatusWebhook and runtime.nextStatusWebhook ~= 0 then
+	if not state.AutoStatusWebhook and rt.nextStatusWebhook ~= 0 then
 		return
 	end
 	if state.WebhookURL == "" then
 		return
 	end
-	runtime.nextStatusWebhook = runtime.nextStatusWebhook or (tick() + state.AutoStatusInterval * 60)
-	if tick() < runtime.nextStatusWebhook then
+	rt.nextStatusWebhook = rt.nextStatusWebhook or (tick() + state.AutoStatusInterval * 60)
+	if tick() < rt.nextStatusWebhook then
 		return
 	end
-	runtime.nextStatusWebhook = tick() + state.AutoStatusInterval * 60
+	rt.nextStatusWebhook = tick() + state.AutoStatusInterval * 60
 	local counts = {}
 	local total = 0
 	local function addTool(tool)
@@ -4900,34 +4882,34 @@ makeSupervisor("Battle", 4, function()
 	refreshRemotes()
 	local status = currentBattleStatus()
 
-	if runtime.battleCooldownUntil and tick() < runtime.battleCooldownUntil then
+	if rt.battleCooldownUntil and tick() < rt.battleCooldownUntil then
 		return
 	end
 
-	if runtime.lastBattleStatus == "Battle" and (status == nil or status == "None") then
-		runtime.battleCooldownUntil = tick() + 20
-		runtime.lastBattleStatus = nil
+	if rt.lastBattleStatus == "Battle" and (status == nil or status == "None") then
+		rt.battleCooldownUntil = tick() + 20
+		rt.lastBattleStatus = nil
 		return
 	end
-	runtime.lastBattleStatus = status
+	rt.lastBattleStatus = status
 
 	if status == nil and remotes.battleCreate then
-		if tick() < (runtime.nextBattleCreate or 0) then
+		if tick() < (rt.nextBattleCreate or 0) then
 			return
 		end
-		runtime.nextBattleCreate = tick() + 8
+		rt.nextBattleCreate = tick() + 8
 		task.spawn(function()
 			safeCall("BattleCreate", function()
 				fireRemote(remotes.battleCreate, state.BattleGamepass, tonumber(state.BattleRounds) or 3)
 			end)
-			runtime.cachedBattleStatusAt = 0
+			rt.cachedBattleStatusAt = 0
 		end)
 		return
 	end
 
 	if status == "Lobby" or status == "GP" then
-		if remotes.battleInvite and tick() >= (runtime.nextBattleInvite or 0) then
-			runtime.nextBattleInvite = tick() + 5
+		if remotes.battleInvite and tick() >= (rt.nextBattleInvite or 0) then
+			rt.nextBattleInvite = tick() + 5
 			for _, player in ipairs(Players:GetPlayers()) do
 				if player ~= LocalPlayer then
 					task.spawn(function()
@@ -4970,9 +4952,9 @@ makeSupervisor("Battle", 4, function()
 		if
 			remotes.battleStart
 			and playersInLobby >= (state.BattleMinPlayers - 1)
-			and tick() >= (runtime.nextBattleStart or 0)
+			and tick() >= (rt.nextBattleStart or 0)
 		then
-			runtime.nextBattleStart = tick() + 4
+			rt.nextBattleStart = tick() + 4
 			safeCall("BattleStart", function()
 				remotes.battleStart:FireServer()
 			end)
@@ -5017,22 +4999,22 @@ end)
 
 makeSupervisor("Mastery", 1, function()
 	if not state.AAutoMastery then
-		runtime.masteryBusy = false
+		rt.masteryBusy = false
 		return
 	end
-	if runtime.masteryBusy or tick() < (runtime.nextMasteryAction or 0) then
+	if rt.masteryBusy or tick() < (rt.nextMasteryAction or 0) then
 		return
 	end
 	if state.AFarm then
 		updateMasteryStatus("Paused - Auto Kick On")
-		runtime.nextMasteryAction = tick() + 2
+		rt.nextMasteryAction = tick() + 2
 		return
 	end
-	runtime.masteryBusy = true
+	rt.masteryBusy = true
 
 	local function finish(delay)
-		runtime.nextMasteryAction = tick() + (delay or 0.6)
-		runtime.masteryBusy = false
+		rt.nextMasteryAction = tick() + (delay or 0.6)
+		rt.masteryBusy = false
 	end
 
 	local _bodyOk, _bodyErr = pcall(function()
@@ -5081,7 +5063,7 @@ makeSupervisor("Mastery", 1, function()
 			local accuracy, power = kickPower()
 			remotes.kick:FireServer(accuracy, power)
 		end)
-		runtime.masteryKickCount = (runtime.masteryKickCount or 0) + 1
+		rt.masteryKickCount = (rt.masteryKickCount or 0) + 1
 		finish(1.2)
 	end)
 end)
@@ -5230,14 +5212,14 @@ makeSupervisor("AutoAntiCheat", 4, function()
 					local vis = v.Visible or (v:FindFirstChildOfClass("BoolValue") and v:FindFirstChildOfClass("BoolValue").Value)
 					if vis then
 						v.Visible = false
-						runtime.lastAntiCheatTrigger = tick()
-						runtime.acTriggerCount = runtime.acTriggerCount + 1
+						rt.lastAntiCheatTrigger = tick()
+						rt.acTriggerCount = rt.acTriggerCount + 1
 					end
 				end
 			end
 		end
 	end
-	if runtime.lastAntiCheatTrigger and tick() - runtime.lastAntiCheatTrigger < 10 then
+	if rt.lastAntiCheatTrigger and tick() - rt.lastAntiCheatTrigger < 10 then
 		task.wait(humanize(0.5, 0.3))
 	end
 end)
@@ -5252,19 +5234,19 @@ do
 		["developer"] = true,
 		["creator"] = true,
 	}
-	runtime.staffDetected = false
-	runtime.staffDetectedName = nil
-	runtime.staffDetectionTime = 0
-	runtime.staffNotifyCooldown = 0
+	rt.staffDetected = false
+	rt.staffDetectedName = nil
+	rt.staffDetectionTime = 0
+	rt.staffNotifyCooldown = 0
 
 	local function checkPlayer(player)
 		if not player then return end
 		local name = player.Name:lower()
 		local display = player.DisplayName:lower()
 		if staffNames[name] or staffNames[display] then
-			runtime.staffDetected = true
-			runtime.staffDetectedName = player.Name
-			runtime.staffDetectionTime = tick()
+			rt.staffDetected = true
+			rt.staffDetectedName = player.Name
+			rt.staffDetectionTime = tick()
 		end
 	end
 
@@ -5272,26 +5254,26 @@ do
 		checkPlayer(player)
 	end
 
-	track(Players.PlayerAdded:Connect(function(player)
+	track(Plrs.PlayerAdded:Connect(function(player)
 		checkPlayer(player)
 	end), "StaffDetectorAdded")
 
-	track(Players.PlayerRemoving:Connect(function(player)
-		if runtime.staffDetectedName == player.Name then
-			runtime.staffDetected = false
-			runtime.staffDetectedName = nil
-			runtime.staffDetectionTime = 0
+	track(Plrs.PlayerRemoving:Connect(function(player)
+		if rt.staffDetectedName == player.Name then
+			rt.staffDetected = false
+			rt.staffDetectedName = nil
+			rt.staffDetectionTime = 0
 		end
 	end), "StaffDetectorRemoved")
 end
 
 makeSupervisor("StaffWatch", 2, function()
 	local sw = Hub._StarlightWindow
-	if runtime.staffDetected then
+	if rt.staffDetected then
 		if sw and not starlight.Minimized then
-			if tick() >= runtime.staffNotifyCooldown then
-				runtime.staffNotifyCooldown = tick() + 30
-				notify("Staff Detected", runtime.staffDetectedName .. " joined! Hiding UI.", 5)
+			if tick() >= rt.staffNotifyCooldown then
+				rt.staffNotifyCooldown = tick() + 30
+				notify("Staff Detected", rt.staffDetectedName .. " joined! Hiding UI.", 5)
 			end
 			if sw.Instance then
 				sw.Instance.Enabled = false
@@ -5303,7 +5285,7 @@ makeSupervisor("StaffWatch", 2, function()
 			state.AAutoMastery = false
 			state.AAutoBattle = false
 		end
-	elseif starlight.Minimized and not runtime.staffDetected then
+	elseif starlight.Minimized and not rt.staffDetected then
 		if sw and sw.Instance then
 			sw.Instance.Enabled = true
 		end
@@ -5325,20 +5307,20 @@ coroutine.wrap(function()
 		if starlight and starlight.Minimized then
 			task.wait(5)
 		elseif Hub._DashboardStatus and Hub._DashboardStatus.Update then
-			local elapsed = math.floor(tick() - runtime.sessionStart)
+			local elapsed = math.floor(tick() - rt.sessionStart)
 			local mins = math.floor(elapsed / 60)
 			local secs = elapsed % 60
 			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Session", string.format("%02d:%02d", mins, secs))
 			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Version", VERSION)
-			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Total Kicks", tostring(runtime.sessionKicks))
-			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Total Errors", tostring(#runtime.errorLog))
+			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Total Kicks", tostring(rt.sessionKicks))
+			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Total Errors", tostring(#rt.errorLog))
 			if state.AFarm or state.AAutoMastery or state.AAutoBattle or state.AAutoWeather or state.AAutoStyle then
 				local count = (state.AFarm and 1 or 0) + (state.AAutoMastery and 1 or 0) + (state.AAutoBattle and 1 or 0) + (state.AAutoWeather and 1 or 0) + (state.AAutoStyle and 1 or 0)
 				pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Active Features", tostring(count))
 			else
 				pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Active Features", "0")
 			end
-			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Session Errors", tostring(runtime.sessionErrors))
+			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Session Errors", tostring(rt.sessionErrors))
 		end
 		if Hub._QuickStatus and Hub._QuickStatus.Update then
 			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Farming", state.AFarm and "On" or "Off")
@@ -5349,11 +5331,11 @@ coroutine.wrap(function()
 		end
 		if Hub._SecurityStatus and Hub._SecurityStatus.Update then
 			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Anti-Cheat", "Active")
-			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Staff Detection", runtime.staffDetected and "Active" or "Standby")
-			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Staff Status", runtime.staffDetected and (runtime.staffDetectedName .. " ^^^") or "None")
-			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Anti-Cheat Triggers", tostring(runtime.acTriggerCount))
-			if runtime.lastAntiCheatTrigger > 0 then
-				pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Last Check", string.format("%.0fs ago", tick() - runtime.lastAntiCheatTrigger))
+			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Staff Detection", rt.staffDetected and "Active" or "Standby")
+			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Staff Status", rt.staffDetected and (rt.staffDetectedName .. " ^^^") or "None")
+			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Anti-Cheat Triggers", tostring(rt.acTriggerCount))
+			if rt.lastAntiCheatTrigger > 0 then
+				pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Last Check", string.format("%.0fs ago", tick() - rt.lastAntiCheatTrigger))
 			end
 		end
 		task.wait(3)
