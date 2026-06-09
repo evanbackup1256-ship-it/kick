@@ -2937,6 +2937,7 @@ local function supportSummary()
 	return table.concat(lines, "\n")
 end
 
+(function()
 profileGroup:CreateInput(
 	"Profile Name",
 	"default",
@@ -4830,5 +4831,6 @@ end
 
 closeLoadingGui()
 notify("Alleral", "v" .. VERSION .. " ready.", 5)
+end)()
 end)()
 end)()
