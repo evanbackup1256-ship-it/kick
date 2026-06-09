@@ -131,7 +131,7 @@ local MktSvc = game:GetService("MarketplaceService")
 local TeleSvc = game:GetService("TeleportService")
 local VUser = game:GetService("VirtualUser")
 local SGui = game:GetService("StarterGui")
-local LP = Plrs.LP
+local LP = Plrs.LocalPlayer
 
 if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
