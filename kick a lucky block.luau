@@ -2888,7 +2888,7 @@ hubInfoGroup:CreateDivider()
 
 hubInfoGroup:CreateButton("Emergency Hide", function()
 	if starlightWindow then
-		starlightWindow.Instance.Enabled = false
+		starlightWindow.Instance.Visible = false
 		starlight.Minimized = true
 	end
 	rt.lastEmergencyHide = tick()
@@ -5313,7 +5313,7 @@ makeSupervisor("StaffWatch", 2, function()
 				notify("Staff Detected", rt.staffDetectedName .. " joined! Hiding UI.", 5)
 			end
 			if sw.Instance then
-				sw.Instance.Enabled = false
+				sw.Instance.Visible = false
 			end
 			starlight.Minimized = true
 		end
@@ -5324,7 +5324,7 @@ makeSupervisor("StaffWatch", 2, function()
 		end
 	elseif starlight.Minimized and not rt.staffDetected then
 		if sw and sw.Instance then
-			sw.Instance.Enabled = true
+			sw.Instance.Visible = true
 		end
 		starlight.Minimized = false
 	end
