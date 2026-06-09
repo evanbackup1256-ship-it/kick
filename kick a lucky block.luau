@@ -2774,6 +2774,9 @@ local function listProfiles()
 		return { "default" }
 	end
 	local profiles = {}
+	if isFolder and makeFolder and not isFolder(profileFolder) then
+		makeFolder(profileFolder)
+	end
 	local ok, files = safeCall("ListProfiles", function()
 		return listFiles(profileFolder)
 	end)
@@ -4111,10 +4114,7 @@ makeSupervisor("Prediction", 1, function()
 	local parts = string.split(inGame, ",")
 	local name     = trim(parts[1] or "Unknown")
 	local mutation = normalizeMutation(parts[2] or "None")
-	-- Some game versions embed rarity at index 4 (index 3 = level sent by server)
-	local serverLevel  = tonumber(parts[3])
-	local serverRarity = parts[4] and trim(parts[4]) ~= "" and trim(parts[4]) or nil
-	local rarity   = rarityFor(name, serverRarity or "Unknown")
+	local rarity   = rarityFor(name) or "Unknown"
 
 	-- CPS at level 1 (a fresh drop always arrives at level 1)
 	local cps1 = brainrotCps(name, mutation, 1)
