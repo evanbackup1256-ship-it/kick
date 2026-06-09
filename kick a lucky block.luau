@@ -57,7 +57,7 @@ if not Hub._Initialized then
 				self._SupervisorConnections[n]:Disconnect()
 			end
 			local last = tick()
-			local c = RunService.Heartbeat:Connect(function()
+			local c = RunSvc.Heartbeat:Connect(function()
 				if not state.HubRunning then return end
 				local now = tick()
 				if now - last >= sup.interval then
@@ -324,7 +324,7 @@ local function notify(title, text, duration)
 		return
 	end
 	pcall(function()
-		StarterGui:SetCore("SendNotification", {
+		SGui:SetCore("SendNotification", {
 			Title = title or "Alleral",
 			Text = text or "",
 			Duration = duration or 4,
@@ -422,7 +422,7 @@ local Executor = (function()
 			or (tbl("syn") and type(env.syn.request) == "function")
 			or (tbl("fluxus") and type(env.fluxus.request) == "function")
 			or (tbl("http") and type(env.http.request) == "function")
-			or (type(HttpService.RequestAsync) == "function"),
+			or (type(HttpSvc.RequestAsync) == "function"),
 		hasGetConn = type(env.getconnections) == "function" or type(env.get_signal_cons) == "function",
 		hasClipboard = type(env.setclipboard) == "function" or type(env.toclipboard) == "function",
 		hasFireTouch = type(env.firetouchinterest) == "function",
@@ -524,7 +524,7 @@ local function saveSettings()
 		if isFolder and makeFolder and not isFolder(settingsFolder) then
 			makeFolder(settingsFolder)
 		end
-		writeFile(settingsFile, HttpService:JSONEncode(output))
+		writeFile(settingsFile, HttpSvc:JSONEncode(output))
 	end)
 end
 
@@ -538,7 +538,7 @@ local function loadSettings()
 	local ok, decoded = safeCall("LoadSettings", function()
 		local raw = readFile(settingsFile)
 		if raw and raw ~= "" then
-			return HttpService:JSONDecode(raw)
+			return HttpSvc:JSONDecode(raw)
 		end
 		return nil
 	end)
@@ -607,8 +607,8 @@ local function requestFunction()
 		function() return raw("request") end,
 		function() return raw("Request") end,
 		function()
-			return type(HttpService.RequestAsync) == "function"
-				and function(req) return HttpService:RequestAsync(req) end
+			return type(HttpSvc.RequestAsync) == "function"
+				and function(req) return HttpSvc:RequestAsync(req) end
 				or nil
 		end,
 	})
@@ -658,7 +658,7 @@ local function sendWebhook(url, payload)
 			Url = postUrl,
 			Method = "POST",
 			Headers = { ["Content-Type"] = "application/json" },
-			Body = HttpService:JSONEncode(payload),
+			Body = HttpSvc:JSONEncode(payload),
 		})
 	end)
 	if not ok then
@@ -691,7 +691,7 @@ end
 
 local function checkGameBuild(forceNotify, acceptCurrent)
 	local ok, info = safeCall("GameBuildCheck", function()
-		return MarketplaceService:GetProductInfo(game.PlaceId)
+		return MktSvc:GetProductInfo(game.PlaceId)
 	end)
 	local updated = ok and info and tostring(info.Updated or "") or ""
 	local placeVersion = tonumber(game.PlaceVersion) or 0
@@ -760,7 +760,7 @@ local function safeFindRemote(network, aliases)
 		end
 		local remote = network and network:FindFirstChild(alias)
 		if not remote then
-			remote = ReplicatedStorage:FindFirstChild(alias, true)
+			remote = RS:FindFirstChild(alias, true)
 		end
 		if remote then
 			rt.remoteLookupCache[alias] = remote
@@ -1268,34 +1268,34 @@ local function loadModule(key, label, resolver)
 end
 
 loadModule("entitiesData", "EntitiesData", function()
-	return ReplicatedStorage.Shared.Data.EntitiesData
+	return RS.Shared.Data.EntitiesData
 end)
 loadModule("mutationData", "MutationData", function()
-	return ReplicatedStorage.Shared.Data.MutationData
+	return RS.Shared.Data.MutationData
 end)
 loadModule("weightsData", "WeightsData", function()
-	return ReplicatedStorage:FindFirstChild("WeightsData", true)
+	return RS:FindFirstChild("WeightsData", true)
 end)
 loadModule("speedData", "SpeedData", function()
-	return ReplicatedStorage.Shared.Data.SpeedData
+	return RS.Shared.Data.SpeedData
 end)
 loadModule("rebirthData", "RebirthData", function()
-	return ReplicatedStorage.Shared.Data.RebirthData
+	return RS.Shared.Data.RebirthData
 end)
 loadModule("sacrificeData", "SacrificeData", function()
-	return ReplicatedStorage.Shared.Data.SacrificeData
+	return RS.Shared.Data.SacrificeData
 end)
 loadModule("kickService", "KickServiceClient", function()
-	return ReplicatedStorage.Modules.ServicesLoader.KickServiceClient
+	return RS.Modules.ServicesLoader.KickServiceClient
 end)
 loadModule("balanceService", "ClientBalanceService", function()
-	return ReplicatedStorage.Modules.ServicesLoader.ClientBalanceService
+	return RS.Modules.ServicesLoader.ClientBalanceService
 end)
 loadModule("rebirthService", "RebirthServiceClient", function()
-	return ReplicatedStorage.Modules.ServicesLoader.RebirthServiceClient
+	return RS.Modules.ServicesLoader.RebirthServiceClient
 end)
 loadModule("weatherService", "WeatherServiceClient", function()
-	return ReplicatedStorage.Modules.ServicesLoader.WeatherService_Client
+	return RS.Modules.ServicesLoader.WeatherService_Client
 end)
 
 local gameData = (function()
@@ -1373,7 +1373,7 @@ local function refreshRemotes()
 		return
 	end
 	rt.cachedRemotesAt = tick()
-	local network = ReplicatedStorage:FindFirstChild("Shared")
+	local network = RS:FindFirstChild("Shared")
 	network = network and network:FindFirstChild("Packages")
 	network = network and network:FindFirstChild("Network")
 
@@ -1423,7 +1423,7 @@ local function findPlot()
 	end
 	rt.nextPlotLookup = tick() + 2
 	local ok, plotService = safeCall("FindPlotService", function()
-		return require(ReplicatedStorage.Modules.ServicesLoader.ClientPlotService)
+		return require(RS.Modules.ServicesLoader.ClientPlotService)
 	end)
 	if ok and plotService and plotService.Model then
 		rt.cachedPlot = plotService.Model
@@ -1431,7 +1431,7 @@ local function findPlot()
 		rt.nextPlotLookup = 0
 		return rt.cachedPlot
 	end
-	local plots = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Plot")
+	local plots = Ws:FindFirstChild("Plots") or Ws:FindFirstChild("Plot")
 	if not plots then
 		return nil
 	end
@@ -1578,7 +1578,7 @@ local function currentBattleStatus()
 	end
 	local status = nil
 	safeCall("BattleStatus", function()
-		local m = require(ReplicatedStorage.Modules.UILoader.KickBattlesUI)
+		local m = require(RS.Modules.UILoader.KickBattlesUI)
 		if m and m.CurrentStatus ~= nil then
 			status = tostring(m.CurrentStatus)
 		end
@@ -1607,7 +1607,7 @@ local function battleTimerVisible()
 end
 
 local function restoreCamera(humanoid)
-	local camera = Workspace.CurrentCamera
+	local camera = Ws.CurrentCamera
 	if camera and humanoid then
 		camera.CameraType = Enum.CameraType.Custom
 		camera.CameraSubject = humanoid
@@ -1627,7 +1627,7 @@ local function fastMove(root, targetCFrame, speed)
 		and (root.Position - targetCFrame.Position).Magnitude > 3
 		and tick() - started < 12
 	do
-		local dt = RunService.Heartbeat:Wait()
+		local dt = RunSvc.Heartbeat:Wait()
 		wobblePhase = wobblePhase + dt
 		local current = root.Position
 		local target = targetCFrame.Position
@@ -1820,7 +1820,7 @@ local function makeSupervisor(name, interval, callback)
 		errors = 0,
 		lastRun = 0,
 		interval = interval,
-		token = HttpService:GenerateGUID(false),
+		token = HttpSvc:GenerateGUID(false),
 	}
 	loops[name] = loopState
 	loopControllers[name] = loopState
@@ -2094,8 +2094,8 @@ local function getSortedWeights()
 		return rt.cachedWeights
 	end
 	local weights = {}
-	local weightModels = ReplicatedStorage:FindFirstChild("Objects")
-		and ReplicatedStorage.Objects:FindFirstChild("WeightModels")
+	local weightModels = RS:FindFirstChild("Objects")
+		and RS.Objects:FindFirstChild("WeightModels")
 	if weightModels then
 		for _, item in ipairs(weightModels:GetChildren()) do
 			table.insert(weights, item.Name)
@@ -2294,7 +2294,7 @@ end
 local function getKickStyleOptions()
 	local options = { "Default" }
 	safeCall("KickStyleOptions", function()
-		local folder = ReplicatedStorage.Shared.Data:FindFirstChild("KickStylesData")
+		local folder = RS.Shared.Data:FindFirstChild("KickStylesData")
 		if folder then
 			for _, item in ipairs(folder:GetChildren()) do
 				if item:IsA("ModuleScript") and item.Name ~= "Default" then
@@ -3101,7 +3101,7 @@ local function saveProfile(name)
 		end
 	end)
 	local ok, err = safeCall("SaveProfile", function()
-		writeFile(profilePath(name), HttpService:JSONEncode(collectConfigSnapshot()))
+		writeFile(profilePath(name), HttpSvc:JSONEncode(collectConfigSnapshot()))
 	end)
 	if not ok then
 		return false, tostring(err)
@@ -3118,7 +3118,7 @@ local function loadProfile(name)
 		return false, "Profile not found."
 	end
 	local ok, decoded = safeCall("LoadProfile", function()
-		return HttpService:JSONDecode(readFile(profilePath(name)))
+		return HttpSvc:JSONDecode(readFile(profilePath(name)))
 	end)
 	if not ok then
 		return false, "Invalid profile JSON: " .. shortError(decoded)
@@ -3289,7 +3289,7 @@ profileGroup:CreateButton(
 	"Import JSON",
 	function()
 		local ok, decoded = safeCall("ImportProfileJson", function()
-			return HttpService:JSONDecode(importBuffer)
+			return HttpSvc:JSONDecode(importBuffer)
 		end)
 		if not ok then
 			notify("Profiles Error", "Invalid JSON: " .. shortError(decoded), 3)
@@ -3303,7 +3303,7 @@ profileGroup:CreateButton(
 profileGroup:CreateButton(
 	"Export to Clipboard",
 	function()
-		local encoded = HttpService:JSONEncode(collectConfigSnapshot())
+		local encoded = HttpSvc:JSONEncode(collectConfigSnapshot())
 		importBuffer = encoded
 		if setClipboard then
 			safeCall("CopyProfileExport", function()
@@ -4157,7 +4157,7 @@ serverGroup:CreateButton(
 		local jobId = trim(state.JoinJobId)
 		jobId = jobId:match("gameInstanceId=([%w%-]+)") or jobId:match("([%w%-]+)")
 		if jobId and jobId ~= "" then
-			TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
+			TeleSvc:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
 		else
 			notify("Alleral", "Failed to extract JobId.", 3)
 		end
@@ -4304,7 +4304,7 @@ end
 local fpsFrames = 0
 local fpsStarted = tick()
 track(
-	RunService.Heartbeat:Connect(function()
+	RunSvc.Heartbeat:Connect(function()
 		fpsFrames = fpsFrames + 1
 		local now = tick()
 		if now - fpsStarted >= 1 then
@@ -4385,9 +4385,9 @@ track(
 		if disabledIdle then
 			return
 		end
-		safeCall("AntiAfkVirtualUser", function()
-			VirtualUser:CaptureController()
-			VirtualUser:ClickButton2(Vector2.new(0, 0))
+		safeCall("AntiAfkVUser", function()
+			VUser:CaptureController()
+			VUser:ClickButton2(Vector2.new(0, 0))
 		end)
 	end),
 	"AntiAfk"
@@ -4539,11 +4539,11 @@ end)
 			return
 		end
 	end
-	local kickReady = Workspace:FindFirstChild("Areas") and Workspace.Areas:FindFirstChild("KickReady")
+	local kickReady = Ws:FindFirstChild("Areas") and Ws.Areas:FindFirstChild("KickReady")
 	if not kickReady then
 		return
 	end
-	local camera = Workspace.CurrentCamera
+	local camera = Ws.CurrentCamera
 	if camera and camera.CameraSubject ~= humanoid then
 		restoreCamera(humanoid)
 	end
@@ -4555,7 +4555,7 @@ end)
 		return
 	end
 	rt.lastAutoKickActivity = tick()
-	local wavesFolder = Workspace:FindFirstChild("Waves")
+	local wavesFolder = Ws:FindFirstChild("Waves")
 	local hasWave = wavesFolder and #wavesFolder:GetChildren() > 0
 	local inGame = LP:GetAttribute("InGame") or ""
 	if hasWave and inGame ~= "" then
@@ -4819,7 +4819,7 @@ makeSupervisor("AutoFavorite", 4, function()
 		if remotes.toggleFavorite then
 			remotes.toggleFavorite:FireServer(guid)
 		else
-			local network = require(ReplicatedStorage.Shared.Packages.Network)
+			local network = require(RS.Shared.Packages.Network)
 			network.FireServer("ToggleFav", guid)
 		end
 	end)
@@ -5034,7 +5034,7 @@ makeSupervisor("Mastery", 1, function()
 		updateMasteryStatus("Scanning...")
 		refreshRemotes()
 		local _, humanoid, root = characterParts()
-		local kickReady = Workspace:FindFirstChild("Areas") and Workspace.Areas:FindFirstChild("KickReady")
+		local kickReady = Ws:FindFirstChild("Areas") and Ws.Areas:FindFirstChild("KickReady")
 		if not humanoid or not root or humanoid.Health <= 0 or not kickReady or not remotes.kick then
 			updateMasteryStatus("Waiting")
 			finish(1)
