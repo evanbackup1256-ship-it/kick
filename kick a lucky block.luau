@@ -131,7 +131,7 @@ local MktSvc = game:GetService("MarketplaceService")
 local TeleSvc = game:GetService("TeleportService")
 local VUser = game:GetService("VirtualUser")
 local SGui = game:GetService("StarterGui")
-local LP = Plrs.LocalPlayer
+local LP = Plrs.LP
 
 if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
@@ -444,8 +444,8 @@ local listFiles   = execFunc("listfiles",  true)
 local appendFile  = execFunc("appendfile", true)
 local setClipboard = execFunc("setclipboard") or execFunc("toclipboard")
 local settingsFolder = "Alleral_Configs"
-local settingsFile = string.format("%s/KickBlox_v4_%s.json", settingsFolder, tostring(LocalPlayer.UserId))
-local logFile = string.format("%s/KickBlox_v4_%s.log", settingsFolder, tostring(LocalPlayer.UserId))
+local settingsFile = string.format("%s/KickBlox_v4_%s.json", settingsFolder, tostring(LP.UserId))
+local logFile = string.format("%s/KickBlox_v4_%s.log", settingsFolder, tostring(LP.UserId))
 
 local function shortError(message)
 	message = tostring(message or "Unknown error"):gsub("%s+", " ")
@@ -793,7 +793,7 @@ state.Alleral_Unload = function()
 		loopState.enabled = false
 	end
 	safeCall("UnloadRestoreHumanoid", function()
-		local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+		local humanoid = LP.Character and LP.Character:FindFirstChild("Humanoid")
 		if humanoid then
 			humanoid.PlatformStand = false
 			humanoid.MaxSlopeAngle = 45
@@ -1156,15 +1156,15 @@ local function isBrainrotOwned(name)
 		return false
 	end
 	local lowName = tostring(name):lower()
-	if LocalPlayer.Character then
-		for _, tool in ipairs(LocalPlayer.Character:GetChildren()) do
+	if LP.Character then
+		for _, tool in ipairs(LP.Character:GetChildren()) do
 			if tool:IsA("Tool") and tostring(tool.Name):lower() == lowName then
 				return true
 			end
 		end
 	end
-	if LocalPlayer.Backpack then
-		for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+	if LP.Backpack then
+		for _, tool in ipairs(LP.Backpack:GetChildren()) do
 			if tool:IsA("Tool") and tostring(tool.Name):lower() == lowName then
 				return true
 			end
@@ -1329,7 +1329,7 @@ local values = {
 }
 
 local function currentCoins()
-	local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+	local leaderstats = LP:FindFirstChild("leaderstats")
 	local coins = leaderstats and leaderstats:FindFirstChild("Coins")
 	if coins then
 		values.coins = parseNumber(coins.Value)
@@ -1422,17 +1422,17 @@ local function findPlot()
 	if not plots then
 		return nil
 	end
-	local userId = tostring(LocalPlayer.UserId)
+	local userId = tostring(LP.UserId)
 	for _, plot in ipairs(plots:GetChildren()) do
 		local owner = tostring(plot:GetAttribute("Owner") or "")
 		local ownerId = tostring(plot:GetAttribute("OwnerId") or plot:GetAttribute("PlayerId") or "")
 		local playerName = tostring(plot:GetAttribute("Player") or "")
 		if
-			owner == LocalPlayer.Name
-			or owner == LocalPlayer.DisplayName
+			owner == LP.Name
+			or owner == LP.DisplayName
 			or owner == userId
 			or ownerId == userId
-			or playerName == LocalPlayer.Name
+			or playerName == LP.Name
 			or playerName == userId
 		then
 			rt.cachedPlot = plot
@@ -1543,7 +1543,7 @@ local function kickPower()
 end
 
 local function characterParts()
-	local character = LocalPlayer.Character
+	local character = LP.Character
 	local humanoid = character and character:FindFirstChild("Humanoid")
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	return character, humanoid, root
@@ -1571,7 +1571,7 @@ local function currentBattleStatus()
 		end
 	end)
 	if not status then
-		local attr = LocalPlayer:GetAttribute("BattleStatus")
+		local attr = LP:GetAttribute("BattleStatus")
 		if attr ~= nil then
 			status = tostring(attr)
 		end
@@ -1585,7 +1585,7 @@ local function currentBattleStatus()
 end
 
 local function battleTimerVisible()
-	local gui = LocalPlayer:FindFirstChild("PlayerGui")
+	local gui = LP:FindFirstChild("PlayerGui")
 	local battleGui = gui and gui:FindFirstChild("KickBattles")
 	return battleGui
 		and battleGui:FindFirstChild("TopFrame")
@@ -1979,8 +1979,8 @@ local function autoPlaceBest()
 	local bestTool = nil
 	local bestCps = -1
 	local tools = {}
-	if LocalPlayer.Backpack then
-		for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+	if LP.Backpack then
+		for _, tool in ipairs(LP.Backpack:GetChildren()) do
 			if isBrainrotTool(tool) then
 				table.insert(tools, tool)
 			end
@@ -2162,8 +2162,8 @@ local function equipOwnedWeight(weight)
 	if equipped and equipped.Name == weight then
 		return
 	end
-	if LocalPlayer.Backpack then
-		local tool = LocalPlayer.Backpack:FindFirstChild(weight)
+	if LP.Backpack then
+		local tool = LP.Backpack:FindFirstChild(weight)
 		if tool and tool:IsA("Tool") then
 			safeCall("EquipWeightTool", function()
 				humanoid:EquipTool(tool)
@@ -2198,9 +2198,9 @@ end
 
 getOwnedWeightTools = function()
 	local tools = {}
-	local character = LocalPlayer.Character
-	if LocalPlayer.Backpack then
-		for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
+	local character = LP.Character
+	if LP.Backpack then
+		for _, item in ipairs(LP.Backpack:GetChildren()) do
 			if item:IsA("Tool") then
 				table.insert(tools, item)
 			end
@@ -2247,7 +2247,7 @@ local function equipBestOwnedWeight()
 				remotes.weightEquip:FireServer(tool.Name)
 			end)
 		end
-		if tool.Parent == LocalPlayer.Backpack then
+		if tool.Parent == LP.Backpack then
 			safeCall("EquipBestWeightTool", function()
 				humanoid:EquipTool(tool)
 			end)
@@ -2451,15 +2451,15 @@ end
 
 local function scanTools()
 	local seen = {}
-	if LocalPlayer.Backpack then
-		for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
+	if LP.Backpack then
+		for _, item in ipairs(LP.Backpack:GetChildren()) do
 			if item:IsA("Tool") and not seen[item] then
 				seen[item] = true
 				watchFavoriteTool(item)
 			end
 		end
 	end
-	local character = LocalPlayer.Character
+	local character = LP.Character
 	if character then
 		for _, item in ipairs(character:GetChildren()) do
 			if item:IsA("Tool") and not seen[item] then
@@ -4144,7 +4144,7 @@ serverGroup:CreateButton(
 		local jobId = trim(state.JoinJobId)
 		jobId = jobId:match("gameInstanceId=([%w%-]+)") or jobId:match("([%w%-]+)")
 		if jobId and jobId ~= "" then
-			TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LocalPlayer)
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
 		else
 			notify("Alleral", "Failed to extract JobId.", 3)
 		end
@@ -4353,7 +4353,7 @@ task.spawn(function()
 end)
 
 track(
-	LocalPlayer.Idled:Connect(function()
+	LP.Idled:Connect(function()
 		if not state.AntiAFK then
 			return
 		end
@@ -4361,7 +4361,7 @@ track(
 		local disabledIdle = false
 		if idleConnections then
 			safeCall("AntiAfkConnections", function()
-				for _, connection in ipairs(idleConnections(LocalPlayer.Idled)) do
+				for _, connection in ipairs(idleConnections(LP.Idled)) do
 					if connection.Disable then
 						connection:Disable()
 						disabledIdle = true
@@ -4380,9 +4380,9 @@ track(
 	"AntiAfk"
 )
 
-if LocalPlayer.Backpack then
+if LP.Backpack then
 	track(
-		LocalPlayer.Backpack.ChildAdded:Connect(function(child)
+		LP.Backpack.ChildAdded:Connect(function(child)
 			if not state.AAutoFav and (not state.AWebhook or state.WebhookURL == "") then
 				return
 			end
@@ -4395,7 +4395,7 @@ if LocalPlayer.Backpack then
 	)
 end
 track(
-	LocalPlayer.CharacterAdded:Connect(function(character)
+	LP.CharacterAdded:Connect(function(character)
 		rt.cachedPlot = nil
 		restoreCamera(character:WaitForChild("Humanoid", 5))
 		track(
@@ -4413,9 +4413,9 @@ track(
 	end),
 	"CharacterAdded"
 )
-if LocalPlayer.Character then
+if LP.Character then
 	track(
-		LocalPlayer.Character.ChildAdded:Connect(function(child)
+		LP.Character.ChildAdded:Connect(function(child)
 			if not state.AAutoFav and (not state.AWebhook or state.WebhookURL == "") then
 				return
 			end
@@ -4437,7 +4437,7 @@ makeSupervisor("Prediction", 1, function()
 	if not state.APredict or not predictionStatus then
 		return
 	end
-	local inGame = LocalPlayer:GetAttribute("InGame") or ""
+	local inGame = LP:GetAttribute("InGame") or ""
 	if inGame == "" then
 		predictionStatus:Update("Brainrot",    "--")
 		predictionStatus:Update("Rarity",      "--")
@@ -4544,7 +4544,7 @@ end)
 	rt.lastAutoKickActivity = tick()
 	local wavesFolder = Workspace:FindFirstChild("Waves")
 	local hasWave = wavesFolder and #wavesFolder:GetChildren() > 0
-	local inGame = LocalPlayer:GetAttribute("InGame") or ""
+	local inGame = LP:GetAttribute("InGame") or ""
 	if hasWave and inGame ~= "" then
 		local parts = string.split(inGame, ",")
 		local shouldReset = true
@@ -4611,7 +4611,7 @@ end)
 		end
 		return
 	end
-	local gui = LocalPlayer:FindFirstChild("PlayerGui")
+	local gui = LP:FindFirstChild("PlayerGui")
 	local hud = gui and gui:FindFirstChild("HUD")
 	local kickButton = hud and hud:FindFirstChild("KickButton")
 	local visible = kickButton and kickButton.Visible
@@ -4648,7 +4648,7 @@ makeSupervisor("Train", 0.75, function()
 		return
 	end
 	local tool = equipBestOwnedWeight()
-	if tool and tool.Parent == LocalPlayer.Character then
+	if tool and tool.Parent == LP.Character then
 		safeCall("TrainToolActivate", function()
 			tool:Activate()
 		end)
@@ -4664,7 +4664,7 @@ makeSupervisor("AutoClaim2x", 2, function()
 	if not (state.A2xTrain or state.ATrainCollect) or state.IsFlashCollecting or not connectionFetcher then
 		return
 	end
-	local gui = LocalPlayer:FindFirstChild("PlayerGui")
+	local gui = LP:FindFirstChild("PlayerGui")
 	local kickUpgrades = gui and gui:FindFirstChild("KickUpgrades")
 	if not kickUpgrades then
 		return
@@ -4713,7 +4713,7 @@ makeSupervisor("TrainCollect", 1, function()
 		end
 	end)
 	local oldCFrame = state.TrainAnchorCFrame or root.CFrame
-	local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+	local tool = LP.Character and LP.Character:FindFirstChildOfClass("Tool")
 	local toolName = tool and tool.Name
 	safeCall("TrainCollectUnequip", function()
 		humanoid:UnequipTools()
@@ -4721,9 +4721,9 @@ makeSupervisor("TrainCollect", 1, function()
 	task.wait(0.15)
 	collectFromPlot()
 	root.CFrame = oldCFrame
-	if toolName and LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild(toolName) then
+	if toolName and LP.Backpack and LP.Backpack:FindFirstChild(toolName) then
 		safeCall("TrainCollectReequip", function()
-			humanoid:EquipTool(LocalPlayer.Backpack[toolName])
+			humanoid:EquipTool(LP.Backpack[toolName])
 		end)
 	end
 	state.NextFlashCollect = tick() + (state.TrainCollectDelay * 60)
@@ -4840,13 +4840,13 @@ makeSupervisor("WebhookStatus", 5, function()
 		counts[rarity] = (counts[rarity] or 0) + 1
 		total = total + 1
 	end
-	if LocalPlayer.Backpack then
-		for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+	if LP.Backpack then
+		for _, tool in ipairs(LP.Backpack:GetChildren()) do
 			addTool(tool)
 		end
 	end
-	if LocalPlayer.Character then
-		for _, tool in ipairs(LocalPlayer.Character:GetChildren()) do
+	if LP.Character then
+		for _, tool in ipairs(LP.Character:GetChildren()) do
 			addTool(tool)
 		end
 	end
@@ -4911,7 +4911,7 @@ makeSupervisor("Battle", 4, function()
 		if remotes.battleInvite and tick() >= (rt.nextBattleInvite or 0) then
 			rt.nextBattleInvite = tick() + 5
 			for _, player in ipairs(Players:GetPlayers()) do
-				if player ~= LocalPlayer then
+				if player ~= LP then
 					task.spawn(function()
 						safeCall("BattleInvite", function()
 							fireRemote(remotes.battleInvite, player)
@@ -4924,14 +4924,14 @@ makeSupervisor("Battle", 4, function()
 
 		local playersInLobby = 0
 		local countedPlayers = {}
-		local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+		local playerGui = LP:FindFirstChild("PlayerGui")
 		local battleGui = playerGui and playerGui:FindFirstChild("KickBattles")
 		if battleGui then
 			for _, label in ipairs(battleGui:GetDescendants()) do
 				if label:IsA("TextLabel") and label.Visible and label.Text ~= "" then
 					for _, player in ipairs(Players:GetPlayers()) do
 						if
-							player ~= LocalPlayer
+							player ~= LP
 							and (label.Text:find(player.DisplayName, 1, true)
 								or label.Text:find(player.Name, 1, true))
 						then
@@ -4967,7 +4967,7 @@ makeSupervisor("AcceptBattle", 4, function()
 	if not state.AAutoAcceptBattle or not connectionFetcher then
 		return
 	end
-	local gui = LocalPlayer:FindFirstChild("PlayerGui")
+	local gui = LP:FindFirstChild("PlayerGui")
 	if not gui then
 		return
 	end
@@ -5027,21 +5027,21 @@ makeSupervisor("Mastery", 1, function()
 			finish(1)
 			return
 		end
-		local inGame = LocalPlayer:GetAttribute("InGame") or ""
+		local inGame = LP:GetAttribute("InGame") or ""
 		if inGame ~= "" then
 			updateMasteryStatus("Resetting")
 			humanoid.Health = 0
-			local oldCharacter = LocalPlayer.Character
+			local oldCharacter = LP.Character
 			local respawnTimeout = tick() + 10
 			while
 				state.HubRunning
 				and state.AAutoMastery
-				and LocalPlayer.Character == oldCharacter
+				and LP.Character == oldCharacter
 				and tick() < respawnTimeout
 			do
 				task.wait(0.1)
 			end
-			local newCharacter = LocalPlayer.Character
+			local newCharacter = LP.Character
 			local newRoot = newCharacter and newCharacter:WaitForChild("HumanoidRootPart", 5)
 			local newHumanoid = newCharacter and newCharacter:WaitForChild("Humanoid", 5)
 			if newRoot and newHumanoid then
@@ -5134,8 +5134,8 @@ local function sacrificeTools()
 			end
 		end
 	end
-	add(LocalPlayer.Backpack)
-	add(LocalPlayer.Character)
+	add(LP.Backpack)
+	add(LP.Character)
 	return tools
 end
 
@@ -5202,7 +5202,7 @@ makeSupervisor("AutoAntiCheat", 4, function()
 	if root.Position.Y < -50 and humanoid.Health > 0 then
 		humanoid.Health = 0
 	end
-	local gui = LocalPlayer:FindFirstChild("PlayerGui")
+	local gui = LP:FindFirstChild("PlayerGui")
 	if gui then
 		for _, v in ipairs(gui:GetDescendants()) do
 			if v:IsA("Frame") or v:IsA("TextLabel") then
