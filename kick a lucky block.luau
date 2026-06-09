@@ -14,13 +14,6 @@ do
 end
 
 getgenv().Alleral_State = getgenv().Alleral_State or {}
-
--- Integrity guard: must be loaded through the official Alleral loader
--- The loader injects a session key; direct copies won't have it.
-if not getgenv().Alleral_Boot then
-	warn("[Alleral] Unauthorized copy — use the official loader")
-	return
-end
 getgenv().Alleral_Boot = nil
 
 local VERSION = "5.3"
