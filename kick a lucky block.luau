@@ -13,6 +13,7 @@ do
 	end
 end
 
+(function()
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 getgenv().Alleral_Boot = nil
 
@@ -4828,3 +4829,4 @@ end
 
 closeLoadingGui()
 notify("Alleral", "v" .. VERSION .. " ready.", 5)
+end)()
