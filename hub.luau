@@ -74,44 +74,8 @@ local starlightSection
 local hubTab
 
 local function patchStarlightSource(source)
-	local needsPatch = not pcall(function() return Instance.new("UIPageLayout") end)
-	if needsPatch then
-		local polyfill = [[
-do
-	if not getgenv()._Alleral_PagePolyfilled then
-		getgenv()._Alleral_PagePolyfilled = true
-		local pd = {cur=nil, conns={}}
-		getgenv()._Alleral_PageData = pd
-		getgenv()._Alleral_PageJumpTo = function(page) pd.cur=page; for _,c in ipairs(pd.conns) do pcall(c,page) end end
-		getgenv()._Alleral_PageCurrent = function() return pd.cur end
-		getgenv()._Alleral_PageSignal = function()
-			local e = Instance.new("BindableEvent")
-			table.insert(pd.conns, function(p) e:Fire(p) end)
-			return e.Event
-		end
-		local _on = Instance.new
-		Instance.new = function(cls,...)
-			if cls=="UIPageLayout" or cls=="UIPaginatedLayout" then
-				local f = _on("Frame")
-				f.Name="UIPageLayout"; f.BackgroundTransparency=1; f.Size=UDim2.fromScale(1,1)
-				return f
-			end
-			return _on(cls,...)
-		end
-	end
-end
-]]
-		source = polyfill .. source
-	end
-
 	source = source:gsub("function Tab:Show%(%)[\r\n]+%s*if Library%.ActiveTab then",
 		"function Tab:Show()\n\t\t\tif Library.ActiveTab == Tab then\n\t\t\t\treturn\n\t\t\tend\n\t\t\tif Library.ActiveTab then")
-	source = source:gsub("tabs%.UIPageLayout:JumpTo%(([^)]+)%)", "_Alleral_PageJumpTo(%1)")
-	source = source:gsub("tabs%.UIPageLayout%.CurrentPage", "_Alleral_PageCurrent()")
-	source = source:gsub("tabs%.UIPageLayout:GetPropertyChangedSignal%(\"CurrentPage\"%)", "_Alleral_PageSignal()")
-	source = source:gsub('v%.ClassName %~= "UIPageLayout"', "true")
-	source = source:gsub("Container%.UIPageLayout:JumpTo%([^)]+%)", "nil")
-	source = source:gsub("%w-%.UIPageLayout%.CurrentPage", "_Alleral_PageCurrent()")
 	local inputStart = source:find("function Groupbox:CreateInput", 1, true)
 	local labelStart = inputStart and source:find("function Groupbox:CreateLabel", inputStart, true)
 	if not inputStart or not labelStart then return source end
