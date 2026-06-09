@@ -17,7 +17,7 @@ end
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 getgenv().Alleral_Boot = nil
 
-local VERSION = "5.3"
+local VERSION = "5.5"
 
 local state = getgenv().Alleral_State
 local connections = {}
@@ -50,6 +50,7 @@ local runtime = {
 	sessionStart = tick(),
 	sessionKicks = 0,
 	sessionResets = 0,
+	sessionIndexSkips = 0,
 	sessionMatches = 0,
 	sessionBestCps = 0,
 	sessionBestName = "--",
@@ -148,13 +149,8 @@ local defaults = {
 	AutoPlaceInterval = 1.5,
 	AutoKickInterval = 0.3,
 	MasteryInterval = 1,
-	-- New v5.3 features
-	ANotifyRare = false,
-	NotifyRarityThreshold = "Legendary",
-	AKickVariance = false,
-	KickVarianceMs = 80,
-	AAutoSell = false,
-	AutoSellMaxBackpack = 25,
+
+	AIndexOnly = false,
 }
 
 local savedKeys = {
@@ -221,12 +217,7 @@ local savedKeys = {
 	"AutoPlaceInterval",
 	"AutoKickInterval",
 	"MasteryInterval",
-	"ANotifyRare",
-	"NotifyRarityThreshold",
-	"AKickVariance",
-	"KickVarianceMs",
-	"AAutoSell",
-	"AutoSellMaxBackpack",
+	"AIndexOnly",
 }
 
 local function copyValue(value)
@@ -910,9 +901,6 @@ do
 	end
 end
 
-local function closeLoadingGui() end
-local function loadingStep(text) end
-
 local function loadStarlight()
 	-- Try the new pure-code rewrite first
 	local rewriteResult = loadLocalLua("starlight_repo/Source.lua", "Starlight v3 (local rewrite)")
@@ -1057,6 +1045,37 @@ local function mainFilterMatches(brainrot, mutation)
 		mutationOk = false
 	end
 	return brainrotOk and rarityOk and mutationOk
+end
+
+local function isBrainrotOwned(name)
+	if not name or name == "" then
+		return false
+	end
+	local lowName = tostring(name):lower()
+	if LocalPlayer.Character then
+		for _, tool in ipairs(LocalPlayer.Character:GetChildren()) do
+			if tool:IsA("Tool") and tostring(tool.Name):lower() == lowName then
+				return true
+			end
+		end
+	end
+	if LocalPlayer.Backpack then
+		for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+			if tool:IsA("Tool") and tostring(tool.Name):lower() == lowName then
+				return true
+			end
+		end
+	end
+	local ok, plot = pcall(findPlot)
+	if ok and plot then
+		for _, child in ipairs(plot:GetChildren()) do
+			local childName = tostring(child:GetAttribute("Name") or child.Name):lower()
+			if childName == lowName then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 local function parseNumber(value)
@@ -1398,22 +1417,6 @@ end
 
 -- Sum of CPS for all brainrots currently placed in the player's plot.
 -- Returns 0 when the plot is inaccessible (used for UI display only).
-local function totalPlotCps()
-	local plot = findPlot()
-	if not plot or not plot:FindFirstChild("Slots") then return 0 end
-	local total = 0
-	for _, slot in ipairs(plot.Slots:GetChildren()) do
-		local placed = slot:FindFirstChild("PlacedPart")
-		if placed then
-			local name, mutation, level = placedBrainrotInfo(placed)
-			if name then
-				total = total + (brainrotCps(name, mutation, level) or 0)
-			end
-		end
-	end
-	return total
-end
-
 local function kickPower()
 	local accuracy = {
 		Bad = 0.05,
@@ -3292,6 +3295,7 @@ local sessionStatus = kickGroup:CreateStatus("Session", {
 	["Kicks/min"]= "0",
 	Matches      = "0",
 	Resets       = "0",
+	["Index Skips"] = "0",
 	["Best CPS"] = "--",
 })
 kickGroup:CreateButton(
@@ -3301,6 +3305,7 @@ kickGroup:CreateButton(
 		runtime.sessionKicks    = 0
 		runtime.sessionMatches  = 0
 		runtime.sessionResets   = 0
+		runtime.sessionIndexSkips = 0
 		runtime.sessionBestCps  = 0
 		runtime.sessionBestName = "--"
 		runtime.kickRateWindow  = {}
@@ -3346,6 +3351,16 @@ filterGroup:AddDropdown("FilterMutation", {
 		saveSettings()
 	end,
 })
+
+filterGroup:CreateToggle(
+	"Index Only",
+	state.AIndexOnly,
+	"Only collect brainrots NOT already in your inventory or on your plot. Already-owned brainrots will be re-rolled (killed).",
+	function(value)
+		state.AIndexOnly = value
+		saveSettings()
+	end
+)
 
 trainGroup:CreateToggle(
 	"Auto Train",
@@ -4007,6 +4022,7 @@ task.spawn(function()
 				sessionStatus:Update("Kicks/min", tostring(runtime.kicksPerMin or 0))
 				sessionStatus:Update("Matches", tostring(runtime.sessionMatches or 0))
 				sessionStatus:Update("Resets",  tostring(runtime.sessionResets  or 0))
+				sessionStatus:Update("Index Skips", tostring(runtime.sessionIndexSkips or 0))
 				local bestCps = runtime.sessionBestCps or 0
 				sessionStatus:Update("Best CPS", bestCps > 0 and (formatNumber(bestCps) .. "/s") or "--")
 			end
@@ -4207,10 +4223,15 @@ makeSupervisor("AutoKick", 0.3, function()
 			local brainrot = trim(parts[index] or "")
 			local mutation = normalizeMutation(parts[index + 1] or "None")
 			if brainrot == "" or brainrot == "Unknown" or mainFilterMatches(brainrot, mutation) then
-					shouldReset = false
-					runtime.lastAutoKickMatch = tick()
-					runtime.sessionMatches = (runtime.sessionMatches or 0) + 1
-					break
+					if state.AIndexOnly and brainrot ~= "" and brainrot ~= "Unknown" and isBrainrotOwned(brainrot) then
+						runtime.lastIndexSkip = tick()
+						runtime.sessionIndexSkips = (runtime.sessionIndexSkips or 0) + 1
+					else
+						shouldReset = false
+						runtime.lastAutoKickMatch = tick()
+						runtime.sessionMatches = (runtime.sessionMatches or 0) + 1
+						break
+					end
 			end
 		end
 		if shouldReset and tick() >= runtime.nextAutoKickReset and tick() - runtime.lastAutoKickMatch > 5 then
@@ -4844,7 +4865,6 @@ if state.AAutoFav then
 	scanTools()
 end
 
-closeLoadingGui()
 notify("Alleral", "v" .. VERSION .. " ready.", 5)
 end)()
 end)()
