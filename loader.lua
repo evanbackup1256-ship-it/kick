@@ -24,8 +24,30 @@ if not url then
 	return
 end
 
-local ok, src = pcall(game.HttpGet, game, url, false)
-if not ok or not src or src == "" or src:find("404: Not Found") then
+local function fetch(url)
+	local funcs = {
+		function() return game:HttpGet(url) end,
+		function() return game:HttpGetAsync(url) end,
+		function()
+			local r = syn and syn.request or http_request or request
+			if r then
+				local resp = r({ Url = url, Method = "GET" })
+				return resp and resp.Body or ""
+			end
+			return ""
+		end,
+	}
+	for _, f in ipairs(funcs) do
+		local ok, src = pcall(f)
+		if ok and src and src ~= "" and not src:find("404") and not src:find("Not Found") then
+			return src
+		end
+	end
+	return nil
+end
+
+local src = fetch(url)
+if not src then
 	warn("[Alleral] failed to fetch script for PlaceId", game.PlaceId)
 	return
 end
