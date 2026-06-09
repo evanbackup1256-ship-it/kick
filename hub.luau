@@ -76,6 +76,7 @@ local hubTab
 local function patchStarlightSource(source)
 	source = source:gsub("function Tab:Show%(%)[\r\n]+%s*if Library%.ActiveTab then",
 		"function Tab:Show()\n\t\t\tif Library.ActiveTab == Tab then\n\t\t\t\treturn\n\t\t\tend\n\t\t\tif Library.ActiveTab then")
+	source = source:gsub('loadstring%(game:HttpGet%("https://raw%." %.. website %.. "/AcrylicModule%.luau"%)%)%(%))', "nil")
 	local inputStart = source:find("function Groupbox:CreateInput", 1, true)
 	local labelStart = inputStart and source:find("function Groupbox:CreateLabel", inputStart, true)
 	if not inputStart or not labelStart then return source end
