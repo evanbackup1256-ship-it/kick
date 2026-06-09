@@ -4822,7 +4822,8 @@ makeSupervisor("Mastery", 1, function()
 		end
 		updateMasteryStatus("Kicking...")
 		safeCall("MasteryKick", function()
-			remotes.kick:FireServer(0, (state.MasteryKickPower or 50) / 100)
+			local accuracy, power = kickPower()
+			remotes.kick:FireServer(accuracy, power)
 		end)
 		runtime.masteryKickCount = (runtime.masteryKickCount or 0) + 1
 		finish(1.2)
