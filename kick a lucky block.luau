@@ -2773,7 +2773,7 @@ hubInfoGroup:CreateDivider()
 
 hubInfoGroup:CreateButton("Copy Support Info", function()
 	local summary = supportSummary()
-	setclipboard and setclipboard(summary)
+	if setclipboard then setclipboard(summary) end
 	notify("Hub", "Support info copied.", 3)
 end)
 
