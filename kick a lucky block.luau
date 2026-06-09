@@ -4662,7 +4662,7 @@ makeSupervisor("Battle", 4, function()
 		runtime.nextBattleCreate = tick() + 8
 		task.spawn(function()
 			safeCall("BattleCreate", function()
-				remotes.battleCreate:FireServer(state.BattleGamepass, tonumber(state.BattleRounds) or 3)
+				fireRemote(remotes.battleCreate, state.BattleGamepass, tonumber(state.BattleRounds) or 3)
 			end)
 			runtime.cachedBattleStatusAt = 0
 		end)
