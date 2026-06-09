@@ -30,15 +30,26 @@ local function fetch(url)
 	local ok, src
 	local env = getgenv and getgenv() or getfenv and getfenv() or {}
 
+	if #url < 8 then return nil end
+
+	local function valid(body)
+		if type(body) ~= "string" or #body < 20 then
+			return false
+		end
+		local head = body:sub(1, 100)
+		if head:find("404") or head:find("Not Found") then
+			return false
+		end
+		return true
+	end
+
 	local function tryHttpGet(f)
 		ok, src = pcall(f)
-		if ok and src and src ~= "" and not src:find("404") and not src:find("Not Found") then
+		if ok and valid(src) then
 			return src
 		end
 		return nil
 	end
-
-	if #url < 8 then return nil end
 
 	local result = tryHttpGet(function() return game:HttpGet(url) end) or
 		tryHttpGet(function() return game:HttpGet(url:gsub("%%20", " ")) end) or
@@ -61,9 +72,10 @@ local function fetch(url)
 		for _, reqFunc in ipairs(requestCandidates) do
 			if type(reqFunc) == "function" then
 				ok, src = pcall(reqFunc, { Url = u, Method = "GET" })
-				if ok and src and type(src) == "table" and type(src.Body) == "string" and src.Body ~= "" then
-					if not src.Body:find("404") and not src.Body:find("Not Found") then
-						return src.Body
+				if ok and type(src) == "table" then
+					local body = src.Body or src.Content or ""
+					if valid(body) then
+						return body
 					end
 				end
 			end
@@ -73,9 +85,10 @@ local function fetch(url)
 	if type(HttpService.RequestAsync) == "function" then
 		for _, u in ipairs(urls) do
 			ok, src = pcall(HttpService.RequestAsync, HttpService, { Url = u, Method = "GET" })
-			if ok and src and type(src) == "table" and type(src.Body) == "string" and src.Body ~= "" then
-				if not src.Body:find("404") and not src.Body:find("Not Found") then
-					return src.Body
+			if ok and type(src) == "table" then
+				local body = src.Body or src.Content or ""
+				if valid(body) then
+					return body
 				end
 			end
 		end
