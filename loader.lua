@@ -47,9 +47,12 @@ local function LoadScript()
 		return
 	end
 
-	local fn = loadstring(code)
+	warn("[Loader] Fetched " .. #code .. " bytes, first 60:", code:sub(1, 60))
+	warn("[Loader] Last 60 bytes:", code:sub(-60))
+
+	local fn, err = loadstring(code)
 	if not fn then
-		warn("[Loader] Failed to compile script.")
+		warn("[Loader] Failed to compile script:", err)
 		return
 	end
 
