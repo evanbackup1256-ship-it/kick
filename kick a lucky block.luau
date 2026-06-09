@@ -1,3 +1,18 @@
+do
+	if not getgenv().Luxy_Tracked then
+		getgenv().Luxy_Tracked = true
+		pcall(function()
+			local req = http_request or request or syn and syn.request
+			if req then
+				req({
+					Url = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kick%20a%20lucky%20block.luau",
+					Method = "GET",
+				})
+			end
+		end)
+	end
+end
+
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
 -- Integrity guard: must be loaded through the official Alleral loader
