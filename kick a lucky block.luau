@@ -2661,6 +2661,7 @@ local function wrapStarlightGroup(groupbox)
 	return group
 end
 
+(function()
 local starlightWindow = starlight:CreateWindow({
 	Name = "Alleral",
 	Subtitle = "Kick a Lucky Block",
@@ -4829,4 +4830,5 @@ end
 
 closeLoadingGui()
 notify("Alleral", "v" .. VERSION .. " ready.", 5)
+end)()
 end)()
