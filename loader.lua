@@ -9,6 +9,13 @@ local function SafeGet(url)
 		warn("[Loader] Invalid URL:", url)
 		return nil
 	end
+	local httpReq = syn and syn.request or http_request or request or (http and http.request)
+	if httpReq then
+		local ok, resp = pcall(httpReq, {Url = url, Method = "GET"})
+		if ok and resp and resp.Body and resp.Body ~= "" then
+			return resp.Body
+		end
+	end
 	local success, result = pcall(function()
 		return game:HttpGet(url)
 	end)

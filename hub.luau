@@ -39,9 +39,7 @@ local function notify(title, text, duration)
 end
 
 local function fetchUrl(url)
-	local ok, data = pcall(function() return game:HttpGet(url) end)
-	if not ok or not data or data == "" or data:find("404: Not Found") then return nil end
-	return data
+	return fetchText(url)
 end
 
 local function safeCall(scope, cb)
@@ -74,15 +72,36 @@ end
 local STARLIGHT_SRC = "https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua"
 local STARLIGHT_LOCAL = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/starlight_repo/Source.lua"
 
+local function fetchText(url)
+	local httpReq = syn and syn.request or http_request or request or (http and http.request)
+	if httpReq then
+		local ok, resp = pcall(httpReq, {Url = url, Method = "GET"})
+		if ok and resp and resp.Body and resp.Body ~= "" then
+			return resp.Body
+		end
+	end
+	local ok, data = pcall(function() return game:HttpGet(url) end)
+	if ok and data and data ~= "" and not data:find("404: Not Found") then
+		return data
+	end
+	return nil
+end
+
 local function loadStarlight()
-	local ok, r = safeCall("LoadRemote", function()
-		return loadstring(patchStarlightSource(game:HttpGet(STARLIGHT_SRC)), "@Starlight")()
-	end)
-	if ok and type(r) == "table" and type(r.CreateWindow) == "function" then return r end
-	local ok2, r2 = safeCall("LoadLocal", function()
-		return loadstring(patchStarlightSource(game:HttpGet(STARLIGHT_LOCAL)), "@Starlight")()
-	end)
-	if ok2 and type(r2) == "table" and type(r2.CreateWindow) == "function" then return r2 end
+	local src = fetchText(STARLIGHT_SRC)
+	if src then
+		local ok, r = safeCall("LoadRemote", function()
+			return loadstring(patchStarlightSource(src), "@Starlight")()
+		end)
+		if ok and type(r) == "table" and type(r.CreateWindow) == "function" then return r end
+	end
+	local src2 = fetchText(STARLIGHT_LOCAL)
+	if src2 then
+		local ok2, r2 = safeCall("LoadLocal", function()
+			return loadstring(patchStarlightSource(src2), "@Starlight")()
+		end)
+		if ok2 and type(r2) == "table" and type(r2.CreateWindow) == "function" then return r2 end
+	end
 	return nil
 end
 
@@ -177,8 +196,8 @@ for idx, gameInfo in ipairs(gamesList) do
 
 	task.spawn(function()
 		local thumbUrl = "https://thumbnails.roblox.com/v1/places/gameicons?placeIds=" .. tostring((gameInfo.placeIds or {})[1] or "") .. "&size=512x512&format=Png"
-		local ok, json = pcall(function() return game:HttpGet(thumbUrl) end)
-		if ok and json and not json:find("404") then
+		local json = fetchText(thumbUrl)
+		if json and not json:find("404") then
 			local ok2, decoded = pcall(function() return HttpService:JSONDecode(json) end)
 			if ok2 and decoded and decoded.data and decoded.data[1] and decoded.data[1].imageUrl then
 				local imgUrl = decoded.data[1].imageUrl
