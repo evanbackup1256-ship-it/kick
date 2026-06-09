@@ -468,19 +468,27 @@ local function logError(scope, err, details)
 	if details and details ~= "" then
 		line = line .. " (" .. shortError(details) .. ")"
 	end
+	if type(rt) ~= "table" then
+		warn("[Alleral] " .. line)
+		return message
+	end
 	local signature = label .. "\0" .. message
 	local now = tick()
-	rt.errCounts[signature] = (rt.errCounts[signature] or 0) + 1
-	rt.lastError = line
-	if now - (rt.errSeen[signature] or 0) >= 5 then
-		rt.errSeen[signature] = now
-			rt.seshErrs = rt.seshErrs + 1
-		table.insert(rt.errLog, 1, line)
-		while #rt.errLog > 12 do
-			table.remove(rt.errLog)
-		end
-		warn("[Alleral] " .. line)
+	if type(rt.errCounts) == "table" then
+		rt.errCounts[signature] = (rt.errCounts[signature] or 0) + 1
 	end
+	rt.lastError = line
+	if type(rt.errSeen) == "table" and (now - (rt.errSeen[signature] or 0)) >= 5 then
+		rt.errSeen[signature] = now
+		rt.seshErrs = (rt.seshErrs or 0) + 1
+		if type(rt.errLog) == "table" then
+			table.insert(rt.errLog, 1, line)
+			while #rt.errLog > 12 do
+				table.remove(rt.errLog)
+			end
+		end
+	end
+	warn("[Alleral] " .. line)
 	if appendFile then
 		pcall(function()
 			if isFolder and makeFolder and not isFolder(settingsFolder) then
