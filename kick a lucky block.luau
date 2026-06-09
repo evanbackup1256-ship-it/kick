@@ -132,6 +132,10 @@ local TeleSvc = game:GetService("TeleportService")
 local VUser = game:GetService("VirtualUser")
 local SGui = game:GetService("StarterGui")
 local LP = Plrs.LocalPlayer
+if not LP then
+	Plrs:GetPropertyChangedSignal("LocalPlayer"):Wait()
+	LP = Plrs.LocalPlayer
+end
 
 if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
@@ -444,8 +448,9 @@ local listFiles   = execFunc("listfiles",  true)
 local appendFile  = execFunc("appendfile", true)
 local setClipboard = execFunc("setclipboard") or execFunc("toclipboard")
 local settingsFolder = "Alleral_Configs"
-local settingsFile = string.format("%s/KickBlox_v4_%s.json", settingsFolder, tostring(LP.UserId))
-local logFile = string.format("%s/KickBlox_v4_%s.log", settingsFolder, tostring(LP.UserId))
+local playerId = LP and tostring(LP.UserId) or "unknown"
+local settingsFile = string.format("%s/KickBlox_v4_%s.json", settingsFolder, playerId)
+local logFile = string.format("%s/KickBlox_v4_%s.log", settingsFolder, playerId)
 
 local function shortError(message)
 	message = tostring(message or "Unknown error"):gsub("%s+", " ")
