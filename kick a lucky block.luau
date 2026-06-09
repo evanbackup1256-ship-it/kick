@@ -890,11 +890,16 @@ if autoUpdate() then
 	return
 end
 
-local function patchStarlightSource(source)
+	local function patchStarlightSource(source)
 	source = source:gsub(
 		"function Tab:Show%(%)[\r\n]+%s*if Library%.ActiveTab then",
 		"function Tab:Show()\n\t\t\tif Library.ActiveTab == Tab then\n\t\t\t\treturn\n\t\t\tend\n\t\t\tif Library.ActiveTab then"
 	)
+	source = source:gsub("local Acrylic = isStudio and require%([^%)]+%)[^\n]+\n[^\n]+AcrylicModule[^\n]+\nAcrylic.Init%(%)\n", "local Acrylic = {Init=function() end}\n")
+	source = source:gsub("local function Hide%(Interface, JustHide: boolean%?, Notify: boolean%?, Bind: string%?%)",
+		"local function Hide(Interface, JustHide, Notify, Bind)\n\tdo if Interface and Interface.ClassName == \"ScreenGui\" then Interface.Enabled = false Starlight.Minimized = true return end end")
+	source = source:gsub("local function Unhide%(Interface%)",
+		"local function Unhide(Interface)\n\tdo if Interface and Interface.ClassName == \"ScreenGui\" then Interface.Enabled = true Starlight.Minimized = false return end end")
 	local inputStart = source:find("function Groupbox:CreateInput", 1, true)
 	local labelStart = inputStart and source:find("function Groupbox:CreateLabel", inputStart, true)
 	if not inputStart or not labelStart then
@@ -1740,34 +1745,35 @@ local function makeSupervisor(name, interval, callback)
 		while state.HubRunning and loopState.enabled and loopControllers[name] == loopState and loopState.token == myToken do
 			if starlight and (starlight.Minimized or not (starlight.Window and starlight.Window.Instance and starlight.Window.Instance.Parent)) then
 				task.wait(1)
-			end
-			local enabledCheck = supervisorEnabled[name]
-			if enabledCheck and not enabledCheck() then
-				task.wait(math.max(3, currentLoopInterval(name, interval) * 4))
 			else
-				local ok, err = pcall(callback)
-				loopState.lastRun = tick()
-				if not ok then
-					if name == "AutoPlaceBest" then
-						state.IsPlacingPet = false
-					elseif name == "Mastery" then
-						runtime.masteryBusy = false
-						runtime.nextMasteryAction = tick() + 1
-					end
-					runtime.lastLoopError = name .. ": " .. shortError(err)
-					logError("Loop:" .. name, err)
-					loopState.errors = loopState.errors + 1
-					if state.NotifyOnError and tick() >= (loopState.nextErrorNotify or 0) then
-						loopState.nextErrorNotify = tick() + (state.UIQuietMode and 20 or 10)
-						notify("Alleral", name .. " recovered: " .. tostring(err), 3)
-					end
-					task.wait(math.min(5, 0.5 + loopState.errors))
+				local enabledCheck = supervisorEnabled[name]
+				if enabledCheck and not enabledCheck() then
+					task.wait(math.max(3, currentLoopInterval(name, interval) * 4))
 				else
-					loopState.errors = 0
-					if shouldThrottleForFps(name) then
-						task.wait(math.max(2, currentLoopInterval(name, interval) * 2))
+					local ok, err = pcall(callback)
+					loopState.lastRun = tick()
+					if not ok then
+						if name == "AutoPlaceBest" then
+							state.IsPlacingPet = false
+						elseif name == "Mastery" then
+							runtime.masteryBusy = false
+							runtime.nextMasteryAction = tick() + 1
+						end
+						runtime.lastLoopError = name .. ": " .. shortError(err)
+						logError("Loop:" .. name, err)
+						loopState.errors = loopState.errors + 1
+						if state.NotifyOnError and tick() >= (loopState.nextErrorNotify or 0) then
+							loopState.nextErrorNotify = tick() + (state.UIQuietMode and 20 or 10)
+							notify("Alleral", name .. " recovered: " .. tostring(err), 3)
+						end
+						task.wait(math.min(5, 0.5 + loopState.errors))
 					else
-						task.wait(currentLoopInterval(name, interval))
+						loopState.errors = 0
+						if shouldThrottleForFps(name) then
+							task.wait(math.max(2, currentLoopInterval(name, interval) * 2))
+						else
+							task.wait(currentLoopInterval(name, interval))
+						end
 					end
 				end
 			end

@@ -109,6 +109,10 @@ local function patchStarlightSource(source)
 	source = source:gsub("function Tab:Show%(%)[\r\n]+%s*if Library%.ActiveTab then",
 		"function Tab:Show()\n\t\t\tif Library.ActiveTab == Tab then\n\t\t\t\treturn\n\t\t\tend\n\t\t\tif Library.ActiveTab then")
 	source = source:gsub("local Acrylic = isStudio and require%([^%)]+%)[^\n]+\n[^\n]+AcrylicModule[^\n]+\nAcrylic.Init%(%)\n", "local Acrylic = {Init=function() end}\n")
+	source = source:gsub("local function Hide%(Interface, JustHide: boolean%?, Notify: boolean%?, Bind: string%?%)",
+		"local function Hide(Interface, JustHide, Notify, Bind)\n\tdo if Interface and Interface.ClassName == \"ScreenGui\" then Interface.Enabled = false Starlight.Minimized = true return end end")
+	source = source:gsub("local function Unhide%(Interface%)",
+		"local function Unhide(Interface)\n\tdo if Interface and Interface.ClassName == \"ScreenGui\" then Interface.Enabled = true Starlight.Minimized = false return end end")
 	local inputStart = source:find("function Groupbox:CreateInput", 1, true)
 	local labelStart = inputStart and source:find("function Groupbox:CreateLabel", inputStart, true)
 	if not inputStart or not labelStart then return source end
