@@ -657,9 +657,18 @@ local function sendWebhook(url, payload)
 	if not ok then
 		return false, tostring(response)
 	end
-	local code = response and (response.StatusCode or response.Status or response.status_code)
-	if type(code) == "number" and (code < 200 or code >= 300) then
-		return false, "Webhook returned HTTP " .. tostring(code)
+	if not response then
+		return false, "No response from server."
+	end
+	local code = response.StatusCode or response.Status or response.status_code or response.StatusCode
+	local body = response.Body or response.Content or response.body or response.content
+	if type(code) == "number" then
+		if code < 200 or code >= 300 then
+			local detail = body and tostring(body):sub(1, 100) or ""
+			return false, "Webhook returned HTTP " .. tostring(code) .. (detail ~= "" and (": " .. detail) or "")
+		end
+	elseif response.Success == false or response.success == false then
+		return false, "Webhook request failed: " .. tostring(body or "unknown error")
 	end
 	return true, nil
 end
@@ -2782,6 +2791,24 @@ hubInfoGroup:CreateButton("Copy Support Info", function()
 	if setclipboard then setclipboard(summary) end
 	notify("Hub", "Support info copied.", 3)
 end)
+hubInfoGroup:CreateDivider()
+hubInfoGroup:CreateButton("Uninject", function()
+	notify("Hub", "Uninjecting...", 3)
+	task.spawn(function()
+		state.HubRunning = false
+		local env = getgenv()
+		env.Starlight = nil
+		env.Library = nil
+		env.AlleralLib = nil
+		env.Alleral_State = nil
+		env.Alleral_Hub = nil
+		env.Alleral_Boot = nil
+		env.Alleral_Tracked = nil
+		env.Alleral_Hub_Settings = nil
+		env.AlleralAlleral = nil
+	end)
+end)
+hubInfoGroup:CreateDivider()
 
 local hubGameStatus = hubGamesGroup:CreateStatus("Status", {
 	["Game"] = "Kick a Lucky Block",
@@ -4267,6 +4294,9 @@ end)
 	if runtime.battleCooldownUntil and tick() < runtime.battleCooldownUntil then
 		return
 	end
+	if state.AAutoKickStyle then
+		equipKickStyle(state.TargetKickStyle)
+	end
 	if not state.AFarm and not battleActive then
 		return
 	end
@@ -4514,9 +4544,6 @@ makeSupervisor("Economy", 2, function()
 		safeCall("AutoPlotUpgrade", function()
 			remotes.plotUpgrade:FireServer()
 		end)
-	end
-	if state.AAutoKickStyle then
-		equipKickStyle(state.TargetKickStyle)
 	end
 end)
 
