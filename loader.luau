@@ -12,7 +12,7 @@
 		getgenv().Alleral_Reload()
 ]]
 
-local LOADER_VERSION = "2.4"
+local LOADER_VERSION = "2.5"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local FETCH_RETRIES = 3
 local FETCH_BACKOFF = 0.75
@@ -152,6 +152,7 @@ local GAMES = {
 			"kick a lucky block.luau",
 		},
 		scriptUrl = REPO_BASE .. "/src/kick_a_lucky_block.luau",
+		sourceMarker = "Alleral_Starlight",
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Shared" }, 20)
 			local areas = Workspace:WaitForChild("Areas", 20)
@@ -323,40 +324,58 @@ local function discoverLocalFiles(fileNames)
 	return found
 end
 
-local function withCacheBust(url)
+local function withCacheBust(url, nonce)
 	local sep = url:find("?") and "&" or "?"
-	return url .. sep .. "v=" .. LOADER_VERSION
+	return url .. sep .. "v=" .. LOADER_VERSION .. "&t=" .. tostring(nonce or os.time())
 end
 
-local function fetchRemote(url, label)
-	if not httpRequest then
-		return nil, "HTTP is not available"
-	end
-	local fetchUrl = withCacheBust(url)
+local function fetchRemote(url, label, marker)
 	local lastErr = nil
-	for attempt = 1, FETCH_RETRIES do
-		local ok, response = pcall(httpRequest, {
-			Url = fetchUrl,
-			Method = "GET",
-		})
-		if ok and response then
-			local status = response.StatusCode or response.status or 0
-			local body = response.Body or response.body or ""
-			if status >= 200 and status < 300 and body ~= "" then
-				return body, nil
+	local nonces = { os.time(), os.time() + 1, math.random(100000, 999999) }
+
+	for attempt = 1, #nonces do
+		local fetchUrl = withCacheBust(url, nonces[attempt])
+
+		if httpRequest then
+			local ok, response = pcall(httpRequest, {
+				Url = fetchUrl,
+				Method = "GET",
+			})
+			if ok and response then
+				local status = response.StatusCode or response.status or 0
+				local body = response.Body or response.body or ""
+				if status >= 200 and status < 300 and body ~= "" then
+					if not marker or body:find(marker, 1, true) then
+						return body, nil
+					end
+					lastErr = label .. " response looked cached/outdated"
+				else
+					lastErr = string.format("%s HTTP %s (empty=%s)", label, tostring(status), tostring(body == ""))
+				end
+			else
+				lastErr = tostring(response)
 			end
-			lastErr = string.format("%s HTTP %s (empty=%s)", label, tostring(status), tostring(body == ""))
-		else
-			lastErr = tostring(response)
 		end
-		if attempt < FETCH_RETRIES then
+
+		if type(game.HttpGet) == "function" then
+			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
+			if ok and body and body ~= "" and not body:find("404: Not Found") then
+				if not marker or body:find(marker, 1, true) then
+					return body, nil
+				end
+				lastErr = label .. " HttpGet response looked cached/outdated"
+			end
+		end
+
+		if attempt < #nonces then
 			task.wait(FETCH_BACKOFF * attempt)
 		end
 	end
+
 	return nil, lastErr or "Download failed"
 end
 
-local function resolveFromFiles(files, label, url)
+local function resolveFromFiles(files, label, url, marker)
 	local devMode = ENV.Alleral_DevMode == true
 	local preferLocal = devMode or ENV.Alleral_PreferLocal == true
 	if preferLocal and CAPABILITIES.readfile then
@@ -373,7 +392,7 @@ local function resolveFromFiles(files, label, url)
 		end
 	end
 	if url then
-		local source, err = fetchRemote(url, label)
+		local source, err = fetchRemote(url, label, marker)
 		if source then
 			return source, url
 		end
@@ -384,7 +403,58 @@ local function resolveFromFiles(files, label, url)
 	return nil, "No " .. label .. " source found"
 end
 
-local function compileAndRun(source, chunkName)
+local ENV_BRIDGE = [=[
+do
+	local bridge = shared
+	if type(bridge) == "table" and getgenv then
+		local g = getgenv()
+		if type(g) == "table" then
+			if bridge.Alleral_Starlight then g.Alleral_Starlight = bridge.Alleral_Starlight end
+			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
+			if bridge.Alleral_Analytics then g.Alleral_Analytics = bridge.Alleral_Analytics end
+			if bridge.Alleral_Boot then g.Alleral_Boot = bridge.Alleral_Boot end
+			g.Alleral_State = g.Alleral_State or bridge.Alleral_State or {}
+			if type(bridge.Alleral_State) == "table" then
+				for key, value in pairs(bridge.Alleral_State) do
+					if g.Alleral_State[key] == nil then
+						g.Alleral_State[key] = value
+					end
+				end
+			end
+			bridge.Alleral_State = g.Alleral_State
+		end
+	end
+end
+]=]
+
+local function publishBridge()
+	ENV.Alleral_State = ENV.Alleral_State or {}
+	pcall(function()
+		shared.Alleral_Starlight = ENV.Alleral_Starlight
+		shared.Alleral_Core = ENV.Alleral_Core
+		shared.Alleral_Analytics = ENV.Alleral_Analytics
+		shared.Alleral_State = ENV.Alleral_State
+		shared.Alleral_Boot = true
+		shared.Alleral_StartupFailed = nil
+	end)
+end
+
+local function patchGameSource(profile, source)
+	if profile.id == "kick_a_lucky_block" then
+		if source:find("HTTP is unavailable; cannot load Starlight", 1, true) then
+			source = source:gsub(
+				"(local function loadStarlight%(%)\r?\n)",
+				"%1\tif shared and type(shared.Alleral_Starlight) == \"table\" then return shared.Alleral_Starlight end\n"
+					.. "\tif getgenv and type((getgenv()).Alleral_Starlight) == \"table\" then return getgenv().Alleral_Starlight end\n",
+				1
+			)
+			log("warn", "Patched cached Kick script to use preloaded Starlight")
+		end
+	end
+	return ENV_BRIDGE .. "\n" .. source
+end
+
+local function compileAndRun(source, chunkName, runEnv)
 	if not loadStringFn then
 		return false, "loadstring is not available"
 	end
@@ -392,11 +462,34 @@ local function compileAndRun(source, chunkName)
 	if not compiled then
 		return false, "Compile failed: " .. tostring(compileErr)
 	end
+	if runEnv and setfenv then
+		pcall(setfenv, compiled, runEnv)
+	end
 	local ok, runErr = pcall(compiled)
 	if not ok then
 		return false, "Runtime error: " .. tostring(runErr)
 	end
 	return true
+end
+
+local function readStartupFailure()
+	local fail = ENV.Alleral_StartupFailed
+	pcall(function()
+		if shared and shared.Alleral_StartupFailed then
+			fail = fail or shared.Alleral_StartupFailed
+		end
+	end)
+	if ENV.Alleral_State and ENV.Alleral_State.StartupFailed then
+		fail = fail or ENV.Alleral_State.StartupFailed
+	end
+	ENV.Alleral_StartupFailed = nil
+	pcall(function()
+		shared.Alleral_StartupFailed = nil
+	end)
+	if ENV.Alleral_State then
+		ENV.Alleral_State.StartupFailed = nil
+	end
+	return fail
 end
 
 local function unloadPrevious()
@@ -426,7 +519,7 @@ local function preloadCore(required)
 	end
 	ENV.Alleral_Core = nil
 	ENV.Alleral_Starlight = nil
-	local source, sourceLabel = resolveFromFiles(SHARED_CORE_FILES, "core", SHARED_CORE_URL)
+	local source, sourceLabel = resolveFromFiles(SHARED_CORE_FILES, "core", SHARED_CORE_URL, "Alleral_Core")
 	if not source then
 		if required then
 			return false, sourceLabel
@@ -447,7 +540,7 @@ local function preloadCore(required)
 end
 
 local function preloadAnalytics()
-	local source, sourceLabel = resolveFromFiles(SHARED_ANALYTICS_FILES, "analytics", SHARED_ANALYTICS_URL)
+	local source, sourceLabel = resolveFromFiles(SHARED_ANALYTICS_FILES, "analytics", SHARED_ANALYTICS_URL, "Alleral_Analytics")
 	if not source then
 		log("warn", "Analytics skipped: " .. tostring(sourceLabel))
 		return false
@@ -462,7 +555,7 @@ local function preloadAnalytics()
 end
 
 local function runGameScript(profile)
-	local source, sourceLabel = resolveFromFiles(profile.scriptFiles, "script", profile.scriptUrl)
+	local source, sourceLabel = resolveFromFiles(profile.scriptFiles, "script", profile.scriptUrl, profile.sourceMarker)
 	if not source then
 		return false, sourceLabel
 	end
@@ -471,8 +564,16 @@ local function runGameScript(profile)
 		return false, "Downloaded script looks truncated (" .. tostring(#source) .. " bytes)"
 	end
 
+	if profile.sourceMarker and not source:find(profile.sourceMarker, 1, true) then
+		if source:find("HTTP is unavailable; cannot load Starlight", 1, true) then
+			return false, "Executor returned a cached outdated Kick script — run the loader again"
+		end
+		log("warn", profile.name .. " download may be outdated (missing " .. profile.sourceMarker .. ")")
+	end
+
 	log("info", string.format("Loading %s v%s from %s", profile.name, profile.version or "?", sourceLabel))
 
+	publishBridge()
 	ENV.Alleral_Boot = true
 	ENV.Alleral_LoaderMeta = {
 		version = LOADER_VERSION,
@@ -482,16 +583,19 @@ local function runGameScript(profile)
 		loadedAt = os.time(),
 	}
 
-	local ok, runErr = compileAndRun(source, "Alleral/" .. profile.id)
+	source = patchGameSource(profile, source)
+	local ok, runErr = compileAndRun(source, "Alleral/" .. profile.id, ENV)
 	ENV.Alleral_Boot = nil
+	pcall(function()
+		shared.Alleral_Boot = nil
+	end)
 
 	if not ok then
 		return false, runErr
 	end
-	if ENV.Alleral_StartupFailed then
-		local failMsg = tostring(ENV.Alleral_StartupFailed)
-		ENV.Alleral_StartupFailed = nil
-		return false, failMsg
+	local failMsg = readStartupFailure()
+	if failMsg then
+		return false, tostring(failMsg)
 	end
 	return true
 end

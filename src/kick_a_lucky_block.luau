@@ -1,3 +1,33 @@
+do
+	local bridge = shared
+	if type(bridge) == "table" and getgenv then
+		local g = getgenv()
+		if type(g) == "table" then
+			if bridge.Alleral_Starlight then
+				g.Alleral_Starlight = bridge.Alleral_Starlight
+			end
+			if bridge.Alleral_Core then
+				g.Alleral_Core = bridge.Alleral_Core
+			end
+			if bridge.Alleral_Analytics then
+				g.Alleral_Analytics = bridge.Alleral_Analytics
+			end
+			if bridge.Alleral_Boot then
+				g.Alleral_Boot = bridge.Alleral_Boot
+			end
+			g.Alleral_State = g.Alleral_State or bridge.Alleral_State or {}
+			if type(bridge.Alleral_State) == "table" then
+				for key, value in pairs(bridge.Alleral_State) do
+					if g.Alleral_State[key] == nil then
+						g.Alleral_State[key] = value
+					end
+				end
+			end
+			bridge.Alleral_State = g.Alleral_State
+		end
+	end
+end
+
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
 if not getgenv().Alleral_Boot then
@@ -1041,6 +1071,10 @@ local function loadStarlightFromLocal()
 end
 
 local function loadStarlight()
+	if type(shared) == "table" and type(shared.Alleral_Starlight) == "table" and type(shared.Alleral_Starlight.CreateWindow) == "function" then
+		return shared.Alleral_Starlight
+	end
+
 	local env = getgenv and getgenv() or {}
 	if type(env.Alleral_Starlight) == "table" and type(env.Alleral_Starlight.CreateWindow) == "function" then
 		return env.Alleral_Starlight
@@ -1085,9 +1119,16 @@ end
 local starlight = loadStarlight()
 if not starlight or type(starlight.CreateWindow) ~= "function" then
 	logError("Starlight", "Starlight Interface Suite was not available; startup aborted.")
+	local failMsg = "Starlight unavailable"
 	if getgenv then
-		getgenv().Alleral_StartupFailed = "Starlight unavailable"
+		getgenv().Alleral_StartupFailed = failMsg
+		if getgenv().Alleral_State then
+			getgenv().Alleral_State.StartupFailed = failMsg
+		end
 	end
+	pcall(function()
+		shared.Alleral_StartupFailed = failMsg
+	end)
 	return
 end
 
