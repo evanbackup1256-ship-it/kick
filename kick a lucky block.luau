@@ -15,8 +15,6 @@ end
 
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
--- Integrity guard: must be loaded through the official Alleral loader
--- The loader injects a session key; direct copies won't have it.
 if not getgenv().Alleral_Boot then
 	warn("[Alleral] Unauthorized copy — use the official loader")
 	return
@@ -154,7 +152,6 @@ local defaults = {
 	AutoPlaceInterval = 1.5,
 	AutoKickInterval = 0.3,
 	MasteryInterval = 1,
-	-- New v6.0 features
 	ANotifyRare = false,
 	NotifyRarityThreshold = "Legendary",
 	AKickVariance = false,
@@ -268,11 +265,6 @@ local function notify(title, text, duration)
 	end)
 end
 
--- Executor detection runs once at startup. Two goals:
---   1. Some executors (old Yub builds, Arceus) have broken file APIs we must skip.
---   2. HTTP request and connection-inspection globals vary by executor.
--- We probe namespaces and known globals rather than relying solely on the name
--- string, since many executors lie, truncate, or don't expose identifyexecutor.
 local Executor = (function()
 	local env = {}
 	pcall(function()
@@ -289,7 +281,6 @@ local Executor = (function()
 		return type(v) == "table" and v or nil
 	end
 
-	-- Try every common name-identification API in priority order
 	local rawName = ""
 	for _, id in ipairs({ "identifyexecutor", "getexecutorname", "whatexecutor" }) do
 		local f = fn(id)
@@ -302,10 +293,8 @@ local Executor = (function()
 		end
 	end
 
-	-- Normalise: lowercase, drop whitespace, keep only the base token
 	local name = rawName:lower():gsub("%s+", ""):match("^[%a][%w%-_%.]*") or ""
 
-	-- Namespace/global fingerprinting — fallback when the name is missing/useless
 	if name == "" then
 		if tbl("syn") and type(env.syn.request) == "function" then
 			name = "synapse"
@@ -341,6 +330,30 @@ local Executor = (function()
 			name = "codex"
 		elseif tbl("Ronix") then
 			name = "ronix"
+		elseif tbl("Nihon") then
+			name = "nihon"
+		elseif tbl("Vega") or tbl("VegaX") then
+			name = "vegax"
+		elseif tbl("Comet") then
+			name = "comet"
+		elseif tbl("Trigon") then
+			name = "trigon"
+		elseif tbl("Cryptic") then
+			name = "cryptic"
+		elseif tbl("Hydrogen") then
+			name = "hydrogen"
+		elseif tbl("Sentinel") then
+			name = "sentinel"
+		elseif tbl("Serenity") then
+			name = "serenity"
+		elseif tbl("Atlantis") then
+			name = "atlantis"
+		elseif tbl("Zorara") then
+			name = "zorara"
+		elseif tbl("Aztup") then
+			name = "aztup"
+		elseif tbl("Nixware") then
+			name = "nixware"
 		elseif fn("queue_on_teleport") and fn("getgc") then
 			name = "synapse"
 		else
@@ -348,12 +361,12 @@ local Executor = (function()
 		end
 	end
 
-	-- Executors whose file-system implementations are known broken/unsafe.
-	-- We simply skip those APIs rather than letting them silently corrupt data.
 	local FS_BROKEN = {
 		yub = true,
 		yubx = true,
 		arceus = true,
+		vegax = true,
+		comet = true,
 	}
 	local fsOk = not FS_BROKEN[name]
 
@@ -372,12 +385,33 @@ local Executor = (function()
 		hasGetConn = type(env.getconnections) == "function" or type(env.get_signal_cons) == "function",
 		hasClipboard = type(env.setclipboard) == "function" or type(env.toclipboard) == "function",
 		hasFireTouch = type(env.firetouchinterest) == "function",
-		env        = env,
+			hasDrawing = tbl("Drawing") or tbl("drawing"),
+			hasMouse = type(env.mouse1click) == "function" or type(env.mouse1press) == "function",
+			hasProximityPrompt = type(env.fireproximityprompt) == "function",
+			hasHookFunction = type(env.hookfunction) == "function" or type(env.hookfunc) == "function",
+			hasGetGC = type(env.getgc) == "function",
+			hasGetConstants = type(env.getconstants) == "function" or type(env.debug_getconstants) == "function",
+			hasGetInfo = type(env.getinfo) == "function" or type(env.debug_getinfo) == "function",
+			hasFireClickDetector = type(env.fireclickdetector) == "function",
+			hasSaveInstance = type(env.saveinstance) == "function",
+			hasSetFpsCap = type(env.setfpscap) == "function",
+			hasQueueOnTeleport = type(env.queue_on_teleport) == "function",
+			hasIsLClosure = type(env.islclosure) == "function" or type(env.checkclosure) == "function",
+			hasGetNamecallMethod = type(env.getnamecallmethod) == "function",
+			hasSetNamecallMethod = type(env.setnamecallmethod) == "function",
+			hasNewCClosure = type(env.newcclosure) == "function",
+			hasGetRawMetatable = type(env.getrawmetatable) == "function",
+			hasSetReadOnly = type(env.setreadonly) == "function" or type(env.makereadonly) == "function",
+			hasWebSocket = type(env.WebSocket) == "table" and type(env.WebSocket.connect) == "function",
+			hasLoadstring = type(env.loadstring) == "function",
+			hasGetScriptClosure = type(env.getscriptclosure) == "function",
+			hasGetHiddenUI = type(env.gethiddenui) == "function" or type(env.get_hidden_ui) == "function",
+			hasGetNilInstances = type(env.getnilinstances) == "function",
+			hasSetClipboard = type(env.setclipboard) == "function" or type(env.toclipboard) == "function",
+			env        = env,
 	}
 end)()
 
--- Retrieve a callable from the executor env. Pass noFs=true to block it on
--- executors whose file APIs are broken (avoids silent corruption).
 local function execFunc(name, noFs)
 	if noFs and not Executor.fsOk then
 		return nil
@@ -518,12 +552,9 @@ end
 
 clampSettings()
 
--- Uses Executor.env so we don't need to reference bare globals that might not
--- exist at parse time on strict executor environments.
 local function requestFunction()
 	local e = Executor.env
 	local candidates = {
-		-- executor-specific namespaces first (most reliable)
 		type(e.syn)         == "table" and type(e.syn.request)          == "function" and e.syn.request          or nil,
 		type(e.fluxus)      == "table" and type(e.fluxus.request)       == "function" and e.fluxus.request       or nil,
 		type(e.http)        == "table" and type(e.http.request)         == "function" and e.http.request         or nil,
@@ -531,12 +562,15 @@ local function requestFunction()
 		type(e.Xeno)        == "table" and type(e.Xeno.request)         == "function" and e.Xeno.request         or nil,
 		type(e.Volt)        == "table" and type(e.Volt.request)         == "function" and e.Volt.request         or nil,
 		type(e.Madium)      == "table" and type(e.Madium.request)       == "function" and e.Madium.request       or nil,
-		-- UNC globals
+		type(e.Nihon)       == "table" and type(e.Nihon.request)        == "function" and e.Nihon.request        or nil,
+		type(e.Cryptic)     == "table" and type(e.Cryptic.request)      == "function" and e.Cryptic.request      or nil,
+		type(e.Sentinel)    == "table" and type(e.Sentinel.request)     == "function" and e.Sentinel.request     or nil,
+		type(e.Serenity)    == "table" and type(e.Serenity.request)     == "function" and e.Serenity.request     or nil,
+		type(e.Atlantis)    == "table" and type(e.Atlantis.request)     == "function" and e.Atlantis.request     or nil,
+		type(e.Zorara)      == "table" and type(e.Zorara.request)       == "function" and e.Zorara.request       or nil,
 		e.http_request,
 		e.request,
-		-- Wave executor capitalises the global
 		e.Request,
-		-- Roblox built-in HttpService as last resort (safeCall handles errors)
 		type(HttpService.RequestAsync) == "function" and function(req)
 			return HttpService:RequestAsync(req)
 		end or nil,
@@ -554,10 +588,12 @@ local function getConnectionFetcher()
 	local candidates = {
 		e.getconnections,
 		e.get_signal_cons,
-		-- some executor forks add a numeric suffix
 		e.getconnections2,
 		e.get_signal_connections,
 		e.debug_getconnections,
+		e.getconnections3,
+		e.get_signal_connections2,
+		e.getconnections4,
 	}
 	for _, candidate in ipairs(candidates) do
 		if type(candidate) == "function" then
@@ -768,48 +804,7 @@ local function loadLuaSource(source, label)
 		local env = getgenv()
 		return env.Starlight or env.Library or env.AlleralLib
 	end
-	return nil
-end
-
-local function loadLocalLua(path, label)
-	if loadfile then
-		local ok, chunk = safeCall("LoadFile:" .. tostring(label), function()
-			return loadfile(path)
-		end)
-		if ok and chunk then
-			local runOk, result = safeCall("RunLocalLua:" .. tostring(label), chunk)
-			if runOk then
-				if result then
-					return result
-				end
-				if getgenv then
-					local env = getgenv()
-					return env.Starlight or env.Library or env.AlleralLib
-				end
-				return nil
-			end
-			logError("Loader", "Failed to run " .. label .. ": " .. tostring(result))
-		end
-	end
-	if not readFile then
-		return nil
-	end
-	if isFile then
-		local ok, exists = safeCall("IsLocalLua:" .. tostring(label), function()
-			return isFile(path)
-		end)
-		if not ok or not exists then
-			return nil
-		end
-	end
-	local ok, source = safeCall("ReadLocalLua:" .. tostring(label), function()
-		return readFile(path)
-	end)
-	if not ok then
-		logError("Loader", "Failed to read " .. tostring(label) .. ": " .. tostring(source))
-		return nil
-	end
-	return loadLuaSource(source, label)
+return nil
 end
 
 local function loadRemoteLua(url, label)
@@ -835,7 +830,6 @@ end
 local STARLIGHT_SOURCE_URL =
 	"https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua"
 
--- Executor compatibility notification
 do
 	local execName = Executor and Executor.name or "unknown"
 	local execRaw = Executor and Executor.rawName or ""
@@ -846,6 +840,9 @@ do
 		oxygenu = true, awp = true, evon = true,
 		solara = true, xeno = true, volt = true, potassium = true,
 		madium = true, velocity = true, codex = true, ronix = true,
+		nihon = true, vegax = true, comet = true, trigon = true,
+		cryptic = true, hydrogen = true, sentinel = true, serenity = true,
+		atlantis = true, zorara = true, aztup = true, nixware = true,
 	}
 	local compat = compatMap[display:lower()] or false
 	if display == "unknown" then
@@ -1018,8 +1015,6 @@ local function mainFilterMatches(brainrot, mutation)
 	local brainrotOk = selectionMatches(state.TBrainrot, brainrot, normalizeText)
 	local rarityOk = selectionMatches(state.TRarity, rarityFor(brainrot, "Unknown"), normalizeText)
 	local mutationOk = selectionMatches(state.TMutation, mutation, normalizeMutation)
-	-- Suppress non-mutated brainrots only when the filter is not a wildcard AND
-	-- the user has not explicitly selected "None" in the filter list.
 	if not hasWildcard(state.TMutation)
 		and normalizeMutation(mutation) == "None"
 		and not tableFind(listFromSelection(state.TMutation), "None")
@@ -1034,12 +1029,10 @@ local function parseNumber(value)
 		return value
 	end
 	local text = tostring(value or ""):gsub("[,%s%$]", "")
-	-- Standard scientific notation: e.g. "1.5e3" → 1500
 	local mantissa, exponent = text:match("^(%-?[%d%.]+)[eE](%-?%d+)$")
 	if mantissa and exponent then
 		return (tonumber(mantissa) or 0) * (10 ^ (tonumber(exponent) or 0))
 	end
-	-- Number with optional K/M/B/T/… suffix; allow leading minus
 	local number, suffix = text:match("^(%-?[%d%.]+)(%a*)$")
 	local valueNumber = tonumber(number or text) or 0
 	local powers = { K = 3, M = 6, B = 9, T = 12, Q = 15, Qi = 18, S = 21, Sp = 24, O = 27, N = 30, D = 33 }
@@ -1126,9 +1119,9 @@ end)
 loadModule("rebirthService", "RebirthServiceClient", function()
 	return ReplicatedStorage.Modules.ServicesLoader.RebirthServiceClient
 end)
-	loadModule("weatherService", "WeatherServiceClient", function()
-		return ReplicatedStorage.Modules.ServicesLoader.WeatherService_Client
-	end)
+loadModule("weatherService", "WeatherServiceClient", function()
+	return ReplicatedStorage.Modules.ServicesLoader.WeatherService_Client
+end)
 
 if modules.mutationData and modules.mutationData.ValidMutations then
 	gameData.MutationOptions = modules.mutationData.ValidMutations
@@ -1179,7 +1172,6 @@ local function refreshRemotes()
 	network = network and network:FindFirstChild("Packages")
 	network = network and network:FindFirstChild("Network")
 
-	-- Primary alias lookup (covers original names + common renamed variants)
 	remotes.kick           = safeFindRemote(network, { "rev_KickEvent", "KickEvent", "rev_kickevent", "KickRemote", "rev_Kick" })
 	remotes.collect        = safeFindRemote(network, { "rev_B_Collect", "B_Collect", "Collect", "CollectCash", "rev_Collect" })
 	remotes.upgradeBrainrot= safeFindRemote(network, { "rev_B_Upgrade", "B_Upgrade", "UpgradeBrainrot", "BrainrotUpgrade", "rev_Upgrade" })
@@ -1192,15 +1184,11 @@ local function refreshRemotes()
 	remotes.plotUpgrade    = safeFindRemote(network, { "rev_bs_upgrade", "bs_upgrade", "PlotUpgrade", "UpgradePlot", "rev_PlotUpgrade" })
 	remotes.weather        = safeFindRemote(network, { "rev_sbe", "sbe", "SummonWeather", "WeatherSummon", "rev_Weather" })
 	remotes.place          = safeFindRemote(network, { "rev_S_Interact", "S_Interact", "PlaceBrainrot", "PlacePet", "rev_Place" })
-	-- Battle remotes: confirmed names from game source use rev_bs_battle_* prefix
 	remotes.battleCreate   = safeFindRemote(network, { "rev_bs_battle_create", "ref_battle_create", "rev_battle_create", "battle_create", "BattleCreate" })
 	remotes.battleInvite   = safeFindRemote(network, { "rev_bs_battle_invite", "ref_battle_invite", "rev_battle_invite", "battle_invite", "BattleInvite" })
 	remotes.battleStart    = safeFindRemote(network, { "rev_bs_battle_start",  "rev_battle_start",  "battle_start", "BattleStart", "StartBattle" })
-	-- Kick style: confirmed name is rev_KickStyle (no 'Equip' suffix)
 	remotes.kickStyle      = safeFindRemote(network, { "rev_KickStyle", "rev_KickStyleEquip", "KickStyleEquip", "EquipKickStyle" })
 
-	-- Dynamic fallback: scan the network folder for remotes not caught above.
-	-- Matches by pattern against the lowercase name; won't overwrite existing hits.
 	if network then
 		for _, child in ipairs(network:GetChildren()) do
 			if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
@@ -1302,9 +1290,6 @@ local function brainrotCps(name, mutation, level)
 	local base = parseNumber(entry.CPS or entry.CashPerSecond or entry.BaseCPS or 0)
 	local lvl = math.max(1, tonumber(level) or 1)
 
-	-- Level scaling: check for explicit per-level data before falling back to
-	-- simple linear scaling. Many games add a fixed amount per upgrade rather
-	-- than multiplying the whole value.
 	local leveledBase
 	if entry.CPSPerLevel or entry.CashPerSecondPerLevel then
 		local perLvl = parseNumber(entry.CPSPerLevel or entry.CashPerSecondPerLevel or 0)
@@ -1313,11 +1298,9 @@ local function brainrotCps(name, mutation, level)
 		local m = parseNumber(entry.LevelMultiplier or 1)
 		leveledBase = base * (1 + (lvl - 1) * (m - 1))
 	else
-		-- Default: linear (base × level). Works for most KickBlox games.
 		leveledBase = base * lvl
 	end
 
-	-- Mutation multiplier
 	local multiplier = 1
 	local mutData = modules.mutationData
 	if mutData and mutData.Mutations and mutData.Mutations[mutation] then
@@ -1336,8 +1319,9 @@ local function brainrotCps(name, mutation, level)
 	return leveledBase * multiplier
 end
 
--- Sum of CPS for all brainrots currently placed in the player's plot.
--- Returns 0 when the plot is inaccessible (used for UI display only).
+-- Forward-declared: defined further down, but referenced by totalPlotCps.
+local placedBrainrotInfo
+
 local function totalPlotCps()
 	local plot = findPlot()
 	if not plot or not plot:FindFirstChild("Slots") then return 0 end
@@ -1381,8 +1365,6 @@ local function characterParts()
 	return character, humanoid, root
 end
 
--- Fire a remote regardless of whether it is a RemoteEvent or RemoteFunction.
--- Tries FireServer first (the common case), falls back to InvokeServer.
 local function fireRemote(remote, ...)
 	if not remote then return false end
 	local args = { ... }
@@ -1398,21 +1380,18 @@ local function currentBattleStatus()
 		return runtime.cachedBattleStatus
 	end
 	local status = nil
-	-- Primary: read from the KickBattles UI module
 	safeCall("BattleStatus", function()
 		local m = require(ReplicatedStorage.Modules.UILoader.KickBattlesUI)
 		if m and m.CurrentStatus ~= nil then
 			status = tostring(m.CurrentStatus)
 		end
 	end)
-	-- Fallback: player attribute set by the server
 	if not status then
 		local attr = LocalPlayer:GetAttribute("BattleStatus")
 		if attr ~= nil then
 			status = tostring(attr)
 		end
 	end
-	-- Normalise known "not in battle" variants to nil so callers can use `== nil`
 	if status == "None" or status == "" then
 		status = nil
 	end
@@ -1718,7 +1697,7 @@ local function protectedSlotLabel(name, mutation)
 	return string.format("%s [%s]", tostring(name), normalizeMutation(mutation))
 end
 
-local function placedBrainrotInfo(placed)
+function placedBrainrotInfo(placed)
 	if not placed then
 		return nil
 	end
@@ -3141,7 +3120,6 @@ tuningGroup:CreateSlider(
 	"How often the backpack is scanned to queue new tools for auto-favoriting."
 )
 
--- AUTO KICK (primary toggle — goes first so it's immediately visible)
 kickGroup:CreateToggle(
 	"Auto Kick",
 	state.AFarm,
@@ -3167,7 +3145,6 @@ kickGroup:CreateSlider(
 	"How fast the script teleports your character to the KickReady position each kick cycle. Higher = snappier movement."
 )
 kickGroup:CreateDivider()
--- Kick power settings
 kickGroup:CreateDropdown(
 	"Minigame Accuracy",
 	{ "Bad", "Mid", "Good", "Great", "Excellent", "Perfect", "Cosmic" },
@@ -3198,9 +3175,7 @@ kickGroup:CreateSlider(
 	"Custom power as a percentage (0–100). Only applied when Power Scale Mode is Micro or Nano."
 )
 kickGroup:CreateDivider()
--- Forward-declare so the toggle callback below can reference it before assignment
 local predictionStatus
--- Live prediction display
 kickGroup:CreateToggle(
 	"Show Prediction",
 	state.APredict,
@@ -3244,7 +3219,6 @@ kickGroup:CreateButton(
 	end,
 	"Zero out kick/match/reset counters and restart the session timer."
 )
--- Roll filters (what brainrots to keep vs. reset)
 filterGroup:AddDropdown("FilterBrainrot", {
 	Text = "Filter: Brainrot",
 	Values = gameData.BrainrotOptions,
@@ -3429,7 +3403,6 @@ upgradeGroup:CreateSlider(
 	"Seconds to wait between consecutive upgrade remote calls per slot."
 )
 
--- Weight buying (most impactful — first)
 economyGroup:CreateToggle(
 	"Auto Buy Best Weight",
 	state.ABuyBest,
@@ -3635,7 +3608,6 @@ battleGroup:CreateSlider(
 	"Minimum number of other players needed in the lobby before it will be started."
 )
 
--- Forward-declare so the toggle callback can reference them before they're assigned
 local masteryStatus
 local updateMasteryStatus
 
@@ -3787,7 +3759,6 @@ webhookGroup:CreateInput(
 	"Must be a valid Discord webhook URL (https://discord.com/api/webhooks/...)."
 )
 webhookGroup:CreateDivider()
--- Inventory alert filters
 webhookGroup:AddDropdown("WebhookBrainrot", {
 	Text = "Notify: Brainrot",
 	Values = gameData.BrainrotOptions,
@@ -3825,7 +3796,6 @@ webhookGroup:AddDropdown("WebhookMutation", {
 	end,
 })
 webhookGroup:CreateDivider()
--- Inventory status tracker
 webhookGroup:CreateToggle(
 	"Auto Send Progress",
 	state.AutoStatusWebhook,
@@ -3856,7 +3826,6 @@ webhookGroup:CreateButton(
 	"Force an immediate inventory summary webhook, bypassing the timer."
 )
 webhookGroup:CreateDivider()
--- Status summary filters
 webhookGroup:AddDropdown("Status Brainrot", {
 	Text = "Status Filter: Brainrot",
 	Values = gameData.BrainrotOptions,
@@ -3934,7 +3903,6 @@ task.spawn(function()
 			diagnosticsStatus:Update("Last Error", runtime.lastError or runtime.lastLoopError or "--")
 			diagnosticsStatus:Update("Recent Error", runtime.errorLog[1] or "--")
 
-			-- Session stats (update them here since this loop already runs every 2s)
 			if sessionStatus and sessionStatus.Update then
 				local elapsed = math.floor(tick() - (runtime.sessionStart or tick()))
 				sessionStatus:Update("Time",    string.format("%d:%02d", math.floor(elapsed / 60), elapsed % 60))
@@ -4049,17 +4017,12 @@ makeSupervisor("Prediction", 1, function()
 	local parts = string.split(inGame, ",")
 	local name     = trim(parts[1] or "Unknown")
 	local mutation = normalizeMutation(parts[2] or "None")
-	-- Some game versions embed rarity at index 4 (index 3 = level sent by server)
-	local serverLevel  = tonumber(parts[3])
+	local _serverLevel = tonumber(parts[3])
 	local serverRarity = parts[4] and trim(parts[4]) ~= "" and trim(parts[4]) or nil
 	local rarity   = rarityFor(name, serverRarity or "Unknown")
 
-	-- CPS at level 1 (a fresh drop always arrives at level 1)
 	local cps1 = brainrotCps(name, mutation, 1)
 
-	-- Net-gain: difference between this brainrot's level-1 CPS and whatever
-	-- is currently the weakest slot in the plot. Tells you at a glance whether
-	-- placing it would actually help.
 	local netGainStr = "?"
 	local plot = findPlot()
 	if cps1 and plot and plot:FindFirstChild("Slots") then
@@ -4090,7 +4053,6 @@ makeSupervisor("Prediction", 1, function()
 		end
 	end
 
-	-- Track best match seen this session
 	if cps1 and cps1 > (runtime.sessionBestCps or 0) then
 		runtime.sessionBestCps = cps1
 		runtime.sessionBestName = name
@@ -4199,7 +4161,6 @@ makeSupervisor("AutoKick", 0.3, function()
 			remotes.kick:FireServer(accuracy, power)
 		end)
 		runtime.sessionKicks = (runtime.sessionKicks or 0) + 1
-		-- sliding-window kicks-per-minute
 		local _now = tick()
 		table.insert(runtime.kickRateWindow, _now)
 		while runtime.kickRateWindow[1] and _now - runtime.kickRateWindow[1] > 60 do
@@ -4461,14 +4422,12 @@ makeSupervisor("Battle", 4, function()
 	refreshRemotes()
 	local status = currentBattleStatus()
 
-	-- Not in any battle state: try to create a new lobby
 	if status == nil and remotes.battleCreate then
 		if tick() < (runtime.nextBattleCreate or 0) then
 			return
 		end
-		runtime.nextBattleCreate = tick() + 8  -- longer cooldown avoids spam
+		runtime.nextBattleCreate = tick() + 8
 		task.spawn(function()
-			-- battleCreate is a RemoteEvent (rev_bs_battle_create), use FireServer
 			safeCall("BattleCreate", function()
 				fireRemote(remotes.battleCreate,
 					{ GP = state.BattleGamepass, R = tonumber(state.BattleRounds) or 3 })
@@ -4477,7 +4436,6 @@ makeSupervisor("Battle", 4, function()
 		return
 	end
 
-	-- In the lobby: invite all players and start when ready
 	if status == "Lobby" or status == "GP" then
 		if remotes.battleInvite and tick() >= (runtime.nextBattleInvite or 0) then
 			runtime.nextBattleInvite = tick() + 5
@@ -4485,7 +4443,6 @@ makeSupervisor("Battle", 4, function()
 				if player ~= LocalPlayer then
 					task.spawn(function()
 						safeCall("BattleInvite", function()
-							-- battleInvite is a RemoteEvent, use FireServer
 							fireRemote(remotes.battleInvite, player)
 						end)
 					end)
@@ -4494,7 +4451,6 @@ makeSupervisor("Battle", 4, function()
 			end
 		end
 
-		-- Count other players shown in the KickBattles lobby GUI
 		local playersInLobby = 0
 		local countedPlayers = {}
 		local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
@@ -4518,7 +4474,6 @@ makeSupervisor("Battle", 4, function()
 				end
 			end
 		end
-		-- Also count by Players service as a fallback (if GUI count is unreliable)
 		if playersInLobby == 0 then
 			playersInLobby = math.max(0, #Players:GetPlayers() - 1)
 		end
@@ -4591,8 +4546,6 @@ makeSupervisor("Mastery", 1, function()
 		runtime.masteryBusy = false
 	end
 
-	-- Wrap the entire body so masteryBusy ALWAYS gets cleared even if something
-	-- throws. Without this guard a single error locks mastery forever.
 	local _bodyOk, _bodyErr = pcall(function()
 		updateMasteryStatus("Scanning...")
 		refreshRemotes()
@@ -4628,7 +4581,6 @@ makeSupervisor("Mastery", 1, function()
 				root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 				task.wait(0.05)
 			end
-			-- TP out of the minigame arena entirely
 			root.CFrame = kickReady.CFrame * CFrame.new(0, -8, 0)
 			task.wait(0.2)
 			root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
@@ -4636,7 +4588,6 @@ makeSupervisor("Mastery", 1, function()
 		else
 			updateMasteryStatus("Resetting (Died)")
 			local gui2 = LocalPlayer:FindFirstChild("PlayerGui")
-			-- KickMinigame is the minigame GUI that appears while a round is active
 			local minigame = gui2 and (
 				gui2:FindFirstChild("KickMinigame")
 				or gui2:FindFirstChild("MinigameUI")
@@ -4644,11 +4595,9 @@ makeSupervisor("Mastery", 1, function()
 			)
 			local timeout = tick() + 3
 			if minigame then
-				-- Wait for minigame to become enabled (round started)
 				while not minigame.Enabled and tick() < timeout and state.AAutoMastery do
 					task.wait(0.05)
 				end
-				-- Wait for minigame to finish
 				while minigame.Enabled and tick() < timeout and state.AAutoMastery do
 					task.wait(0.05)
 				end
