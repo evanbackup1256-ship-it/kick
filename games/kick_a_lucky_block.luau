@@ -5710,4 +5710,3 @@ notify("Alleral", "v" .. VERSION .. " loaded. Tabs on the left.", 5)
 end
 
 startRuntime()
-
