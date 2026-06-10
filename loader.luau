@@ -1,4 +1,4 @@
-local LOADER_VERSION = "3.1"
+local LOADER_VERSION = "3.1.1"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local FETCH_RETRIES = 3
 local FETCH_BACKOFF = 0.75
@@ -22,9 +22,10 @@ local SHARED_TELEMETRY_FILES = {
 local OWNER_TELEMETRY_FILES = {
 	"../Alleral-Private/owner_telemetry.luau",
 	"../../Alleral-Private/owner_telemetry.luau",
+	"kick/../Alleral-Private/owner_telemetry.luau",
+	"kick/kick/../Alleral-Private/owner_telemetry.luau",
 	"Alleral-Private/owner_telemetry.luau",
 	"kick/Alleral-Private/owner_telemetry.luau",
-	"config/owner_telemetry.luau",
 	"owner_telemetry.luau",
 }
 local TELEMETRY_MODULE_VERSION = "2.2"
@@ -593,29 +594,93 @@ local function preloadAnalytics()
 	return ENV.Alleral_Analytics ~= nil
 end
 
+local function ownerTelemetryValid(cfg)
+	return type(cfg) == "table"
+		and cfg.enabled ~= false
+		and trim(cfg.relayUrl or "") ~= ""
+		and trim(cfg.apiKey or "") ~= ""
+end
+
+local function loadOwnerTelemetryTable(raw, label)
+	if type(raw) ~= "string" or raw == "" or not loadStringFn then
+		return nil
+	end
+	local compiled = loadStringFn(raw, "Alleral/owner_telemetry")
+	if not compiled then
+		return nil
+	end
+	local ok, result = pcall(compiled)
+	if ok and ownerTelemetryValid(result) then
+		return result, label
+	end
+	return nil
+end
+
 local function loadOwnerTelemetryConfig()
-	if type(ENV.Alleral_OwnerTelemetry) == "table" then
-		local cfg = ENV.Alleral_OwnerTelemetry
-		if cfg.enabled ~= false and trim(cfg.relayUrl or "") ~= "" and trim(cfg.apiKey or "") ~= "" then
-			return true
+	if ownerTelemetryValid(ENV.Alleral_OwnerTelemetry) then
+		return true
+	end
+
+	for _, path in ipairs(OWNER_TELEMETRY_FILES) do
+		if isFile and readFile and isFile(path) then
+			local cfg, label = loadOwnerTelemetryTable(readFile(path), path)
+			if cfg then
+				ENV.Alleral_OwnerTelemetry = cfg
+				log("info", "Telemetry config loaded from " .. label)
+				return true
+			end
 		end
 	end
-	for _, path in ipairs(OWNER_TELEMETRY_FILES) do
-		if isFile and isFile(path) and readFile then
-			local raw = readFile(path)
-			if type(raw) == "string" and raw ~= "" then
-				local compiled = loadStringFn and loadStringFn(raw, "Alleral/owner_telemetry")
-				if compiled then
-					local ok, result = pcall(compiled)
-					if ok and type(result) == "table" then
-						ENV.Alleral_OwnerTelemetry = result
-						log("info", "Telemetry config loaded")
-						return true
+
+	if CAPABILITIES.readfile then
+		for _, hit in ipairs(discoverLocalFiles({
+			"owner_telemetry.luau",
+			"../Alleral-Private/owner_telemetry.luau",
+			"Alleral-Private/owner_telemetry.luau",
+		})) do
+			local cfg, label = loadOwnerTelemetryTable(hit.source, hit.path)
+			if cfg then
+				ENV.Alleral_OwnerTelemetry = cfg
+				log("info", "Telemetry config loaded from " .. label)
+				return true
+			end
+		end
+		if listFiles then
+			local queue = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
+			local seen = {}
+			local scanned = 0
+			while #queue > 0 and scanned < 80 do
+				local dir = table.remove(queue, 1)
+				if not seen[dir] then
+				seen[dir] = true
+				scanned = scanned + 1
+				local ok, entries = pcall(listFiles, dir)
+				if ok and type(entries) == "table" then
+					for _, entry in ipairs(entries) do
+						local path = entry
+						if dir ~= "" and not path:find("/", 1, true) then
+							path = dir .. entry
+						end
+						if path:find("owner_telemetry%.luau$") then
+							local cfg, label = loadOwnerTelemetryTable(readLocalFile(path), path)
+							if cfg then
+								ENV.Alleral_OwnerTelemetry = cfg
+								log("info", "Telemetry config loaded from " .. label)
+								return true
+							end
+						elseif path:find("Alleral%-Private", 1, true) and isFile and isFile(path) then
+							table.insert(queue, path .. "/")
+						elseif path:sub(-1) == "/" or (isFile and not isFile(path) and listFiles(path)) then
+							table.insert(queue, path:gsub("/$", "") .. "/")
+						end
 					end
+				end
 				end
 			end
 		end
 	end
+
+	ENV.Alleral_OwnerTelemetry = nil
 	return false
 end
 
@@ -680,7 +745,7 @@ local function preloadTelemetry()
 		end)
 		log("info", "Telemetry on" .. (relayHost ~= "" and (" (" .. relayHost .. ")") or ""))
 	else
-		log("info", "Telemetry off (no relay config)")
+		log("info", "Telemetry off (set getgenv().Alleral_OwnerTelemetry before loader)")
 	end
 	return telemetry ~= nil
 end
