@@ -1,4 +1,4 @@
-local LOADER_VERSION = "3.1.1"
+local LOADER_VERSION = "3.1.2"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local FETCH_RETRIES = 3
 local FETCH_BACKOFF = 0.75
@@ -646,15 +646,19 @@ local function loadOwnerTelemetryConfig()
 			end
 		end
 		if listFiles then
-			local queue = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
-			local seen = {}
-			local scanned = 0
-			while #queue > 0 and scanned < 80 do
-				local dir = table.remove(queue, 1)
-				if not seen[dir] then
-				seen[dir] = true
-				scanned = scanned + 1
-				local ok, entries = pcall(listFiles, dir)
+			local scanRoots = {
+				"",
+				"kick/",
+				"kick/kick/",
+				"workspace/",
+				"scripts/",
+				"../",
+				"../Alleral-Private/",
+				"Alleral-Private/",
+			}
+			for _, dir in ipairs(scanRoots) do
+				local listPath = dir == "" and "" or dir:gsub("/$", "")
+				local ok, entries = pcall(listFiles, listPath)
 				if ok and type(entries) == "table" then
 					for _, entry in ipairs(entries) do
 						local path = entry
@@ -668,13 +672,8 @@ local function loadOwnerTelemetryConfig()
 								log("info", "Telemetry config loaded from " .. label)
 								return true
 							end
-						elseif path:find("Alleral%-Private", 1, true) and isFile and isFile(path) then
-							table.insert(queue, path .. "/")
-						elseif path:sub(-1) == "/" or (isFile and not isFile(path) and listFiles(path)) then
-							table.insert(queue, path:gsub("/$", "") .. "/")
 						end
 					end
-				end
 				end
 			end
 		end
