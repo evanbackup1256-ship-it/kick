@@ -1551,9 +1551,9 @@ local function refreshRemotes()
 	remotes.plotUpgrade    = safeFindRemote(network, { "rev_bs_upgrade", "bs_upgrade", "PlotUpgrade", "UpgradePlot", "rev_PlotUpgrade" })
 	remotes.weather        = safeFindRemote(network, { "rev_sbe", "sbe", "SummonWeather", "WeatherSummon", "rev_Weather" })
 	remotes.place          = safeFindRemote(network, { "rev_S_Interact", "S_Interact", "PlaceBrainrot", "PlacePet", "rev_Place" })
-	remotes.battleCreate   = safeFindRemote(network, { "rev_bs_battle_create", "ref_battle_create", "rev_battle_create", "battle_create", "BattleCreate" })
-	remotes.battleInvite   = safeFindRemote(network, { "rev_bs_battle_invite", "ref_battle_invite", "rev_battle_invite", "battle_invite", "BattleInvite" })
-	remotes.battleStart    = safeFindRemote(network, { "rev_bs_battle_start",  "rev_battle_start",  "battle_start", "BattleStart", "StartBattle" })
+	remotes.battleCreate   = safeFindRemote(network, { "rev_bs_battle_create", "ref_bs_battle_create", "ref_battle_create", "rev_battle_create", "battle_create", "BattleCreate" })
+	remotes.battleInvite   = safeFindRemote(network, { "rev_bs_battle_invite", "ref_bs_battle_invite", "ref_battle_invite", "rev_battle_invite", "battle_invite", "BattleInvite" })
+	remotes.battleStart    = safeFindRemote(network, { "rev_bs_battle_start",  "ref_bs_battle_start",  "rev_battle_start",  "battle_start", "BattleStart", "StartBattle" })
 	remotes.kickStyle      = safeFindRemote(network, { "rev_KickStyle", "rev_KickStyleEquip", "KickStyleEquip", "EquipKickStyle" })
 
 	if network then
@@ -1915,6 +1915,93 @@ local function kickPower()
 		mathClamp((state.CustomKickPowerPercent or 100) / 100, 0, 1) / divisor
 end
 
+local function masteryKickArgs()
+	local power = mathClamp((state.MasteryKickPower or 50) / 100, 0, 1)
+	local divisor = 1
+	if state.KickPowerMode == "Micro" then
+		divisor = 100
+	elseif state.KickPowerMode == "Nano" then
+		divisor = 10000
+	end
+	return 0.05, power / divisor
+end
+
+local function syncMasteryKickPercent()
+	if modules.kickService then
+		safeCall("MasteryKickServicePercent", function()
+			modules.kickService.Percent = mathClamp((state.MasteryKickPower or 50) / 100, 0, 1)
+		end)
+	end
+end
+
+local function getNetworkModule()
+	local ok, network = safeCall("RequireNetwork", function()
+		return require(ReplicatedStorage.Shared.Packages.Network)
+	end)
+	if ok then
+		return network
+	end
+	return nil
+end
+
+local function fireNetworkEvent(eventName, ...)
+	local network = getNetworkModule()
+	if not network or type(network.FireServer) ~= "function" then
+		return false
+	end
+	local args = { ... }
+	local ok = pcall(function()
+		network.FireServer(eventName, table.unpack(args))
+	end)
+	return ok
+end
+
+local function clickGuiButton(button)
+	local connectionFetcher = getConnectionFetcher()
+	if not connectionFetcher or not button then
+		return false
+	end
+	local fired = false
+	safeCall("ClickGuiButton", function()
+		for _, connection in ipairs(connectionFetcher(button.MouseButton1Click)) do
+			connection:Fire()
+			fired = true
+		end
+		for _, connection in ipairs(connectionFetcher(button.Activated)) do
+			connection:Fire()
+			fired = true
+		end
+	end)
+	return fired
+end
+
+local function clickBattleButtons(keywords)
+	local gui = LocalPlayer:FindFirstChild("PlayerGui")
+	if not gui then
+		return false
+	end
+	local clicked = false
+	local scanned = 0
+	for _, item in ipairs(gui:GetDescendants()) do
+		scanned = scanned + 1
+		if scanned > 300 then
+			break
+		end
+		if (item:IsA("TextButton") or item:IsA("ImageButton")) and item.Visible and item.Active then
+			local text = (item:IsA("TextButton") and item.Text or item.Name or ""):lower()
+			for _, keyword in ipairs(keywords) do
+				if text:find(keyword:lower(), 1, true) then
+					if clickGuiButton(item) then
+						clicked = true
+					end
+					break
+				end
+			end
+		end
+	end
+	return clicked
+end
+
 local function characterParts()
 	local character = LocalPlayer.Character
 	local humanoid = character and character:FindFirstChild("Humanoid")
@@ -1930,6 +2017,72 @@ local function fireRemote(remote, ...)
 		ok = pcall(function() remote:InvokeServer(table.unpack(args)) end)
 	end
 	return ok
+end
+
+local function fireBattleCreate()
+	local rounds = tonumber(state.BattleRounds) or 3
+	local payload = { GP = state.BattleGamepass, R = rounds }
+	if remotes.battleCreate then
+		if fireRemote(remotes.battleCreate, payload) then
+			return true
+		end
+		if fireRemote(remotes.battleCreate, state.BattleGamepass, rounds) then
+			return true
+		end
+	end
+	for _, eventName in ipairs({
+		"bs_battle_create",
+		"rev_bs_battle_create",
+		"ref_bs_battle_create",
+		"battle_create",
+	}) do
+		if fireNetworkEvent(eventName, payload) or fireNetworkEvent(eventName, state.BattleGamepass, rounds) then
+			return true
+		end
+	end
+	return clickBattleButtons({ "create", "host", "battle" })
+end
+
+local function fireBattleInvite(player)
+	if not player then
+		return false
+	end
+	if remotes.battleInvite then
+		if fireRemote(remotes.battleInvite, player) then
+			return true
+		end
+		if fireRemote(remotes.battleInvite, player.UserId) then
+			return true
+		end
+	end
+	for _, eventName in ipairs({
+		"bs_battle_invite",
+		"rev_bs_battle_invite",
+		"ref_bs_battle_invite",
+		"battle_invite",
+	}) do
+		if fireNetworkEvent(eventName, player) or fireNetworkEvent(eventName, player.UserId) then
+			return true
+		end
+	end
+	return clickBattleButtons({ "invite", player.Name:lower(), player.DisplayName:lower() })
+end
+
+local function fireBattleStart()
+	if remotes.battleStart and fireRemote(remotes.battleStart) then
+		return true
+	end
+	for _, eventName in ipairs({
+		"bs_battle_start",
+		"rev_bs_battle_start",
+		"ref_bs_battle_start",
+		"battle_start",
+	}) do
+		if fireNetworkEvent(eventName) then
+			return true
+		end
+	end
+	return clickBattleButtons({ "start", "begin", "play" })
 end
 
 local function currentBattleStatus()
@@ -5366,28 +5519,25 @@ makeSupervisor("Battle", 4, function()
 	refreshRemotes()
 	local status = currentBattleStatus()
 
-	if status == nil and remotes.battleCreate then
+	if (status == nil or status == "Create") and status ~= "Battle" then
 		if tick() < (runtime.nextBattleCreate or 0) then
 			return
 		end
 		runtime.nextBattleCreate = tick() + 8
 		task.spawn(function()
-			safeCall("BattleCreate", function()
-				fireRemote(remotes.battleCreate,
-					{ GP = state.BattleGamepass, R = tonumber(state.BattleRounds) or 3 })
-			end)
+			safeCall("BattleCreate", fireBattleCreate)
 		end)
 		return
 	end
 
 	if status == "Lobby" or status == "GP" then
-		if remotes.battleInvite and tick() >= (runtime.nextBattleInvite or 0) then
+		if tick() >= (runtime.nextBattleInvite or 0) then
 			runtime.nextBattleInvite = tick() + 5
 			for _, player in ipairs(Players:GetPlayers()) do
 				if player ~= LocalPlayer then
 					task.spawn(function()
 						safeCall("BattleInvite", function()
-							fireRemote(remotes.battleInvite, player)
+							fireBattleInvite(player)
 						end)
 					end)
 					task.wait(0.3)
@@ -5430,27 +5580,30 @@ makeSupervisor("Battle", 4, function()
 		end
 
 		if
-			remotes.battleStart
-			and playersInLobby >= (state.BattleMinPlayers - 1)
+			playersInLobby >= (state.BattleMinPlayers - 1)
 			and tick() >= (runtime.nextBattleStart or 0)
 		then
 			runtime.nextBattleStart = tick() + 4
-			safeCall("BattleStart", function()
-				remotes.battleStart:FireServer()
-			end)
+			safeCall("BattleStart", fireBattleStart)
 		end
 	end
 end)
 
 makeSupervisor("AcceptBattle", 6, function()
-	local connectionFetcher = getConnectionFetcher()
-	if not state.AAutoAcceptBattle or not connectionFetcher then
+	if not state.AAutoAcceptBattle then
 		return
 	end
 	if tick() < (runtime.nextAcceptBattleScan or 0) then
 		return
 	end
 	runtime.nextAcceptBattleScan = tick() + (runtime.performanceMode == "Safe" and 8 or 5)
+	if clickBattleButtons({ "accept", "join", "terima" }) then
+		return
+	end
+	local connectionFetcher = getConnectionFetcher()
+	if not connectionFetcher then
+		return
+	end
 	local gui = LocalPlayer:FindFirstChild("PlayerGui")
 	if not gui then
 		return
@@ -5474,12 +5627,7 @@ makeSupervisor("AcceptBattle", 6, function()
 					end
 					parent = parent.Parent
 				end
-				if related then
-					for _, connection in ipairs(connectionFetcher(item.Activated)) do
-						safeCall("AcceptBattleButton", function()
-							connection:Fire()
-						end)
-					end
+				if related and clickGuiButton(item) then
 					return
 				end
 			end
@@ -5527,13 +5675,16 @@ makeSupervisor("Mastery", 1, function()
 		if inGame == "" then
 			if (root.Position - kickReady.Position).Magnitude > 5 then
 				ui.updateMasteryStatus("Walking to pad")
-				root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
+				fastMove(root, kickReady.CFrame * CFrame.new(0, 3, 0), state.VolcanoTweenSpeed)
 				finish(0.4)
 				return
 			end
+			restoreCamera(humanoid)
+			syncMasteryKickPercent()
 			ui.updateMasteryStatus("Kicking")
+			local accuracy, power = masteryKickArgs()
 			safeCall("MasteryKick", function()
-				remotes.kick:FireServer(0, (state.MasteryKickPower or 50) / 100)
+				remotes.kick:FireServer(accuracy, power)
 			end)
 			finish(1.2)
 			return

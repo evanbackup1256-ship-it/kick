@@ -254,6 +254,32 @@ local GAMES = {
 				and remotes:FindFirstChild("Plot") ~= nil
 		end,
 	},
+	{
+		id = "survive_a_zombie_arena",
+		name = "Survive a Zombie Arena",
+		version = "1.0",
+		needsCore = true,
+		placeIds = { 114204398207377 },
+		scriptFiles = {
+			"games/survive_a_zombie_arena.luau",
+			"src/survive_a_zombie_arena.luau",
+			"survive_a_zombie_arena.luau",
+		},
+		scriptUrl = REPO_BASE .. "/games/survive_a_zombie_arena.luau",
+		preload = function()
+			waitForPath(ReplicatedStorage, { "ZombieRemotes", "ZombieDamage" }, 20)
+			waitForPath(ReplicatedStorage, { "WaveRemotes", "SkipVote" }, 15)
+			return true
+		end,
+		validate = function()
+			local zombieRemotes = ReplicatedStorage:FindFirstChild("ZombieRemotes")
+			local waveRemotes = ReplicatedStorage:FindFirstChild("WaveRemotes")
+			return zombieRemotes ~= nil
+				and zombieRemotes:FindFirstChild("ZombieDamage") ~= nil
+				and waveRemotes ~= nil
+				and waveRemotes:FindFirstChild("SkipVote") ~= nil
+		end,
+	},
 }
 
 local function resolveUniverseId()
@@ -321,7 +347,7 @@ end
 
 local function discoverLocalFiles(fileNames)
 	local found = {}
-	if not listFiles or not isFile then
+	if not readFile then
 		return found
 	end
 	local roots = {
@@ -822,6 +848,7 @@ local function preflight()
 end
 
 local function main()
+	log("info", "Alleral loader " .. LOADER_VERSION)
 	if ENV.Alleral_LoaderRunning then
 		log("warn", "Already running, call getgenv().Alleral_Reload() after unload")
 		return
