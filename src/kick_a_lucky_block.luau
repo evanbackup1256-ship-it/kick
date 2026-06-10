@@ -51,6 +51,7 @@ local runtime = {
 	nextAutoKickReset = 0,
 	flashCollectSession = 0,
 	cachedWeights = nil,
+	brainrotCpsCache = {},
 	cachedPlot = nil,
 	cachedPlotAt = 0,
 	nextPlotLookup = 0,
@@ -1334,7 +1335,6 @@ end
 
 local modules = {
 	entitiesData = nil,
-	luckyBlocksData = nil,
 	mutationData = nil,
 	weightsData = nil,
 	speedData = nil,
@@ -1419,16 +1419,15 @@ local function retryMissingModules()
 			loadModule(key, entry.label, entry.resolver, entry.optional)
 		end
 	end
+	if modules.entitiesData and not next(runtime.brainrotCpsCache) then
+		refreshBrainrotCpsCache()
+	end
 	bindProgressionModules()
 end
 
 loadModule("entitiesData", "EntitiesData", function()
 	return rsChild("Shared", "Data", "EntitiesData")
 end, false)
-loadModule("luckyBlocksData", "LuckyBlocksData", function()
-	return rsChild("Shared", "Data", "LuckyBlocksData")
-		or ReplicatedStorage:FindFirstChild("LuckyBlocksData", true)
-end, true)
 loadModule("mutationData", "MutationData", function()
 	return rsChild("Shared", "Data", "MutationData")
 end, true)
@@ -1460,6 +1459,26 @@ end, true)
 loadModule("weatherService", "WeatherServiceClient", function()
 	return rsChild("Modules", "ServicesLoader", "WeatherService_Client")
 end, true)
+loadModule("serverLuckClient", "ServerLuckClient", function()
+	return rsChild("Modules", "ServicesLoader", "ServerLuckClient")
+end, true)
+
+local function refreshBrainrotCpsCache()
+	runtime.brainrotCpsCache = {}
+	local brainrots = modules.entitiesData and modules.entitiesData.Brainrots
+	if not brainrots then
+		return
+	end
+	for name, entry in pairs(brainrots) do
+		if entry and entry.CPS ~= nil then
+			runtime.brainrotCpsCache[name] = coerceNumber(entry.CPS)
+		end
+	end
+end
+
+if modules.entitiesData then
+	refreshBrainrotCpsCache()
+end
 
 if modules.mutationData and modules.mutationData.ValidMutations then
 	gameData.MutationOptions = modules.mutationData.ValidMutations
@@ -1502,7 +1521,8 @@ local function refreshRemotes()
 	remotes.speedUpgrade   = safeFindRemote(network, { "rev_SPEED_UPGRADE", "SPEED_UPGRADE", "SpeedUpgrade", "rev_SpeedUp" })
 	remotes.shopBuy        = safeFindRemote(network, { "rev_Shop_Buy", "Shop_Buy", "ShopBuy", "BuyItem", "rev_Buy" })
 	remotes.weightEquip    = safeFindRemote(network, { "rev_WeightEquip", "WeightEquip", "EquipWeight", "rev_Equip" })
-	remotes.sellAll        = safeFindRemote(network, { "rev_B_SellAll", "ref_B_SellAll", "B_SellAll", "SellAll", "SellAllBrainrots" })
+	remotes.sellAll        = safeFindRemote(network, { "ref_B_SellAll", "rev_B_SellAll", "B_SellAll", "SellAll", "SellAllBrainrots" })
+	remotes.sell           = safeFindRemote(network, { "ref_B_Sell", "rev_B_Sell", "B_Sell", "SellBrainrot", "Sell" })
 	remotes.toggleFavorite = safeFindRemote(network, { "rev_ToggleFav", "ToggleFav", "FavoriteTool", "rev_Fav" })
 	remotes.rebirth        = safeFindRemote(network, { "rev_RebirthRequest", "RebirthRequest", "Rebirth", "DoRebirth", "rev_Rebirth" })
 	remotes.plotUpgrade    = safeFindRemote(network, { "rev_bs_upgrade", "bs_upgrade", "PlotUpgrade", "UpgradePlot", "rev_PlotUpgrade" })
@@ -1625,13 +1645,34 @@ local function rarityMeetsThreshold(rarity, threshold)
 	return rank >= minimum
 end
 
+local FALLBACK_MUTATION_MULTIPLIERS = {
+	Golden = 1.5,
+	Diamond = 2,
+	Plasma = 4,
+	Molten = 6,
+	Radioactive = 8,
+	Void = 10,
+	Shadow = 12,
+	Electrified = 16,
+	Rainbow = 30,
+	Virus = 10,
+	Wet = 16,
+	Alien = 22,
+	Bacon = 30,
+	Enchanted = 12,
+	Phantom = 35,
+	Astral = 35,
+	Volcanic = 35,
+}
+
 local function brainrotCps(name, mutation, level)
 	local brainrots = modules.entitiesData and modules.entitiesData.Brainrots
 	if not brainrots or not brainrots[name] then
 		return nil
 	end
 	local entry = brainrots[name]
-	local base = parseNumber(entry.CPS or entry.CashPerSecond or entry.BaseCPS or 0)
+	local base = runtime.brainrotCpsCache[name]
+		or parseNumber(entry.CPS or entry.CashPerSecond or entry.BaseCPS or 0)
 	local lvl = math.max(1, tonumber(level) or 1)
 
 	local leveledBase
@@ -1657,24 +1698,16 @@ local function brainrotCps(name, mutation, level)
 			multiplier = tonumber(mutation:sub(2)) or 1
 		elseif mutation and mutation:lower():match("^%d+x$") then
 			multiplier = tonumber(mutation:match("^(%d+)")) or 1
+		elseif mutation and FALLBACK_MUTATION_MULTIPLIERS[mutation] then
+			multiplier = FALLBACK_MUTATION_MULTIPLIERS[mutation]
 		end
 	end
 
 	return leveledBase * multiplier
 end
 
-local function luckyBlocksSource()
-	if modules.luckyBlocksData and modules.luckyBlocksData.LuckyBlocks then
-		return modules.luckyBlocksData
-	end
-	if modules.entitiesData and modules.entitiesData.LuckyBlocks then
-		return modules.entitiesData
-	end
-	return nil
-end
-
 local function rollChanceFor(name)
-	local data = luckyBlocksSource()
+	local data = modules.entitiesData
 	if not data or not data.LuckyBlocks then
 		return "Unknown"
 	end
