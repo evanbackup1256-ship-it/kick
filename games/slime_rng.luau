@@ -1,12 +1,12 @@
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
 if not getgenv().Alleral_Boot then
-	warn("[Alleral] Not the official script — grab it from the real loader")
+	warn("[Alleral] run loader.luau first")
 	return
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.0"
+local VERSION = "1.1"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {}
@@ -21,12 +21,16 @@ local starlight
 local bootErr
 local bootApi = getgenv().Alleral_Core
 if not bootApi or not bootApi.prepareGame then
-	warn("[Alleral] Core missing — run loader.luau first")
+	local msg = "Core missing, run loader.luau first"
+	getgenv().Alleral_StartupFailed = msg
+	warn("[Alleral] " .. msg)
 	return
 end
 Core, starlight, bootErr = bootApi.prepareGame(state)
 if not Core or not starlight then
-	warn("[Alleral] Boot failed: " .. tostring(bootErr))
+	local msg = "Boot failed: " .. tostring(bootErr)
+	getgenv().Alleral_StartupFailed = msg
+	warn("[Alleral] " .. msg)
 	return
 end
 
@@ -74,6 +78,7 @@ local defaults = {
 	FPSBoost = false,
 	DisableMusic = false,
 	Freecam = false,
+	AntiAFK = true,
 	LastTeleportedZone = nil,
 	PreviousKnownMaxZone = nil,
 }
@@ -112,6 +117,7 @@ local savedKeys = {
 	"FPSBoost",
 	"DisableMusic",
 	"Freecam",
+	"AntiAFK",
 }
 
 for key, value in pairs(defaults) do
@@ -178,6 +184,25 @@ end
 local dataClient
 pcall(function()
 	dataClient = require(ReplicatedStorage.Packages.DataService).client
+end)
+
+local function waitForGameData(maxAttempts)
+	for _ = 1, maxAttempts or 10 do
+		if dataClient and type(dataClient.get) == "function" then
+			local inventory = dataClient:get("inventory")
+			local zone = dataClient:get("maxZone") or dataClient:get("zone")
+			if inventory and zone then
+				return true
+			end
+		end
+		task.wait(0.5)
+	end
+	warn("[Alleral] Timeout loading Slime RNG data.")
+	return false
+end
+
+task.spawn(function()
+	waitForGameData(10)
 end)
 
 local Zones
@@ -840,76 +865,86 @@ local function equipBestSlimes()
 		return
 	end
 	state.equipLock = true
-	local upgrades = dataClient:get("upgrades") or {}
-	local slotCount = InventoryServiceUtils.getOwnedSlotCount(upgrades, 0) or 1
-	local mode = state.BestMode[1] or "Any"
-	local ranked = {}
-	for slimeKey, slimeValue in pairs(inventory) do
-		local slimeData = InventoryServiceUtils.getSlimeData(slimeKey, slimeValue)
-		if slimeData then
-			local stats = InventoryServiceUtils.getSlimeStatsFromData(slimeData)
-			local damage = (stats and stats.damage) or 0
-			local health = (stats and stats.health) or 0
-			local dps = InventoryServiceUtils.getDpsFromData(slimeData) or 0
-			local level = slimeData.level or 1
-			local xp = InventoryServiceUtils.getAccumulatedXp(slimeData) or 0
-			local rarity = InventoryServiceUtils.getRarity(slimeData) or 0
-			local hasMutation = slimeData.mutations and next(slimeData.mutations) ~= nil
-			local score
-			if mode == "Damage" then
-				score = damage
-			elseif mode == "Health" then
-				score = health
-			elseif mode == "DPS" then
-				score = dps
-			elseif mode == "Level" then
-				score = level
-			elseif mode == "XP" then
-				score = xp
-			elseif mode == "Rarity" then
-				score = rarity
-			elseif mode == "Mutation" then
-				score = (hasMutation and 10000000 or 0) + dps
-			else
-				score = damage + health
-			end
-			local copies = type(slimeValue) == "number" and slimeValue or 1
-			for _ = 1, copies do
-				table.insert(ranked, { id = slimeKey, score = score, rarity = rarity })
-			end
-		end
-	end
-	table.sort(ranked, function(a, b)
-		if a.score ~= b.score then
-			return a.score > b.score
-		end
-		if a.rarity ~= b.rarity then
-			return a.rarity > b.rarity
-		end
-		return a.id < b.id
-	end)
-	local targetEquip = {}
-	for i = 1, math.min(slotCount, #ranked) do
-		table.insert(targetEquip, ranked[i].id)
-	end
-	local equipped = dataClient:get("equipped") or {}
-	local needsEquip = false
-	if #equipped == #targetEquip then
-		for i = 1, #targetEquip do
-			if equipped[i] ~= targetEquip[i] then
-				needsEquip = true
-				break
+	local ok, err = pcall(function()
+		local upgrades = dataClient:get("upgrades") or {}
+		local slotCount = InventoryServiceUtils.getOwnedSlotCount(upgrades, 0) or 1
+		local mode = state.BestMode[1] or "Any"
+		local ranked = {}
+		for slimeKey, slimeValue in pairs(inventory) do
+			local slimeData = InventoryServiceUtils.getSlimeData(slimeKey, slimeValue)
+			if slimeData then
+				local stats = InventoryServiceUtils.getSlimeStatsFromData(slimeData)
+				local damage = (stats and stats.damage) or 0
+				local health = (stats and stats.health) or 0
+				local dps = InventoryServiceUtils.getDpsFromData(slimeData) or 0
+				local level = slimeData.level or 1
+				local xp = InventoryServiceUtils.getAccumulatedXp(slimeData) or 0
+				local rarity = InventoryServiceUtils.getRarity(slimeData) or 0
+				local hasMutation = slimeData.mutations and next(slimeData.mutations) ~= nil
+				local score
+				if mode == "Damage" then
+					score = damage
+				elseif mode == "Health" then
+					score = health
+				elseif mode == "DPS" then
+					score = dps
+				elseif mode == "Level" then
+					score = level
+				elseif mode == "XP" then
+					score = xp
+				elseif mode == "Rarity" then
+					score = rarity
+				elseif mode == "Mutation" then
+					score = (hasMutation and 10000000 or 0) + dps
+				elseif mode == "Base Power" then
+					score = (stats and stats.basePower) or damage
+				else
+					score = damage + health
+				end
+				local copies = type(slimeValue) == "number" and slimeValue or 1
+				for _ = 1, copies do
+					table.insert(ranked, { id = slimeKey, score = score, rarity = rarity })
+				end
 			end
 		end
-	else
-		needsEquip = true
-	end
-	if needsEquip then
+		table.sort(ranked, function(a, b)
+			if a.score ~= b.score then
+				return a.score > b.score
+			end
+			if a.rarity ~= b.rarity then
+				return a.rarity > b.rarity
+			end
+			return a.id < b.id
+		end)
+		local targetEquip = {}
+		for i = 1, math.min(slotCount, #ranked) do
+			table.insert(targetEquip, ranked[i].id)
+		end
+		local equipped = dataClient:get("equipped") or {}
+		local needsEquip = false
+		if #equipped == #targetEquip then
+			for i = 1, #targetEquip do
+				if equipped[i] ~= targetEquip[i] then
+					needsEquip = true
+					break
+				end
+			end
+		else
+			needsEquip = true
+		end
+		if not needsEquip then
+			return
+		end
 		for idx = #equipped, 1, -1 do
 			pcall(function()
 				inventoryRemote:InvokeServer("requestUnequip", idx)
 			end)
 			task.wait(0.08)
+		end
+		local waited = 0
+		while #(dataClient:get("equipped") or {}) > 0 and waited < 0.75 do
+			task.wait(0.05)
+			waited = waited + 0.05
 		end
 		for _, slimeKey in ipairs(targetEquip) do
 			pcall(function()
@@ -917,6 +952,9 @@ local function equipBestSlimes()
 			end)
 			task.wait(0.08)
 		end
+	end)
+	if not ok then
+		warn("[Alleral] equipBestSlimes: " .. tostring(err))
 	end
 	state.equipLock = false
 end
@@ -951,10 +989,10 @@ local function usePotionIfAvailable()
 	if usedCount >= state.PotionMaxUses then
 		return
 	end
-	local ok = pcall(function()
+	local ok, result = pcall(function()
 		return inventoryRemote:InvokeServer("requestUseItem", potionId)
 	end)
-	if ok then
+	if ok and result == true then
 		state.PotionTracker[selectedPotion] = usedCount + 1
 	end
 end
@@ -987,9 +1025,12 @@ local function useFruitIfAvailable()
 	if not slimeKey then
 		return
 	end
-	pcall(function()
-		inventoryRemote:InvokeServer("requestUseFruit", fruitInfo.id, slimeKey)
+	local ok, result = pcall(function()
+		return inventoryRemote:InvokeServer("requestUseFruit", fruitInfo.id, slimeKey)
 	end)
+	if ok and result == false then
+		task.wait(0.5)
+	end
 end
 
 LocalPlayer.CharacterAdded:Connect(function()
@@ -1187,17 +1228,23 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoUnlockMachine", 5, funct
 	if CraftingServiceUtils and not CraftingServiceUtils.isMachineUnlocked(unlocks) then
 		local craftingRemote = getRemoteFunction("CraftingService")
 		if craftingRemote then
-			pcall(function()
-				craftingRemote:InvokeServer("requestUnlockMachine")
+			local ok, result = pcall(function()
+				return craftingRemote:InvokeServer("requestUnlockMachine")
 			end)
+			if ok and result then
+				task.wait(5)
+			end
 		end
 	end
 	if XpTransferServiceUtils and not XpTransferServiceUtils.isMachineUnlocked(unlocks) then
 		local xpRemote = getRemoteFunction("XpTransferService")
 		if xpRemote then
-			pcall(function()
-				xpRemote:InvokeServer("requestUnlockMachine")
+			local ok, result = pcall(function()
+				return xpRemote:InvokeServer("requestUnlockMachine")
 			end)
+			if ok and result then
+				task.wait(5)
+			end
 		end
 	end
 end)
@@ -1440,19 +1487,19 @@ local autoTab = section:CreateTab({ Name = "Auto", Icon = 10734923214, Columns =
 local inventoryTab = section:CreateTab({ Name = "Inventory", Icon = 10709769841, Columns = 2 }, "inventory")
 local miscTab = section:CreateTab({ Name = "Misc", Icon = 10734950020, Columns = 2 }, "misc")
 
-local zoneGroup = mainTab:CreateGroupbox({ Name = "Zone", Column = 1 }, "zone")
-local rollGroup = mainTab:CreateGroupbox({ Name = "Roll", Column = 2 }, "roll")
-local gunGroup = mainTab:CreateGroupbox({ Name = "Gun", Column = 1 }, "gun")
-local treeGroup = autoTab:CreateGroupbox({ Name = "Upgrades", Column = 1 }, "tree")
+local zoneGroup = mainTab:CreateGroupbox({ Name = "Zones", Column = 1 }, "zone")
+local rollGroup = mainTab:CreateGroupbox({ Name = "Rolling", Column = 2 }, "roll")
+local gunGroup = mainTab:CreateGroupbox({ Name = "Combat", Column = 1 }, "gun")
+local treeGroup = autoTab:CreateGroupbox({ Name = "Skill tree", Column = 1 }, "tree")
 local craftGroup = autoTab:CreateGroupbox({ Name = "Crafting", Column = 2 }, "craft")
-local lootGroup = autoTab:CreateGroupbox({ Name = "Loot & Index", Column = 1 }, "loot")
-local petGroup = inventoryTab:CreateGroupbox({ Name = "Feed", Column = 1 }, "feed")
+local lootGroup = autoTab:CreateGroupbox({ Name = "Loot & index", Column = 1 }, "loot")
+local petGroup = inventoryTab:CreateGroupbox({ Name = "Feeding", Column = 1 }, "feed")
 local potionGroup = inventoryTab:CreateGroupbox({ Name = "Potions", Column = 2 }, "potions")
-local fruitGroup = inventoryTab:CreateGroupbox({ Name = "Fruit", Column = 1 }, "fruit")
+local fruitGroup = inventoryTab:CreateGroupbox({ Name = "Fruit tree", Column = 1 }, "fruit")
 local movementGroup = miscTab:CreateGroupbox({ Name = "Movement", Column = 1 }, "movement")
-local performanceGroup = miscTab:CreateGroupbox({ Name = "Performance", Column = 2 }, "performance")
-local visualsGroup = miscTab:CreateGroupbox({ Name = "Visuals", Column = 1 }, "visuals")
-local configGroup = miscTab:CreateGroupbox({ Name = "Config", Column = 2 }, "config")
+local performanceGroup = miscTab:CreateGroupbox({ Name = "Lag fixes", Column = 2 }, "performance")
+local visualsGroup = miscTab:CreateGroupbox({ Name = "Camera", Column = 1 }, "visuals")
+local configGroup = miscTab:CreateGroupbox({ Name = "Save / reset", Column = 2 }, "config")
 
 local zone = Core.wrapStarlightGroup(zoneGroup, function(fn)
 	return function(value)
@@ -1564,131 +1611,138 @@ local function addMultiDropdown(group, name, label, values, default, callback)
 	})
 end
 
-addMultiDropdown(zone, "TargetZone", "Target Zone", zonesList, state.TargetZone, function(value)
+addMultiDropdown(zone, "TargetZone", "Zones to farm", zonesList, state.TargetZone, function(value)
 	state.TargetZone = value
 end)
-zone:CreateToggle("Auto Farm Zone", state.AutoBestArea, "Automatically farms the best zone", function(value)
+zone:CreateToggle("Farm best zone", state.AutoBestArea, "Farms your best unlocked zone.", function(value)
 	state.AutoBestArea = value
 	if value then
 		state.LastTeleportedZone = nil
 	end
 end)
-zone:CreateToggle("Auto Rebirth", state.AutoRebirth, "Automatically rebirths when affordable", function(value)
+zone:CreateToggle("Auto rebirth", state.AutoRebirth, "Rebirths when you've got enough for it.", function(value)
 	state.AutoRebirth = value
 end)
-zone:CreateToggle("Auto Unlock Machine", state.AutoUnlockMachine, "Unlocks crafting & XP transfer", function(value)
+zone:CreateToggle("Unlock machines", state.AutoUnlockMachine, "Opens crafting and XP transfer when you can.", function(value)
 	state.AutoUnlockMachine = value
 end)
 
-roll:CreateToggle("Auto Roll", state.AutoRoll, "Automatically rolls for slimes", function(value)
+roll:CreateToggle("Keep rolling", state.AutoRoll, "Spins for slimes on its own.", function(value)
 	state.AutoRoll = value
 end)
-addMultiDropdown(roll, "BestMode", "Target Slime to Equip", bestModeList, state.BestMode, function(value)
+addMultiDropdown(roll, "BestMode", "Equip if you get", bestModeList, state.BestMode, function(value)
 	state.BestMode = value
 end)
-roll:CreateToggle("Auto Equip Best", state.AutoEquip, "Equips best slimes by stat filter", function(value)
+roll:CreateToggle("Equip best", state.AutoEquip, "Swaps to your best slime based on the filter above.", function(value)
 	state.AutoEquip = value
 end)
 
-addMultiDropdown(gun, "ShootPriority", "Shoot Priority", shootPriorityList, state.ShootPriority, function(value)
+addMultiDropdown(gun, "ShootPriority", "Shoot order", shootPriorityList, state.ShootPriority, function(value)
 	state.ShootPriority = value
 end)
-addMultiDropdown(gun, "TargetType", "Slime Target", targetTypeList, state.TargetType, function(value)
+addMultiDropdown(gun, "TargetType", "What to shoot", targetTypeList, state.TargetType, function(value)
 	state.TargetType = value
 end)
-gun:CreateToggle("Auto Gun", state.AutoGun, "Auto-shoots enemies", function(value)
+gun:CreateToggle("Auto shoot", state.AutoGun, "Fires at enemies for you.", function(value)
 	state.AutoGun = value
 	setAutoGun(value)
 end)
 
-addMultiDropdown(tree, "TargetTree", "Target Tree", treeList, state.TargetTree, function(value)
+addMultiDropdown(tree, "TargetTree", "Skill tree", treeList, state.TargetTree, function(value)
 	state.TargetTree = value
 end)
-tree:CreateToggle("Auto Upgrade Tree", state.AutoUpgradeTree, "Automatically unlocks cheapest node", function(value)
+tree:CreateToggle("Upgrade tree", state.AutoUpgradeTree, "Buys the cheapest node it can afford.", function(value)
 	state.AutoUpgradeTree = value
 end)
 
-addMultiDropdown(craft, "TargetCraft", "Target Craft", craftTargets, state.TargetCraft, function(value)
+addMultiDropdown(craft, "TargetCraft", "Craft target", craftTargets, state.TargetCraft, function(value)
 	state.TargetCraft = value
 end)
-craft:CreateToggle("Auto Craft", state.AutoCraft, "Sacrifices worst slimes to craft target", function(value)
+craft:CreateToggle("Auto craft", state.AutoCraft, "Trades your worst slimes in for what you picked above.", function(value)
 	state.AutoCraft = value
 end)
-craft:CreateToggle("Auto Collect Recipes", state.AutoCollectRecipes, "Claim floating recipe scrolls", function(value)
+craft:CreateToggle("Grab recipes", state.AutoCollectRecipes, "Picks up recipe scrolls floating around.", function(value)
 	state.AutoCollectRecipes = value
 end)
 
-addMultiDropdown(loot, "TargetLoot", "Target Loot", lootList, state.TargetLoot, function(value)
+addMultiDropdown(loot, "TargetLoot", "Loot to grab", lootList, state.TargetLoot, function(value)
 	state.TargetLoot = value
 end)
-loot:CreateToggle("Auto Collect Loot", state.AutoCollectLoot, "Collects filtered loot drops", function(value)
+loot:CreateToggle("Collect loot", state.AutoCollectLoot, "Snags drops that match your filter.", function(value)
 	state.AutoCollectLoot = value
 end)
-addMultiDropdown(loot, "TargetIndexCategory", "Target Index Category", indexCategoryList, state.TargetIndexCategory, function(value)
+addMultiDropdown(loot, "TargetIndexCategory", "Index tab", indexCategoryList, state.TargetIndexCategory, function(value)
 	state.TargetIndexCategory = value
 end)
-loot:CreateToggle("Auto Claim Index", state.AutoClaimIndex, "Claims index rewards", function(value)
+loot:CreateToggle("Claim index", state.AutoClaimIndex, "Grabs index rewards when they're ready.", function(value)
 	state.AutoClaimIndex = value
 end)
 
-addMultiDropdown(pet, "FeedSlime", "Target Slime", slimeNameList, state.FeedSlime, function(value)
+addMultiDropdown(pet, "FeedSlime", "Feed this slime", slimeNameList, state.FeedSlime, function(value)
 	state.FeedSlime = value
 end)
-addMultiDropdown(pet, "FeedFood", "Target Food", foodList, state.FeedFood, function(value)
+addMultiDropdown(pet, "FeedFood", "With this food", foodList, state.FeedFood, function(value)
 	state.FeedFood = value
 end)
-pet:CreateToggle("Auto Feed Pet", state.AutoFeedPet, "Feeds selected food to selected slime", function(value)
+pet:CreateToggle("Auto feed", state.AutoFeedPet, "Feeds the slime + food you picked.", function(value)
 	state.AutoFeedPet = value
 end)
 
-addMultiDropdown(potion, "TargetPotion", "Target Potion", potionList, state.TargetPotion, function(value)
+addMultiDropdown(potion, "TargetPotion", "Potions to use", potionList, state.TargetPotion, function(value)
 	state.TargetPotion = value
 end)
-potion:CreateSlider("PotionMaxUses", 1, 10, state.PotionMaxUses, function(value)
+potion:CreateSlider("Uses per potion", 1, 10, state.PotionMaxUses, function(value)
 	state.PotionMaxUses = value
 	state.PotionTracker = {}
-end, "Potion Use Count")
-potion:CreateToggle("Auto Potion", state.AutoPotion, "Automatically uses potions", function(value)
+end, "How many times to drink each one before moving on.")
+potion:CreateToggle("Auto potion", state.AutoPotion, "Drinks potions from your list.", function(value)
 	state.AutoPotion = value
 end)
 
-addMultiDropdown(fruit, "TargetSlimeFruit", "Target Slime", slimeNameList, state.TargetSlimeFruit, function(value)
+addMultiDropdown(fruit, "TargetSlimeFruit", "Fruit this slime", slimeNameList, state.TargetSlimeFruit, function(value)
 	state.TargetSlimeFruit = value
 end)
-addMultiDropdown(fruit, "TargetFruit", "Target Fruit", fruitList, state.TargetFruit, function(value)
+addMultiDropdown(fruit, "TargetFruit", "Fruit type", fruitList, state.TargetFruit, function(value)
 	state.TargetFruit = value
 end)
-fruit:CreateToggle("Auto Fruit", state.AutoFruit, "Unlocks skill tree for selected slime", function(value)
+fruit:CreateToggle("Auto fruit", state.AutoFruit, "Unlocks fruit nodes on that slime's tree.", function(value)
 	state.AutoFruit = value
 end)
 
-movement:CreateSlider("RunSpeed", 16, 250, state.RunSpeed, function(value)
+movement:CreateSlider("Walk speed", 16, 250, state.RunSpeed, function(value)
 	state.RunSpeed = value
-end, "Run Speed")
-movement:CreateToggle("Noclip", state.Noclip, "Walk through walls", function(value)
+end, "Your run speed. Go wild if your executor allows it.")
+movement:CreateToggle("Noclip", state.Noclip, "Walk through walls.", function(value)
 	state.Noclip = value
 	setNoclip(value)
 end)
 
-performance:CreateToggle("FPS Boost", state.FPSBoost, "Disables shadows and lowers quality", function(value)
+performance:CreateToggle("FPS boost", state.FPSBoost, "Turns off shadows and dials graphics down a bit.", function(value)
 	state.FPSBoost = value
 	setFPSBoost(value)
 end)
-performance:CreateToggle("Disable Music", state.DisableMusic, "Mutes all background music", function(value)
+performance:CreateToggle("Mute music", state.DisableMusic, "Kills in-game music.", function(value)
 	state.DisableMusic = value
 	setMusicMuted(value)
 end)
 
-visuals:CreateToggle("Freecam", state.Freecam, "Move camera freely using WASD + Q/E", function(value)
+visuals:CreateToggle("Freecam", state.Freecam, "Fly the camera with WASD + Q/E.", function(value)
 	state.Freecam = value
 	setFreecam(value)
 end)
 
-config:CreateButton("Save Config", function()
+config:CreateButton("Save settings", function()
 	saveSettings()
 end)
-config:CreateButton("Delete Config", function()
+config:CreateButton("Reset settings", function()
 	resetSettings()
+end)
+
+performance:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Stops Roblox from kicking you while you farm.", function(value)
+	state.AntiAFK = value
+	if value then
+		Core.setupAntiAfk(LocalPlayer)
+	end
 end)
 
 state.Alleral_Unload = function()

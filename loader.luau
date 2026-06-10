@@ -1,33 +1,36 @@
---[[
-	Alleral Universal Loader
-	Detects the current Roblox game, preloads core + analytics, and injects the matching script.
-
-	Usage (executor, from repo root):
-		loadstring(readfile("loader.luau"))()
-
-	Remote:
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau"))()
-
-	Reload after unload:
-		getgenv().Alleral_Reload()
-]]
-
-local LOADER_VERSION = "2.6"
+local LOADER_VERSION = "3.1"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local FETCH_RETRIES = 3
 local FETCH_BACKOFF = 0.75
 local MIN_SCRIPT_BYTES = 1000
 
 local SHARED_CORE_FILES = {
+	"core/alleral_core.luau",
 	"src/alleral_core.luau",
 	"alleral_core.luau",
 }
 local SHARED_ANALYTICS_FILES = {
+	"core/analytics.luau",
 	"src/analytics.luau",
 	"analytics.luau",
 }
-local SHARED_CORE_URL = REPO_BASE .. "/src/alleral_core.luau"
-local SHARED_ANALYTICS_URL = REPO_BASE .. "/src/analytics.luau"
+local SHARED_TELEMETRY_FILES = {
+	"core/telemetry.luau",
+	"src/telemetry.luau",
+	"telemetry.luau",
+}
+local OWNER_TELEMETRY_FILES = {
+	"../Alleral-Private/owner_telemetry.luau",
+	"../../Alleral-Private/owner_telemetry.luau",
+	"Alleral-Private/owner_telemetry.luau",
+	"kick/Alleral-Private/owner_telemetry.luau",
+	"config/owner_telemetry.luau",
+	"owner_telemetry.luau",
+}
+local TELEMETRY_MODULE_VERSION = "2.2"
+local SHARED_CORE_URL = REPO_BASE .. "/core/alleral_core.luau"
+local SHARED_ANALYTICS_URL = REPO_BASE .. "/core/analytics.luau"
+local SHARED_TELEMETRY_URL = REPO_BASE .. "/core/telemetry.luau"
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -65,6 +68,10 @@ local function notify(title, text, duration)
 			Duration = duration or 5,
 		})
 	end)
+end
+
+local function trim(value)
+	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
 end
 
 local function log(level, message)
@@ -142,22 +149,23 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "6.4",
+		version = "6.5",
 		needsCore = true,
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = {
+			"games/kick_a_lucky_block.luau",
 			"src/kick_a_lucky_block.luau",
 			"kick_a_lucky_block.luau",
 			"kick a lucky block.luau",
 		},
-		scriptUrl = REPO_BASE .. "/src/kick_a_lucky_block.luau",
+		scriptUrl = REPO_BASE .. "/games/kick_a_lucky_block.luau",
 		sourceMarker = "Alleral_Starlight",
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Shared" }, 20)
 			local areas = Workspace:WaitForChild("Areas", 20)
 			if not areas or not areas:WaitForChild("KickReady", 10) then
-				return false, "KickReady pad not found — are you in the main world?"
+				return false, "KickReady pad not found, are you in the main world?"
 			end
 			return true
 		end,
@@ -174,14 +182,15 @@ local GAMES = {
 	{
 		id = "speed_keyboard_escape",
 		name = "Speed Keyboard Escape",
-		version = "1.0",
+		version = "1.1",
 		needsCore = true,
 		placeIds = { 95082159892680 },
 		scriptFiles = {
+			"games/speed_keyboard_escape.luau",
 			"src/speed_keyboard_escape.luau",
 			"speed_keyboard_escape.luau",
 		},
-		scriptUrl = REPO_BASE .. "/src/speed_keyboard_escape.luau",
+		scriptUrl = REPO_BASE .. "/games/speed_keyboard_escape.luau",
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Remotes" }, 20)
 			return true
@@ -196,15 +205,16 @@ local GAMES = {
 	{
 		id = "slime_rng",
 		name = "Slime RNG",
-		version = "1.0",
+		version = "1.1",
 		needsCore = true,
 		placeIds = { 92416421522960 },
 		universeIds = { 9792947201 },
 		scriptFiles = {
+			"games/slime_rng.luau",
 			"src/slime_rng.luau",
 			"slime_rng.luau",
 		},
-		scriptUrl = REPO_BASE .. "/src/slime_rng.luau",
+		scriptUrl = REPO_BASE .. "/games/slime_rng.luau",
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Packages", "DataService" }, 25)
 			return true
@@ -219,14 +229,15 @@ local GAMES = {
 	{
 		id = "build_a_ring_farm",
 		name = "Build A Ring Farm",
-		version = "1.0",
+		version = "1.1",
 		needsCore = true,
 		placeIds = { 107646426076756 },
 		scriptFiles = {
+			"games/build_a_ring_farm.luau",
 			"src/build_a_ring_farm.luau",
 			"build_a_ring_farm.luau",
 		},
-		scriptUrl = REPO_BASE .. "/src/build_a_ring_farm.luau",
+		scriptUrl = REPO_BASE .. "/games/build_a_ring_farm.luau",
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Shared" }, 20)
 			waitForPath(ReplicatedStorage, { "Remotes", "PlantSeed" }, 15)
@@ -311,7 +322,15 @@ local function discoverLocalFiles(fileNames)
 	if not listFiles or not isFile then
 		return found
 	end
-	local roots = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
+	local roots = {
+		"",
+		"kick/",
+		"kick/kick/",
+		"Alleral Hub/",
+		"kick/Alleral Hub/",
+		"workspace/",
+		"scripts/",
+	}
 	for _, root in ipairs(roots) do
 		for _, name in ipairs(fileNames) do
 			local path = root .. name
@@ -419,6 +438,11 @@ do
 			if bridge.Alleral_Starlight then g.Alleral_Starlight = bridge.Alleral_Starlight end
 			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
 			if bridge.Alleral_Analytics then g.Alleral_Analytics = bridge.Alleral_Analytics end
+			if bridge.Alleral_Telemetry then g.Alleral_Telemetry = bridge.Alleral_Telemetry end
+			if bridge.Alleral_LoaderMeta then g.Alleral_LoaderMeta = bridge.Alleral_LoaderMeta end
+			if bridge.Alleral_LoaderCapabilities then g.Alleral_LoaderCapabilities = bridge.Alleral_LoaderCapabilities end
+			if bridge.Alleral_ReportError then g.Alleral_ReportError = bridge.Alleral_ReportError end
+			if bridge.Alleral_LogEvent then g.Alleral_LogEvent = bridge.Alleral_LogEvent end
 			if bridge.Alleral_Boot then g.Alleral_Boot = bridge.Alleral_Boot end
 			g.Alleral_State = g.Alleral_State or bridge.Alleral_State or {}
 			if type(bridge.Alleral_State) == "table" then
@@ -440,6 +464,11 @@ local function publishBridge()
 		shared.Alleral_Starlight = ENV.Alleral_Starlight
 		shared.Alleral_Core = ENV.Alleral_Core
 		shared.Alleral_Analytics = ENV.Alleral_Analytics
+		shared.Alleral_Telemetry = ENV.Alleral_Telemetry
+		shared.Alleral_LoaderMeta = ENV.Alleral_LoaderMeta
+		shared.Alleral_LoaderCapabilities = ENV.Alleral_LoaderCapabilities
+		shared.Alleral_ReportError = ENV.Alleral_ReportError
+		shared.Alleral_LogEvent = ENV.Alleral_LogEvent
 		shared.Alleral_State = ENV.Alleral_State
 		shared.Alleral_Boot = true
 		shared.Alleral_StartupFailed = nil
@@ -515,13 +544,16 @@ local function invalidateStaleModules()
 	ENV.Alleral_Core = nil
 	ENV.Alleral_Starlight = nil
 	ENV.Alleral_Analytics = nil
+	ENV.Alleral_Telemetry = nil
+	ENV.Alleral_ReportError = nil
+	ENV.Alleral_LogEvent = nil
 	ENV.Alleral_LoaderVersion = LOADER_VERSION
 	log("info", "Cleared cached modules for loader " .. LOADER_VERSION)
 end
 
 local function preloadCore(required)
 	local core = ENV.Alleral_Core
-	if core and type(core.loadStarlight) == "function" and core.VERSION == "1.2" then
+	if core and type(core.loadStarlight) == "function" and core.VERSION == "1.4" then
 		return true
 	end
 	ENV.Alleral_Core = nil
@@ -561,6 +593,107 @@ local function preloadAnalytics()
 	return ENV.Alleral_Analytics ~= nil
 end
 
+local function loadOwnerTelemetryConfig()
+	if type(ENV.Alleral_OwnerTelemetry) == "table" then
+		local cfg = ENV.Alleral_OwnerTelemetry
+		if cfg.enabled ~= false and trim(cfg.relayUrl or "") ~= "" and trim(cfg.apiKey or "") ~= "" then
+			return true
+		end
+	end
+	for _, path in ipairs(OWNER_TELEMETRY_FILES) do
+		if isFile and isFile(path) and readFile then
+			local raw = readFile(path)
+			if type(raw) == "string" and raw ~= "" then
+				local compiled = loadStringFn and loadStringFn(raw, "Alleral/owner_telemetry")
+				if compiled then
+					local ok, result = pcall(compiled)
+					if ok and type(result) == "table" then
+						ENV.Alleral_OwnerTelemetry = result
+						log("info", "Telemetry config loaded")
+						return true
+					end
+				end
+			end
+		end
+	end
+	return false
+end
+
+local function preloadTelemetry()
+	local source, sourceLabel = resolveFromFiles(SHARED_TELEMETRY_FILES, "telemetry", SHARED_TELEMETRY_URL, "Alleral_Telemetry")
+	if not source then
+		log("warn", "Telemetry skipped: " .. tostring(sourceLabel))
+		return false
+	end
+	local ok, err = compileAndRun(source, "Alleral/telemetry")
+	if not ok then
+		log("warn", "Telemetry failed: " .. tostring(err))
+		return false
+	end
+	local telemetry = ENV.Alleral_Telemetry
+	if telemetry and telemetry.Version ~= TELEMETRY_MODULE_VERSION then
+		log("warn", "Telemetry version mismatch (expected " .. TELEMETRY_MODULE_VERSION .. ")")
+	end
+	loadOwnerTelemetryConfig()
+	if type(ENV.Alleral_OwnerTelemetry) == "table" then
+		local ownerCfg = ENV.Alleral_OwnerTelemetry
+		if ownerCfg.shareKickWebhook == true then
+			local ownerWebhook = ownerCfg.kickWebhookUrl
+			if type(ownerWebhook) == "string" and ownerWebhook ~= "" then
+				ENV.Alleral_DefaultWebhook = ownerWebhook
+			end
+		end
+	end
+	telemetry = ENV.Alleral_Telemetry
+	if telemetry and type(telemetry.Configure) == "function" and type(ENV.Alleral_OwnerTelemetry) == "table" then
+		telemetry:Configure(ENV.Alleral_OwnerTelemetry)
+	end
+	if telemetry and type(telemetry.InstallBridge) == "function" then
+		pcall(function()
+			telemetry:InstallBridge()
+		end)
+	end
+	ENV.Alleral_ReportError = ENV.Alleral_ReportError or (telemetry and telemetry.ReportError and function(scope, err, details)
+		telemetry:ReportError(scope, err, details)
+	end)
+	ENV.Alleral_LogEvent = ENV.Alleral_LogEvent or (telemetry and telemetry.ReportEvent and function(category, message, data)
+		telemetry:ReportEvent(category, message, data)
+	end)
+	if telemetry and telemetry.IsEnabled and telemetry:IsEnabled() then
+		if type(telemetry.ReportSessionStart) == "function" then
+			pcall(function()
+				telemetry:ReportSessionStart({
+					loaderVersion = LOADER_VERSION,
+					executor = CAPABILITIES.executor,
+				})
+			end)
+		end
+		if type(telemetry.HookLifecycle) == "function" then
+			pcall(function()
+				telemetry:HookLifecycle()
+			end)
+		end
+		local relayHost = ""
+		pcall(function()
+			local cfg = telemetry._config or ENV.Alleral_OwnerTelemetry or {}
+			relayHost = tostring(cfg.relayUrl or ""):match("^https?://([^/]+)") or ""
+		end)
+		log("info", "Telemetry on" .. (relayHost ~= "" and (" (" .. relayHost .. ")") or ""))
+	else
+		log("info", "Telemetry off (no relay config)")
+	end
+	return telemetry ~= nil
+end
+
+local function telemetryReport(phase, extra)
+	local telemetry = ENV.Alleral_Telemetry
+	if telemetry and type(telemetry.ReportInject) == "function" then
+		pcall(function()
+			telemetry:ReportInject(phase, extra)
+		end)
+	end
+end
+
 local function runGameScript(profile)
 	local source, sourceLabel = resolveFromFiles(profile.scriptFiles, "script", profile.scriptUrl, profile.sourceMarker)
 	if not source then
@@ -573,20 +706,29 @@ local function runGameScript(profile)
 
 	if profile.sourceMarker and not source:find(profile.sourceMarker, 1, true) then
 		if source:find("HTTP is unavailable; cannot load Starlight", 1, true) then
-			return false, "Executor returned a cached outdated Kick script — run the loader again"
+			return false, "Cached Kick script is stale, run loader again"
 		end
 		log("warn", profile.name .. " download may be outdated (missing " .. profile.sourceMarker .. ")")
 	end
 
 	log("info", string.format("Loading %s v%s from %s", profile.name, profile.version or "?", sourceLabel))
 
+	telemetryReport("start", {
+		scriptName = profile.id,
+		scriptVersion = profile.version,
+		gameName = profile.name,
+	})
+
 	publishBridge()
 	ENV.Alleral_Boot = true
+	ENV.Alleral_LoaderCapabilities = CAPABILITIES
 	ENV.Alleral_LoaderMeta = {
 		version = LOADER_VERSION,
 		profile = profile.id,
+		scriptVersion = profile.version,
 		source = sourceLabel,
 		executor = CAPABILITIES.executor,
+		capabilities = CAPABILITIES,
 		loadedAt = os.time(),
 	}
 
@@ -598,11 +740,34 @@ local function runGameScript(profile)
 	end)
 
 	if not ok then
+		telemetryReport("failed", {
+			scriptName = profile.id,
+			scriptVersion = profile.version,
+			gameName = profile.name,
+			error = tostring(runErr),
+		})
 		return false, runErr
 	end
 	local failMsg = readStartupFailure()
 	if failMsg then
+		telemetryReport("failed", {
+			scriptName = profile.id,
+			scriptVersion = profile.version,
+			gameName = profile.name,
+			error = tostring(failMsg),
+		})
 		return false, tostring(failMsg)
+	end
+	telemetryReport("loaded", {
+		scriptName = profile.id,
+		scriptVersion = profile.version,
+		gameName = profile.name,
+	})
+	local telemetry = ENV.Alleral_Telemetry
+	if telemetry and type(telemetry.StartHeartbeat) == "function" then
+		pcall(function()
+			telemetry:StartHeartbeat()
+		end)
 	end
 	return true
 end
@@ -623,7 +788,7 @@ end
 
 local function main()
 	if ENV.Alleral_LoaderRunning then
-		log("warn", "Already running — call getgenv().Alleral_Reload() after unload")
+		log("warn", "Already running, call getgenv().Alleral_Reload() after unload")
 		return
 	end
 	ENV.Alleral_LoaderRunning = true
@@ -671,11 +836,18 @@ local function main()
 	if not coreOk then
 		notify("Alleral", "Core failed: " .. tostring(coreErr), 8)
 		log("warn", "Core required but unavailable: " .. tostring(coreErr))
+		telemetryReport("failed", {
+			scriptName = profile.id,
+			scriptVersion = profile.version,
+			gameName = profile.name,
+			error = "Core failed: " .. tostring(coreErr),
+		})
 		ENV.Alleral_LoaderRunning = false
 		return
 	end
 
 	preloadAnalytics()
+	preloadTelemetry()
 
 	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadStarlight) == "function" then
 		local starlight, starlightErr = ENV.Alleral_Core.loadStarlight()
@@ -693,6 +865,12 @@ local function main()
 	if not ok then
 		notify("Alleral", tostring(runErr), 8)
 		log("warn", tostring(runErr))
+		telemetryReport("failed", {
+			scriptName = profile.id,
+			scriptVersion = profile.version,
+			gameName = profile.name,
+			error = tostring(runErr),
+		})
 		return
 	end
 
@@ -701,6 +879,15 @@ local function main()
 end
 
 ENV.Alleral_Reload = function()
+	local telemetry = ENV.Alleral_Telemetry
+	if telemetry and type(telemetry.ReportSessionEnd) == "function" then
+		pcall(function()
+			telemetry:ReportSessionEnd("reload")
+			telemetry._sessionEnded = false
+			telemetry._sessionId = nil
+			telemetry._heartbeatRunning = false
+		end)
+	end
 	unloadPrevious()
 	task.defer(main)
 end

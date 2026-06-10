@@ -3,18 +3,14 @@ do
 	if type(bridge) == "table" and getgenv then
 		local g = getgenv()
 		if type(g) == "table" then
-			if bridge.Alleral_Starlight then
-				g.Alleral_Starlight = bridge.Alleral_Starlight
-			end
-			if bridge.Alleral_Core then
-				g.Alleral_Core = bridge.Alleral_Core
-			end
-			if bridge.Alleral_Analytics then
-				g.Alleral_Analytics = bridge.Alleral_Analytics
-			end
-			if bridge.Alleral_Boot then
-				g.Alleral_Boot = bridge.Alleral_Boot
-			end
+			if bridge.Alleral_Starlight then g.Alleral_Starlight = bridge.Alleral_Starlight end
+			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
+			if bridge.Alleral_Analytics then g.Alleral_Analytics = bridge.Alleral_Analytics end
+			if bridge.Alleral_Telemetry then g.Alleral_Telemetry = bridge.Alleral_Telemetry end
+			if bridge.Alleral_LoaderMeta then g.Alleral_LoaderMeta = bridge.Alleral_LoaderMeta end
+			if bridge.Alleral_ReportError then g.Alleral_ReportError = bridge.Alleral_ReportError end
+			if bridge.Alleral_LogEvent then g.Alleral_LogEvent = bridge.Alleral_LogEvent end
+			if bridge.Alleral_Boot then g.Alleral_Boot = bridge.Alleral_Boot end
 			g.Alleral_State = g.Alleral_State or bridge.Alleral_State or {}
 			if type(bridge.Alleral_State) == "table" then
 				for key, value in pairs(bridge.Alleral_State) do
@@ -31,12 +27,12 @@ end
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
 if not getgenv().Alleral_Boot then
-	warn("[Alleral] Not the official script — grab it from the real loader")
+	warn("[Alleral] run loader.luau first")
 	return
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "6.4"
+local VERSION = "6.5"
 
 local state = getgenv().Alleral_State
 local connections = {}
@@ -109,7 +105,7 @@ if not Tracker then
 		local loadStringLocal = env.loadstring or loadstring
 		local source
 		if type(readFileFn) == "function" and type(isFileFn) == "function" then
-			for _, path in ipairs({ "src/analytics.luau", "analytics.luau" }) do
+			for _, path in ipairs({ "core/analytics.luau", "src/analytics.luau", "analytics.luau" }) do
 				if isFileFn(path) then
 					source = readFileFn(path)
 					break
@@ -555,6 +551,12 @@ local function logError(scope, err, details)
 			table.remove(runtime.errorLog)
 		end
 		warn("[Alleral] " .. line)
+		pcall(function()
+			local report = getgenv().Alleral_ReportError
+			if type(report) == "function" then
+				report(label, message, details)
+			end
+		end)
 	end
 	if appendFile then
 		pcall(function()
@@ -784,7 +786,27 @@ local function normalizeWebhookUrl(url)
 	return url, nil
 end
 
+do
+	local genv = getgenv and getgenv() or {}
+	local defaultWebhook = genv.Alleral_DefaultWebhook
+	if trim(state.WebhookURL or "") == "" and type(defaultWebhook) == "string" and defaultWebhook ~= "" then
+		local normalized = normalizeWebhookUrl(defaultWebhook)
+		if normalized then
+			state.WebhookURL = normalized
+			state.AWebhook = true
+		end
+	end
+end
+
 local function sendWebhook(url, payload)
+	local core = getgenv and getgenv().Alleral_Core
+	if core and type(core.postWebhook) == "function" then
+		local postUrl, urlError = normalizeWebhookUrl(url)
+		if not postUrl then
+			return false, urlError
+		end
+		return core.postWebhook(postUrl, payload)
+	end
 	local sender = requestFunction()
 	if not sender then
 		return false, "Your executor can't send webhooks (no HTTP)."
@@ -853,16 +875,16 @@ local function checkGameBuild(forceNotify, acceptCurrent)
 		saveSettings()
 	end
 	if changed then
-		notify("Game update", "The game updated since you last checked. Flip through your toggles if something acts weird.", 8)
+		notify("Game update", "New patch dropped. Toggle stuff off and on if things feel weird.", 8)
 	elseif forceNotify then
-		notify("Game check", "Looks like the same build you saved last time.", 5)
+		notify("Game check", "Same build as last time.", 5)
 	end
 	return runtime.gameBuild
 end
 
 local function acceptCurrentGameBuild()
 	local build = checkGameBuild(false, true)
-	notify("Game check", "Saved this build — you won't get update warnings for it.", 5)
+	notify("Game check", "Won't nag about updates until the next patch.", 5)
 	return build
 end
 
@@ -1004,11 +1026,11 @@ do
 	local capText = #caps > 0 and (" [" .. table.concat(caps, ", ") .. "]") or ""
 	local compat = compatMap[display:lower()] or Executor.isKnown
 	if display == "unknown" then
-		notify("Executor", "Couldn't ID your executor" .. capText .. ". Stuff will still try to work.", 6)
+		notify("Executor", "Couldn't tell what you're on" .. capText .. ". Most stuff should still run.", 6)
 	elseif not compat and (#caps < 2) then
-		notify("Executor", display .. capText .. " — a few features might not run.", 6)
+		notify("Executor", display .. capText .. ". A few features might not run.", 6)
 	else
-		notify("Alleral", display .. capText .. " — good to go.", 4)
+		notify("Alleral", display .. capText .. ". Good to go.", 4)
 	end
 end
 
@@ -1140,10 +1162,11 @@ if not starlight or type(starlight.CreateWindow) ~= "function" then
 end
 
 local KICKBLOX_URLS = {
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/src/kickblox.luau",
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/games/kickblox.luau",
 	"https://raw.githubusercontent.com/Omnie7/Luxy-Core/main/Data/KickBlox.luau",
 }
 local KICKBLOX_LOCAL_FILES = {
+	"games/kickblox.luau",
 	"src/kickblox.luau",
 	"kickblox.luau",
 }
@@ -2183,7 +2206,7 @@ supervisorEnabled = {
 		return state.A2xTrain or state.ATrainCollect
 	end,
 	CollectCash = function()
-		return state.ACollect or state.AAutoBattle
+		return state.ACollect
 	end,
 	TrainCollect = function()
 		return state.ATrainCollect
@@ -2362,7 +2385,7 @@ local function tryAutoSell()
 	safeCall("AutoSellAll", function()
 		remotes.sellAll:InvokeServer()
 	end)
-	notify("Auto sell", "Backpack's full — ran sell all.", 3)
+	notify("Auto sell", "Bag was full so I sold everything.", 3)
 end
 
 local recentPlaceSlots = {}
@@ -3239,7 +3262,7 @@ local function wrapStarlightGroup(groupbox)
 			local searchId = tostring(id) .. "_search"
 			local searchInput = groupbox:CreateInput({
 				Name = tostring(options.Text or options.Name or id) .. " filter",
-				PlaceholderText = "type to filter",
+				PlaceholderText = "search...",
 				RemoveTextOnFocus = false,
 				Callback = loggedCallback(tostring(options.Text or options.Name or id) .. " Search", function(text)
 					handle:Search(text)
@@ -3394,11 +3417,11 @@ local styleGroup = createStarlightGroup(shopTab, "Styles", "rbxassetid://1073495
 local favoriteGroup = createStarlightGroup(shopTab, "Favorites", "rbxassetid://10734952479", 2)
 local serverGroup = createStarlightGroup(miscTab, "Server", "rbxassetid://10734950020", 1)
 local webhookGroup = createStarlightGroup(miscTab, "Webhooks", "rbxassetid://10734950020", 2)
-local configGroup = createStarlightGroup(configTab, "Notifications", "rbxassetid://10734950309", 1)
-local recoveryGroup = createStarlightGroup(configTab, "Something stuck?", "rbxassetid://10734950309", 2)
-local tuningGroup = createStarlightGroup(configTab, "Intervals", "rbxassetid://10734950309", 1)
-local diagnosticsGroup = createStarlightGroup(configTab, "Debug", "rbxassetid://10734950309", 2)
-local profileGroup = createStarlightGroup(configTab, "Configs", "rbxassetid://10734950309", 1)
+local configGroup = createStarlightGroup(configTab, "Alerts", "rbxassetid://10734950309", 1)
+local recoveryGroup = createStarlightGroup(configTab, "Stuck?", "rbxassetid://10734950309", 2)
+local tuningGroup = createStarlightGroup(configTab, "Speed tweaks", "rbxassetid://10734950309", 1)
+local diagnosticsGroup = createStarlightGroup(configTab, "Debug info", "rbxassetid://10734950309", 2)
+local profileGroup = createStarlightGroup(configTab, "Save slots", "rbxassetid://10734950309", 1)
 local protectedDropdown
 local upgradeDropdown
 
@@ -3609,35 +3632,35 @@ local function supportSummary()
 end
 
 profileGroup:CreateInput(
-	"Config name",
-	"default",
+	"Save name",
+	"my setup",
 	nil,
 	function(value)
 		profileNameInput = sanitizeProfileName(value)
 	end,
-	"What to call this save file."
+	"main, alt, webhook-only, whatever."
 )
 profileGroup:CreateButton(
-	"Save",
+	"Save setup",
 	function()
 		local ok, result = saveProfile(profileNameInput)
 		if ok then
 			refreshProfilesDropdown(result)
 		end
-		notify(ok and "Saved" or "Couldn't save", ok and ("Wrote " .. tostring(result)) or tostring(result), 3)
+		notify(ok and "Saved" or "Didn't save", ok and ("'" .. tostring(result) .. "' is on disk.") or tostring(result), 3)
 	end,
-	"Saves your current toggles and settings under this name."
+	"Stores every toggle and slider under that name."
 )
 profileGroup:CreateButton(
-	"Load",
+	"Load setup",
 	function()
 		local ok, err = loadProfile(profileNameInput)
-		notify(ok and "Loaded" or "Couldn't load", ok and profileNameInput or tostring(err), 3)
+		notify(ok and "Loaded" or "Couldn't load", ok and ("Applied '" .. profileNameInput .. "'.") or tostring(err), 3)
 	end,
-	"Loads a saved config and applies it right away."
+	"Loads a saved setup."
 )
 profileGroup:CreateButton(
-	"Delete",
+	"Delete setup",
 	function()
 		local deletedName = profileNameInput
 		local ok, err = deleteProfile(profileNameInput)
@@ -3645,13 +3668,13 @@ profileGroup:CreateButton(
 			profileNameInput = "default"
 			refreshProfilesDropdown("default")
 		end
-		notify(ok and "Deleted" or "Couldn't delete", ok and deletedName or tostring(err), 3)
+		notify(ok and "Deleted" or "Couldn't delete", ok and ("Removed '" .. deletedName .. "'.") or tostring(err), 3)
 	end,
-	"Deletes this config from your executor folder."
+	"Deletes it from your executor folder."
 )
 profileGroup:CreateDivider()
 availableProfilesDropdown = profileGroup:CreateDropdown(
-	"Your saves",
+	"Saved setups",
 	listProfiles(),
 	"default",
 	function(value)
@@ -3659,40 +3682,40 @@ availableProfilesDropdown = profileGroup:CreateDropdown(
 	end
 )
 profileGroup:CreateButton(
-	"Refresh saves",
+	"Rescan folder",
 	function()
 		refreshProfilesDropdown(profileNameInput)
-		notify("Configs", "List updated.", 3)
+		notify("Setups", "Found whatever's on disk.", 3)
 	end,
-	"Scans the folder again for config files."
+	"Use this if you added files manually."
 )
 profileGroup:CreateDivider()
 profileGroup:CreateInput(
-	"Share config (JSON)",
+	"Paste a friend's setup",
 	"paste JSON here",
 	nil,
 	function(value)
 		importBuffer = tostring(value or "")
 	end,
-	"Paste a shared config here, or hit Export and send that to a friend."
+	"Drop shared JSON here, or hit Export and send yours to someone."
 )
 profileGroup:CreateButton(
-	"Import",
+	"Import JSON",
 	function()
 		local ok, decoded = safeCall("ImportProfileJson", function()
 			return HttpService:JSONDecode(importBuffer)
 		end)
 		if not ok then
-			notify("Import failed", shortError(decoded), 3)
+			notify("Nope", "Bad JSON: " .. shortError(decoded), 3)
 			return
 		end
 		local applied, err = applyConfigSnapshot(decoded)
-		notify(applied and "Imported" or "Import failed", applied and "Settings applied." or tostring(err), 3)
+		notify(applied and "Imported" or "Didn't work", applied and "Your toggles just swapped over." or tostring(err), 3)
 	end,
-	"Applies whatever JSON is in the box above."
+	"Runs whatever's in the box above."
 )
 profileGroup:CreateButton(
-	"Export",
+	"Export JSON",
 	function()
 		local encoded = HttpService:JSONEncode(collectConfigSnapshot())
 		importBuffer = encoded
@@ -3702,25 +3725,25 @@ profileGroup:CreateButton(
 			end)
 			notify("Exported", "Copied to clipboard.", 3)
 		else
-			notify("Exported", "JSON is in the box above.", 3)
+			notify("Exported", "JSON is sitting in the box above.", 3)
 		end
 	end,
-	"Copies your full settings as JSON."
+	"Full dump of your settings as JSON."
 )
 
 configGroup:CreateToggle(
-	"Fewer popups",
+	"Quiet mode",
 	state.UIQuietMode,
-	"Won't spam you when the same error keeps happening. Still shows up under Debug.",
+	"Same error twice won't spam popups. Still logged under Debug.",
 	function(value)
 		state.UIQuietMode = value
 		saveSettings()
 	end
 )
 configGroup:CreateToggle(
-	"Tell me when stuff breaks",
+	"Error popups",
 	state.NotifyOnError,
-	"Ping you if a background task errors out and retries.",
+	"Popup when a background loop errors.",
 	function(value)
 		state.NotifyOnError = value
 		saveSettings()
@@ -3728,17 +3751,17 @@ configGroup:CreateToggle(
 )
 
 recoveryGroup:CreateButton(
-	"Unstick everything",
+	"Unstick loops",
 	resetRuntimeLocks,
-	"Use this if auto place, mastery, or collect gets frozen mid-run."
+	"Place, mastery, or collect frozen? This clears the flags."
 )
 recoveryGroup:CreateButton(
-	"Stop all automation",
+	"Kill all autos",
 	pauseAutomation,
-	"Turns off every auto feature in one click."
+	"Turns off every automation toggle."
 )
 recoveryGroup:CreateButton(
-	"Reconnect to game",
+	"Refresh hooks",
 	function()
 		runtime.cachedRemotesAt = 0
 		runtime.cachedPlotAt = 0
@@ -3747,59 +3770,59 @@ recoveryGroup:CreateButton(
 		runtime.remoteLookupCache = {}
 		refreshRemotes()
 		updatePlotLists(protectedDropdown, upgradeDropdown)
-		notify("Refreshed", "Plot and game hooks reloaded.", 3)
+		notify("Refreshed", "Plot lists and remotes are live again.", 3)
 	end,
-	"Hit this after a game update if kicks or buys stop working."
+	"Game updated and stuff broke? Try this first."
 )
 recoveryGroup:CreateButton(
-	"Reset webhook memory",
+	"Reset Discord memory",
 	function()
 		runtime.seenWebhookGuids = {}
 		runtime.seenWebhookOrder = {}
-		notify("Webhook", "Can send the same item again now.", 3)
+		notify("Discord", "Same brainrot can ping you again.", 3)
 	end,
-	"Lets Discord alerts fire again for brainrots you already got pinged for."
+	"Forgot which items already got a webhook ping."
 )
 diagnosticsGroup:CreateButton(
-	"Clear errors",
+	"Wipe error log",
 	clearErrorLog,
-	"Empties the error list and deletes the log file."
+	"Clears the list and deletes the log file."
 )
 diagnosticsGroup:CreateButton(
-	"Check for game update",
+	"Check game version",
 	function()
 		checkGameBuild(true)
 	end,
-	"Compares today's game version to what you saved last."
+	"See if the devs pushed an update since you last ran."
 )
 diagnosticsGroup:CreateButton(
-	"I'm on the new version",
+	"Yeah I'm updated",
 	acceptCurrentGameBuild,
-	"Stops update warnings until the game patches again."
+	"Mutes update warnings until the next patch."
 )
 diagnosticsGroup:CreateButton(
-	"Copy debug info",
+	"Copy debug dump",
 	function()
 		local summary = supportSummary()
 		if setClipboard then
 			safeCall("CopySupportInfo", function()
 				setClipboard(summary)
 			end, true)
-			notify("Copied", "Paste that if you need help.", 3)
+			notify("Copied", "Paste that if you're asking for help.", 3)
 		else
 			logError("Support", "Clipboard is not available.", summary)
 			notify("No clipboard", "Your executor can't copy text.", 4)
 		end
 	end,
-	"Version, FPS, last error — handy for bug reports."
+	"Version, FPS, last error, all of it."
 )
 diagnosticsGroup:CreateButton(
-	"Refresh debug panel",
+	"Refresh panel",
 	function()
 		checkGameBuild(true)
-		notify("Debug", "Panel updated.", 3)
+		notify("Debug", "Numbers should be current now.", 3)
 	end,
-	"Forces a fresh read of build info and stats."
+	"Re-reads build info and live stats."
 )
 
 tuningGroup:CreateSlider(
@@ -3956,36 +3979,36 @@ kickGroup:CreateButton(
 	"Starts the timer over from zero."
 )
 filterGroup:AddDropdown("FilterBrainrot", {
-	Text = "Brainrot",
+	Text = "Keep these",
 	Values = gameData.BrainrotOptions,
 	Default = state.TBrainrot,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Pick specific ones to keep, or leave Any for everything.",
+	Tooltip = "Only keep names you pick. Leave Any if you don't care.",
 	Callback = function(selection)
 		state.TBrainrot = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
 })
 filterGroup:AddDropdown("FilterRarity", {
-	Text = "Rarity",
+	Text = "Rarity floor",
 	Values = gameData.RarityOptions,
 	Default = state.TRarity,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Only keep these rarities. Any = don't care.",
+	Tooltip = "Skip kicks that land below what you picked.",
 	Callback = function(selection)
 		state.TRarity = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
 })
 filterGroup:AddDropdown("FilterMutation", {
-	Text = "Mutation",
+	Text = "Mutations",
 	Values = gameData.MutationOptions,
 	Default = state.TMutation,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Pick mutations you want. None = no mutation only. Any = whatever.",
+	Tooltip = "None = only non-mutated. Any = whatever rolls.",
 	Callback = function(selection)
 		state.TMutation = selectedDropdownKeys(selection)
 		saveSettings()
@@ -3993,9 +4016,9 @@ filterGroup:AddDropdown("FilterMutation", {
 })
 filterGroup:CreateDivider()
 filterGroup:CreateToggle(
-	"Ping me on rares",
+	"Notify on rares",
 	state.ANotifyRare,
-	"Roblox notification when something at or above your rarity floor shows up.",
+	"Roblox popup when something good hits the block.",
 	function(value)
 		state.ANotifyRare = value
 		runtime.lastRareNotify = ""
@@ -4003,7 +4026,7 @@ filterGroup:CreateToggle(
 	end
 )
 filterGroup:CreateDropdown(
-	"Rare floor",
+	"Notify at rarity",
 	gameData.RarityOptions,
 	state.NotifyRarityThreshold,
 	function(value)
@@ -4013,16 +4036,16 @@ filterGroup:CreateDropdown(
 	end
 )
 filterGroup:CreateToggle(
-	"Random kick delay",
+	"Humanize kicks",
 	state.AKickVariance,
-	"Adds a tiny wait before each kick so timing isn't identical every time.",
+	"Tiny random pause so kicks don't look robotic.",
 	function(value)
 		state.AKickVariance = value
 		saveSettings()
 	end
 )
 filterGroup:CreateSlider(
-	"Max delay (ms)",
+	"Max random wait (ms)",
 	0,
 	250,
 	state.KickVarianceMs,
@@ -4030,7 +4053,7 @@ filterGroup:CreateSlider(
 		state.KickVarianceMs = value
 		saveSettings()
 	end,
-	"Upper limit on that random wait."
+	"Cap on the humanize pause."
 )
 
 trainGroup:CreateToggle(
@@ -4096,7 +4119,7 @@ trainGroup:CreateSlider(
 placeGroup:CreateToggle(
 	"Auto place best",
 	state.APlaceBest,
-	"Puts your best brainrot on the plot — empty slots first, then weaker ones.",
+	"Empty slots first, then swaps out weaker ones.",
 	function(value)
 		state.APlaceBest = value
 		saveSettings()
@@ -4295,12 +4318,12 @@ favoriteGroup:CreateToggle(
 )
 favoriteGroup:CreateDivider()
 favoriteGroup:AddDropdown("FavoriteBrainrot", {
-	Text = "Brainrot",
+	Text = "Star these",
 	Values = gameData.BrainrotOptions,
 	Default = state.TSSellBrainrot,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Favorite if name matches.",
+	Tooltip = "Matches name → gets a star.",
 	Callback = function(selection)
 		state.TSSellBrainrot = selectedDropdownKeys(selection)
 		if state.AAutoFav then
@@ -4310,12 +4333,12 @@ favoriteGroup:AddDropdown("FavoriteBrainrot", {
 	end,
 })
 favoriteGroup:AddDropdown("FavoriteRarity", {
-	Text = "Rarity",
+	Text = "Star rarity",
 	Values = gameData.RarityOptions,
 	Default = state.TSSellRarity,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Favorite if rarity matches.",
+	Tooltip = "Matches rarity → gets a star.",
 	Callback = function(selection)
 		state.TSSellRarity = selectedDropdownKeys(selection)
 		if state.AAutoFav then
@@ -4325,12 +4348,12 @@ favoriteGroup:AddDropdown("FavoriteRarity", {
 	end,
 })
 favoriteGroup:AddDropdown("FavoriteMutation", {
-	Text = "Mutation",
+	Text = "Star mutation",
 	Values = gameData.MutationOptions,
 	Default = state.TSSellMutation,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Favorite if mutation matches.",
+	Tooltip = "Matches mutation → gets a star.",
 	Callback = function(selection)
 		state.TSSellMutation = selectedDropdownKeys(selection)
 		if state.AAutoFav then
@@ -4341,7 +4364,7 @@ favoriteGroup:AddDropdown("FavoriteMutation", {
 })
 favoriteGroup:CreateDivider()
 favoriteGroup:CreateButton(
-	"Sell all (not favorited)",
+	"Sell unstarred",
 	function()
 		refreshRemotes()
 		if state.AAutoFav then
@@ -4352,27 +4375,27 @@ favoriteGroup:CreateButton(
 			safeCall("SellAllBrainrots", function()
 				remotes.sellAll:InvokeServer()
 			end, true)
-			notify("Sold", "Sell all sent.", 3)
+			notify("Sold", "Sell all went through.", 3)
 		else
-			notify("Couldn't sell", "Sell button not found — try Reconnect to game.", 3)
+			notify("Couldn't sell", "Sell remote missing, try Refresh hooks.", 3)
 		end
 	end,
-	"Same as the in-game sell all. Favorited stuff stays."
+	"Same as sell all. Starred brainrots stay."
 )
 
 battleGroup:CreateToggle(
 	"Host battles",
 	state.AAutoBattle,
-	"Makes a lobby, invites people, starts when enough show up.",
+	"Creates a lobby, invites folks, starts when enough join.",
 	function(value)
 		state.AAutoBattle = value
 		saveSettings()
 	end
 )
 battleGroup:CreateToggle(
-	"Accept invites",
+	"Auto-accept battles",
 	state.AAutoAcceptBattle,
-	"Clicks accept on battle popups for you.",
+	"Hits accept when someone invites you.",
 	function(value)
 		state.AAutoAcceptBattle = value
 		saveSettings()
@@ -4391,7 +4414,7 @@ battleGroup:CreateDropdown(
 battleGroup:CreateToggle(
 	"Use gamepass",
 	state.BattleGamepass,
-	"Turns on the gamepass toggle when hosting.",
+	"Flips the gamepass switch when you host.",
 	function(value)
 		state.BattleGamepass = value
 		saveSettings()
@@ -4406,16 +4429,16 @@ battleGroup:CreateSlider(
 		state.BattleMinPlayers = value
 		saveSettings()
 	end,
-	"How many others need to be in lobby before it hits start."
+	"Won't start until at least this many other players show up."
 )
 
 local masteryStatus
 local updateMasteryStatus
 
 masteryGroup:CreateToggle(
-	"Farm mastery",
+	"Mastery farm",
 	state.AAutoMastery,
-	"Kicks at your set power, resets, repeats. Turn off auto kick first.",
+	"Kick → reset → repeat at your power %. Turn off auto kick first.",
 	function(value)
 		state.AAutoMastery = value
 		if not value and updateMasteryStatus then
@@ -4434,10 +4457,10 @@ masteryGroup:CreateSlider(
 		state.MasteryKickPower = value
 		saveSettings()
 	end,
-	"Lower if kicks are too strong for the mastery tier you're on."
+	"Dial down if you're overshooting the tier."
 )
 masteryGroup:CreateDropdown(
-	"Reset with",
+	"Reset method",
 	{ "Died", "TP" },
 	state.MasteryResetMethod,
 	function(value)
@@ -4471,9 +4494,9 @@ if modules.sacrificeData and modules.sacrificeData.Recipes then
 	table.sort(weatherOptions)
 end
 weatherGroup:CreateToggle(
-	"Auto summon",
+	"Summon weather",
 	state.AAutoSummonWeather,
-	"Sacrifices the mats and starts the weather you picked.",
+	"Burns the mats and starts whatever weather you picked.",
 	function(value)
 		state.AAutoSummonWeather = value
 		saveSettings()
@@ -4500,16 +4523,16 @@ serverGroup:CreateToggle(
 )
 serverGroup:CreateDivider()
 serverGroup:CreateInput(
-	"Job ID or invite link",
-	"paste here",
+	"Server link or job id",
+	"paste invite link",
 	nil,
 	function(value)
 		state.JoinJobId = trim(value)
 	end,
-	"Full roblox.com/share link works, or just the job id."
+	"Full roblox share link or raw job id both work."
 )
 serverGroup:CreateButton(
-	"Join",
+	"Hop to server",
 	function()
 		local jobId, placeId = parseJobIdInput(state.JoinJobId)
 		if jobId and jobId ~= "" then
@@ -4517,16 +4540,16 @@ serverGroup:CreateButton(
 				TeleportService:TeleportToPlaceInstance(placeId or game.PlaceId, jobId, LocalPlayer)
 			end, true)
 		else
-			notify("Join failed", "Couldn't read a job id from that.", 3)
+			notify("Can't join", "That doesn't look like a valid link or job id.", 3)
 		end
 	end,
-	"Teleports you to that server."
+	"Sends you to whoever's server you pasted."
 )
 
 webhookGroup:CreateToggle(
-	"Discord pings",
+	"Discord alerts",
 	state.AWebhook,
-	"Posts to your webhook when a matching brainrot hits your bag.",
+	"Message your webhook when something good lands in your bag.",
 	function(value)
 		state.AWebhook = value
 		syncTrackerConfig()
@@ -4534,8 +4557,8 @@ webhookGroup:CreateToggle(
 	end
 )
 webhookGroup:CreateInput(
-	"Webhook URL",
-	"discord webhook url",
+	"Webhook link",
+	"paste discord webhook",
 	nil,
 	function(value)
 		local normalized, err = normalizeWebhookUrl(value)
@@ -4555,7 +4578,7 @@ webhookGroup:CreateInput(
 				embeds = {
 					{
 						title = "Connected",
-						description = "You'll get pings from this session.",
+						description = "Webhook works. Alerts come from here.",
 						color = 16733440,
 						footer = { text = "Alleral" },
 						timestamp = DateTime.now():ToIsoDate(),
@@ -4563,25 +4586,25 @@ webhookGroup:CreateInput(
 				},
 			})
 		end
-		notify(ok and "Webhook" or "Webhook failed", ok and "Test message sent." or sendError, 4)
+		notify(ok and "Discord" or "Didn't send", ok and "Test ping went through." or sendError, 4)
 	end,
-	"Create one in Discord channel settings → integrations → webhooks."
+	"Channel settings, integrations, webhooks, copy URL."
 )
 webhookGroup:CreateDivider()
 webhookGroup:AddDropdown("WebhookBrainrot", {
-	Text = "Brainrot",
+	Text = "Ping for name",
 	Values = gameData.BrainrotOptions,
 	Default = state.WBBrainrot,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Ping only for these names. Any = all.",
+	Tooltip = "Only these names trigger a ping. Any = everything.",
 	Callback = function(selection)
 		state.WBBrainrot = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
 })
 webhookGroup:AddDropdown("WebhookRarity", {
-	Text = "Rarity",
+	Text = "Ping for rarity",
 	Values = gameData.RarityOptions,
 	Default = state.WBRarity,
 	Multi = true,
@@ -4593,7 +4616,7 @@ webhookGroup:AddDropdown("WebhookRarity", {
 	end,
 })
 webhookGroup:AddDropdown("WebhookMutation", {
-	Text = "Mutation",
+	Text = "Ping for mutation",
 	Values = gameData.MutationOptions,
 	Default = state.WBMutation,
 	Multi = true,
@@ -4606,9 +4629,9 @@ webhookGroup:AddDropdown("WebhookMutation", {
 })
 webhookGroup:CreateDivider()
 webhookGroup:CreateToggle(
-	"Inventory updates",
+	"Bag check-ins",
 	state.AutoStatusWebhook,
-	"Sends a bag count to Discord every so often.",
+	"Periodic Discord message with what's in your bag.",
 	function(value)
 		state.AutoStatusWebhook = value
 		runtime.nextStatusWebhook = tick() + (state.AutoStatusInterval * 60)
@@ -4616,7 +4639,7 @@ webhookGroup:CreateToggle(
 	end
 )
 webhookGroup:CreateSlider(
-	"Every (minutes)",
+	"How often (min)",
 	1,
 	120,
 	state.AutoStatusInterval,
@@ -4625,35 +4648,35 @@ webhookGroup:CreateSlider(
 		runtime.nextStatusWebhook = tick() + (value * 60)
 		saveSettings()
 	end,
-	"How often the inventory update fires."
+	"Minutes between bag check-in messages."
 )
 webhookGroup:CreateButton(
-	"Send update now",
+	"Post bag count now",
 	function()
 		runtime.nextStatusWebhook = 0
 	end,
-	"Skips the wait and posts your bag count right away."
+	"Send the bag update right now."
 )
 webhookGroup:CreateDivider()
 webhookGroup:AddDropdown("Status Brainrot", {
-	Text = "Count: brainrot",
+	Text = "Count these names",
 	Values = gameData.BrainrotOptions,
 	Default = state.StatusFilterBrainrot,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Only count these in the update message.",
+	Tooltip = "Only these show up in the bag count.",
 	Callback = function(selection)
 		state.StatusFilterBrainrot = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
 })
 webhookGroup:AddDropdown("Status Rarity", {
-	Text = "Count: rarity",
+	Text = "Count these rarities",
 	Values = gameData.RarityOptions,
 	Default = state.StatusFilterRarity,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Only count these rarities in the update.",
+	Tooltip = "Filter the bag count by rarity.",
 	Callback = function(selection)
 		state.StatusFilterRarity = selectedDropdownKeys(selection)
 		saveSettings()
@@ -5086,10 +5109,11 @@ makeSupervisor("AutoClaim2x", 2, function()
 end)
 
 makeSupervisor("CollectCash", 1.5, function()
+	if not state.ACollect then
+		return
+	end
 	local battleStatus = currentBattleStatus()
-	local safeBattleCollect = state.AAutoBattle
-		and (battleStatus == "Lobby" or battleStatus == "Create" or battleStatus == nil)
-	if not state.ACollect and not safeBattleCollect then
+	if battleStatus == "Battle" or battleTimerVisible() then
 		return
 	end
 	runtime.nextCollect = runtime.nextCollect or 0
@@ -5476,6 +5500,12 @@ makeSupervisor("Mastery", 1, function()
 		runtime.nextMasteryAction = tick() + 2
 		return
 	end
+	local battleStatus = currentBattleStatus()
+	if state.AAutoBattle and (battleStatus == "Battle" or battleTimerVisible()) then
+		ui.updateMasteryStatus("Paused (battle)")
+		runtime.nextMasteryAction = tick() + 2
+		return
+	end
 	runtime.masteryBusy = true
 
 	local function finish(delay)
@@ -5499,14 +5529,17 @@ makeSupervisor("Mastery", 1, function()
 				ui.updateMasteryStatus("Walking to pad")
 				root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
 				finish(0.4)
-			else
-				ui.updateMasteryStatus("Kicking")
-				safeCall("MasteryKick", function()
-					remotes.kick:FireServer(0, (state.MasteryKickPower or 50) / 100)
-				end)
-				finish(1.2)
+				return
 			end
-		elseif state.MasteryResetMethod == "TP" then
+			ui.updateMasteryStatus("Kicking")
+			safeCall("MasteryKick", function()
+				remotes.kick:FireServer(0, (state.MasteryKickPower or 50) / 100)
+			end)
+			finish(1.2)
+			return
+		end
+
+		if state.MasteryResetMethod == "TP" then
 			ui.updateMasteryStatus("TP reset")
 			local timeout = tick() + 4
 			while state.HubRunning and state.AAutoMastery and tick() < timeout do
@@ -5520,39 +5553,41 @@ makeSupervisor("Mastery", 1, function()
 			root.CFrame = kickReady.CFrame * CFrame.new(0, -8, 0)
 			task.wait(0.2)
 			root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
-			finish(1)
-		else
-			ui.updateMasteryStatus("Dying to reset")
-			local gui2 = LocalPlayer:FindFirstChild("PlayerGui")
-			local minigame = gui2 and (
-				gui2:FindFirstChild("KickMinigame")
-				or gui2:FindFirstChild("MinigameUI")
-				or gui2:FindFirstChild("Minigame")
-			)
-			local timeout = tick() + 3
-			if minigame then
-				while not minigame.Enabled and tick() < timeout and state.AAutoMastery do
-					task.wait(0.05)
-				end
-				while minigame.Enabled and tick() < timeout and state.AAutoMastery do
-					task.wait(0.05)
-				end
-			else
-				task.wait(1.5)
-			end
 			restoreCamera(humanoid)
-			humanoid.Health = 0
-			ui.updateMasteryStatus("Dying to reset", { ["Last"] = os.date("%H:%M:%S") })
-			local oldCharacter = LocalPlayer.Character
-			local respawnTimeout = tick() + 10
-			while
-				state.HubRunning
-				and state.AAutoMastery
-				and LocalPlayer.Character == oldCharacter
-				and tick() < respawnTimeout
-			do
-				task.wait(0.1)
+			finish(1)
+			return
+		end
+
+		ui.updateMasteryStatus("Dying to reset")
+		local gui2 = LocalPlayer:FindFirstChild("PlayerGui")
+		local minigame = gui2 and (
+			gui2:FindFirstChild("KickMinigame")
+			or gui2:FindFirstChild("MinigameUI")
+			or gui2:FindFirstChild("Minigame")
+		)
+		local timeout = tick() + 3
+		if minigame then
+			while not minigame.Enabled and tick() < timeout and state.AAutoMastery do
+				task.wait(0.05)
 			end
+			while minigame.Enabled and tick() < timeout and state.AAutoMastery do
+				task.wait(0.05)
+			end
+		else
+			task.wait(1.5)
+		end
+		restoreCamera(humanoid)
+		humanoid.Health = 0
+		ui.updateMasteryStatus("Dying to reset", { ["Last"] = os.date("%H:%M:%S") })
+		local oldCharacter = LocalPlayer.Character
+		local respawnTimeout = tick() + 10
+		while
+			state.HubRunning
+			and state.AAutoMastery
+			and LocalPlayer.Character == oldCharacter
+			and tick() < respawnTimeout
+		do
+			task.wait(0.1)
 		end
 		local newCharacter = LocalPlayer.Character
 		local newRoot = newCharacter and newCharacter:WaitForChild("HumanoidRootPart", 5)
@@ -5671,7 +5706,7 @@ if state.AAutoFav then
 	scanTools()
 end
 
-notify("Alleral", "v" .. VERSION .. " loaded — tabs on the left, hover stuff for tips.", 5)
+notify("Alleral", "v" .. VERSION .. " loaded. Tabs on the left.", 5)
 end
 
 startRuntime()

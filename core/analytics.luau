@@ -1,9 +1,3 @@
---[[
-	Alleral Analytics
-	Deobfuscated / reimplemented from Luxy Analytics.lua (LuaObfuscator VM).
-	Privacy-first: Discord webhooks you configure only — no third-party telemetry.
-]]
-
 local Analytics = {}
 Analytics.Version = "1.0"
 Analytics.Config = {
@@ -21,66 +15,17 @@ local function trim(value)
 	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
 end
 
-local function requestFunction()
-	local env = {}
-	pcall(function()
-		local g = getgenv or getfenv
-		if g then
-			env = g() or {}
-		end
-	end)
-	for _, name in ipairs({ "http_request", "request" }) do
-		local fn = env[name]
-		if type(fn) == "function" then
-			return fn
-		end
-	end
-	local syn = env.syn
-	if type(syn) == "table" and type(syn.request) == "function" then
-		return syn.request
-	end
-	return nil
-end
-
-local function normalizeWebhookUrl(url)
-	local text = trim(url)
-	if text == "" then
-		return nil, "Webhook URL is empty."
-	end
-	if not text:find("^https://") and not text:find("^http://") then
-		text = "https://" .. text
-	end
-	if not text:find("discord%.com/api/webhooks/") and not text:find("discordapp%.com/api/webhooks/") then
-		return nil, "That doesn't look like a Discord webhook URL."
-	end
-	return text, nil
+local function coreApi()
+	local genv = getgenv and getgenv() or {}
+	return genv.Alleral_Core
 end
 
 local function postWebhook(url, payload)
-	local sender = requestFunction()
-	if not sender then
-		return false, "HTTP is not available in this executor."
+	local core = coreApi()
+	if core and type(core.postWebhook) == "function" then
+		return core.postWebhook(url, payload)
 	end
-	local postUrl, urlError = normalizeWebhookUrl(url)
-	if not postUrl then
-		return false, urlError
-	end
-	local ok, response = pcall(function()
-		return sender({
-			Url = postUrl,
-			Method = "POST",
-			Headers = { ["Content-Type"] = "application/json" },
-			Body = HttpService:JSONEncode(payload),
-		})
-	end)
-	if not ok then
-		return false, tostring(response)
-	end
-	local code = response and (response.StatusCode or response.Status or response.status_code)
-	if type(code) == "number" and (code < 200 or code >= 300) then
-		return false, "Webhook returned HTTP " .. tostring(code)
-	end
-	return true, nil
+	return false, "Run loader.luau first."
 end
 
 local function executorName()
@@ -190,7 +135,7 @@ function Analytics:SendTestConnection(webhookUrl)
 		username = Analytics.Config.brand,
 		embeds = {
 			{
-				title = "Connected",
+				title = "Webhook works",
 				description = "Webhook test from " .. (Analytics.Config.brand or "Alleral") .. ".",
 				color = Analytics.Config.color,
 				fields = {

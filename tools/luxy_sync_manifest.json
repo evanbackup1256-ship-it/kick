@@ -1,0 +1,58 @@
+{
+  "accounts": [
+    "https://github.com/Omnie7"
+  ],
+  "entries": [
+    {
+      "id": "kick_lucky_blox",
+      "label": "Kick A Lucky Blox",
+      "url": "https://raw.githubusercontent.com/Omnie7/Luxy-Scripts/main/Games/Kick%20A%20Lucky%20Blox.lua",
+      "local_obfuscated": "tools/luxy-cache/kick_a_lucky_blox.obfuscated.lua",
+      "local_deobfuscated": "tools/luxy-cache/kick_a_lucky_blox.deobfuscated.lua",
+      "production": "games/kick_a_lucky_block.luau",
+      "xor_deobfuscate": true,
+      "post_update": [],
+      "production_note": "Manual port required — compare deobfuscated cache with games/kick_a_lucky_block.luau"
+    },
+    {
+      "id": "speed_keyboard_escape",
+      "label": "Speed Keyboard Escape",
+      "url": "https://raw.githubusercontent.com/Omnie7/Luxy-Scripts/main/Games/Speed%20Keyboard%20Escape.lua",
+      "local_obfuscated": "tools/luxy-cache/speed_keyboard_escape.obfuscated.lua",
+      "local_deobfuscated": "tools/luxy-cache/speed_keyboard_escape.deobfuscated.lua",
+      "production": "games/speed_keyboard_escape.luau",
+      "xor_deobfuscate": true,
+      "post_update": ["python tools/emit_speed_keyboard.py"]
+    },
+    {
+      "id": "slime_rng",
+      "label": "Slime RNG",
+      "url": "https://raw.githubusercontent.com/Omnie7/Luxy-Scripts/main/Games/Slime%20RNG.lua",
+      "local_obfuscated": "tools/luxy-cache/slime_rng.obfuscated.lua",
+      "local_deobfuscated": "tools/luxy-cache/slime_rng.deobfuscated.lua",
+      "production": "games/slime_rng.luau",
+      "xor_deobfuscate": true,
+      "post_update": [],
+      "production_note": "Manual port required — compare deobfuscated cache with games/slime_rng.luau"
+    },
+    {
+      "id": "build_a_ring_farm",
+      "label": "Build A Ring Farm",
+      "url": "https://raw.githubusercontent.com/Omnie7/Luxy-Scripts/main/Games/Build%20A%20Ring%20Farm.lua",
+      "local_obfuscated": "tools/luxy-cache/build_a_ring_farm_obfuscated.lua",
+      "local_deobfuscated": "tools/luxy-cache/build_a_ring_farm.deobfuscated.lua",
+      "production": "games/build_a_ring_farm.luau",
+      "xor_deobfuscate": true,
+      "post_update": ["python tools/emit_clean_barf.py"]
+    },
+    {
+      "id": "kickblox_data",
+      "label": "KickBlox game data",
+      "url": "https://raw.githubusercontent.com/Omnie7/Luxy-Core/main/Data/KickBlox.luau",
+      "local_obfuscated": "tools/luxy-cache/KickBlox.luau",
+      "production": "games/kickblox.luau",
+      "xor_deobfuscate": false,
+      "post_update": []
+    }
+  ]
+}

@@ -1,5 +1,17 @@
 .cora/
 .zed/
+__pycache__/
+*.pyc
+tools/.luxy-sync-state.json
+tools/luxy-cache/
 
-# Local editor overrides (optional — keep shared .vscode/extensions.json tracked)
+# Secrets — never commit or share
+backend/.env
+config/owner_telemetry.luau
+config/telemetry.env
+src/owner_telemetry.luau
+owner_telemetry.luau
+../Alleral-Private/
+
+# Local editor overrides
 .vscode/settings.json

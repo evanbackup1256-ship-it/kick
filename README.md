@@ -1,74 +1,64 @@
-# Alleral
+# Alleral Hub
 
-Roblox automation hub built around the Alleral loader and Starlight UI.
+Roblox automation hub — one loader, four games, private owner telemetry.
 
-Supported games:
-
-- Kick a Lucky Block
-- Speed Keyboard Escape
-- Slime RNG
-- Build A Ring Farm
+**Supported games:** Kick a Lucky Block · Speed Keyboard Escape · Slime RNG · Build A Ring Farm
 
 ## Quick start
 
-Copy the whole repo into your executor workspace, then run from the repo root:
+Copy **Alleral Hub** into your executor workspace, then from the repo root:
 
 ```lua
 loadstring(readfile("loader.luau"))()
 ```
 
-Remote loader:
+Remote (after pushing this layout to GitHub):
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau"))()
 ```
 
-The loader detects the game, preloads `src/alleral_core.luau` and `src/analytics.luau`, then injects the matching script from `src/`.
+Reload: `getgenv().Alleral_Reload()` · Debug: `getgenv().Alleral_LoaderInfo()`
 
-By default the loader pulls scripts from GitHub (avoids stale local copies). Set `getgenv().Alleral_DevMode = true` before running to prefer local files instead.
-
-Reload after unload: `getgenv().Alleral_Reload()`
-
-Inspect loader state: `getgenv().Alleral_LoaderInfo()`
+Dev mode (prefer local files): `getgenv().Alleral_DevMode = true` before running.
 
 ## Project layout
 
 ```
-.
-├── loader.luau                 # Entry point — run this
-├── src/
-│   ├── alleral_core.luau       # Shared Starlight/settings bootstrap
-│   ├── analytics.luau          # Discord analytics / Tracker
-│   ├── kick_a_lucky_block.luau # Kick a Lucky Block (v6.4)
-│   ├── kickblox.luau           # Brainrot/rarity data (from Omnie7/Luxy-Core)
+Alleral Hub/
+├── loader.luau                 # Entry point
+├── core/
+│   ├── alleral_core.luau       # Starlight, supervisors, HTTP
+│   ├── analytics.luau          # In-game user webhooks (Kick)
+│   └── telemetry.luau          # Owner telemetry client (relay only)
+├── games/
+│   ├── kick_a_lucky_block.luau
+│   ├── kickblox.luau
 │   ├── speed_keyboard_escape.luau
 │   ├── slime_rng.luau
 │   └── build_a_ring_farm.luau
-├── reference/                  # Deobfuscated sources (not executed by loader)
-├── tools/                      # Emit scripts to regenerate game ports
-├── vendor/
-│   └── starlight/              # Offline Starlight fallback for Alleral_Core
-├── archive/                    # Deprecated experiments
-└── README.md
+├── config/
+│   ├── owner_telemetry.example.luau
+│   └── WEBHOOK_SETUP.md        # Full webhook deploy guide
+├── backend/
+│   └── telemetry_relay.py      # Private Discord relay (host this)
+├── tools/
+└── vendor/starlight/
 ```
 
-## What each folder is for
+## Owner webhook (secure)
 
-- **`src/`** — Production scripts only. This is what the loader loads locally.
-- **`reference/`** — Deobfuscated Luxy dumps used during porting (not loaded at runtime).
-- **`tools/`** — `emit_speed_keyboard.py`, `emit_clean_barf.py` to rebuild game scripts.
-- **`vendor/starlight/`** — Local Starlight copy used when HTTP is unavailable.
-- **`archive/`** — Deprecated experiments.
+**If others can read this folder**, read [config/SECURITY.md](config/SECURITY.md) first.
 
-## Local vs remote
+- Discord webhook → `backend/.env` on **your server only**
+- Relay API key → `../Alleral-Private/owner_telemetry.luau` (**outside** shared hub)
+- Before sharing: `powershell tools/prepare_distribution.ps1`
 
-The loader tries local files in this order:
+Setup: [config/WEBHOOK_SETUP.md](config/WEBHOOK_SETUP.md)
 
-1. `src/alleral_core.luau`, `src/analytics.luau`, then the detected game script
-2. Legacy flat filenames at repo root
+## Luxy sync (dev)
 
-If none exist, it falls back to the GitHub raw URL in `loader.luau`.
-
-## Config in-game
-
-Runtime settings are saved by the script to `Alleral_Configs/` in the executor filesystem — not in this repo.
+```bash
+python tools/luxy_sync.py
+python tools/luxy_sync.py --check
+```

@@ -1,5 +1,3 @@
---[[ Kick a Lucky Block game data — adapted from Omnie7/Luxy-Core Data/KickBlox.luau ]]
-
 local RS = game:GetService("ReplicatedStorage")
 
 local TrueFallbackBrainrots = {
@@ -120,7 +118,7 @@ local TrueFallbackBrainrots = {
 	"W",
 	"W or L",
 	"Waterdino",
-	"Zibra Zubra Zibralini",
+	"Zibra Zubra Zibralini"
 }
 
 local GameData = {
@@ -140,7 +138,7 @@ local GameData = {
 		"OG",
 		"Celestial",
 		"Exclusive",
-		"Eternal",
+		"Eternal"
 	},
 	MutationOptions = {
 		"Any",
@@ -161,26 +159,29 @@ local GameData = {
 		"Enchanted",
 		"Phantom",
 		"Astral",
-		"Volcanic",
-	},
+		"Volcanic"
+	}
 }
 
 local sharedFolder = RS:WaitForChild("Shared", 8)
-local dataFolder = sharedFolder and sharedFolder:FindFirstChild("Data")
-local entitiesModule = dataFolder and dataFolder:FindFirstChild("EntitiesData")
+local dataFolder = sharedFolder and sharedFolder:WaitForChild("Data", 5)
+local entitiesModule = dataFolder and dataFolder:WaitForChild("EntitiesData", 5)
 
 if entitiesModule then
 	local success, EntitiesData = pcall(function()
 		return require(entitiesModule)
 	end)
+	
 	if success and EntitiesData and EntitiesData.Brainrots then
 		GameData.BrainrotOptions = { "Any" }
+		
 		for brName, brData in pairs(EntitiesData.Brainrots) do
 			if brData.Rarity then
 				GameData.RarityMap[brName] = brData.Rarity
 			end
 			table.insert(GameData.BrainrotOptions, brName)
 		end
+		
 		table.sort(GameData.BrainrotOptions, function(a, b)
 			if a == "Any" then
 				return true

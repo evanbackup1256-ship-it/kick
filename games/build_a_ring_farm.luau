@@ -1,12 +1,12 @@
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
 if not getgenv().Alleral_Boot then
-	warn("[Alleral] Not the official script — grab it from the real loader")
+	warn("[Alleral] run loader.luau first")
 	return
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.0"
+local VERSION = "1.1"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {}
@@ -21,12 +21,16 @@ local starlight
 local bootErr
 local bootApi = getgenv().Alleral_Core
 if not bootApi or not bootApi.prepareGame then
-	warn("[Alleral] Core missing — run loader.luau first")
+	local msg = "Core missing, run loader.luau first"
+	getgenv().Alleral_StartupFailed = msg
+	warn("[Alleral] " .. msg)
 	return
 end
 Core, starlight, bootErr = bootApi.prepareGame(state)
 if not Core or not starlight then
-	warn("[Alleral] Boot failed: " .. tostring(bootErr))
+	local msg = "Boot failed: " .. tostring(bootErr)
+	getgenv().Alleral_StartupFailed = msg
+	warn("[Alleral] " .. msg)
 	return
 end
 
@@ -152,7 +156,6 @@ local function notify(title, text, duration)
 	Core.notify(title, text, duration)
 end
 
--- Runtime cache (not persisted)
 local runtime = {
 	playerPlot = nil,
 	unlockCooldowns = {},
@@ -168,7 +171,6 @@ local runtime = {
 	afkSpinStarted = false,
 }
 
--- Remotes
 local Remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
 local RollSeedsRemote = Remotes and Remotes:WaitForChild("RollSeeds", 5)
 local BuySeedRemote = Remotes and Remotes:WaitForChild("BuySeed", 5)
@@ -198,11 +200,12 @@ local UsePetTreatRemote = Remotes:WaitForChild("UsePetTreat")
 local ContractsFolder = ReplicatedStorage:WaitForChild("Contracts"):WaitForChild("RF")
 local ContractSubmitRemote = ContractsFolder:WaitForChild("Submit")
 local ContractRerollRemote = ContractsFolder:WaitForChild("Reroll")
-local EquipPetRemote = Remotes:WaitForChild("Pets"):WaitForChild("EquipPet")
-local SellPetRemote = Remotes:WaitForChild("Pets"):WaitForChild("SellPet")
+local PetsRemotes = Remotes:WaitForChild("Pets")
+local EquipPetRemote = PetsRemotes:WaitForChild("EquipPet")
+local UnequipPetRemote = PetsRemotes:FindFirstChild("UnequipPet")
+local SellPetRemote = PetsRemotes:WaitForChild("SellPet")
 local PlantRushBuyRemote = Remotes:FindFirstChild("PlantRush") and Remotes.PlantRush:FindFirstChild("BuyShopItem")
 
--- Game modules
 local DataReplicator, Configuration, SharedUtils, EconomyTuning
 pcall(function()
 	DataReplicator = require(ReplicatedStorage.Packages.DataReplicator)
@@ -240,7 +243,6 @@ pcall(function()
 	end
 end)
 
--- Registry helpers
 local function getRegistryModule(moduleName)
 	local registry = ReplicatedStorage:FindFirstChild("Registry")
 	if registry then
@@ -342,7 +344,6 @@ sortAnyFirst(gearNameOptions)
 sortAnyFirst(eggNameOptions)
 sortAnyFirst(eventItemOptions)
 
--- Utility helpers
 local function listContains(list, value)
 	if not list or #list == 0 then
 		return false
@@ -774,7 +775,12 @@ local function pickPriorityTarget(candidates, rootPosition)
 			if listContains(state.TargetEnemyPriority, "Medium (Huge)") and entry.Type == "Medium" then
 				score = score - 1000
 			end
-			if listContains(state.TargetEnemyPriority, "Boss") and entry.Type == "Boss" then
+			if listContains(state.TargetEnemyPriority, "Small (Normal)") and (entry.Type == "Small" or entry.Type == "Normal") then
+				score = score - 500
+			end
+			if listContains(state.TargetEnemyPriority, "Boss (Full XP)") and entry.Type == "Boss" then
+				score = score - 3000
+			elseif listContains(state.TargetEnemyPriority, "Boss") and entry.Type == "Boss" then
 				score = score - 2000
 			end
 			if closestMode and score < bestScore then
@@ -999,17 +1005,28 @@ local function optimizePets()
 	table.sort(pets, function(a, b)
 		return a.mult > b.mult
 	end)
+	local topKeys = {}
+	for i = 1, math.min(4, #pets) do
+		topKeys[pets[i].key] = true
+	end
+	for petKey in pairs(replica.Data.PetInventory) do
+		if not topKeys[petKey] and UnequipPetRemote then
+			pcall(function()
+				UnequipPetRemote:FireServer(petKey)
+			end)
+		end
+	end
 	for i = 1, math.min(4, #pets) do
 		local pet = pets[i]
 		pcall(function()
-			if SellPetRemote then
-				-- equip best via EquipPetRemote after teleporting near plot sign
+			if EquipPetRemote then
 				local sign = runtime.playerPlot:FindFirstChild("PlotUpgradeSign", true)
 				if sign and sign:IsA("BasePart") then
 					root.CFrame = sign.CFrame + Vector3.new(0, 3, 0)
 					task.wait(0.4)
 				end
-				local tool = LocalPlayer.Backpack:FindFirstChild(pet.key) or LocalPlayer.Backpack:FindFirstChild(pet.data.Name or "")
+				local tool = LocalPlayer.Backpack:FindFirstChild(pet.key)
+					or LocalPlayer.Backpack:FindFirstChild(pet.data.Name or "")
 				if tool then
 					humanoid:EquipTool(tool)
 					task.wait(0.3)
@@ -1022,7 +1039,6 @@ local function optimizePets()
 	end
 end
 
--- Plot bootstrap
 task.spawn(function()
 	local attempts = 0
 	while not runtime.playerPlot and state.HubRunning do
@@ -1049,7 +1065,6 @@ task.spawn(function()
 	end
 end)
 
--- Automations
 Core.makeSupervisor(state, loops, loopControllers, "AutoPlaceSeed", 0.5, function()
 	if not state.AutoPlaceSeed or not runtime.playerPlot then
 		if runtime.plantingActive then
@@ -1870,7 +1885,7 @@ local miscTab = section:CreateTab({ Name = "Misc", Icon = 10734950020, Columns =
 local plantGroup = farmTab:CreateGroupbox({ Name = "Planting", Column = 1 }, "plant")
 local plotGroup = farmTab:CreateGroupbox({ Name = "Plot", Column = 2 }, "plot")
 local sellGroup = farmTab:CreateGroupbox({ Name = "Selling", Column = 1 }, "sell")
-local careGroup = farmTab:CreateGroupbox({ Name = "Spray & Fertilizer", Column = 2 }, "care")
+local careGroup = farmTab:CreateGroupbox({ Name = "Spray & fert", Column = 2 }, "care")
 local rollGroup = seedTab:CreateGroupbox({ Name = "Roll & Buy", Column = 1 }, "roll")
 local discardGroup = seedTab:CreateGroupbox({ Name = "Discard", Column = 2 }, "discard")
 local plantUpGroup = upgradeTab:CreateGroupbox({ Name = "Plants", Column = 1 }, "plant_up")
@@ -1881,9 +1896,9 @@ local eggShopGroup = shopTab:CreateGroupbox({ Name = "Eggs", Column = 2 }, "egg_
 local contractGroup = shopTab:CreateGroupbox({ Name = "Contracts", Column = 1 }, "contracts")
 local eventSeedGroup = eventTab:CreateGroupbox({ Name = "Event Seeds", Column = 1 }, "event_seed")
 local eventShopGroup = eventTab:CreateGroupbox({ Name = "Event Shop", Column = 2 }, "event_shop")
-local eventCombatGroup = eventTab:CreateGroupbox({ Name = "Combat & Drops", Column = 1 }, "event_combat")
+local eventCombatGroup = eventTab:CreateGroupbox({ Name = "Events & drops", Column = 1 }, "event_combat")
 local honeyGroup = eventTab:CreateGroupbox({ Name = "Honey", Column = 2 }, "honey")
-local petAutoGroup = petTab:CreateGroupbox({ Name = "Pet Automation", Column = 1 }, "pet_auto")
+local petAutoGroup = petTab:CreateGroupbox({ Name = "Pets", Column = 1 }, "pet_auto")
 local petSellGroup = petTab:CreateGroupbox({ Name = "Sell Pets", Column = 2 }, "pet_sell")
 local compGroup = petTab:CreateGroupbox({ Name = "Composter", Column = 1 }, "comp")
 local flyGroup = miscTab:CreateGroupbox({ Name = "Movement", Column = 1 }, "fly")
@@ -1925,62 +1940,78 @@ local function bindSlider(group, label, minVal, maxVal, key)
 	end)
 end
 
-bindToggle(plant, "Auto Place Seed", "AutoPlaceSeed", "Places seeds from backpack onto plot")
-bindToggle(plant, "Auto Remove Seed", "AutoRemoveSeed", "Removes plants matching filters")
-bindToggle(plant, "Auto Upgrade Seed", "AutoUpgradeSeed", "Upgrades planted seeds")
-bindToggle(plot, "Auto Unlock Plot", "AutoUnlockPlot", "Unlocks new plot slots")
-bindToggle(plot, "Auto Expand Farm", "AutoExpandFarm", "Purchases farm expansion")
-bindToggle(sell, "Auto Sell", "AutoSell", "Sells held crates at crate position")
-bindSlider(sell, "Sell Delay", 1, 10, "SellDelay")
-bindToggle(care, "Auto Spray", "AutoSpray", nil)
-bindToggle(care, "Auto Fertilizer", "AutoFertilizer", nil)
-bindToggle(roll, "Auto Buy Seed", "AutoBuySeed", nil)
-bindToggle(roll, "Auto Roll Manual", "AutoRollManual", nil)
-bindSlider(roll, "Roll Delay", 1, 10, "RollDelay")
-bindToggle(discard, "Auto Discard Seed", "AutoDiscardSeed", nil)
-bindSlider(plantUp, "Max Upgrade Level", 1, 50, "MaxUpgradeLevel")
-bindToggle(plantUp, "Auto Upgrade Seed Rolls", "AutoUpgradeSeedRolls", nil)
-bindToggle(plantUp, "Auto Upgrade Seed Luck", "AutoUpgradeSeedLuck", nil)
-bindToggle(farmUp, "Auto Upgrade Plot Stats", "AutoUpgradePlotStats", nil)
-bindToggle(gearUp, "Auto Upgrade Saw Range", "AutoUpgradeSawRange", nil)
-bindToggle(gearUp, "Auto Upgrade Saw Yield", "AutoUpgradeSawYield", nil)
-bindToggle(gearUp, "Auto Upgrade Sprinkler Range", "AutoUpgradeSprinklerRange", nil)
-bindToggle(gearUp, "Auto Upgrade Sprinkler Power", "AutoUpgradeSprinklerPower", nil)
-bindToggle(gearShop, "Auto Buy Gear", "AutoBuyGear", nil)
-bindToggle(eggShop, "Auto Buy Egg", "AutoBuyEgg", nil)
-bindToggle(eggShop, "Auto Unlock Egg", "AutoUnlockEgg", nil)
-bindToggle(contracts, "Auto Contract Submit", "AutoContractSubmit", nil)
-bindToggle(contracts, "Auto Contract Reroll", "AutoContractReroll", nil)
-bindToggle(eventSeed, "Auto Submit Event Seed", "AutoSubmitEventSeed", nil)
-bindToggle(eventShop, "Auto Buy Event Shop", "AutoBuyEventShop", nil)
-bindToggle(eventCombat, "Auto Shoot Event", "AutoShootEvent", nil)
-bindToggle(eventCombat, "Auto Collect Rush Drops", "AutoCollectRushDrops", nil)
-bindToggle(eventCombat, "Auto Collect Alien Drop", "AutoCollectAlienDrop", nil)
-bindToggle(honey, "Auto Honey", "AutoHoney", nil)
-bindToggle(honey, "Auto Roll Honey", "AutoRollHoney", nil)
-bindToggle(pets, "Auto Feed Pet", "AutoFeedPet", nil)
-bindToggle(pets, "Auto Optimize Pets", "AutoOptimizePets", nil)
-bindToggle(petSell, "Auto Sell Pet", "AutoSellPet", nil)
-bindToggle(comp, "Auto Composter", "AutoComposter", nil)
-bindToggle(comp, "Auto Pull Lever", "AutoPullLever", nil)
-bindToggle(fly, "Enable Fly", "EnableFly", nil)
-bindSlider(fly, "Fly Speed", 50, 500, "FlySpeed")
-bindToggle(util, "Auto Claim Playtime", "AutoClaimPlaytime", nil)
-bindToggle(util, "Auto Open Box", "AutoOpenBox", nil)
-util:CreateToggle("Anti AFK", state.AntiAFK, "Bypass idle kick", function(value)
+bindToggle(plant, "Plant seeds", "AutoPlaceSeed", "Puts seeds from your bag onto empty plot spots.")
+bindToggle(plant, "Clear plants", "AutoRemoveSeed", "Removes plants you don't want anymore.")
+bindToggle(plant, "Upgrade plants", "AutoUpgradeSeed", "Levels up what's already planted.")
+bindToggle(plot, "Unlock plots", "AutoUnlockPlot", "Buys new plot slots when you can afford them.")
+bindToggle(plot, "Expand farm", "AutoExpandFarm", "Purchases the next farm expansion.")
+bindToggle(sell, "Sell crates", "AutoSell", "Walks over and sells whatever you're holding.")
+bindSlider(sell, "Wait between sells", 1, 10, "SellDelay")
+bindToggle(care, "Auto spray", "AutoSpray", "Sprays your crops on a loop.")
+bindToggle(care, "Auto fertilizer", "AutoFertilizer", "Fertilizes without you clicking.")
+bindToggle(roll, "Buy seeds", "AutoBuySeed", "Grabs seeds from the shop.")
+bindToggle(roll, "Roll seeds", "AutoRollManual", "Keeps rolling until you get something good.")
+bindSlider(roll, "Roll wait (sec)", 1, 10, "RollDelay")
+bindToggle(discard, "Toss bad seeds", "AutoDiscardSeed", "Discards seeds that don't match what you want.")
+bindSlider(plantUp, "Stop upgrading at", 1, 50, "MaxUpgradeLevel")
+bindToggle(plantUp, "Upgrade roll stat", "AutoUpgradeSeedRolls", "Puts points into seed roll upgrades.")
+bindToggle(plantUp, "Upgrade luck stat", "AutoUpgradeSeedLuck", "Puts points into seed luck upgrades.")
+bindToggle(farmUp, "Upgrade plot stats", "AutoUpgradePlotStats", "Buys plot stat upgrades.")
+bindToggle(gearUp, "Saw range", "AutoUpgradeSawRange", "Upgrades saw reach.")
+bindToggle(gearUp, "Saw yield", "AutoUpgradeSawYield", "Upgrades how much the saw gives.")
+bindToggle(gearUp, "Sprinkler range", "AutoUpgradeSprinklerRange", "Upgrades sprinkler reach.")
+bindToggle(gearUp, "Sprinkler power", "AutoUpgradeSprinklerPower", "Upgrades sprinkler strength.")
+bindToggle(gearShop, "Buy gear", "AutoBuyGear", "Purchases gear upgrades from the shop.")
+bindToggle(eggShop, "Buy eggs", "AutoBuyEgg", "Grabs eggs when you have the cash.")
+bindToggle(eggShop, "Unlock eggs", "AutoUnlockEgg", "Unlocks egg types you haven't opened yet.")
+bindToggle(contracts, "Turn in contracts", "AutoContractSubmit", "Submits finished contracts for you.")
+bindToggle(contracts, "Reroll contracts", "AutoContractReroll", "Rerolls contracts you don't like.")
+bindToggle(eventSeed, "Submit event seeds", "AutoSubmitEventSeed", "Hands in event seeds during events.")
+bindToggle(eventShop, "Buy event shop", "AutoBuyEventShop", "Buys from the limited event shop.")
+bindToggle(eventCombat, "Shoot event mobs", "AutoShootEvent", "Fights event enemies automatically.")
+bindToggle(eventCombat, "Grab rush drops", "AutoCollectRushDrops", "Picks up rush event loot.")
+bindToggle(eventCombat, "Grab alien drops", "AutoCollectAlienDrop", "Picks up alien event loot.")
+bindToggle(honey, "Honey farm", "AutoHoney", "Runs the honey minigame for you.")
+bindToggle(honey, "Roll honey", "AutoRollHoney", "Keeps rolling honey rewards.")
+bindToggle(pets, "Feed pets", "AutoFeedPet", "Feeds your pets so they stay happy.")
+bindToggle(pets, "Optimize pets", "AutoOptimizePets", "Equips your best pets and unequips the rest.")
+bindToggle(petSell, "Sell pets", "AutoSellPet", "Sells pets you don't need.")
+bindToggle(comp, "Run composter", "AutoComposter", "Tosses stuff into the composter.")
+bindToggle(comp, "Pull lever", "AutoPullLever", "Pulls the composter lever when it's ready.")
+bindToggle(fly, "Fly", "EnableFly", "Lets you fly around the map.")
+bindSlider(fly, "Fly speed", 50, 500, "FlySpeed")
+bindToggle(util, "Claim playtime", "AutoClaimPlaytime", "Grabs playtime rewards.")
+bindToggle(util, "Open boxes", "AutoOpenBox", "Opens reward boxes in your inventory.")
+util:CreateToggle("Anti AFK", state.AntiAFK, "So you don't get booted for sitting still.", function(value)
 	state.AntiAFK = value
 	if value then
 		Core.setupAntiAfk(LocalPlayer)
 	end
 	saveSettings()
 end)
-util:CreateButton("Save Settings", saveSettings)
+util:CreateButton("Save now", saveSettings)
 
-notify("Alleral", "Build A Ring Farm loaded")
+notify("Alleral", "Loaded. Hover toggles for tips.")
 
 state.Alleral_Unload = function()
-	Core.stopAutomation(state, connections, loopControllers, loops, function()
-		stopFly()
-		restoreShooter()
-	end)
+	state.HubRunning = false
+	stopFly()
+	restoreShooter()
+	for name, controller in pairs(loopControllers) do
+		if controller then
+			controller.enabled = false
+		end
+		loopControllers[name] = nil
+	end
+	for key, connection in pairs(connections) do
+		if connection and connection.Disconnect then
+			pcall(function()
+				connection:Disconnect()
+			end)
+		end
+		connections[key] = nil
+	end
+	for _, loopState in pairs(loops) do
+		loopState.enabled = false
+	end
 end

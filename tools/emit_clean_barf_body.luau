@@ -1,4 +1,3 @@
--- Remotes
 local Remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
 local RollSeedsRemote = Remotes and Remotes:WaitForChild("RollSeeds", 5)
 local BuySeedRemote = Remotes and Remotes:WaitForChild("BuySeed", 5)
@@ -28,11 +27,12 @@ local UsePetTreatRemote = Remotes:WaitForChild("UsePetTreat")
 local ContractsFolder = ReplicatedStorage:WaitForChild("Contracts"):WaitForChild("RF")
 local ContractSubmitRemote = ContractsFolder:WaitForChild("Submit")
 local ContractRerollRemote = ContractsFolder:WaitForChild("Reroll")
-local EquipPetRemote = Remotes:WaitForChild("Pets"):WaitForChild("EquipPet")
-local SellPetRemote = Remotes:WaitForChild("Pets"):WaitForChild("SellPet")
+local PetsRemotes = Remotes:WaitForChild("Pets")
+local EquipPetRemote = PetsRemotes:WaitForChild("EquipPet")
+local UnequipPetRemote = PetsRemotes:FindFirstChild("UnequipPet")
+local SellPetRemote = PetsRemotes:WaitForChild("SellPet")
 local PlantRushBuyRemote = Remotes:FindFirstChild("PlantRush") and Remotes.PlantRush:FindFirstChild("BuyShopItem")
 
--- Game modules
 local DataReplicator, Configuration, SharedUtils, EconomyTuning
 pcall(function()
 	DataReplicator = require(ReplicatedStorage.Packages.DataReplicator)
@@ -70,7 +70,6 @@ pcall(function()
 	end
 end)
 
--- Registry helpers
 local function getRegistryModule(moduleName)
 	local registry = ReplicatedStorage:FindFirstChild("Registry")
 	if registry then
@@ -172,7 +171,6 @@ sortAnyFirst(gearNameOptions)
 sortAnyFirst(eggNameOptions)
 sortAnyFirst(eventItemOptions)
 
--- Utility helpers
 local function listContains(list, value)
 	if not list or #list == 0 then
 		return false
@@ -604,7 +602,12 @@ local function pickPriorityTarget(candidates, rootPosition)
 			if listContains(state.TargetEnemyPriority, "Medium (Huge)") and entry.Type == "Medium" then
 				score = score - 1000
 			end
-			if listContains(state.TargetEnemyPriority, "Boss") and entry.Type == "Boss" then
+			if listContains(state.TargetEnemyPriority, "Small (Normal)") and (entry.Type == "Small" or entry.Type == "Normal") then
+				score = score - 500
+			end
+			if listContains(state.TargetEnemyPriority, "Boss (Full XP)") and entry.Type == "Boss" then
+				score = score - 3000
+			elseif listContains(state.TargetEnemyPriority, "Boss") and entry.Type == "Boss" then
 				score = score - 2000
 			end
 			if closestMode and score < bestScore then
@@ -829,17 +832,28 @@ local function optimizePets()
 	table.sort(pets, function(a, b)
 		return a.mult > b.mult
 	end)
+	local topKeys = {}
+	for i = 1, math.min(4, #pets) do
+		topKeys[pets[i].key] = true
+	end
+	for petKey in pairs(replica.Data.PetInventory) do
+		if not topKeys[petKey] and UnequipPetRemote then
+			pcall(function()
+				UnequipPetRemote:FireServer(petKey)
+			end)
+		end
+	end
 	for i = 1, math.min(4, #pets) do
 		local pet = pets[i]
 		pcall(function()
-			if SellPetRemote then
-				-- equip best via EquipPetRemote after teleporting near plot sign
+			if EquipPetRemote then
 				local sign = runtime.playerPlot:FindFirstChild("PlotUpgradeSign", true)
 				if sign and sign:IsA("BasePart") then
 					root.CFrame = sign.CFrame + Vector3.new(0, 3, 0)
 					task.wait(0.4)
 				end
-				local tool = LocalPlayer.Backpack:FindFirstChild(pet.key) or LocalPlayer.Backpack:FindFirstChild(pet.data.Name or "")
+				local tool = LocalPlayer.Backpack:FindFirstChild(pet.key)
+					or LocalPlayer.Backpack:FindFirstChild(pet.data.Name or "")
 				if tool then
 					humanoid:EquipTool(tool)
 					task.wait(0.3)
@@ -852,7 +866,6 @@ local function optimizePets()
 	end
 end
 
--- Plot bootstrap
 task.spawn(function()
 	local attempts = 0
 	while not runtime.playerPlot and state.HubRunning do
@@ -879,7 +892,6 @@ task.spawn(function()
 	end
 end)
 
--- Automations
 Core.makeSupervisor(state, loops, loopControllers, "AutoPlaceSeed", 0.5, function()
 	if not state.AutoPlaceSeed or not runtime.playerPlot then
 		if runtime.plantingActive then

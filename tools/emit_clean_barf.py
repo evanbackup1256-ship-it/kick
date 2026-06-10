@@ -16,7 +16,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.0"
+local VERSION = "1.1"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {}

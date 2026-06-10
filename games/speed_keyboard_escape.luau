@@ -1,12 +1,12 @@
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
 if not getgenv().Alleral_Boot then
-	warn("[Alleral] Not the official script — grab it from the real loader")
+	warn("[Alleral] run loader.luau first")
 	return
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.0"
+local VERSION = "1.1"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {}
@@ -21,12 +21,16 @@ local starlight
 local bootErr
 local bootApi = getgenv().Alleral_Core
 if not bootApi or not bootApi.prepareGame then
-	warn("[Alleral] Core missing — run loader.luau first")
+	local msg = "Core missing, run loader.luau first"
+	getgenv().Alleral_StartupFailed = msg
+	warn("[Alleral] " .. msg)
 	return
 end
 Core, starlight, bootErr = bootApi.prepareGame(state)
 if not Core or not starlight then
-	warn("[Alleral] Boot failed: " .. tostring(bootErr))
+	local msg = "Boot failed: " .. tostring(bootErr)
+	getgenv().Alleral_StartupFailed = msg
+	warn("[Alleral] " .. msg)
 	return
 end
 
@@ -41,6 +45,8 @@ local defaults = {
 	AutoStepFarm = false,
 	AutoWinsFarm = false,
 	SelectedWinTarget = workspace:FindFirstChild("WORLD 2") and "Win 250k" or "Win 500",
+	LastWinTargetW1 = "Win 500",
+	LastWinTargetW2 = "Win 250k",
 	TargetTreadmill = "Diamond",
 	FreezePosition = false,
 	AutoRebirth = false,
@@ -70,7 +76,6 @@ local function notify(title, text, duration)
 	Core.notify(title, text, duration)
 end
 
--- Route data (World 1)
 local ROUTE_WORLD1 = {
 	Vector3.new(4, 7, 1),
 	Vector3.new(5, 6, 286),
@@ -250,6 +255,16 @@ local function refreshWorldRoutes()
 	state.isWorld2 = workspace:FindFirstChild("WORLD 2") ~= nil
 	state.CurrentRoute = state.isWorld2 and ROUTE_WORLD2 or ROUTE_WORLD1
 	state.CurrentConfig = state.isWorld2 and WIN_CONFIG_WORLD2 or WIN_CONFIG_WORLD1
+	if not state.CurrentConfig[state.SelectedWinTarget] then
+		if state.isWorld2 then
+			state.SelectedWinTarget = state.LastWinTargetW2 or "Win 250k"
+		else
+			state.SelectedWinTarget = state.LastWinTargetW1 or "Win 500"
+		end
+		if not state.CurrentConfig[state.SelectedWinTarget] then
+			state.SelectedWinTarget = state.isWorld2 and "Win 250k" or "Win 500"
+		end
+	end
 end
 refreshWorldRoutes()
 
@@ -263,13 +278,6 @@ local BuyAuraRemote = Remotes:FindFirstChild("BuyAura")
 local EquipAuraRemote = Remotes:FindFirstChild("EquipAura")
 
 local ClientState = require(ReplicatedStorage:WaitForChild("ClientState", 10))
-
-local function getClientState()
-	local ok, data = pcall(function()
-		return ClientState:Get()
-	end)
-	return ok and data or nil
-end
 local NotificationSystem = require(ReplicatedStorage:WaitForChild("NotificationSystem", 10))
 local EventsConfig = require(ReplicatedStorage:WaitForChild("EventsConfig", 10))
 local ConfigFolder = ReplicatedStorage:WaitForChild("Config", 10)
@@ -296,7 +304,7 @@ local sensors = {
 
 function state.BypassFunction()
 	pcall(function()
-		local data = getClientState()
+		local data = ClientState.Get and ClientState:Get() or nil
 		if type(data) ~= "table" then
 			return
 		end
@@ -584,7 +592,6 @@ local function runWinFarmCycle()
 	end
 end
 
--- Supervisors
 Core.makeSupervisor(state, loops, loopControllers, "treadmillBypass", 1, function()
 	state.BypassFunction()
 end)
@@ -600,7 +607,7 @@ Core.makeSupervisor(state, loops, loopControllers, "stepFarm", 0.05, function()
 	if not state.AutoStepFarm or state.AutoWinsFarm then
 		return
 	end
-	local data = getClientState()
+	local data = ClientState:Get()
 	if not data then
 		return
 	end
@@ -626,6 +633,7 @@ Core.makeSupervisor(state, loops, loopControllers, "stepFarm", 0.05, function()
 end)
 
 Core.makeSupervisor(state, loops, loopControllers, "world1Sensors", 0.05, function()
+	refreshWorldRoutes()
 	if state.isWorld2 then
 		state.WallState = "Unknown"
 		state.LavaState = "Unknown"
@@ -673,6 +681,7 @@ Core.makeSupervisor(state, loops, loopControllers, "world1Sensors", 0.05, functi
 end)
 
 Core.makeSupervisor(state, loops, loopControllers, "world2WallSensor", 0.05, function()
+	refreshWorldRoutes()
 	if not state.isWorld2 then
 		return
 	end
@@ -694,6 +703,7 @@ Core.makeSupervisor(state, loops, loopControllers, "world2WallSensor", 0.05, fun
 end)
 
 Core.makeSupervisor(state, loops, loopControllers, "world2LavaSensor", 0.05, function()
+	refreshWorldRoutes()
 	if not state.isWorld2 then
 		return
 	end
@@ -726,7 +736,7 @@ Core.makeSupervisor(state, loops, loopControllers, "autoBuyItems", 1.5, function
 	if not state.AutoBuyItems or not ItemsShopRemote then
 		return
 	end
-	local data = getClientState()
+	local data = ClientState:Get()
 	local wins = data and data.Wins or 0
 	for key, value in pairs(state.TargetBuyItems) do
 		local itemName = nil
@@ -760,7 +770,6 @@ Core.makeSupervisor(state, loops, loopControllers, "autoRebirth", 0.5, function(
 	end
 end)
 
--- Starlight UI
 local window = starlight:CreateWindow({
 	Name = "Alleral",
 	Subtitle = "Speed Keyboard Escape · v" .. VERSION,
@@ -774,11 +783,11 @@ local shopTab = section:CreateTab({ Name = "Shop", Icon = 10734952479, Columns =
 local miscTab = section:CreateTab({ Name = "Misc", Icon = 10734950020, Columns = 1 }, "misc")
 
 local farmGroup = mainTab:CreateGroupbox({ Name = "Farming", Column = 1 }, "farm")
-local tweenGroup = mainTab:CreateGroupbox({ Name = "Tween", Column = 2 }, "tween")
-local auraGroup = autoTab:CreateGroupbox({ Name = "Aura", Column = 1 }, "aura")
-local equipGroup = autoTab:CreateGroupbox({ Name = "Equip", Column = 2 }, "equip")
-local shopGroup = shopTab:CreateGroupbox({ Name = "Items", Column = 1 }, "shop_items")
-local utilGroup = miscTab:CreateGroupbox({ Name = "Utilities", Column = 1 }, "utils")
+local tweenGroup = mainTab:CreateGroupbox({ Name = "Movement", Column = 2 }, "tween")
+local auraGroup = autoTab:CreateGroupbox({ Name = "Auras", Column = 1 }, "aura")
+local equipGroup = autoTab:CreateGroupbox({ Name = "Gear", Column = 2 }, "equip")
+local shopGroup = shopTab:CreateGroupbox({ Name = "Shop", Column = 1 }, "shop_items")
+local utilGroup = miscTab:CreateGroupbox({ Name = "Extras", Column = 1 }, "utils")
 
 local farm = Core.wrapStarlightGroup(farmGroup, function() end)
 local tween = Core.wrapStarlightGroup(tweenGroup, function() end)
@@ -790,65 +799,67 @@ local util = Core.wrapStarlightGroup(utilGroup, function() end)
 local winTargetsW1 = { "Win 1", "Win 3", "Win 10", "Win 20", "Win 50", "Win 100", "Win 150", "Win 300", "Win 500", "Win 1000", "Win 2500" }
 local winTargetsW2 = { "Win 250k", "Win 400k", "Win 600k", "Win 1M", "Win 1.5M", "Win 2.5M" }
 
-farm:CreateToggle("Auto Step Farm", state.AutoStepFarm, "Purple pop-up step training", function(enabled)
+farm:CreateToggle("Step farm", state.AutoStepFarm, "Hits the purple step popup for you.", function(enabled)
 	state.AutoStepFarm = enabled
 end)
-farm:CreateToggle("Auto Wins Farm", state.AutoWinsFarm, "Smart route win farming", function(enabled)
+farm:CreateToggle("Win farm", state.AutoWinsFarm, "Picks a smart route and farms wins.", function(enabled)
 	state.AutoWinsFarm = enabled
 end)
-farm:CreateDropdown("Win Target (W1)", winTargetsW1, state.SelectedWinTarget, function(value)
+farm:CreateDropdown("Stop at (World 1)", winTargetsW1, state.LastWinTargetW1 or "Win 500", function(value)
+	state.LastWinTargetW1 = value
 	if not state.isWorld2 then
 		state.SelectedWinTarget = value
 	end
 end)
-farm:CreateDropdown("Win Target (W2)", winTargetsW2, state.SelectedWinTarget, function(value)
+farm:CreateDropdown("Stop at (World 2)", winTargetsW2, state.LastWinTargetW2 or "Win 250k", function(value)
+	state.LastWinTargetW2 = value
 	if state.isWorld2 then
 		state.SelectedWinTarget = value
 	end
 end)
 
-tween:CreateSlider("Tween Speed", 50, 300, state.TweenSpeed, function(value)
+tween:CreateSlider("Move speed", 50, 300, state.TweenSpeed, function(value)
 	state.TweenSpeed = value
 	_G.TweenSpeed = value
-end)
-tween:CreateToggle("Freeze Position", state.FreezePosition, "Anchor while on treadmill", function(enabled)
+end, "How fast you glide between spots.")
+tween:CreateToggle("Lock in place", state.FreezePosition, "Stops you sliding around on the treadmill.", function(enabled)
 	state.FreezePosition = enabled
 end)
-tween:CreateToggle("Auto Rebirth", state.AutoRebirth, nil, function(enabled)
+tween:CreateToggle("Auto rebirth", state.AutoRebirth, "Rebirths when you can afford it.", function(enabled)
 	state.AutoRebirth = enabled
 end)
 tween:CreateDropdown("Treadmill", { "Normal", "Gold", "Diamond", "Candy", "Admin" }, state.TargetTreadmill, function(value)
 	state.TargetTreadmill = value
 end)
-tween:CreateButton("Bypass Treadmill", function()
+tween:CreateButton("Skip treadmill", function()
 	state.BypassFunction()
-	notify("Alleral", "Treadmill bypass applied")
+	notify("Alleral", "Treadmill skip is on.")
 end)
-tween:CreateButton("Unlock Infinity Trail", function()
+tween:CreateButton("Unlock infinity trail", function()
 	local ok, result = state.UnlockInfinityTrail()
-	notify("Alleral", ok and result and "Infinity trail unlocked" or ("Infinity trail failed: " .. tostring(result)))
+	notify("Alleral", ok and result and "Infinity trail unlocked." or "Couldn't unlock infinity trail.")
 end)
 
-aura:CreateDropdown("Aura", { "GlowAura", "Wind Aura", "Water Aura", "Fire Aura", "Medal Aura" }, state.SelectedAura, function(value)
+aura:CreateDropdown("Pick aura", { "GlowAura", "Wind Aura", "Water Aura", "Fire Aura", "Medal Aura" }, state.SelectedAura, function(value)
 	state.SelectedAura = value
 end)
-aura:CreateButton("Buy Aura", function()
+aura:CreateButton("Buy aura", function()
 	local ok, result = state.UnlockAuraBypass(state.SelectedAura)
-	notify("Alleral", ok and result and "Aura bought" or ("Aura buy failed: " .. tostring(result)))
+	notify("Alleral", ok and result and "Aura bought." or "Buy didn't go through.")
 end)
-aura:CreateButton("Equip Aura", function()
+aura:CreateButton("Wear aura", function()
 	if EquipAuraRemote and state.SelectedAura then
 		EquipAuraRemote:FireServer(state.SelectedAura:gsub("%s+", ""))
-		notify("Alleral", "Aura equipped")
+		notify("Alleral", "Aura equipped.")
 	end
 end)
 
-equip:CreateToggle("Auto Equip Best", state.AutoEquipBest, nil, function(enabled)
+equip:CreateToggle("Equip best gear", state.AutoEquipBest, "Keeps your best items on.", function(enabled)
 	state.AutoEquipBest = enabled
 end)
 
 shop:AddDropdown("Target Items", {
-	Text = "Buy Items",
+	Text = "What to buy",
 	Values = { "Common", "Uncommon", "Rare", "Epic" },
 	Default = state.TargetBuyItems,
 	Multi = true,
@@ -856,21 +867,37 @@ shop:AddDropdown("Target Items", {
 		state.TargetBuyItems = selected
 	end,
 })
-shop:CreateToggle("Auto Buy Items", state.AutoBuyItems, nil, function(enabled)
+shop:CreateToggle("Auto buy", state.AutoBuyItems, "Buys whatever you picked above.", function(enabled)
 	state.AutoBuyItems = enabled
 end)
 
-util:CreateToggle("Anti AFK", state.AntiAFK ~= false, nil, function(enabled)
+util:CreateToggle("Anti AFK", state.AntiAFK ~= false, "So you don't get kicked for idling.", function(enabled)
 	state.AntiAFK = enabled
 	if enabled then
 		Core.setupAntiAfk(LocalPlayer)
 	end
 end)
 
-notify("Alleral", "Speed Keyboard Escape loaded")
+notify("Alleral", "Loaded. Tabs on the left.")
 
 state.Alleral_Unload = function()
-	Core.stopAutomation(state, connections, loopControllers, loops, function()
-		setAnchored(false)
-	end)
+	state.HubRunning = false
+	for name, controller in pairs(loopControllers) do
+		if controller then
+			controller.enabled = false
+		end
+		loopControllers[name] = nil
+	end
+	for key, connection in pairs(connections) do
+		if connection and connection.Disconnect then
+			pcall(function()
+				connection:Disconnect()
+			end)
+		end
+		connections[key] = nil
+	end
+	for _, loopState in pairs(loops) do
+		loopState.enabled = false
+	end
+	setAnchored(false)
 end

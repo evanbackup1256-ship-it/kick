@@ -1,7 +1,5 @@
---[[ Alleral shared bootstrap — loaded by loader into getgenv().Alleral_Core ]]
-
 local Core = {}
-Core.VERSION = "1.2"
+Core.VERSION = "1.4"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -36,15 +34,46 @@ function Core.notify(title, text, duration)
 end
 
 function Core.requestFunction()
-	for _, name in ipairs({ "http_request", "request" }) do
+	local candidates = {
+		type(ENV.syn) == "table" and ENV.syn.request or nil,
+		type(ENV.fluxus) == "table" and ENV.fluxus.request or nil,
+		type(ENV.http) == "table" and ENV.http.request or nil,
+		type(ENV.http_service) == "table" and ENV.http_service.request or nil,
+		type(ENV.Xeno) == "table" and ENV.Xeno.request or nil,
+		type(ENV.Volt) == "table" and ENV.Volt.request or nil,
+		type(ENV.Madium) == "table" and ENV.Madium.request or nil,
+		type(ENV.Nihon) == "table" and ENV.Nihon.request or nil,
+		type(ENV.Cryptic) == "table" and ENV.Cryptic.request or nil,
+		type(ENV.Sentinel) == "table" and ENV.Sentinel.request or nil,
+		type(ENV.Serenity) == "table" and ENV.Serenity.request or nil,
+		type(ENV.Atlantis) == "table" and ENV.Atlantis.request or nil,
+		type(ENV.Zorara) == "table" and ENV.Zorara.request or nil,
+		type(ENV.Wave) == "table" and ENV.Wave.request or nil,
+		type(ENV.Electron) == "table" and ENV.Electron.request or nil,
+		type(ENV.Potassium) == "table" and ENV.Potassium.request or nil,
+		type(ENV.Velocity) == "table" and ENV.Velocity.request or nil,
+		type(ENV.Krnl) == "table" and ENV.Krnl.request or nil,
+		type(ENV.jjsploit) == "table" and ENV.jjsploit.request or nil,
+		type(ENV.Bunni) == "table" and ENV.Bunni.request or nil,
+		type(ENV.Valyse) == "table" and ENV.Valyse.request or nil,
+		type(ENV.Krypton) == "table" and ENV.Krypton.request or nil,
+		type(ENV.Evon) == "table" and ENV.Evon.request or nil,
+		type(ENV.delta) == "table" and ENV.delta.request or nil,
+		type(ENV.celery) == "table" and ENV.celery.request or nil,
+		ENV.http_request,
+		ENV.request,
+		ENV.Request,
+	}
+	for _, name in ipairs({ "http_request", "request", "Request" }) do
 		local fn = ENV[name]
 		if type(fn) == "function" then
-			return fn
+			table.insert(candidates, 1, fn)
 		end
 	end
-	local syn = ENV.syn
-	if type(syn) == "table" and type(syn.request) == "function" then
-		return syn.request
+	for _, candidate in ipairs(candidates) do
+		if type(candidate) == "function" then
+			return candidate
+		end
 	end
 	if type(HttpService.RequestAsync) == "function" then
 		return function(opts)
@@ -57,6 +86,60 @@ function Core.requestFunction()
 		end
 	end
 	return nil
+end
+
+local function trimText(value)
+	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
+end
+
+function Core.normalizeWebhookUrl(url)
+	local text = trimText(url)
+	if text == "" then
+		return nil, "Webhook URL is empty."
+	end
+	if not text:find("^https://") and not text:find("^http://") then
+		text = "https://" .. text
+	end
+	if
+		not text:find("discord%.com/api/webhooks/")
+		and not text:find("discordapp%.com/api/webhooks/")
+	then
+		return nil, "That doesn't look like a Discord webhook URL."
+	end
+	return text, nil
+end
+
+function Core.postWebhook(url, payload)
+	local sender = Core.requestFunction()
+	if not sender then
+		return false, "HTTP is not available in this executor."
+	end
+	local postUrl, urlError = Core.normalizeWebhookUrl(url)
+	if not postUrl then
+		return false, urlError
+	end
+	local ok, response = pcall(function()
+		return sender({
+			Url = postUrl,
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = HttpService:JSONEncode(payload),
+		})
+	end)
+	if not ok then
+		return false, tostring(response)
+	end
+	if type(response) == "table" then
+		if response.Success == false then
+			local code = response.StatusCode or response.Status or response.status_code
+			return false, "Webhook failed (HTTP " .. tostring(code or "?") .. ")"
+		end
+		local code = response.StatusCode or response.Status or response.status_code
+		if type(code) == "number" and (code < 200 or code >= 300) then
+			return false, "Webhook returned HTTP " .. tostring(code)
+		end
+	end
+	return true, nil
 end
 
 function Core.loadStringFn()
@@ -203,7 +286,7 @@ function Core.ensureCore()
 	if type(loadStringFn) ~= "function" or type(isFile) ~= "function" or type(readFile) ~= "function" then
 		return nil
 	end
-	for _, path in ipairs({ "src/alleral_core.luau", "alleral_core.luau" }) do
+	for _, path in ipairs({ "core/alleral_core.luau", "src/alleral_core.luau", "alleral_core.luau" }) do
 		if isFile(path) then
 			local ok = pcall(loadStringFn(readFile(path), "Alleral/core")())
 			if ok and ENV.Alleral_Core then
@@ -214,14 +297,34 @@ function Core.ensureCore()
 	return nil
 end
 
+local function signalBootFailure(message)
+	ENV.Alleral_StartupFailed = message
+	if ENV.Alleral_State then
+		ENV.Alleral_State.StartupFailed = message
+	end
+	pcall(function()
+		if shared then
+			shared.Alleral_StartupFailed = message
+		end
+	end)
+	local report = ENV.Alleral_ReportError
+	if type(report) == "function" then
+		pcall(report, "boot", message)
+	end
+end
+
 function Core.prepareGame(state)
 	state = state or ENV.Alleral_State
 	if not state then
-		return nil, nil, "Alleral_State missing"
+		local msg = "Alleral_State missing"
+		signalBootFailure(msg)
+		return nil, nil, msg
 	end
 	local core = Core.ensureCore()
 	if not core then
-		return nil, nil, "Alleral_Core missing — run loader.luau first"
+		local msg = "Alleral_Core missing, run loader.luau first"
+		signalBootFailure(msg)
+		return nil, nil, msg
 	end
 	state.HubRunning = state.HubRunning ~= false
 	core.initAnalytics()
@@ -230,7 +333,9 @@ function Core.prepareGame(state)
 	end
 	local starlight, err = core.loadStarlight()
 	if not starlight then
-		return nil, nil, err or "Starlight unavailable"
+		local msg = err or "Starlight unavailable"
+		signalBootFailure(msg)
+		return nil, nil, msg
 	end
 	return core, starlight
 end
@@ -364,6 +469,7 @@ function Core.makeSupervisor(state, loops, controllers, name, interval, callback
 		while state.HubRunning and loopState.enabled and controllers[name] == loopState and loopState.token == token do
 			local ok, err = pcall(callback)
 			if not ok then
+				Core.reportError("Loop:" .. name, err)
 				warn("[Alleral:" .. name .. "] " .. tostring(err))
 				task.wait(math.min(5, interval * 2))
 			else
@@ -383,14 +489,29 @@ function Core.setupAntiAfk(player)
 				connection:Disconnect()
 			end
 		end
-		return
-	end
-	local VirtualUser = game:GetService("VirtualUser")
-	player.Idled:Connect(function()
-		pcall(function()
-			VirtualUser:CaptureController()
-			VirtualUser:ClickButton2(Vector2.new(0, 0))
+	else
+		local VirtualUser = game:GetService("VirtualUser")
+		player.Idled:Connect(function()
+			pcall(function()
+				VirtualUser:CaptureController()
+				VirtualUser:ClickButton2(Vector2.new(0, 0))
+			end)
 		end)
+	end
+	task.spawn(function()
+		local VirtualUser = game:GetService("VirtualUser")
+		while player.Parent do
+			task.wait(120)
+			pcall(function()
+				local camera = workspace.CurrentCamera
+				if not camera then
+					return
+				end
+				VirtualUser:Button2Down(Vector2.new(100, 100), camera.CFrame)
+				task.wait(0.2)
+				VirtualUser:Button2Up(Vector2.new(100, 100), camera.CFrame)
+			end)
+		end
 	end)
 end
 
@@ -400,6 +521,20 @@ function Core.initAnalytics()
 		tracker:Track()
 	end
 	return tracker
+end
+
+function Core.reportError(scope, err, details)
+	local reporter = ENV.Alleral_ReportError
+	if type(reporter) == "function" then
+		pcall(reporter, scope, err, details)
+	end
+end
+
+function Core.logEvent(category, message, data)
+	local logger = ENV.Alleral_LogEvent
+	if type(logger) == "function" then
+		pcall(logger, category, message, data)
+	end
 end
 
 ENV.Alleral_Core = Core
