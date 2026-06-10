@@ -1,7 +1,7 @@
 --[[ Alleral shared bootstrap — loaded by loader into getgenv().Alleral_Core ]]
 
 local Core = {}
-Core.VERSION = "1.0"
+Core.VERSION = "1.1"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")

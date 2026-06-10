@@ -12,7 +12,7 @@
 		getgenv().Alleral_Reload()
 ]]
 
-local LOADER_VERSION = "2.3"
+local LOADER_VERSION = "2.4"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local FETCH_RETRIES = 3
 local FETCH_BACKOFF = 0.75
@@ -143,7 +143,7 @@ local GAMES = {
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
 		version = "6.4",
-		needsCore = false,
+		needsCore = true,
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = {
@@ -323,14 +323,20 @@ local function discoverLocalFiles(fileNames)
 	return found
 end
 
+local function withCacheBust(url)
+	local sep = url:find("?") and "&" or "?"
+	return url .. sep .. "v=" .. LOADER_VERSION
+end
+
 local function fetchRemote(url, label)
 	if not httpRequest then
 		return nil, "HTTP is not available"
 	end
+	local fetchUrl = withCacheBust(url)
 	local lastErr = nil
 	for attempt = 1, FETCH_RETRIES do
 		local ok, response = pcall(httpRequest, {
-			Url = url,
+			Url = fetchUrl,
 			Method = "GET",
 		})
 		if ok and response then
@@ -352,7 +358,8 @@ end
 
 local function resolveFromFiles(files, label, url)
 	local devMode = ENV.Alleral_DevMode == true
-	if devMode or CAPABILITIES.readfile then
+	local preferLocal = devMode or ENV.Alleral_PreferLocal == true
+	if preferLocal and CAPABILITIES.readfile then
 		for _, file in ipairs(files) do
 			local source = readLocalFile(file)
 			if source then
@@ -401,10 +408,24 @@ local function unloadPrevious()
 	ENV.Alleral_LoaderRunning = false
 end
 
+local function invalidateStaleModules()
+	if ENV.Alleral_LoaderVersion == LOADER_VERSION then
+		return
+	end
+	ENV.Alleral_Core = nil
+	ENV.Alleral_Starlight = nil
+	ENV.Alleral_Analytics = nil
+	ENV.Alleral_LoaderVersion = LOADER_VERSION
+	log("info", "Cleared cached modules for loader " .. LOADER_VERSION)
+end
+
 local function preloadCore(required)
-	if ENV.Alleral_Core and ENV.Alleral_Core.prepareGame then
+	local core = ENV.Alleral_Core
+	if core and type(core.loadStarlight) == "function" and core.VERSION == "1.1" then
 		return true
 	end
+	ENV.Alleral_Core = nil
+	ENV.Alleral_Starlight = nil
 	local source, sourceLabel = resolveFromFiles(SHARED_CORE_FILES, "core", SHARED_CORE_URL)
 	if not source then
 		if required then
@@ -504,6 +525,7 @@ local function main()
 		return
 	end
 
+	invalidateStaleModules()
 	ENV.Alleral_StartupFailed = nil
 	ENV.Alleral_Starlight = nil
 	unloadPrevious()
@@ -534,9 +556,8 @@ local function main()
 		end
 	end
 
-	local coreRequired = profile.needsCore == true
-	local coreOk, coreErr = preloadCore(coreRequired)
-	if coreRequired and not coreOk then
+	local coreOk, coreErr = preloadCore(true)
+	if not coreOk then
 		notify("Alleral", "Core failed: " .. tostring(coreErr), 8)
 		log("warn", "Core required but unavailable: " .. tostring(coreErr))
 		ENV.Alleral_LoaderRunning = false

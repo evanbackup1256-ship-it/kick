@@ -25,7 +25,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-i
 
 The loader detects the game, preloads `src/alleral_core.luau` and `src/analytics.luau`, then injects the matching script from `src/`.
 
-Set `getgenv().Alleral_DevMode = true` before running the loader to prefer local files over GitHub.
+By default the loader pulls scripts from GitHub (avoids stale local copies). Set `getgenv().Alleral_DevMode = true` before running to prefer local files instead.
 
 Reload after unload: `getgenv().Alleral_Reload()`
 
