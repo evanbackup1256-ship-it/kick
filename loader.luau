@@ -1,4 +1,4 @@
-local LOADER_VERSION = "3.1.3"
+local LOADER_VERSION = "3.2.0"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local FETCH_RETRIES = 3
 local FETCH_BACKOFF = 0.75
@@ -59,7 +59,6 @@ end
 
 local httpRequest = firstExecFunc("http_request", "request") or (ENV.syn and ENV.syn.request)
 local readFile = firstExecFunc("readfile")
-local listFiles = firstExecFunc("listfiles")
 local isFile = firstExecFunc("isfile")
 local loadStringFn = firstExecFunc("loadstring", "LoadString") or loadstring
 
@@ -116,7 +115,7 @@ local CAPABILITIES = {
 	loadstring = loadStringFn ~= nil,
 	readfile = readFile ~= nil,
 	isfile = isFile ~= nil,
-	listfiles = listFiles ~= nil,
+	listfiles = firstExecFunc("listfiles") ~= nil,
 }
 
 local function waitForPath(root, path, timeout)
