@@ -5,7 +5,7 @@ do
 			local req = http_request or request or syn and syn.request
 			if req then
 				req({
-					Url = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.lua",
+					Url = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kick%20a%20lucky%20block.luau",
 					Method = "GET",
 				})
 			end
@@ -13,153 +13,67 @@ do
 	end
 end
 
-(function()
 getgenv().Alleral_State = getgenv().Alleral_State or {}
-getgenv().Alleral_Boot = nil
-local VERSION = "6.0"
-getgenv().Alleral_Hub = getgenv().Alleral_Hub or {}
-local Hub = getgenv().Alleral_Hub
-if not Hub._Initialized then
-	Hub.Games = {}
-	Hub.ActiveGame = nil
-	Hub.GameModules = {}
-	Hub.VERSION = VERSION
-	Hub.PlaceIds = {}
-	Hub._Supervisors = {}
-	Hub._SupervisorConnections = {}
 
-	function Hub:RegisterGame(info)
-		if not info or not info.name then return end
-		self.Games[info.name] = info
-		if info.placeIds then
-			for _, id in ipairs(info.placeIds) do
-				self.PlaceIds[id] = info.name
-			end
-		end
-		if not self.ActiveGame then self.ActiveGame = info.name end
-	end
-	function Hub:GetActiveGame()
-		return self.Games[self.ActiveGame]
-	end
-	function Hub:DetectGame()
-		local name = self.PlaceIds[game.PlaceId]
-		if name and self.Games[name] then
-			self.ActiveGame = name
-			return name
-		end
-	end
-	function Hub:RegisterSupervisor(name, interval, callback)
-		self._Supervisors[name] = { interval = interval, callback = callback }
-	end
-	function Hub:StartSupervisors()
-		for n, sup in pairs(self._Supervisors) do
-			if self._SupervisorConnections[n] then
-				self._SupervisorConnections[n]:Disconnect()
-			end
-			local last = tick()
-			local c = RunSvc.Heartbeat:Connect(function()
-				if not state.HubRunning then return end
-				local now = tick()
-				if now - last >= sup.interval then
-					last = now
-					local ok, err = pcall(sup.callback)
-					if not ok then logError("Supervisor:" .. n, err) end
-				end
-			end)
-			self._SupervisorConnections[n] = c
-		end
-	end
-	function Hub:StopSupervisors()
-		for _, con in pairs(self._SupervisorConnections) do
-			pcall(con.Disconnect, con)
-		end
-		self._SupervisorConnections = {}
-	end
-	Hub._Initialized = true
+-- Integrity guard: must be loaded through the official Alleral loader
+-- The loader injects a session key; direct copies won't have it.
+if not getgenv().Alleral_Boot then
+	warn("[Alleral] Unauthorized copy — use the official loader")
+	return
 end
+getgenv().Alleral_Boot = nil
+
+local VERSION = "6.0"
 
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
 local loopControllers = {}
-local rt = {
-	errLog = {},
-	errCounts = {},
-	errSeen = {},
-	seshErrs = 0,
-	remoteLookupCache = {},
-	cachedRemotesAt = 0,
+local runtime = {
+	seenWebhookGuids = {},
+	seenWebhookOrder = {},
+	favoriteQueue = {},
+	favoriteTools = {},
+	lastAutoKickActivity = 0,
+	lastAutoKickMatch = 0,
+	nextAutoKickReset = 0,
+	autoKickSession = 0,
+	flashCollectSession = 0,
+	cachedWeights = nil,
 	cachedPlot = nil,
 	cachedPlotAt = 0,
 	nextPlotLookup = 0,
+	cachedRemotesAt = 0,
 	cachedBattleStatus = nil,
 	cachedBattleStatusAt = 0,
-	cachedWeights = nil,
-	currentFps = 60,
-	performanceMode = "Balanced",
-	favoriteTools = {},
-	favoriteQueue = {},
-	seenWebhookGuids = {},
-	seenWebhookOrder = {},
 	nextWeightBuyAttempt = {},
-	gameBuild = nil,
-	lastError = nil,
-	lastLoopError = nil,
-	kickRateWindow = {},
-	kicksPerMin = 0,
+	nextKickStyleAttempt = 0,
+	remoteLookupCache = {},
+	errorLog = {},
+	errorCounts = {},
+	errorLastSeen = {},
+	performanceMode = "Balanced",
 	sessionStart = tick(),
 	sessionKicks = 0,
 	sessionResets = 0,
-	sessionSkips = 0,
 	sessionMatches = 0,
 	sessionBestCps = 0,
 	sessionBestName = "--",
-	sessionIndexSkips = 0,
-	autoKickSession = 0,
-	nextAutoKickReset = 0,
-	lastAutoKickActivity = 0,
-	lastAutoKickMatch = 0,
-	flashCollectSession = 0,
-	acTriggerCount = 0,
-	lastAntiCheatTrigger = 0,
-	lastEmergencyHide = 0,
-	masteryBusy = false,
+	kickRateWindow = {},
+	kicksPerMin = 0,
 	masteryKickCount = 0,
-	nextMasteryAction = 0,
-	nextSpeedBuyAttempt = 0,
-	nextBattleCreate = 0,
-	nextBattleInvite = 0,
-	nextBattleStart = 0,
-	lastProtectedSignature = nil,
-	lastUpgradeSignature = nil,
-	nextKickStyleAttempt = 0,
-	nextCollect = 0,
-	nextFavoriteScan = 0,
-	nextStatusWebhook = 0,
-	battleCooldownUntil = 0,
-	lastBattleStatus = nil,
-	lastIndexSkip = nil,
-	staffDetected = nil,
-	staffDetectedName = nil,
-	staffDetectionTime = nil,
-	staffNotifyCooldown = 0,
-	ui = nil,
 }
 
-local Plrs = Players or game:GetService("Players")
-local RS = ReplicatedStorage or game:GetService("ReplicatedStorage")
-local Ws = Workspace or game:GetService("Workspace")
-local RunSvc = RunService or game:GetService("RunService")
-local HttpSvc = HttpService or game:GetService("HttpService")
-local MktSvc = MarketplaceService or game:GetService("MarketplaceService")
-local TeleSvc = TeleportService or game:GetService("TeleportService")
-local VUser = VirtualUser or game:GetService("VirtualUser")
-local SGui = StarterGui or game:GetService("StarterGui")
-local LP = Plrs.LocalPlayer
-if not LP then
-	Plrs:GetPropertyChangedSignal("LocalPlayer"):Wait()
-	LP = Plrs.LocalPlayer
-end
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
+local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
 
 if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
@@ -240,9 +154,13 @@ local defaults = {
 	AutoPlaceInterval = 1.5,
 	AutoKickInterval = 0.3,
 	MasteryInterval = 1,
-
-	AIndexOnly = false,
-	AHumanize = true,
+	-- New v6.0 features
+	ANotifyRare = false,
+	NotifyRarityThreshold = "Legendary",
+	AKickVariance = false,
+	KickVarianceMs = 80,
+	AAutoSell = false,
+	AutoSellMaxBackpack = 25,
 }
 
 local savedKeys = {
@@ -309,8 +227,12 @@ local savedKeys = {
 	"AutoPlaceInterval",
 	"AutoKickInterval",
 	"MasteryInterval",
-	"AIndexOnly",
-	"AHumanize",
+	"ANotifyRare",
+	"NotifyRarityThreshold",
+	"AKickVariance",
+	"KickVarianceMs",
+	"AAutoSell",
+	"AutoSellMaxBackpack",
 }
 
 local function copyValue(value)
@@ -337,18 +259,8 @@ local function trim(value)
 end
 
 local function notify(title, text, duration)
-	if rt.ui and rt.ui.Notification then
-		pcall(function()
-			rt.ui:Notification({
-				Title = title or "Alleral",
-				Content = text or "",
-				Duration = duration or 4,
-			})
-		end)
-		return
-	end
 	pcall(function()
-		SGui:SetCore("SendNotification", {
+		StarterGui:SetCore("SendNotification", {
 			Title = title or "Alleral",
 			Text = text or "",
 			Duration = duration or 4,
@@ -356,6 +268,11 @@ local function notify(title, text, duration)
 	end)
 end
 
+-- Executor detection runs once at startup. Two goals:
+--   1. Some executors (old Yub builds, Arceus) have broken file APIs we must skip.
+--   2. HTTP request and connection-inspection globals vary by executor.
+-- We probe namespaces and known globals rather than relying solely on the name
+-- string, since many executors lie, truncate, or don't expose identifyexecutor.
 local Executor = (function()
 	local env = {}
 	pcall(function()
@@ -372,6 +289,7 @@ local Executor = (function()
 		return type(v) == "table" and v or nil
 	end
 
+	-- Try every common name-identification API in priority order
 	local rawName = ""
 	for _, id in ipairs({ "identifyexecutor", "getexecutorname", "whatexecutor" }) do
 		local f = fn(id)
@@ -384,8 +302,10 @@ local Executor = (function()
 		end
 	end
 
+	-- Normalise: lowercase, drop whitespace, keep only the base token
 	local name = rawName:lower():gsub("%s+", ""):match("^[%a][%w%-_%.]*") or ""
 
+	-- Namespace/global fingerprinting — fallback when the name is missing/useless
 	if name == "" then
 		if tbl("syn") and type(env.syn.request) == "function" then
 			name = "synapse"
@@ -428,6 +348,8 @@ local Executor = (function()
 		end
 	end
 
+	-- Executors whose file-system implementations are known broken/unsafe.
+	-- We simply skip those APIs rather than letting them silently corrupt data.
 	local FS_BROKEN = {
 		yub = true,
 		yubx = true,
@@ -446,7 +368,7 @@ local Executor = (function()
 			or (tbl("syn") and type(env.syn.request) == "function")
 			or (tbl("fluxus") and type(env.fluxus.request) == "function")
 			or (tbl("http") and type(env.http.request) == "function")
-			or (type(HttpSvc.RequestAsync) == "function"),
+			or (type(HttpService.RequestAsync) == "function"),
 		hasGetConn = type(env.getconnections) == "function" or type(env.get_signal_cons) == "function",
 		hasClipboard = type(env.setclipboard) == "function" or type(env.toclipboard) == "function",
 		hasFireTouch = type(env.firetouchinterest) == "function",
@@ -454,6 +376,8 @@ local Executor = (function()
 	}
 end)()
 
+-- Retrieve a callable from the executor env. Pass noFs=true to block it on
+-- executors whose file APIs are broken (avoids silent corruption).
 local function execFunc(name, noFs)
 	if noFs and not Executor.fsOk then
 		return nil
@@ -472,9 +396,8 @@ local listFiles   = execFunc("listfiles",  true)
 local appendFile  = execFunc("appendfile", true)
 local setClipboard = execFunc("setclipboard") or execFunc("toclipboard")
 local settingsFolder = "Alleral_Configs"
-local playerId = LP and tostring(LP.UserId) or "unknown"
-local settingsFile = string.format("%s/KickBlox_v4_%s.json", settingsFolder, playerId)
-local logFile = string.format("%s/KickBlox_v4_%s.log", settingsFolder, playerId)
+local settingsFile = string.format("%s/KickBlox_v4_%s.json", settingsFolder, tostring(LocalPlayer.UserId))
+local logFile = string.format("%s/KickBlox_v4_%s.log", settingsFolder, tostring(LocalPlayer.UserId))
 
 local function shortError(message)
 	message = tostring(message or "Unknown error"):gsub("%s+", " ")
@@ -492,27 +415,18 @@ local function logError(scope, err, details)
 	if details and details ~= "" then
 		line = line .. " (" .. shortError(details) .. ")"
 	end
-	if type(rt) ~= "table" then
-		warn("[Alleral] " .. line)
-		return message
-	end
 	local signature = label .. "\0" .. message
 	local now = tick()
-	if type(rt.errCounts) == "table" then
-		rt.errCounts[signature] = (rt.errCounts[signature] or 0) + 1
-	end
-	rt.lastError = line
-	if type(rt.errSeen) == "table" and (now - (rt.errSeen[signature] or 0)) >= 5 then
-		rt.errSeen[signature] = now
-		rt.seshErrs = (rt.seshErrs or 0) + 1
-		if type(rt.errLog) == "table" then
-			table.insert(rt.errLog, 1, line)
-			while #rt.errLog > 12 do
-				table.remove(rt.errLog)
-			end
+	runtime.errorCounts[signature] = (runtime.errorCounts[signature] or 0) + 1
+	runtime.lastError = line
+	if now - (runtime.errorLastSeen[signature] or 0) >= 5 then
+		runtime.errorLastSeen[signature] = now
+		table.insert(runtime.errorLog, 1, line)
+		while #runtime.errorLog > 12 do
+			table.remove(runtime.errorLog)
 		end
+		warn("[Alleral] " .. line)
 	end
-	warn("[Alleral] " .. line)
 	if appendFile then
 		pcall(function()
 			if isFolder and makeFolder and not isFolder(settingsFolder) then
@@ -548,7 +462,7 @@ local function saveSettings()
 		if isFolder and makeFolder and not isFolder(settingsFolder) then
 			makeFolder(settingsFolder)
 		end
-		writeFile(settingsFile, HttpSvc:JSONEncode(output))
+		writeFile(settingsFile, HttpService:JSONEncode(output))
 	end)
 end
 
@@ -562,7 +476,7 @@ local function loadSettings()
 	local ok, decoded = safeCall("LoadSettings", function()
 		local raw = readFile(settingsFile)
 		if raw and raw ~= "" then
-			return HttpSvc:JSONDecode(raw)
+			return HttpService:JSONDecode(raw)
 		end
 		return nil
 	end)
@@ -604,45 +518,51 @@ end
 
 clampSettings()
 
+-- Uses Executor.env so we don't need to reference bare globals that might not
+-- exist at parse time on strict executor environments.
 local function requestFunction()
 	local e = Executor.env
-	local function pick(prefix, name)
-		local tbl = type(e[prefix]) == "table" and e[prefix]
-		return tbl and type(tbl[name]) == "function" and tbl[name] or nil
-	end
-	local function raw(name)
-		return type(e[name]) == "function" and e[name] or nil
-	end
-	local function each(fns)
-		for _, fn in ipairs(fns) do
-			if fn then
-				local r = fn()
-				if r then return r end
-			end
+	local candidates = {
+		-- executor-specific namespaces first (most reliable)
+		type(e.syn)         == "table" and type(e.syn.request)          == "function" and e.syn.request          or nil,
+		type(e.fluxus)      == "table" and type(e.fluxus.request)       == "function" and e.fluxus.request       or nil,
+		type(e.http)        == "table" and type(e.http.request)         == "function" and e.http.request         or nil,
+		type(e.http_service) == "table" and type(e.http_service.request) == "function" and e.http_service.request or nil,
+		type(e.Xeno)        == "table" and type(e.Xeno.request)         == "function" and e.Xeno.request         or nil,
+		type(e.Volt)        == "table" and type(e.Volt.request)         == "function" and e.Volt.request         or nil,
+		type(e.Madium)      == "table" and type(e.Madium.request)       == "function" and e.Madium.request       or nil,
+		-- UNC globals
+		e.http_request,
+		e.request,
+		-- Wave executor capitalises the global
+		e.Request,
+		-- Roblox built-in HttpService as last resort (safeCall handles errors)
+		type(HttpService.RequestAsync) == "function" and function(req)
+			return HttpService:RequestAsync(req)
+		end or nil,
+	}
+	for _, candidate in ipairs(candidates) do
+		if type(candidate) == "function" then
+			return candidate
 		end
-		return nil
 	end
-	return each({
-		function() return pick("syn", "request") end,
-		function() return pick("fluxus", "request") end,
-		function() return pick("http", "request") end,
-		function() return pick("http_service", "request") end,
-		function() return raw("http_request") end,
-		function() return raw("request") end,
-		function() return raw("Request") end,
-		function()
-			return type(HttpSvc.RequestAsync) == "function"
-				and function(req) return HttpSvc:RequestAsync(req) end
-				or nil
-		end,
-	})
+	return nil
 end
 
 local function getConnectionFetcher()
 	local e = Executor.env
-	for _, name in ipairs({ "getconnections", "get_signal_cons", "getconnections2", "get_signal_connections" }) do
-		local fn = e[name]
-		if type(fn) == "function" then return fn end
+	local candidates = {
+		e.getconnections,
+		e.get_signal_cons,
+		-- some executor forks add a numeric suffix
+		e.getconnections2,
+		e.get_signal_connections,
+		e.debug_getconnections,
+	}
+	for _, candidate in ipairs(candidates) do
+		if type(candidate) == "function" then
+			return candidate
+		end
 	end
 	return nil
 end
@@ -659,8 +579,6 @@ local function normalizeWebhookUrl(url)
 		not (
 			url:match("^https://discord%.com/api/webhooks/%d+/.+")
 			or url:match("^https://discordapp%.com/api/webhooks/%d+/.+")
-			or url:match("^https://canary%.discord%.com/api/webhooks/%d+/.+")
-			or url:match("^https://ptb%.discord%.com/api/webhooks/%d+/.+")
 		)
 	then
 		return nil, "Webhook URL is not a Discord webhook."
@@ -682,24 +600,15 @@ local function sendWebhook(url, payload)
 			Url = postUrl,
 			Method = "POST",
 			Headers = { ["Content-Type"] = "application/json" },
-			Body = HttpSvc:JSONEncode(payload),
+			Body = HttpService:JSONEncode(payload),
 		})
 	end)
 	if not ok then
 		return false, tostring(response)
 	end
-	if not response then
-		return false, "No response from server."
-	end
-	local code = response.StatusCode or response.Status or response.status_code or response.StatusCode
-	local body = response.Body or response.Content or response.body or response.content
-	if type(code) == "number" then
-		if code < 200 or code >= 300 then
-			local detail = body and tostring(body):sub(1, 100) or ""
-			return false, "Webhook returned HTTP " .. tostring(code) .. (detail ~= "" and (": " .. detail) or "")
-		end
-	elseif response.Success == false or response.success == false then
-		return false, "Webhook request failed: " .. tostring(body or "unknown error")
+	local code = response and (response.StatusCode or response.Status or response.status_code)
+	if type(code) == "number" and (code < 200 or code >= 300) then
+		return false, "Webhook returned HTTP " .. tostring(code)
 	end
 	return true, nil
 end
@@ -715,7 +624,7 @@ end
 
 local function checkGameBuild(forceNotify, acceptCurrent)
 	local ok, info = safeCall("GameBuildCheck", function()
-		return MktSvc:GetProductInfo(game.PlaceId)
+		return MarketplaceService:GetProductInfo(game.PlaceId)
 	end)
 	local updated = ok and info and tostring(info.Updated or "") or ""
 	local placeVersion = tonumber(game.PlaceVersion) or 0
@@ -728,7 +637,7 @@ local function checkGameBuild(forceNotify, acceptCurrent)
 	if previousPlaceVersion > 0 and placeVersion > 0 and previousPlaceVersion ~= placeVersion then
 		changed = true
 	end
-	rt.gameBuild = {
+	runtime.gameBuild = {
 		Name = (ok and info and info.Name) or game.Name,
 		Updated = updated ~= "" and updated or previousUpdated,
 		PlaceVersion = placeVersion,
@@ -740,9 +649,9 @@ local function checkGameBuild(forceNotify, acceptCurrent)
 	if acceptCurrent or previousUpdated == "" then
 		state.KnownGameUpdated = updated
 		state.KnownPlaceVersion = placeVersion
-		rt.gameBuild.KnownUpdated = state.KnownGameUpdated
-		rt.gameBuild.KnownPlaceVersion = state.KnownPlaceVersion
-		rt.gameBuild.Changed = false
+		runtime.gameBuild.KnownUpdated = state.KnownGameUpdated
+		runtime.gameBuild.KnownPlaceVersion = state.KnownPlaceVersion
+		runtime.gameBuild.Changed = false
 		saveSettings()
 	end
 	if changed then
@@ -750,7 +659,7 @@ local function checkGameBuild(forceNotify, acceptCurrent)
 	elseif forceNotify then
 		notify("Game Check", "Game metadata matches your saved baseline.", 5)
 	end
-	return rt.gameBuild
+	return runtime.gameBuild
 end
 
 local function acceptCurrentGameBuild()
@@ -778,16 +687,16 @@ end
 
 local function safeFindRemote(network, aliases)
 	for _, alias in ipairs(aliases) do
-		local cached = rt.remoteLookupCache[alias]
+		local cached = runtime.remoteLookupCache[alias]
 		if cached and cached.Parent then
 			return cached
 		end
 		local remote = network and network:FindFirstChild(alias)
 		if not remote then
-			remote = RS and RS:FindFirstChild(alias, true)
+			remote = ReplicatedStorage:FindFirstChild(alias, true)
 		end
 		if remote then
-			rt.remoteLookupCache[alias] = remote
+			runtime.remoteLookupCache[alias] = remote
 			return remote
 		end
 	end
@@ -830,7 +739,7 @@ state.Alleral_Unload = function()
 		loopState.enabled = false
 	end
 	safeCall("UnloadRestoreHumanoid", function()
-		local humanoid = LP.Character and LP.Character:FindFirstChild("Humanoid")
+		local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
 		if humanoid then
 			humanoid.PlatformStand = false
 			humanoid.MaxSlopeAngle = 45
@@ -864,9 +773,11 @@ end
 
 local function loadLocalLua(path, label)
 	if loadfile then
-		local ok, chunk = pcall(loadfile, path)
+		local ok, chunk = safeCall("LoadFile:" .. tostring(label), function()
+			return loadfile(path)
+		end)
 		if ok and chunk then
-			local runOk, result = pcall(chunk)
+			local runOk, result = safeCall("RunLocalLua:" .. tostring(label), chunk)
 			if runOk then
 				if result then
 					return result
@@ -877,14 +788,42 @@ local function loadLocalLua(path, label)
 				end
 				return nil
 			end
+			logError("Loader", "Failed to run " .. label .. ": " .. tostring(result))
 		end
 	end
-	return nil
+	if not readFile then
+		return nil
+	end
+	if isFile then
+		local ok, exists = safeCall("IsLocalLua:" .. tostring(label), function()
+			return isFile(path)
+		end)
+		if not ok or not exists then
+			return nil
+		end
+	end
+	local ok, source = safeCall("ReadLocalLua:" .. tostring(label), function()
+		return readFile(path)
+	end)
+	if not ok then
+		logError("Loader", "Failed to read " .. tostring(label) .. ": " .. tostring(source))
+		return nil
+	end
+	return loadLuaSource(source, label)
 end
 
 local function loadRemoteLua(url, label)
+	local httpGet = requestFunction()
+	if not httpGet then
+		logError("Loader", "No HTTP function available for " .. label .. ".")
+		return nil
+	end
 	local ok, source = safeCall("FetchLua:" .. tostring(label), function()
-		return game:HttpGet(url)
+		local response = httpGet({
+			Url = url,
+			Method = "GET",
+		})
+		return response and (response.Body or tostring(response))
 	end)
 	if not ok or not source or source == "" or source:find("404: Not Found") then
 		logError("Loader", ok and ("Failed to fetch " .. label .. ".") or source)
@@ -895,119 +834,37 @@ end
 
 local STARLIGHT_SOURCE_URL =
 	"https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua"
-local STARLIGHT_LOCAL_URL =
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/starlight_repo/Source.lua"
 
-local SCRIPT_SOURCE_URL =
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kick%20a%20lucky%20block.luau"
-local SCRIPT_HUB_URL =
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub.luau"
-
-local function contentStamp(text)
-	if not text then return "" end
-	local a, b = 0, 0
-	for i = 1, #text do
-		local byte = string.byte(text, i)
-		a = (a + byte) % 65521
-		b = (b + a) % 65521
+-- Executor compatibility notification
+do
+	local execName = Executor and Executor.name or "unknown"
+	local execRaw = Executor and Executor.rawName or ""
+	local display = execName ~= "unknown" and execName or (execRaw ~= "" and execRaw or "unknown")
+	local compatMap = {
+		synapse = true, krnl = true, fluxus = true, scriptware = true,
+		celery = true, delta = true, electron = true, wave = true,
+		oxygenu = true, awp = true, evon = true,
+		solara = true, xeno = true, volt = true, potassium = true,
+		madium = true, velocity = true, codex = true, ronix = true,
+	}
+	local compat = compatMap[display:lower()] or false
+	if display == "unknown" then
+		notify("Executor", "Unknown executor - features may not work", 6)
+	elseif not compat then
+		notify("Executor", display .. " is untested - some features may fail", 6)
+	else
+		notify("Executor", display .. " detected - fully supported", 4)
 	end
-	return tostring((b * 65536 + a) % 2147483647)
 end
 
-local env = getgenv()
-env._AlReload = env._AlReload or 0
-
-local function fetchRaw(url)
-	if type(game.HttpGet) == "function" then
-		return game:HttpGet(url)
+local function patchStarlightSource(source)
+	if not source or source == "" then
+		return source
 	end
-	local req = requestFunction()
-	if req then
-		local ok, resp = pcall(req, { Url = url, Method = "GET" })
-		if ok and resp and resp.Body then return resp.Body end
-	end
-	return nil
-end
-
-local function tryReload(raw)
-	if not raw or raw == "" or raw:find("404: Not Found") then return false end
-	env._AlReload = (env._AlReload or 0) + 1
-	if env._AlReload > 3 then return false end
-	local chunk, err = loadstring(raw, "@AlLive")
-	if not chunk then return false end
-	local ok, runErr = pcall(chunk)
-	if not ok then warn("[AlLive] Reload err:", runErr) end
-	return ok
-end
-
-local function hotSwap(raw)
-	if env._AlReloading then return false end
-	env._AlReloading = true
-	task.spawn(function()
-		task.wait(0.3)
-		env._AlReloading = nil
-	end)
-	state.HubRunning = false
-	for _, con in pairs(connections) do
-		pcall(con.Disconnect, con)
-	end
-	for k in pairs(connections) do connections[k] = nil end
-	if starlightWindow and starlightWindow.Instance then
-		pcall(starlightWindow.Instance.Destroy, starlightWindow.Instance)
-	end
-	env.Starlight = nil
-	env.Library = nil
-	env.AlleralLib = nil
-	task.wait(0.15)
-	return tryReload(raw)
-end
-
-local cachedHash = contentStamp(nil)
-local function checkForUpdate()
-	if not Executor.hasHttp then return false end
-	if env._AlReloading then return false end
-	local _, raw = safeCall("LiveCheck", function()
-		return fetchRaw(SCRIPT_SOURCE_URL .. "?ck=" .. tostring(tick()))
-	end)
-	if not raw then return false end
-	local hash = contentStamp(raw)
-	if hash == cachedHash then return false end
-	if cachedHash == "" then
-		cachedHash = hash
-		return false
-	end
-	return hotSwap(raw)
-end
-
-if not env._AlBootStamp then
-	local _, initial = safeCall("BootFetch", function()
-		return fetchRaw(SCRIPT_SOURCE_URL .. "?bt=" .. tostring(tick()))
-	end)
-	if initial then
-		cachedHash = contentStamp(initial)
-	end
-	env._AlBootStamp = cachedHash
-end
-
-cachedHash = env._AlBootStamp or cachedHash
-
-task.spawn(function()
-	while task.wait(17 + math.random(0, 8)) do
-		if not state.HubRunning then break end
-		checkForUpdate()
-	end
-end)
-
-	local function patchStarlightSource(source)
 	source = source:gsub(
 		"function Tab:Show%(%)[\r\n]+%s*if Library%.ActiveTab then",
 		"function Tab:Show()\n\t\t\tif Library.ActiveTab == Tab then\n\t\t\t\treturn\n\t\t\tend\n\t\t\tif Library.ActiveTab then"
 	)
-	source = source:gsub("local Acrylic = isStudio and require%([^%)]+%)[^\n]+\n[^\n]+AcrylicModule[^\n]+\nAcrylic.Init%(%)\n", "local Acrylic = {Init=function() end}\n")
-	source = source:gsub("local function Hide%(Interface, JustHide: boolean%?, Notify: boolean%?, Bind: string%?%)",
-		"local function Hide(Interface, JustHide, Notify, Bind)\n\tdo if Interface and Interface.ClassName == \"ScreenGui\" then Interface.Enabled = false Starlight.Minimized = true return end end")
-	source = source:gsub("local function Unhide%(Interface%)",
-		"local function Unhide(Interface)\n\tdo if Interface and Interface.ClassName == \"ScreenGui\" then Interface.Enabled = true Starlight.Minimized = false return end end")
 	local inputStart = source:find("function Groupbox:CreateInput", 1, true)
 	local labelStart = inputStart and source:find("function Groupbox:CreateLabel", inputStart, true)
 	if not inputStart or not labelStart then
@@ -1029,60 +886,25 @@ end)
 	return before .. block .. after
 end
 
-do
-	local execName = Executor and Executor.name or "unknown"
-	local execRaw = Executor and Executor.rawName or ""
-	local display = execName ~= "unknown" and execName or (execRaw ~= "" and execRaw or "unknown")
-	local compatMap = {
-		synapse = true, krnl = true, fluxus = true, scriptware = true,
-		celery = true, delta = true, electron = true, wave = true,
-		oxygenu = true, awp = true, evon = true,
-	}
-	local compat = compatMap[display:lower()] or false
-	if display == "unknown" then
-		notify("Executor", "Unknown executor - features may not work", 6)
-	elseif not compat then
-		notify("Executor", display .. " is untested - some features may fail", 6)
-	else
-		notify("Executor", display .. " detected - fully supported", 4)
-	end
-end
-
 local function loadStarlight()
-	local rewriteResult = loadLocalLua("starlight_repo/Source.lua", "Starlight v3 (local rewrite)")
-	if rewriteResult and type(rewriteResult.CreateWindow) == "function" then
-		return rewriteResult
+	local httpGet = requestFunction()
+	if not httpGet then
+		logError("Starlight", "HTTP is unavailable; cannot load Starlight.")
+		return nil
 	end
-
-	local ok, result = safeCall("LoadStarlightRemote", function()
-		return loadstring(patchStarlightSource(game:HttpGet(STARLIGHT_SOURCE_URL)), "@" .. "Starlight")()
+	local ok, result = safeCall("LoadStarlight", function()
+		local response = httpGet({ Url = STARLIGHT_SOURCE_URL, Method = "GET" })
+		local source = response and (response.Body or tostring(response))
+		if not source or source == "" or source:find("404: Not Found") then
+			error("Empty or missing source.")
+		end
+		return loadstring(patchStarlightSource(source), "@Starlight")()
 	end)
 	if ok and type(result) == "table" and type(result.CreateWindow) == "function" then
 		return result
 	end
-	if not ok then
-		logError("Starlight", result)
-	else
-		logError("Starlight", "Remote Starlight returned an invalid library.")
-	end
-
-	local ok2, result2 = safeCall("LoadStarlightLocal", function()
-		return loadstring(patchStarlightSource(game:HttpGet(STARLIGHT_LOCAL_URL)), "@" .. "Starlight")()
-	end)
-	if ok2 and type(result2) == "table" and type(result2.CreateWindow) == "function" then
-		return result2
-	end
-	if not ok2 then
-		logError("Starlight", result2)
-	else
-		logError("Starlight", "Local repo Starlight returned an invalid library.")
-	end
-
-	local alleralBackup = loadLocalLua("new_ui_library_luxy_backup.lua", "Starlight local backup")
-	if alleralBackup and type(alleralBackup.CreateWindow) == "function" then
-		return alleralBackup
-	end
-	return loadLocalLua("new_ui_library.lua", "Starlight local fallback")
+	logError("Starlight", ok and "Invalid library returned." or tostring(result))
+	return nil
 end
 
 local starlight = loadStarlight()
@@ -1090,7 +912,24 @@ if not starlight or type(starlight.CreateWindow) ~= "function" then
 	logError("Starlight", "Starlight Interface Suite was not available; startup aborted.")
 	return
 end
-rt.ui = starlight
+runtime.ui = starlight
+
+local gameData = loadRemoteLua(
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kickblox.lua",
+	"game data"
+) or { BrainrotOptions = {}, RarityOptions = {}, MutationOptions = {} }
+
+local function withAny(options)
+	local output = { "Any" }
+	local seen = { Any = true, All = true, None = true, ["--"] = true }
+	for _, option in ipairs(options or {}) do
+		if not seen[option] then
+			table.insert(output, option)
+			seen[option] = true
+		end
+	end
+	return output
+end
 
 local function listFromSelection(selection)
 	if type(selection) == "string" then
@@ -1160,7 +999,7 @@ local function normalizeMutation(value)
 	return text
 end
 
-local function selectionMatches(selection, value, normalizer)
+local function selectionMatches(selection, value, normalizer: (any) -> string)
 	selection = listFromSelection(selection)
 	if hasWildcard(selection) then
 		return true
@@ -1179,6 +1018,8 @@ local function mainFilterMatches(brainrot, mutation)
 	local brainrotOk = selectionMatches(state.TBrainrot, brainrot, normalizeText)
 	local rarityOk = selectionMatches(state.TRarity, rarityFor(brainrot, "Unknown"), normalizeText)
 	local mutationOk = selectionMatches(state.TMutation, mutation, normalizeMutation)
+	-- Suppress non-mutated brainrots only when the filter is not a wildcard AND
+	-- the user has not explicitly selected "None" in the filter list.
 	if not hasWildcard(state.TMutation)
 		and normalizeMutation(mutation) == "None"
 		and not tableFind(listFromSelection(state.TMutation), "None")
@@ -1188,46 +1029,17 @@ local function mainFilterMatches(brainrot, mutation)
 	return brainrotOk and rarityOk and mutationOk
 end
 
-local function isBrainrotOwned(name)
-	if not name or name == "" then
-		return false
-	end
-	local lowName = tostring(name):lower()
-	if LP.Character then
-		for _, tool in ipairs(LP.Character:GetChildren()) do
-			if tool:IsA("Tool") and tostring(tool.Name):lower() == lowName then
-				return true
-			end
-		end
-	end
-	if LP.Backpack then
-		for _, tool in ipairs(LP.Backpack:GetChildren()) do
-			if tool:IsA("Tool") and tostring(tool.Name):lower() == lowName then
-				return true
-			end
-		end
-	end
-	local ok, plot = pcall(findPlot)
-	if ok and plot then
-		for _, child in ipairs(plot:GetChildren()) do
-			local childName = tostring(child:GetAttribute("Name") or child.Name):lower()
-			if childName == lowName then
-				return true
-			end
-		end
-	end
-	return false
-end
-
 local function parseNumber(value)
 	if type(value) == "number" then
 		return value
 	end
 	local text = tostring(value or ""):gsub("[,%s%$]", "")
+	-- Standard scientific notation: e.g. "1.5e3" → 1500
 	local mantissa, exponent = text:match("^(%-?[%d%.]+)[eE](%-?%d+)$")
 	if mantissa and exponent then
 		return (tonumber(mantissa) or 0) * (10 ^ (tonumber(exponent) or 0))
 	end
+	-- Number with optional K/M/B/T/… suffix; allow leading minus
 	local number, suffix = text:match("^(%-?[%d%.]+)(%a*)$")
 	local valueNumber = tonumber(number or text) or 0
 	local powers = { K = 3, M = 6, B = 9, T = 12, Q = 15, Qi = 18, S = 21, Sp = 24, O = 27, N = 30, D = 33 }
@@ -1239,10 +1051,6 @@ end
 
 local function mathClamp(value, min, max)
 	return math.min(math.max(value, min), max)
-end
-
-local function humanize(base, variance)
-	return base + (math.random() * 2 - 1) * variance
 end
 
 local function formatNumber(value)
@@ -1292,72 +1100,42 @@ local function loadModule(key, label, resolver)
 end
 
 loadModule("entitiesData", "EntitiesData", function()
-	return RS and RS.Shared and RS.Shared.Data and RS.Shared.Data.EntitiesData
+	return ReplicatedStorage.Shared.Data.EntitiesData
 end)
 loadModule("mutationData", "MutationData", function()
-	return RS and RS.Shared and RS.Shared.Data and RS.Shared.Data.MutationData
+	return ReplicatedStorage.Shared.Data.MutationData
 end)
 loadModule("weightsData", "WeightsData", function()
-	return RS and RS:FindFirstChild("WeightsData", true)
+	return ReplicatedStorage:FindFirstChild("WeightsData", true)
 end)
 loadModule("speedData", "SpeedData", function()
-	return RS and RS.Shared and RS.Shared.Data and RS.Shared.Data.SpeedData
+	return ReplicatedStorage.Shared.Data.SpeedData
 end)
 loadModule("rebirthData", "RebirthData", function()
-	return RS and RS.Shared and RS.Shared.Data and RS.Shared.Data.RebirthData
+	return ReplicatedStorage.Shared.Data.RebirthData
 end)
 loadModule("sacrificeData", "SacrificeData", function()
-	return RS and RS.Shared and RS.Shared.Data and RS.Shared.Data.SacrificeData
+	return ReplicatedStorage.Shared.Data.SacrificeData
 end)
 loadModule("kickService", "KickServiceClient", function()
-	return RS and RS.Modules and RS.Modules.ServicesLoader and RS.Modules.ServicesLoader.KickServiceClient
+	return ReplicatedStorage.Modules.ServicesLoader.KickServiceClient
 end)
 loadModule("balanceService", "ClientBalanceService", function()
-	return RS and RS.Modules and RS.Modules.ServicesLoader and RS.Modules.ServicesLoader.ClientBalanceService
+	return ReplicatedStorage.Modules.ServicesLoader.ClientBalanceService
 end)
 loadModule("rebirthService", "RebirthServiceClient", function()
-	return RS and RS.Modules and RS.Modules.ServicesLoader and RS.Modules.ServicesLoader.RebirthServiceClient
+	return ReplicatedStorage.Modules.ServicesLoader.RebirthServiceClient
 end)
-loadModule("weatherService", "WeatherServiceClient", function()
-	return RS and RS.Modules and RS.Modules.ServicesLoader and RS.Modules.ServicesLoader.WeatherService_Client
-end)
+	loadModule("weatherService", "WeatherServiceClient", function()
+		return ReplicatedStorage.Modules.ServicesLoader.WeatherService_Client
+	end)
 
-local gameData = (function()
-	local data = { BrainrotOptions = { "Any" }, RarityOptions = { "Any" }, MutationOptions = { "Any" } }
-
-	local brainrots = modules.entitiesData and modules.entitiesData.Brainrots
-	if brainrots then
-		local seenRarity = { Any = true }
-		for name in pairs(brainrots) do
-			if name ~= "Any" then
-				table.insert(data.BrainrotOptions, tostring(name))
-			end
-			local r = brainrots[name] and brainrots[name].Rarity
-			if r and not seenRarity[r] then
-				seenRarity[r] = true
-				table.insert(data.RarityOptions, r)
-			end
-		end
-		table.sort(data.BrainrotOptions)
-		table.sort(data.RarityOptions)
-	else
-		data.RarityOptions = { "Any", "Common", "Rare", "Epic", "Legendary", "Mythic", "Godly", "Secret", "Divine", "Hacked", "OG", "Celestial", "Exclusive", "Eternal" }
-	end
-
-	local mutations = modules.mutationData and modules.mutationData.Mutations
-	if mutations then
-		for name in pairs(mutations) do
-			if name ~= "None" then
-				table.insert(data.MutationOptions, tostring(name))
-			end
-		end
-		table.sort(data.MutationOptions)
-	else
-		data.MutationOptions = { "Any", "None", "Golden", "Diamond", "Plasma", "Molten", "Radioactive", "Void", "Shadow", "Electrified", "Rainbow", "Virus", "Wet", "Alien", "Bacon", "Enchanted", "Phantom", "Astral", "Volcanic" }
-	end
-
-	return data
-end)()
+if modules.mutationData and modules.mutationData.ValidMutations then
+	gameData.MutationOptions = modules.mutationData.ValidMutations
+end
+gameData.BrainrotOptions = withAny(gameData.BrainrotOptions)
+gameData.RarityOptions = withAny(gameData.RarityOptions)
+gameData.MutationOptions = withAny(gameData.MutationOptions)
 
 local values = {
 	coins = modules.balanceService and parseNumber(modules.balanceService.Balance) or 0,
@@ -1366,7 +1144,7 @@ local values = {
 }
 
 local function currentCoins()
-	local leaderstats = LP:FindFirstChild("leaderstats")
+	local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
 	local coins = leaderstats and leaderstats:FindFirstChild("Coins")
 	if coins then
 		values.coins = parseNumber(coins.Value)
@@ -1393,14 +1171,15 @@ end
 local remotes = {}
 
 local function refreshRemotes()
-	if tick() - (rt.cachedRemotesAt or 0) < 5 then
+	if tick() - runtime.cachedRemotesAt < 5 then
 		return
 	end
-	rt.cachedRemotesAt = tick()
-	local network = RS and RS:FindFirstChild("Shared")
+	runtime.cachedRemotesAt = tick()
+	local network = ReplicatedStorage:FindFirstChild("Shared")
 	network = network and network:FindFirstChild("Packages")
 	network = network and network:FindFirstChild("Network")
 
+	-- Primary alias lookup (covers original names + common renamed variants)
 	remotes.kick           = safeFindRemote(network, { "rev_KickEvent", "KickEvent", "rev_kickevent", "KickRemote", "rev_Kick" })
 	remotes.collect        = safeFindRemote(network, { "rev_B_Collect", "B_Collect", "Collect", "CollectCash", "rev_Collect" })
 	remotes.upgradeBrainrot= safeFindRemote(network, { "rev_B_Upgrade", "B_Upgrade", "UpgradeBrainrot", "BrainrotUpgrade", "rev_Upgrade" })
@@ -1413,11 +1192,15 @@ local function refreshRemotes()
 	remotes.plotUpgrade    = safeFindRemote(network, { "rev_bs_upgrade", "bs_upgrade", "PlotUpgrade", "UpgradePlot", "rev_PlotUpgrade" })
 	remotes.weather        = safeFindRemote(network, { "rev_sbe", "sbe", "SummonWeather", "WeatherSummon", "rev_Weather" })
 	remotes.place          = safeFindRemote(network, { "rev_S_Interact", "S_Interact", "PlaceBrainrot", "PlacePet", "rev_Place" })
+	-- Battle remotes: confirmed names from game source use rev_bs_battle_* prefix
 	remotes.battleCreate   = safeFindRemote(network, { "rev_bs_battle_create", "ref_battle_create", "rev_battle_create", "battle_create", "BattleCreate" })
 	remotes.battleInvite   = safeFindRemote(network, { "rev_bs_battle_invite", "ref_battle_invite", "rev_battle_invite", "battle_invite", "BattleInvite" })
 	remotes.battleStart    = safeFindRemote(network, { "rev_bs_battle_start",  "rev_battle_start",  "battle_start", "BattleStart", "StartBattle" })
+	-- Kick style: confirmed name is rev_KickStyle (no 'Equip' suffix)
 	remotes.kickStyle      = safeFindRemote(network, { "rev_KickStyle", "rev_KickStyleEquip", "KickStyleEquip", "EquipKickStyle" })
 
+	-- Dynamic fallback: scan the network folder for remotes not caught above.
+	-- Matches by pattern against the lowercase name; won't overwrite existing hits.
 	if network then
 		for _, child in ipairs(network:GetChildren()) do
 			if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
@@ -1439,42 +1222,42 @@ end
 refreshRemotes()
 
 local function findPlot()
-	if rt.cachedPlot and rt.cachedPlot.Parent and tick() - rt.cachedPlotAt < 5 then
-		return rt.cachedPlot
+	if runtime.cachedPlot and runtime.cachedPlot.Parent and tick() - runtime.cachedPlotAt < 5 then
+		return runtime.cachedPlot
 	end
-	if tick() < (rt.nextPlotLookup or 0) then
+	if tick() < (runtime.nextPlotLookup or 0) then
 		return nil
 	end
-	rt.nextPlotLookup = tick() + 2
+	runtime.nextPlotLookup = tick() + 2
 	local ok, plotService = safeCall("FindPlotService", function()
-		return require(RS.Modules.ServicesLoader.ClientPlotService)
+		return require(ReplicatedStorage.Modules.ServicesLoader.ClientPlotService)
 	end)
 	if ok and plotService and plotService.Model then
-		rt.cachedPlot = plotService.Model
-		rt.cachedPlotAt = tick()
-		rt.nextPlotLookup = 0
-		return rt.cachedPlot
+		runtime.cachedPlot = plotService.Model
+		runtime.cachedPlotAt = tick()
+		runtime.nextPlotLookup = 0
+		return runtime.cachedPlot
 	end
-	local plots = Ws:FindFirstChild("Plots") or Ws:FindFirstChild("Plot")
+	local plots = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Plot")
 	if not plots then
 		return nil
 	end
-	local userId = tostring(LP.UserId)
+	local userId = tostring(LocalPlayer.UserId)
 	for _, plot in ipairs(plots:GetChildren()) do
 		local owner = tostring(plot:GetAttribute("Owner") or "")
 		local ownerId = tostring(plot:GetAttribute("OwnerId") or plot:GetAttribute("PlayerId") or "")
 		local playerName = tostring(plot:GetAttribute("Player") or "")
 		if
-			owner == LP.Name
-			or owner == LP.DisplayName
+			owner == LocalPlayer.Name
+			or owner == LocalPlayer.DisplayName
 			or owner == userId
 			or ownerId == userId
-			or playerName == LP.Name
+			or playerName == LocalPlayer.Name
 			or playerName == userId
 		then
-			rt.cachedPlot = plot
-			rt.cachedPlotAt = tick()
-			rt.nextPlotLookup = 0
+			runtime.cachedPlot = plot
+			runtime.cachedPlotAt = tick()
+			runtime.nextPlotLookup = 0
 			return plot
 		end
 	end
@@ -1519,6 +1302,9 @@ local function brainrotCps(name, mutation, level)
 	local base = parseNumber(entry.CPS or entry.CashPerSecond or entry.BaseCPS or 0)
 	local lvl = math.max(1, tonumber(level) or 1)
 
+	-- Level scaling: check for explicit per-level data before falling back to
+	-- simple linear scaling. Many games add a fixed amount per upgrade rather
+	-- than multiplying the whole value.
 	local leveledBase
 	if entry.CPSPerLevel or entry.CashPerSecondPerLevel then
 		local perLvl = parseNumber(entry.CPSPerLevel or entry.CashPerSecondPerLevel or 0)
@@ -1527,9 +1313,11 @@ local function brainrotCps(name, mutation, level)
 		local m = parseNumber(entry.LevelMultiplier or 1)
 		leveledBase = base * (1 + (lvl - 1) * (m - 1))
 	else
+		-- Default: linear (base × level). Works for most KickBlox games.
 		leveledBase = base * lvl
 	end
 
+	-- Mutation multiplier
 	local multiplier = 1
 	local mutData = modules.mutationData
 	if mutData and mutData.Mutations and mutData.Mutations[mutation] then
@@ -1548,6 +1336,24 @@ local function brainrotCps(name, mutation, level)
 	return leveledBase * multiplier
 end
 
+-- Sum of CPS for all brainrots currently placed in the player's plot.
+-- Returns 0 when the plot is inaccessible (used for UI display only).
+local function totalPlotCps()
+	local plot = findPlot()
+	if not plot or not plot:FindFirstChild("Slots") then return 0 end
+	local total = 0
+	for _, slot in ipairs(plot.Slots:GetChildren()) do
+		local placed = slot:FindFirstChild("PlacedPart")
+		if placed then
+			local name, mutation, level = placedBrainrotInfo(placed)
+			if name then
+				total = total + (brainrotCps(name, mutation, level) or 0)
+			end
+		end
+	end
+	return total
+end
+
 local function kickPower()
 	local accuracy = {
 		Bad = 0.05,
@@ -1564,28 +1370,19 @@ local function kickPower()
 	elseif state.KickPowerMode == "Nano" then
 		divisor = 10000
 	end
-	local baseAcc = accuracy[state.TargetMinigameAccuracy] or 0.98
-	local acc = baseAcc
-	if state.AHumanize then
-		acc = humanize(baseAcc, 0.04)
-		acc = mathClamp(acc, baseAcc - 0.08, math.min(baseAcc + 0.08, 0.99))
-	end
-	local basePower = mathClamp((state.CustomKickPowerPercent or 100) / 100, 0, 1) / divisor
-	local power = basePower
-	if state.AHumanize then
-		power = humanize(basePower, (basePower or 1) * 0.03)
-		power = mathClamp(power, math.max(0, basePower - 0.06), math.min(1, basePower + 0.06)) / (basePower > 0 and 1 or 1)
-	end
-	return acc, power
+	return accuracy[state.TargetMinigameAccuracy] or 0.98,
+		mathClamp((state.CustomKickPowerPercent or 100) / 100, 0, 1) / divisor
 end
 
 local function characterParts()
-	local character = LP.Character
+	local character = LocalPlayer.Character
 	local humanoid = character and character:FindFirstChild("Humanoid")
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	return character, humanoid, root
 end
 
+-- Fire a remote regardless of whether it is a RemoteEvent or RemoteFunction.
+-- Tries FireServer first (the common case), falls back to InvokeServer.
 local function fireRemote(remote, ...)
 	if not remote then return false end
 	local args = { ... }
@@ -1597,32 +1394,35 @@ local function fireRemote(remote, ...)
 end
 
 local function currentBattleStatus()
-	if tick() - rt.cachedBattleStatusAt < 0.75 then
-		return rt.cachedBattleStatus
+	if tick() - runtime.cachedBattleStatusAt < 0.75 then
+		return runtime.cachedBattleStatus
 	end
 	local status = nil
+	-- Primary: read from the KickBattles UI module
 	safeCall("BattleStatus", function()
-		local m = require(RS.Modules.UILoader.KickBattlesUI)
+		local m = require(ReplicatedStorage.Modules.UILoader.KickBattlesUI)
 		if m and m.CurrentStatus ~= nil then
 			status = tostring(m.CurrentStatus)
 		end
 	end)
+	-- Fallback: player attribute set by the server
 	if not status then
-		local attr = LP:GetAttribute("BattleStatus")
+		local attr = LocalPlayer:GetAttribute("BattleStatus")
 		if attr ~= nil then
 			status = tostring(attr)
 		end
 	end
+	-- Normalise known "not in battle" variants to nil so callers can use `== nil`
 	if status == "None" or status == "" then
 		status = nil
 	end
-	rt.cachedBattleStatus = status
-	rt.cachedBattleStatusAt = tick()
+	runtime.cachedBattleStatus = status
+	runtime.cachedBattleStatusAt = tick()
 	return status
 end
 
 local function battleTimerVisible()
-	local gui = LP:FindFirstChild("PlayerGui")
+	local gui = LocalPlayer:FindFirstChild("PlayerGui")
 	local battleGui = gui and gui:FindFirstChild("KickBattles")
 	return battleGui
 		and battleGui:FindFirstChild("TopFrame")
@@ -1631,7 +1431,7 @@ local function battleTimerVisible()
 end
 
 local function restoreCamera(humanoid)
-	local camera = Ws.CurrentCamera
+	local camera = Workspace.CurrentCamera
 	if camera and humanoid then
 		camera.CameraType = Enum.CameraType.Custom
 		camera.CameraSubject = humanoid
@@ -1644,15 +1444,13 @@ local function fastMove(root, targetCFrame, speed)
 	end
 	speed = math.max(speed or 90, 1)
 	local started = tick()
-	local wobblePhase = 0
 	while
 		state.HubRunning
 		and root.Parent
 		and (root.Position - targetCFrame.Position).Magnitude > 3
 		and tick() - started < 12
 	do
-		local dt = RunSvc.Heartbeat:Wait()
-		wobblePhase = wobblePhase + dt
+		local dt = RunService.Heartbeat:Wait()
 		local current = root.Position
 		local target = targetCFrame.Position
 		local direction = Vector3.new(target.X - current.X, 0, target.Z - current.Z)
@@ -1660,29 +1458,9 @@ local function fastMove(root, targetCFrame, speed)
 		if distance <= 0 then
 			break
 		end
-		local stepSize = speed * dt
-		if state.AHumanize then
-			stepSize = stepSize * humanize(1, 0.08)
-		end
-		local step = direction.Unit * math.min(distance, stepSize)
-		local wobble = Vector3.new(0, 0, 0)
-		if state.AHumanize and distance > 8 then
-			local wobbleAmp = math.min(0.5, distance * 0.02)
-			wobble = Vector3.new(
-				math.sin(wobblePhase * 4) * wobbleAmp,
-				0,
-				math.cos(wobblePhase * 3.7) * wobbleAmp
-			)
-		end
+		local step = direction.Unit * math.min(distance, speed * dt)
 		root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-		root.CFrame = CFrame.new(
-			current.X + step.X + wobble.X,
-			target.Y + 3 + wobble.Y,
-			current.Z + step.Z + wobble.Z
-		)
-		if state.AHumanize and distance < 12 then
-			task.wait(humanize(0, 0.003))
-		end
+		root.CFrame = CFrame.new(current.X + step.X, target.Y + 3, current.Z + step.Z)
 	end
 	return true
 end
@@ -1742,7 +1520,7 @@ local function activeAutomationCount()
 end
 
 local function refreshPerformanceMode()
-	local fps = tonumber(rt.currentFps) or 60
+	local fps = tonumber(runtime.currentFps) or 60
 	local active = activeAutomationCount()
 	local nextMode = "Balanced"
 	if fps < 22 or active >= 8 then
@@ -1752,7 +1530,7 @@ local function refreshPerformanceMode()
 	elseif fps >= 48 and active <= 2 then
 		nextMode = "Aggressive"
 	end
-	rt.performanceMode = nextMode
+	runtime.performanceMode = nextMode
 	return nextMode
 end
 
@@ -1767,7 +1545,7 @@ local function currentLoopInterval(name, fallback)
 	local key = intervalKeys[name]
 	local value = key and tonumber(state[key])
 	local minimum = minimumLoopIntervals[name] or 0
-	local multiplier = performanceMultipliers[rt.performanceMode or "Balanced"] or 1
+	local multiplier = performanceMultipliers[runtime.performanceMode or "Balanced"] or 1
 	if value and value > 0 then
 		return math.max(minimum, value * multiplier)
 	end
@@ -1775,7 +1553,7 @@ local function currentLoopInterval(name, fallback)
 end
 
 local function shouldThrottleForFps(name)
-	if not rt.currentFps or rt.currentFps >= 28 then
+	if not runtime.currentFps or runtime.currentFps >= 28 then
 		return false
 	end
 	return name ~= "RefreshData" and name ~= "Prediction" and name ~= "WebhookStatus"
@@ -1795,7 +1573,7 @@ supervisorEnabled = {
 		return state.A2xTrain or state.ATrainCollect
 	end,
 	CollectCash = function()
-		return state.ACollect
+		return state.ACollect or state.AAutoBattle
 	end,
 	TrainCollect = function()
 		return state.ATrainCollect
@@ -1844,44 +1622,40 @@ local function makeSupervisor(name, interval, callback)
 		errors = 0,
 		lastRun = 0,
 		interval = interval,
-		token = HttpSvc:GenerateGUID(false),
+		token = HttpService:GenerateGUID(false),
 	}
 	loops[name] = loopState
 	loopControllers[name] = loopState
 	task.spawn(function()
 		local myToken = loopState.token
 		while state.HubRunning and loopState.enabled and loopControllers[name] == loopState and loopState.token == myToken do
-			if starlight and (starlight.Minimized or not (starlight.Window and starlight.Window.Instance and starlight.Window.Instance.Parent)) then
-				task.wait(1)
+			local enabledCheck = supervisorEnabled[name]
+			if enabledCheck and not enabledCheck() then
+				task.wait(math.max(3, currentLoopInterval(name, interval) * 4))
 			else
-				local enabledCheck = supervisorEnabled[name]
-				if enabledCheck and not enabledCheck() then
-					task.wait(math.max(3, currentLoopInterval(name, interval) * 4))
+				local ok, err = pcall(callback)
+				loopState.lastRun = tick()
+				if not ok then
+					if name == "AutoPlaceBest" then
+						state.IsPlacingPet = false
+					elseif name == "Mastery" then
+						runtime.masteryBusy = false
+						runtime.nextMasteryAction = tick() + 1
+					end
+					runtime.lastLoopError = name .. ": " .. shortError(err)
+					logError("Loop:" .. name, err)
+					loopState.errors = loopState.errors + 1
+					if state.NotifyOnError and tick() >= (loopState.nextErrorNotify or 0) then
+						loopState.nextErrorNotify = tick() + (state.UIQuietMode and 20 or 10)
+						notify("Alleral", name .. " recovered: " .. tostring(err), 3)
+					end
+					task.wait(math.min(5, 0.5 + loopState.errors))
 				else
-					local ok, err = pcall(callback)
-					loopState.lastRun = tick()
-					if not ok then
-						if name == "AutoPlaceBest" then
-							state.IsPlacingPet = false
-						elseif name == "Mastery" then
-							rt.masteryBusy = false
-							rt.nextMasteryAction = tick() + 1
-						end
-						rt.lastLoopError = name .. ": " .. shortError(err)
-						logError("Loop:" .. name, err)
-						loopState.errors = loopState.errors + 1
-						if state.NotifyOnError and tick() >= (loopState.nextErrorNotify or 0) then
-							loopState.nextErrorNotify = tick() + (state.UIQuietMode and 20 or 10)
-							notify("Alleral", name .. " recovered: " .. tostring(err), 3)
-						end
-						task.wait(math.min(5, 0.5 + loopState.errors))
+					loopState.errors = 0
+					if shouldThrottleForFps(name) then
+						task.wait(math.max(2, currentLoopInterval(name, interval) * 2))
 					else
-						loopState.errors = 0
-						if shouldThrottleForFps(name) then
-							task.wait(math.max(2, currentLoopInterval(name, interval) * 2))
-						else
-							task.wait(currentLoopInterval(name, interval))
-						end
+						task.wait(currentLoopInterval(name, interval))
 					end
 				end
 			end
@@ -2016,8 +1790,8 @@ local function autoPlaceBest()
 	local bestTool = nil
 	local bestCps = -1
 	local tools = {}
-	if LP.Backpack then
-		for _, tool in ipairs(LP.Backpack:GetChildren()) do
+	if LocalPlayer.Backpack then
+		for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
 			if isBrainrotTool(tool) then
 				table.insert(tools, tool)
 			end
@@ -2092,11 +1866,11 @@ local function updatePlotLists(protectedDropdown, upgradeDropdown)
 	state.PlotBrainrotList = upgrades
 	local protectedSignature = table.concat(protected, "\0")
 	local upgradeSignature = table.concat(upgrades, "\0")
-	if rt.lastProtectedSignature == protectedSignature and rt.lastUpgradeSignature == upgradeSignature then
+	if runtime.lastProtectedSignature == protectedSignature and runtime.lastUpgradeSignature == upgradeSignature then
 		return
 	end
-	rt.lastProtectedSignature = protectedSignature
-	rt.lastUpgradeSignature = upgradeSignature
+	runtime.lastProtectedSignature = protectedSignature
+	runtime.lastUpgradeSignature = upgradeSignature
 	safeCall("RefreshPlotDropdowns", function()
 		if protectedDropdown and protectedDropdown.Refresh then
 			protectedDropdown:Refresh(protected)
@@ -2114,12 +1888,12 @@ end
 local weightCost
 
 local function getSortedWeights()
-	if rt.cachedWeights then
-		return rt.cachedWeights
+	if runtime.cachedWeights then
+		return runtime.cachedWeights
 	end
 	local weights = {}
-	local weightModels = RS and RS:FindFirstChild("Objects")
-		and RS.Objects:FindFirstChild("WeightModels")
+	local weightModels = ReplicatedStorage:FindFirstChild("Objects")
+		and ReplicatedStorage.Objects:FindFirstChild("WeightModels")
 	if weightModels then
 		for _, item in ipairs(weightModels:GetChildren()) do
 			table.insert(weights, item.Name)
@@ -2130,7 +1904,7 @@ local function getSortedWeights()
 		local costB = weightCost(b)
 		return costA < costB
 	end)
-	rt.cachedWeights = weights
+	runtime.cachedWeights = weights
 	return weights
 end
 
@@ -2199,8 +1973,8 @@ local function equipOwnedWeight(weight)
 	if equipped and equipped.Name == weight then
 		return
 	end
-	if LP.Backpack then
-		local tool = LP.Backpack:FindFirstChild(weight)
+	if LocalPlayer.Backpack then
+		local tool = LocalPlayer.Backpack:FindFirstChild(weight)
 		if tool and tool:IsA("Tool") then
 			safeCall("EquipWeightTool", function()
 				humanoid:EquipTool(tool)
@@ -2218,11 +1992,11 @@ equipWeight = function(weight)
 		equipOwnedWeight(weight)
 		return
 	end
-	rt.nextWeightBuyAttempt[weight] = rt.nextWeightBuyAttempt[weight] or 0
-	if tick() < rt.nextWeightBuyAttempt[weight] then
+	runtime.nextWeightBuyAttempt[weight] = runtime.nextWeightBuyAttempt[weight] or 0
+	if tick() < runtime.nextWeightBuyAttempt[weight] then
 		return
 	end
-	rt.nextWeightBuyAttempt[weight] = tick() + 6
+	runtime.nextWeightBuyAttempt[weight] = tick() + 6
 	safeCall("BuyWeight", function()
 		if remotes.shopBuy then
 			remotes.shopBuy:FireServer("WeightShop", weight)
@@ -2235,9 +2009,9 @@ end
 
 getOwnedWeightTools = function()
 	local tools = {}
-	local character = LP.Character
-	if LP.Backpack then
-		for _, item in ipairs(LP.Backpack:GetChildren()) do
+	local character = LocalPlayer.Character
+	if LocalPlayer.Backpack then
+		for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
 			if item:IsA("Tool") then
 				table.insert(tools, item)
 			end
@@ -2284,7 +2058,7 @@ local function equipBestOwnedWeight()
 				remotes.weightEquip:FireServer(tool.Name)
 			end)
 		end
-		if tool.Parent == LP.Backpack then
+		if tool.Parent == LocalPlayer.Backpack then
 			safeCall("EquipBestWeightTool", function()
 				humanoid:EquipTool(tool)
 			end)
@@ -2318,7 +2092,7 @@ end
 local function getKickStyleOptions()
 	local options = { "Default" }
 	safeCall("KickStyleOptions", function()
-		local folder = RS and RS.Shared and RS.Shared.Data and RS.Shared.Data:FindFirstChild("KickStylesData")
+		local folder = ReplicatedStorage.Shared.Data:FindFirstChild("KickStylesData")
 		if folder then
 			for _, item in ipairs(folder:GetChildren()) do
 				if item:IsA("ModuleScript") and item.Name ~= "Default" then
@@ -2337,10 +2111,10 @@ local function equipKickStyle(styleName)
 	if styleName == "" or styleName == "Default" then
 		return
 	end
-	if tick() < (rt.nextKickStyleAttempt or 0) then
+	if tick() < (runtime.nextKickStyleAttempt or 0) then
 		return
 	end
-	rt.nextKickStyleAttempt = tick() + 10
+	runtime.nextKickStyleAttempt = tick() + 10
 	safeCall("KickStyleBuy", function()
 		if remotes.shopBuy then
 			remotes.shopBuy:FireServer("KickStyles", styleName)
@@ -2381,14 +2155,14 @@ local function webhookSeen(guid)
 	if not guid then
 		return true
 	end
-	if rt.seenWebhookGuids[guid] then
+	if runtime.seenWebhookGuids[guid] then
 		return true
 	end
-	rt.seenWebhookGuids[guid] = true
-	table.insert(rt.seenWebhookOrder, guid)
-	while #rt.seenWebhookOrder > 500 do
-		local old = table.remove(rt.seenWebhookOrder, 1)
-		rt.seenWebhookGuids[old] = nil
+	runtime.seenWebhookGuids[guid] = true
+	table.insert(runtime.seenWebhookOrder, guid)
+	while #runtime.seenWebhookOrder > 500 do
+		local old = table.remove(runtime.seenWebhookOrder, 1)
+		runtime.seenWebhookGuids[old] = nil
 	end
 	return false
 end
@@ -2444,16 +2218,16 @@ local function handleClaimedTool(tool)
 end
 
 local function watchFavoriteTool(tool)
-	if not state.AAutoFav or not tool:IsA("Tool") or rt.favoriteTools[tool] then
+	if not state.AAutoFav or not tool:IsA("Tool") or runtime.favoriteTools[tool] then
 		return
 	end
 	local toolConnections = {}
-	rt.favoriteTools[tool] = toolConnections
+	runtime.favoriteTools[tool] = toolConnections
 	local function cleanup()
 		for _, connection in ipairs(toolConnections) do
 			untrack(connection)
 		end
-		rt.favoriteTools[tool] = nil
+		runtime.favoriteTools[tool] = nil
 	end
 	local function evaluate()
 		if not state.AAutoFav or not tool.Parent then
@@ -2468,8 +2242,8 @@ local function watchFavoriteTool(tool)
 		local matches = selectionMatches(state.TSSellBrainrot, tool.Name, normalizeText)
 			and selectionMatches(state.TSSellRarity, rarity, normalizeText)
 			and selectionMatches(state.TSSellMutation, mutation, normalizeMutation)
-		if matches and tool:GetAttribute("Favorite") ~= true and not tableFind(rt.favoriteQueue, guid) then
-			table.insert(rt.favoriteQueue, guid)
+		if matches and tool:GetAttribute("Favorite") ~= true and not tableFind(runtime.favoriteQueue, guid) then
+			table.insert(runtime.favoriteQueue, guid)
 		end
 	end
 	local function add(connection)
@@ -2488,15 +2262,15 @@ end
 
 local function scanTools()
 	local seen = {}
-	if LP.Backpack then
-		for _, item in ipairs(LP.Backpack:GetChildren()) do
+	if LocalPlayer.Backpack then
+		for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
 			if item:IsA("Tool") and not seen[item] then
 				seen[item] = true
 				watchFavoriteTool(item)
 			end
 		end
 	end
-	local character = LP.Character
+	local character = LocalPlayer.Character
 	if character then
 		for _, item in ipairs(character:GetChildren()) do
 			if item:IsA("Tool") and not seen[item] then
@@ -2513,7 +2287,7 @@ local function starlightIcon(icon)
 	return tostring(icon or ""):match("%d+$") or ""
 end
 
-local function starlightWait(predicate, timeout)
+local function starlightWait(predicate: () -> any, timeout)
 	local started = tick()
 	repeat
 		if predicate() then
@@ -2556,7 +2330,7 @@ local function starlightSearch(values, query)
 	return starlightOptions(filtered)
 end
 
-local MAX_RENDERED_DROPDOWN_OPTIONS = 80
+local MAX_RENDERED_DROPDOWN_OPTIONS = 50
 
 local function compactStarlightOptions(values, selected, limit)
 	values = starlightOptions(values)
@@ -2692,8 +2466,8 @@ local function wrapStarlightGroup(groupbox)
 			end
 		end
 		if not starlightWait(function()
-			return label.Instance and label.Instance.DropdownHolder
-		end, 5) then
+						return label.Instance and label.Instance.DropdownHolder
+					end, 3) then
 			function handle:SetValues(newValues, newDefault)
 				self.Values = starlightOptions(newValues)
 				self.Selection = starlightCurrent(newDefault or self.Selection, multi)
@@ -2807,17 +2581,16 @@ local function wrapStarlightGroup(groupbox)
 			}, nextId(label .. "_" .. tostring(key)))
 		end
 		function status:Update(key, value)
-			local ok, rendered = pcall(tostring, value)
-			if not ok then return end
-			if self.LastValues and self.LastValues[key] == rendered then
+			local rendered = tostring(value)
+			if self.LastValues[key] == rendered then
 				return
 			end
-			if self.LastValues then
-				self.LastValues[key] = rendered
-			end
-			local row = self.Labels and self.Labels[key]
+			self.LastValues[key] = rendered
+			local row = self.Labels[key]
 			if row and row.Set then
-				pcall(row.Set, row, {Name = tostring(key) .. ": " .. rendered})
+				row:Set({
+					Name = tostring(key) .. ": " .. rendered,
+				})
 			end
 		end
 		function status:SetVisible(visible)
@@ -2843,9 +2616,8 @@ local function wrapStarlightGroup(groupbox)
 	return group
 end
 
-(function()
 local starlightWindow = starlight:CreateWindow({
-	Name = "Alleral Hub",
+	Name = "Alleral",
 	Subtitle = "Kick a Lucky Block",
 	Icon = 10723407389,
 	LoadingEnabled = false,
@@ -2855,7 +2627,6 @@ local starlightWindow = starlight:CreateWindow({
 		ConfigFolder = "Interface",
 	},
 })
-Hub._StarlightWindow = starlightWindow
 local starlightSection = starlightWindow:CreateTabSection("Alleral", true)
 
 local function createStarlightTab(name, icon)
@@ -2873,123 +2644,10 @@ local function createStarlightGroup(tab, name, icon, column)
 		Column = column or 1,
 	}, starlightId(name))
 	starlightWait(function()
-		return groupbox.Instance and groupbox.ParentingItem
-	end, 2)
+			return groupbox.Instance and groupbox.ParentingItem
+		end, 1.5)
 	return wrapStarlightGroup(groupbox)
 end
-
-local hubTab = createStarlightTab("Hub", "rbxassetid://10723407389")
-local hubInfoGroup = createStarlightGroup(hubTab, "Alleral Hub", "rbxassetid://10723407389", 1)
-local hubGamesGroup = createStarlightGroup(hubTab, "Games", "rbxassetid://10734975692", 2)
-local hubStatsGroup = createStarlightGroup(hubTab, "Session", "rbxassetid://10734952479", 1)
-
-hubInfoGroup:CreateParagraph("About", "Alleral Hub v" .. VERSION .. "\nMulti-game script hub\nKick a Lucky Block")
-hubInfoGroup:CreateDivider()
-
-hubInfoGroup:CreateButton("Emergency Hide", function()
-	if starlightWindow then
-		starlightWindow.Instance.Visible = false
-		starlight.Minimized = true
-	end
-	rt.lastEmergencyHide = tick()
-	notify("Hub", "UI hidden. Reopen with your keybind.", 3)
-end)
-hubInfoGroup:CreateButton("Stop All Farms", function()
-	state.AFarm = false
-	state.AAutoMastery = false
-	state.AAutoBattle = false
-	state.AAutoWeather = false
-	state.AAutoStyle = false
-	notify("Hub", "All farms stopped.", 3)
-end)
-hubInfoGroup:CreateDivider()
-
-hubInfoGroup:CreateButton("Copy Support Info", function()
-	local summary = supportSummary()
-	if setclipboard then setclipboard(summary) end
-	notify("Hub", "Support info copied.", 3)
-end)
-hubInfoGroup:CreateDivider()
-local function nukeEverything()
-	state.HubRunning = false
-	for _, con in pairs(connections) do
-		pcall(con.Disconnect, con)
-	end
-	for k in pairs(connections) do connections[k] = nil end
-	for _, ls in pairs(loops) do
-		ls.enabled = false
-	end
-	for _, ctl in pairs(loopControllers) do
-		ctl.enabled = false
-	end
-	for k in pairs(loops) do loops[k] = nil end
-	for k in pairs(loopControllers) do loopControllers[k] = nil end
-	if starlightWindow and starlightWindow.Instance then
-		pcall(starlightWindow.Instance.Destroy, starlightWindow.Instance)
-	end
-	if starlight then
-		pcall(starlight.Unload, starlight)
-	end
-	local env = getgenv()
-	env.Starlight = nil
-	env.Library = nil
-	env.AlleralLib = nil
-	env.Alleral_State = nil
-	env.Alleral_Hub = nil
-	env.Alleral_Boot = nil
-	env.Alleral_Tracked = nil
-	env.Alleral_Hub_Settings = nil
-	env.AlleralAlleral = nil
-	env._AlReload = nil
-	env._AlBootStamp = nil
-	env._AlReloading = nil
-	rt = nil
-end
-
-hubInfoGroup:CreateButton("Uninject", function()
-	notify("Hub", "Uninjecting...", 2)
-	task.spawn(nukeEverything)
-end)
-hubInfoGroup:CreateDivider()
-
-local hubGameStatus = hubGamesGroup:CreateStatus("Status", {
-	["Game"] = "Kick a Lucky Block",
-	["PlaceId"] = tostring(game.PlaceId),
-	["Status"] = "Active",
-})
-
-hubGamesGroup:CreateDivider()
-
-local hubSecurityStatus = hubGamesGroup:CreateStatus("Security", {
-	["Anti-Cheat"] = "Active",
-	["Staff Detection"] = "Off",
-	["Staff Status"] = "None",
-	["Anti-Cheat Triggers"] = "0",
-	["Last Check"] = "Never",
-})
-
-hubGamesGroup:CreateDivider()
-
-Hub._SecurityStatus = hubSecurityStatus
-
-Hub._DashboardStatus = hubStatsGroup:CreateStatus("Stats", {
-	["Version"] = VERSION,
-	["Session"] = "Not started",
-	["Total Kicks"] = "0",
-	["Total Errors"] = "0",
-	["Active Features"] = "0",
-	["Session Errors"] = "0",
-})
-
-hubStatsGroup:CreateDivider()
-
-Hub._QuickStatus = hubStatsGroup:CreateStatus("Quick Status", {
-	["Farming"] = "Off",
-	["Mastery"] = "Off",
-	["Battles"] = "Off",
-	["Weather"] = "Off",
-	["Styles"] = "Off",
-})
 
 local mainTab = createStarlightTab("Kick", "rbxassetid://10723407389")
 local autoTab = createStarlightTab("Plot", "rbxassetid://10734923214")
@@ -3031,10 +2689,6 @@ local diagnosticsStatus = diagnosticsGroup:CreateStatus("Status", {
 	["Last Error"] = "--",
 	["Recent Error"]= "--",
 	["Log File"]   = appendFile and logFile or "Unavailable",
-	Overall        = "--",
-	Passed         = "--",
-	Failed         = "--",
-	["Last Check"] = "--",
 })
 
 local profileFolder = "Alleral_Configs/Profiles"
@@ -3059,9 +2713,6 @@ local function listProfiles()
 		return { "default" }
 	end
 	local profiles = {}
-	if isFolder and makeFolder and not isFolder(profileFolder) then
-		makeFolder(profileFolder)
-	end
 	local ok, files = safeCall("ListProfiles", function()
 		return listFiles(profileFolder)
 	end)
@@ -3125,7 +2776,7 @@ local function saveProfile(name)
 		end
 	end)
 	local ok, err = safeCall("SaveProfile", function()
-		writeFile(profilePath(name), HttpSvc:JSONEncode(collectConfigSnapshot()))
+		writeFile(profilePath(name), HttpService:JSONEncode(collectConfigSnapshot()))
 	end)
 	if not ok then
 		return false, tostring(err)
@@ -3142,7 +2793,7 @@ local function loadProfile(name)
 		return false, "Profile not found."
 	end
 	local ok, decoded = safeCall("LoadProfile", function()
-		return HttpSvc:JSONDecode(readFile(profilePath(name)))
+		return HttpService:JSONDecode(readFile(profilePath(name)))
 	end)
 	if not ok then
 		return false, "Invalid profile JSON: " .. shortError(decoded)
@@ -3171,14 +2822,14 @@ end
 local function resetRuntimeLocks()
 	state.IsPlacingPet = false
 	state.IsFlashCollecting = false
-	rt.masteryBusy = false
-	rt.nextMasteryAction = 0
-	rt.nextSpeedBuyAttempt = 0
-	rt.nextBattleCreate = 0
-	rt.nextBattleInvite = 0
-	rt.nextBattleStart = 0
-	rt.lastProtectedSignature = nil
-	rt.lastUpgradeSignature = nil
+	runtime.masteryBusy = false
+	runtime.nextMasteryAction = 0
+	runtime.nextSpeedBuyAttempt = 0
+	runtime.nextBattleCreate = 0
+	runtime.nextBattleInvite = 0
+	runtime.nextBattleStart = 0
+	runtime.lastProtectedSignature = nil
+	runtime.lastUpgradeSignature = nil
 	notify("Runtime", "Recovered stuck locks and cooldowns.", 3)
 end
 
@@ -3203,10 +2854,10 @@ local function pauseAutomation()
 end
 
 local function clearErrorLog()
-	rt.errLog = {}
-	rt.errCounts = {}
-	rt.lastError = nil
-	rt.lastLoopError = nil
+	runtime.errorLog = {}
+	runtime.errorCounts = {}
+	runtime.lastError = nil
+	runtime.lastLoopError = nil
 	if deleteFile and isFile and isFile(logFile) then
 		safeCall("ClearErrorLog", function()
 			deleteFile(logFile)
@@ -3217,14 +2868,14 @@ end
 
 local function totalLoggedErrors()
 	local total = 0
-	for _, count in pairs(rt.errCounts) do
+	for _, count in pairs(runtime.errorCounts) do
 		total = total + (tonumber(count) or 0)
 	end
 	return total
 end
 
 local function supportSummary()
-	local build = rt.gameBuild or checkGameBuild(false)
+	local build = runtime.gameBuild or checkGameBuild(false)
 	local lines = {
 		"Alleral " .. VERSION,
 		"Game: " .. tostring(build and build.Name or game.Name),
@@ -3232,15 +2883,14 @@ local function supportSummary()
 		"PlaceVersion: " .. tostring(build and build.PlaceVersion or game.PlaceVersion),
 		"GameUpdated: " .. tostring(build and formatRobloxTimestamp(build.Updated) or "Unknown"),
 		"BuildStatus: " .. tostring(build and (build.Changed and "Changed" or "Current") or "Unknown"),
-		"RuntimeMode: " .. tostring(rt.performanceMode or "Balanced"),
-		"FPS: " .. tostring(rt.currentFps or "--"),
+		"RuntimeMode: " .. tostring(runtime.performanceMode or "Balanced"),
+		"FPS: " .. tostring(runtime.currentFps or "--"),
 		"Errors: " .. tostring(totalLoggedErrors()),
-		"LastError: " .. tostring(rt.lastError or rt.lastLoopError or "None"),
+		"LastError: " .. tostring(runtime.lastError or runtime.lastLoopError or "None"),
 	}
 	return table.concat(lines, "\n")
 end
 
-(function()
 profileGroup:CreateInput(
 	"Profile Name",
 	"default",
@@ -3313,7 +2963,7 @@ profileGroup:CreateButton(
 	"Import JSON",
 	function()
 		local ok, decoded = safeCall("ImportProfileJson", function()
-			return HttpSvc:JSONDecode(importBuffer)
+			return HttpService:JSONDecode(importBuffer)
 		end)
 		if not ok then
 			notify("Profiles Error", "Invalid JSON: " .. shortError(decoded), 3)
@@ -3327,7 +2977,7 @@ profileGroup:CreateButton(
 profileGroup:CreateButton(
 	"Export to Clipboard",
 	function()
-		local encoded = HttpSvc:JSONEncode(collectConfigSnapshot())
+		local encoded = HttpService:JSONEncode(collectConfigSnapshot())
 		importBuffer = encoded
 		if setClipboard then
 			safeCall("CopyProfileExport", function()
@@ -3373,11 +3023,11 @@ recoveryGroup:CreateButton(
 recoveryGroup:CreateButton(
 	"Refresh Remotes & Plot",
 	function()
-		rt.cachedRemotesAt = 0
-		rt.cachedPlotAt = 0
-		rt.nextPlotLookup = 0
-		rt.cachedPlot = nil
-		rt.remoteLookupCache = {}
+		runtime.cachedRemotesAt = 0
+		runtime.cachedPlotAt = 0
+		runtime.nextPlotLookup = 0
+		runtime.cachedPlot = nil
+		runtime.remoteLookupCache = {}
 		refreshRemotes()
 		updatePlotLists(protectedDropdown, upgradeDropdown)
 		notify("Runtime", "Remotes and plot cache refreshed.", 3)
@@ -3387,8 +3037,8 @@ recoveryGroup:CreateButton(
 recoveryGroup:CreateButton(
 	"Clear Webhook Cache",
 	function()
-		rt.seenWebhookGuids = {}
-		rt.seenWebhookOrder = {}
+		runtime.seenWebhookGuids = {}
+		runtime.seenWebhookOrder = {}
 		notify("Webhook", "Seen-item cache cleared.", 3)
 	end,
 	"Reset the seen-GUID list so previously sent webhook items can be sent again."
@@ -3426,82 +3076,6 @@ diagnosticsGroup:CreateButton(
 	end,
 	"Copy a debug summary (version, FPS, errors) to clipboard for bug reports."
 )
-local function runFullDiagnostics()
-	local results = {}
-	local function check(label, ok, detail)
-		table.insert(results, { label = label, ok = ok, detail = detail or "" })
-	end
-
-	check("Script Version", true, VERSION)
-	check("Executor", Executor.isKnown, Executor.name .. " (" .. (Executor.rawName or "") .. ")")
-	check("HTTP", Executor.hasHttp, requestFunction() and "Available" or "Unavailable")
-	check("Filesystem", Executor.hasFilesystem or false, writeFile and "RW Available" or "N/A")
-	check("Clipboard", Executor.hasClipboard or false, "Available")
-	check("Connections API", Executor.hasGetConn or false, "Available")
-	check("FPS", (rt.currentFps or 0) >= 15, tostring(rt.currentFps or "--"))
-	check("Performance Mode", true, rt.performanceMode or "Balanced")
-
-	local remoteCount = 0
-	for _, r in pairs(remotes) do
-		if r then remoteCount = remoteCount + 1 end
-	end
-	check("Remotes Found", remoteCount > 3, tostring(remoteCount) .. " remotes")
-	check("Kick Remote", not not remotes.kick, remotes.kick and remotes.kick.Name or "MISSING")
-	check("Collect Remote", not not remotes.collect, remotes.collect and remotes.collect.Name or "MISSING")
-	check("Place Remote", not not remotes.place, remotes.place and remotes.place.Name or "MISSING")
-
-	for key, mod in pairs(modules) do
-		check("Module: " .. tostring(key), not not mod, mod and "Loaded" or "nil")
-	end
-
-	local _, _, root = characterParts()
-	check("Character Valid", not not root, root and "OK" or "Dead/Respawning")
-	check("HubRunning", state.HubRunning == true, "Running")
-	check("Auto Update", not not env._AlBootStamp, "Hash-tracked: " .. tostring(env._AlBootStamp):sub(1, 8) .. "...")
-
-	if state.WebhookURL and state.WebhookURL ~= "" then
-		local norm, err = normalizeWebhookUrl(state.WebhookURL)
-		check("Webhook URL", not not norm, norm and "Valid" or err)
-	end
-
-	local envTest = getgenv()
-	check("Global State", not not envTest.Alleral_State, "Persistent")
-	check("Total Errors", totalLoggedErrors() == 0, tostring(totalLoggedErrors()) .. " total")
-	check("Session Errors", rt.seshErrs == 0, tostring(rt.seshErrs) .. " session")
-
-	local pass = 0
-	local fail = 0
-	for _, r in ipairs(results) do
-		if r.ok then pass = pass + 1 else fail = fail + 1 end
-	end
-	local summary = string.format("%d / %d checks passed", pass, pass + fail)
-	check("OVERALL", fail == 0, fail == 0 and "ALL PASSED" or (tostring(fail) .. " FAILURES"))
-
-	local reportLines = {}
-	for _, r in ipairs(results) do
-		local icon = r.ok and "[OK]" or "[FAIL]"
-		table.insert(reportLines, string.format("%s %s: %s", icon, r.label, r.detail))
-	end
-	local report = table.concat(reportLines, "\n")
-	if setClipboard then
-		pcall(setClipboard, report)
-	end
-
-	if diagnosticsStatus and diagnosticsStatus.Update then
-		diagnosticsStatus:Update("Overall", summary)
-		diagnosticsStatus:Update("Passed", tostring(pass))
-		diagnosticsStatus:Update("Failed", tostring(fail))
-		diagnosticsStatus:Update("Last Check", os.date("%H:%M:%S"))
-	end
-	notify("Diagnostics", summary, 5)
-end
-
-diagnosticsGroup:CreateButton(
-	"Run Full Diagnostics",
-	runFullDiagnostics,
-	"Test every feature — remotes, modules, executor APIs, webhooks — and report pass/fail. Also copies the report to clipboard."
-)
-diagnosticsGroup:CreateDivider()
 diagnosticsGroup:CreateButton(
 	"Refresh Status",
 	function()
@@ -3567,15 +3141,16 @@ tuningGroup:CreateSlider(
 	"How often the backpack is scanned to queue new tools for auto-favoriting."
 )
 
+-- AUTO KICK (primary toggle — goes first so it's immediately visible)
 kickGroup:CreateToggle(
 	"Auto Kick",
 	state.AFarm,
 	"Kick lucky blocks automatically. Moves to KickReady, fires the kick remote, and resets when a non-matching brainrot is detected.",
 	function(value)
 		state.AFarm = value
-		rt.autoKickSession = rt.autoKickSession + 1
-		rt.nextAutoKickReset = 0
-		rt.lastAutoKickActivity = tick()
+		runtime.autoKickSession = runtime.autoKickSession + 1
+		runtime.nextAutoKickReset = 0
+		runtime.lastAutoKickActivity = tick()
 		restoreCamera(select(2, characterParts()))
 		saveSettings()
 	end
@@ -3592,6 +3167,7 @@ kickGroup:CreateSlider(
 	"How fast the script teleports your character to the KickReady position each kick cycle. Higher = snappier movement."
 )
 kickGroup:CreateDivider()
+-- Kick power settings
 kickGroup:CreateDropdown(
 	"Minigame Accuracy",
 	{ "Bad", "Mid", "Good", "Great", "Excellent", "Perfect", "Cosmic" },
@@ -3619,14 +3195,16 @@ kickGroup:CreateSlider(
 		state.CustomKickPowerPercent = value
 		saveSettings()
 	end,
-	"Custom power as a percentage (0-100). Only applied when Power Scale Mode is Micro or Nano."
+	"Custom power as a percentage (0–100). Only applied when Power Scale Mode is Micro or Nano."
 )
 kickGroup:CreateDivider()
+-- Forward-declare so the toggle callback below can reference it before assignment
 local predictionStatus
+-- Live prediction display
 kickGroup:CreateToggle(
 	"Show Prediction",
 	state.APredict,
-	"Display the brainrot currently rolling in real-time - name, rarity, mutation, and CPS.",
+	"Display the brainrot currently rolling in real-time — name, rarity, mutation, and CPS.",
 	function(value)
 		state.APredict = value
 		saveSettings()
@@ -3649,25 +3227,24 @@ local sessionStatus = kickGroup:CreateStatus("Session", {
 	["Kicks/min"]= "0",
 	Matches      = "0",
 	Resets       = "0",
-	["Index Skips"] = "0",
 	["Best CPS"] = "--",
 })
 kickGroup:CreateButton(
 	"Reset Session Stats",
 	function()
-		rt.sessionStart    = tick()
-		rt.sessionKicks    = 0
-		rt.sessionMatches  = 0
-		rt.sessionResets   = 0
-		rt.sessionIndexSkips = 0
-		rt.sessionBestCps  = 0
-		rt.sessionBestName = "--"
-		rt.kickRateWindow  = {}
-		rt.kicksPerMin     = 0
+		runtime.sessionStart    = tick()
+		runtime.sessionKicks    = 0
+		runtime.sessionMatches  = 0
+		runtime.sessionResets   = 0
+		runtime.sessionBestCps  = 0
+		runtime.sessionBestName = "--"
+		runtime.kickRateWindow  = {}
+		runtime.kicksPerMin     = 0
 		notify("Session", "Stats reset.", 2)
 	end,
 	"Zero out kick/match/reset counters and restart the session timer."
 )
+-- Roll filters (what brainrots to keep vs. reset)
 filterGroup:AddDropdown("FilterBrainrot", {
 	Text = "Filter: Brainrot",
 	Values = gameData.BrainrotOptions,
@@ -3704,25 +3281,6 @@ filterGroup:AddDropdown("FilterMutation", {
 		saveSettings()
 	end,
 })
-
-filterGroup:CreateToggle(
-	"Index Only",
-	state.AIndexOnly,
-	"Only collect brainrots NOT already in your inventory or on your plot. Already-owned brainrots will be re-rolled (killed).",
-	function(value)
-		state.AIndexOnly = value
-		saveSettings()
-	end
-)
-filterGroup:CreateToggle(
-	"Humanize",
-	state.AHumanize,
-	"Add subtle variance to accuracy, power, movement path, and timing to avoid anti-cheat flags. Stays fast, just less robotic.",
-	function(value)
-		state.AHumanize = value
-		saveSettings()
-	end
-)
 
 trainGroup:CreateToggle(
 	"Auto Train",
@@ -3871,6 +3429,7 @@ upgradeGroup:CreateSlider(
 	"Seconds to wait between consecutive upgrade remote calls per slot."
 )
 
+-- Weight buying (most impactful — first)
 economyGroup:CreateToggle(
 	"Auto Buy Best Weight",
 	state.ABuyBest,
@@ -4076,6 +3635,7 @@ battleGroup:CreateSlider(
 	"Minimum number of other players needed in the lobby before it will be started."
 )
 
+-- Forward-declare so the toggle callback can reference them before they're assigned
 local masteryStatus
 local updateMasteryStatus
 
@@ -4181,7 +3741,7 @@ serverGroup:CreateButton(
 		local jobId = trim(state.JoinJobId)
 		jobId = jobId:match("gameInstanceId=([%w%-]+)") or jobId:match("([%w%-]+)")
 		if jobId and jobId ~= "" then
-			TeleSvc:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LocalPlayer)
 		else
 			notify("Alleral", "Failed to extract JobId.", 3)
 		end
@@ -4227,6 +3787,7 @@ webhookGroup:CreateInput(
 	"Must be a valid Discord webhook URL (https://discord.com/api/webhooks/...)."
 )
 webhookGroup:CreateDivider()
+-- Inventory alert filters
 webhookGroup:AddDropdown("WebhookBrainrot", {
 	Text = "Notify: Brainrot",
 	Values = gameData.BrainrotOptions,
@@ -4264,13 +3825,14 @@ webhookGroup:AddDropdown("WebhookMutation", {
 	end,
 })
 webhookGroup:CreateDivider()
+-- Inventory status tracker
 webhookGroup:CreateToggle(
 	"Auto Send Progress",
 	state.AutoStatusWebhook,
 	"Periodically send an inventory summary webhook listing counts by rarity.",
 	function(value)
 		state.AutoStatusWebhook = value
-		rt.nextStatusWebhook = tick() + (state.AutoStatusInterval * 60)
+		runtime.nextStatusWebhook = tick() + (state.AutoStatusInterval * 60)
 		saveSettings()
 	end
 )
@@ -4281,7 +3843,7 @@ webhookGroup:CreateSlider(
 	state.AutoStatusInterval,
 	function(value)
 		state.AutoStatusInterval = value
-		rt.nextStatusWebhook = tick() + (value * 60)
+		runtime.nextStatusWebhook = tick() + (value * 60)
 		saveSettings()
 	end,
 	"How many minutes between automatic inventory status sends."
@@ -4289,11 +3851,12 @@ webhookGroup:CreateSlider(
 webhookGroup:CreateButton(
 	"Send Status Now",
 	function()
-		rt.nextStatusWebhook = 0
+		runtime.nextStatusWebhook = 0
 	end,
 	"Force an immediate inventory summary webhook, bypassing the timer."
 )
 webhookGroup:CreateDivider()
+-- Status summary filters
 webhookGroup:AddDropdown("Status Brainrot", {
 	Text = "Status Filter: Brainrot",
 	Values = gameData.BrainrotOptions,
@@ -4328,11 +3891,11 @@ end
 local fpsFrames = 0
 local fpsStarted = tick()
 track(
-	RunSvc.Heartbeat:Connect(function()
+	RunService.Heartbeat:Connect(function()
 		fpsFrames = fpsFrames + 1
 		local now = tick()
 		if now - fpsStarted >= 1 then
-			rt.currentFps = math.floor(fpsFrames / math.max(now - fpsStarted, 0.01))
+			runtime.currentFps = math.floor(fpsFrames / math.max(now - fpsStarted, 0.01))
 			fpsFrames = 0
 			fpsStarted = now
 		end
@@ -4344,9 +3907,7 @@ checkGameBuild(false)
 
 task.spawn(function()
 	while state.HubRunning do
-		if starlight and (starlight.Minimized or not (starlight.Window and starlight.Window.Instance and starlight.Window.Instance.Parent)) then
-			task.wait(3)
-		elseif diagnosticsStatus and diagnosticsStatus.Update then
+		if diagnosticsStatus and diagnosticsStatus.Update then
 			refreshPerformanceMode()
 			local remoteCount = 0
 			for _, remote in pairs(remotes) do
@@ -4359,29 +3920,29 @@ task.spawn(function()
 				loopCount = loopCount + 1
 			end
 			diagnosticsStatus:Update("Executor", Executor.isKnown and Executor.name or ("? " .. (Executor.rawName ~= "" and ("(" .. Executor.rawName .. ")") or "unknown")))
-			diagnosticsStatus:Update("FPS", tostring(rt.currentFps or "--"))
-			diagnosticsStatus:Update("Mode", tostring(rt.performanceMode or "Balanced"))
+			diagnosticsStatus:Update("FPS", tostring(runtime.currentFps or "--"))
+			diagnosticsStatus:Update("Mode", tostring(runtime.performanceMode or "Balanced"))
 			diagnosticsStatus:Update("Loops", tostring(loopCount))
 			diagnosticsStatus:Update("Remotes", tostring(remoteCount))
-			local build = rt.gameBuild
+			local build = runtime.gameBuild
 			diagnosticsStatus:Update(
 				"Game Build",
 				build and ((build.Changed and "Changed" or "Current") .. " / v" .. tostring(build.PlaceVersion or "--")) or "--"
 			)
 			diagnosticsStatus:Update("Last Update", build and formatRobloxTimestamp(build.Updated) or "--")
 			diagnosticsStatus:Update("Error Count", tostring(totalLoggedErrors()))
-			diagnosticsStatus:Update("Last Error", rt.lastError or rt.lastLoopError or "--")
-			diagnosticsStatus:Update("Recent Error", rt.errLog[1] or "--")
+			diagnosticsStatus:Update("Last Error", runtime.lastError or runtime.lastLoopError or "--")
+			diagnosticsStatus:Update("Recent Error", runtime.errorLog[1] or "--")
 
+			-- Session stats (update them here since this loop already runs every 2s)
 			if sessionStatus and sessionStatus.Update then
-				local elapsed = math.floor(tick() - (rt.sessionStart or tick()))
+				local elapsed = math.floor(tick() - (runtime.sessionStart or tick()))
 				sessionStatus:Update("Time",    string.format("%d:%02d", math.floor(elapsed / 60), elapsed % 60))
-				sessionStatus:Update("Kicks",   tostring(rt.sessionKicks  or 0))
-				sessionStatus:Update("Kicks/min", tostring(rt.kicksPerMin or 0))
-				sessionStatus:Update("Matches", tostring(rt.sessionMatches or 0))
-				sessionStatus:Update("Resets",  tostring(rt.sessionResets  or 0))
-				sessionStatus:Update("Index Skips", tostring(rt.sessionIndexSkips or 0))
-				local bestCps = rt.sessionBestCps or 0
+				sessionStatus:Update("Kicks",   tostring(runtime.sessionKicks  or 0))
+				sessionStatus:Update("Kicks/min", tostring(runtime.kicksPerMin or 0))
+				sessionStatus:Update("Matches", tostring(runtime.sessionMatches or 0))
+				sessionStatus:Update("Resets",  tostring(runtime.sessionResets  or 0))
+				local bestCps = runtime.sessionBestCps or 0
 				sessionStatus:Update("Best CPS", bestCps > 0 and (formatNumber(bestCps) .. "/s") or "--")
 			end
 		end
@@ -4390,7 +3951,7 @@ task.spawn(function()
 end)
 
 track(
-	LP.Idled:Connect(function()
+	LocalPlayer.Idled:Connect(function()
 		if not state.AntiAFK then
 			return
 		end
@@ -4398,7 +3959,7 @@ track(
 		local disabledIdle = false
 		if idleConnections then
 			safeCall("AntiAfkConnections", function()
-				for _, connection in ipairs(idleConnections(LP.Idled)) do
+				for _, connection in ipairs(idleConnections(LocalPlayer.Idled)) do
 					if connection.Disable then
 						connection:Disable()
 						disabledIdle = true
@@ -4409,17 +3970,17 @@ track(
 		if disabledIdle then
 			return
 		end
-		safeCall("AntiAfkVUser", function()
-			VUser:CaptureController()
-			VUser:ClickButton2(Vector2.new(0, 0))
+		safeCall("AntiAfkVirtualUser", function()
+			VirtualUser:CaptureController()
+			VirtualUser:ClickButton2(Vector2.new(0, 0))
 		end)
 	end),
 	"AntiAfk"
 )
 
-if LP.Backpack then
+if LocalPlayer.Backpack then
 	track(
-		LP.Backpack.ChildAdded:Connect(function(child)
+		LocalPlayer.Backpack.ChildAdded:Connect(function(child)
 			if not state.AAutoFav and (not state.AWebhook or state.WebhookURL == "") then
 				return
 			end
@@ -4432,8 +3993,8 @@ if LP.Backpack then
 	)
 end
 track(
-	LP.CharacterAdded:Connect(function(character)
-		rt.cachedPlot = nil
+	LocalPlayer.CharacterAdded:Connect(function(character)
+		runtime.cachedPlot = nil
 		restoreCamera(character:WaitForChild("Humanoid", 5))
 		track(
 			character.ChildAdded:Connect(function(child)
@@ -4450,9 +4011,9 @@ track(
 	end),
 	"CharacterAdded"
 )
-if LP.Character then
+if LocalPlayer.Character then
 	track(
-		LP.Character.ChildAdded:Connect(function(child)
+		LocalPlayer.Character.ChildAdded:Connect(function(child)
 			if not state.AAutoFav and (not state.AWebhook or state.WebhookURL == "") then
 				return
 			end
@@ -4474,7 +4035,7 @@ makeSupervisor("Prediction", 1, function()
 	if not state.APredict or not predictionStatus then
 		return
 	end
-	local inGame = LP:GetAttribute("InGame") or ""
+	local inGame = LocalPlayer:GetAttribute("InGame") or ""
 	if inGame == "" then
 		predictionStatus:Update("Brainrot",    "--")
 		predictionStatus:Update("Rarity",      "--")
@@ -4488,10 +4049,17 @@ makeSupervisor("Prediction", 1, function()
 	local parts = string.split(inGame, ",")
 	local name     = trim(parts[1] or "Unknown")
 	local mutation = normalizeMutation(parts[2] or "None")
-	local rarity   = rarityFor(name) or "Unknown"
+	-- Some game versions embed rarity at index 4 (index 3 = level sent by server)
+	local serverLevel  = tonumber(parts[3])
+	local serverRarity = parts[4] and trim(parts[4]) ~= "" and trim(parts[4]) or nil
+	local rarity   = rarityFor(name, serverRarity or "Unknown")
 
+	-- CPS at level 1 (a fresh drop always arrives at level 1)
 	local cps1 = brainrotCps(name, mutation, 1)
 
+	-- Net-gain: difference between this brainrot's level-1 CPS and whatever
+	-- is currently the weakest slot in the plot. Tells you at a glance whether
+	-- placing it would actually help.
 	local netGainStr = "?"
 	local plot = findPlot()
 	if cps1 and plot and plot:FindFirstChild("Slots") then
@@ -4522,9 +4090,10 @@ makeSupervisor("Prediction", 1, function()
 		end
 	end
 
-	if cps1 and cps1 > (rt.sessionBestCps or 0) then
-		rt.sessionBestCps = cps1
-		rt.sessionBestName = name
+	-- Track best match seen this session
+	if cps1 and cps1 > (runtime.sessionBestCps or 0) then
+		runtime.sessionBestCps = cps1
+		runtime.sessionBestName = name
 	end
 
 	local matchesFilter = mainFilterMatches(name, mutation)
@@ -4536,15 +4105,9 @@ makeSupervisor("Prediction", 1, function()
 	predictionStatus:Update("Filter",     matchesFilter and "Keep" or "Skip")
 end)
 
-	makeSupervisor("AutoKick", 0.3, function()
+makeSupervisor("AutoKick", 0.3, function()
 	local battleStatus = currentBattleStatus()
 	local battleActive = state.AAutoBattle and (battleStatus == "Battle" or battleTimerVisible())
-	if rt.battleCooldownUntil and tick() < rt.battleCooldownUntil then
-		return
-	end
-	if state.AAutoKickStyle then
-		equipKickStyle(state.TargetKickStyle)
-	end
 	if not state.AFarm and not battleActive then
 		return
 	end
@@ -4556,18 +4119,11 @@ end)
 	if not character or not humanoid or not root or humanoid.Health <= 0 then
 		return
 	end
-	if (root.Position.Y < -10 or root.Position.Magnitude < 1) and humanoid.Health > 0 then
-		task.wait(0.5)
-		character, humanoid, root = characterParts()
-		if not character or not humanoid or not root or humanoid.Health <= 0 then
-			return
-		end
-	end
-	local kickReady = Ws:FindFirstChild("Areas") and Ws.Areas:FindFirstChild("KickReady")
+	local kickReady = Workspace:FindFirstChild("Areas") and Workspace.Areas:FindFirstChild("KickReady")
 	if not kickReady then
 		return
 	end
-	local camera = Ws.CurrentCamera
+	local camera = Workspace.CurrentCamera
 	if camera and camera.CameraSubject ~= humanoid then
 		restoreCamera(humanoid)
 	end
@@ -4578,10 +4134,10 @@ end)
 	elseif battleStatus == "Lobby" or battleStatus == "Create" then
 		return
 	end
-	rt.lastAutoKickActivity = tick()
-	local wavesFolder = Ws:FindFirstChild("Waves")
+	runtime.lastAutoKickActivity = tick()
+	local wavesFolder = Workspace:FindFirstChild("Waves")
 	local hasWave = wavesFolder and #wavesFolder:GetChildren() > 0
-	local inGame = LP:GetAttribute("InGame") or ""
+	local inGame = LocalPlayer:GetAttribute("InGame") or ""
 	if hasWave and inGame ~= "" then
 		local parts = string.split(inGame, ",")
 		local shouldReset = true
@@ -4589,20 +4145,15 @@ end)
 			local brainrot = trim(parts[index] or "")
 			local mutation = normalizeMutation(parts[index + 1] or "None")
 			if brainrot == "" or brainrot == "Unknown" or mainFilterMatches(brainrot, mutation) then
-					if state.AIndexOnly and brainrot ~= "" and brainrot ~= "Unknown" and isBrainrotOwned(brainrot) then
-						rt.lastIndexSkip = tick()
-						rt.sessionIndexSkips = (rt.sessionIndexSkips or 0) + 1
-					else
-						shouldReset = false
-						rt.lastAutoKickMatch = tick()
-						rt.sessionMatches = (rt.sessionMatches or 0) + 1
-						break
-					end
+					shouldReset = false
+					runtime.lastAutoKickMatch = tick()
+					runtime.sessionMatches = (runtime.sessionMatches or 0) + 1
+					break
 			end
 		end
-		if shouldReset and tick() >= rt.nextAutoKickReset and tick() - rt.lastAutoKickMatch > 5 then
-			rt.nextAutoKickReset = tick() + 10
-			rt.sessionResets = (rt.sessionResets or 0) + 1
+		if shouldReset and tick() >= runtime.nextAutoKickReset and tick() - runtime.lastAutoKickMatch > 5 then
+			runtime.nextAutoKickReset = tick() + 10
+			runtime.sessionResets = (runtime.sessionResets or 0) + 1
 			restoreCamera(humanoid)
 			humanoid.Health = 0
 			return
@@ -4613,21 +4164,11 @@ end)
 					modules.kickService:SlowMode(false)
 				end
 			end)
-			if state.AHumanize then
-				task.wait(humanize(0, 0.02))
-			end
 			humanoid.PlatformStand = true
 			humanoid.MaxSlopeAngle = 89
-			local targetOffset = CFrame.new(0, -1.5, 0)
-			if state.AHumanize then
-				targetOffset = targetOffset * CFrame.new(humanize(0, 0.6), 0, humanize(0, 0.6))
-			end
-			fastMove(root, kickReady.CFrame * targetOffset, state.VolcanoTweenSpeed)
+			fastMove(root, kickReady.CFrame * CFrame.new(0, -1.5, 0), state.VolcanoTweenSpeed)
 			humanoid.PlatformStand = false
 			humanoid.HipHeight = humanoid:GetAttribute("DefaultHipHeight") or humanoid.HipHeight
-			if state.AHumanize then
-				task.wait(humanize(0, 0.015))
-			end
 			safeCall("KickSlowModeOn", function()
 				if modules.kickService and modules.kickService.SlowMode then
 					modules.kickService:SlowMode(true)
@@ -4642,13 +4183,10 @@ end)
 		kickReady.Position.Z
 	)
 	if horizontal.Magnitude > 3 then
-		local snapTarget = kickReady.CFrame * CFrame.new(0, 3 + (state.AHumanize and humanize(0, 1.5) or 0), 0)
-		if root.Position.Y > -5 then
-			root.CFrame = snapTarget
-		end
+		root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
 		return
 	end
-	local gui = LP:FindFirstChild("PlayerGui")
+	local gui = LocalPlayer:FindFirstChild("PlayerGui")
 	local hud = gui and gui:FindFirstChild("HUD")
 	local kickButton = hud and hud:FindFirstChild("KickButton")
 	local visible = kickButton and kickButton.Visible
@@ -4656,20 +4194,18 @@ end)
 		visible = true
 	end
 	if visible and remotes.kick then
-		if state.AHumanize then
-			task.wait(humanize(0, 0.025))
-		end
 		local accuracy, power = kickPower()
 		safeCall("AutoKickRemote", function()
 			remotes.kick:FireServer(accuracy, power)
 		end)
-		rt.sessionKicks = (rt.sessionKicks or 0) + 1
+		runtime.sessionKicks = (runtime.sessionKicks or 0) + 1
+		-- sliding-window kicks-per-minute
 		local _now = tick()
-		table.insert(rt.kickRateWindow, _now)
-		while rt.kickRateWindow[1] and _now - rt.kickRateWindow[1] > 60 do
-			table.remove(rt.kickRateWindow, 1)
+		table.insert(runtime.kickRateWindow, _now)
+		while runtime.kickRateWindow[1] and _now - runtime.kickRateWindow[1] > 60 do
+			table.remove(runtime.kickRateWindow, 1)
 		end
-		rt.kicksPerMin = #rt.kickRateWindow
+		runtime.kicksPerMin = #runtime.kickRateWindow
 	end
 end)
 
@@ -4685,7 +4221,7 @@ makeSupervisor("Train", 0.75, function()
 		return
 	end
 	local tool = equipBestOwnedWeight()
-	if tool and tool.Parent == LP.Character then
+	if tool and tool.Parent == LocalPlayer.Character then
 		safeCall("TrainToolActivate", function()
 			tool:Activate()
 		end)
@@ -4701,7 +4237,7 @@ makeSupervisor("AutoClaim2x", 2, function()
 	if not (state.A2xTrain or state.ATrainCollect) or state.IsFlashCollecting or not connectionFetcher then
 		return
 	end
-	local gui = LP:FindFirstChild("PlayerGui")
+	local gui = LocalPlayer:FindFirstChild("PlayerGui")
 	local kickUpgrades = gui and gui:FindFirstChild("KickUpgrades")
 	if not kickUpgrades then
 		return
@@ -4721,14 +4257,17 @@ makeSupervisor("AutoClaim2x", 2, function()
 end)
 
 makeSupervisor("CollectCash", 1.5, function()
-	if not state.ACollect then
+	local battleStatus = currentBattleStatus()
+	local safeBattleCollect = state.AAutoBattle
+		and (battleStatus == "Lobby" or battleStatus == "Create" or battleStatus == nil)
+	if not state.ACollect and not safeBattleCollect then
 		return
 	end
-	rt.nextCollect = rt.nextCollect or 0
-	if tick() < rt.nextCollect then
+	runtime.nextCollect = runtime.nextCollect or 0
+	if tick() < runtime.nextCollect then
 		return
 	end
-	rt.nextCollect = tick() + state.CollectDelay
+	runtime.nextCollect = tick() + state.CollectDelay
 	collectFromPlot()
 end)
 
@@ -4741,16 +4280,16 @@ makeSupervisor("TrainCollect", 1, function()
 		return
 	end
 	state.IsFlashCollecting = true
-	rt.flashCollectSession = rt.flashCollectSession + 1
-	local session = rt.flashCollectSession
+	runtime.flashCollectSession = runtime.flashCollectSession + 1
+	local session = runtime.flashCollectSession
 	task.delay(20, function()
-		if state.IsFlashCollecting and rt.flashCollectSession == session then
+		if state.IsFlashCollecting and runtime.flashCollectSession == session then
 			state.IsFlashCollecting = false
 			state.NextFlashCollect = tick() + 10
 		end
 	end)
 	local oldCFrame = state.TrainAnchorCFrame or root.CFrame
-	local tool = LP.Character and LP.Character:FindFirstChildOfClass("Tool")
+	local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
 	local toolName = tool and tool.Name
 	safeCall("TrainCollectUnequip", function()
 		humanoid:UnequipTools()
@@ -4758,9 +4297,9 @@ makeSupervisor("TrainCollect", 1, function()
 	task.wait(0.15)
 	collectFromPlot()
 	root.CFrame = oldCFrame
-	if toolName and LP.Backpack and LP.Backpack:FindFirstChild(toolName) then
+	if toolName and LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild(toolName) then
 		safeCall("TrainCollectReequip", function()
-			humanoid:EquipTool(LP.Backpack[toolName])
+			humanoid:EquipTool(LocalPlayer.Backpack[toolName])
 		end)
 	end
 	state.NextFlashCollect = tick() + (state.TrainCollectDelay * 60)
@@ -4773,9 +4312,9 @@ end)
 
 makeSupervisor("Economy", 2, function()
 	refreshRemotes()
-	if state.ABuySpeed and tick() >= (rt.nextSpeedBuyAttempt or 0) then
+	if state.ABuySpeed and tick() >= (runtime.nextSpeedBuyAttempt or 0) then
 		if not buySpeedUpgrade() then
-			rt.nextSpeedBuyAttempt = tick() + 5
+			runtime.nextSpeedBuyAttempt = tick() + 5
 		end
 	end
 	if state.ABuyBest then
@@ -4792,6 +4331,9 @@ makeSupervisor("Economy", 2, function()
 		safeCall("AutoPlotUpgrade", function()
 			remotes.plotUpgrade:FireServer()
 		end)
+	end
+	if state.AAutoKickStyle then
+		equipKickStyle(state.TargetKickStyle)
 	end
 end)
 
@@ -4831,11 +4373,11 @@ makeSupervisor("AutoFavorite", 4, function()
 		return
 	end
 	refreshRemotes()
-	if tick() >= (rt.nextFavoriteScan or 0) then
-		rt.nextFavoriteScan = tick() + math.max(4, tonumber(state.FavoriteScanInterval) or 8)
+	if tick() >= (runtime.nextFavoriteScan or 0) then
+		runtime.nextFavoriteScan = tick() + math.max(4, tonumber(state.FavoriteScanInterval) or 8)
 		scanTools()
 	end
-	local guid = table.remove(rt.favoriteQueue, 1)
+	local guid = table.remove(runtime.favoriteQueue, 1)
 	if not guid then
 		return
 	end
@@ -4843,24 +4385,24 @@ makeSupervisor("AutoFavorite", 4, function()
 		if remotes.toggleFavorite then
 			remotes.toggleFavorite:FireServer(guid)
 		else
-			local network = RS and RS.Shared and RS.Shared.Packages and RS.Shared.Packages.Network and require(RS.Shared.Packages.Network)
+			local network = require(ReplicatedStorage.Shared.Packages.Network)
 			network.FireServer("ToggleFav", guid)
 		end
 	end)
 end)
 
 makeSupervisor("WebhookStatus", 5, function()
-	if not state.AutoStatusWebhook and rt.nextStatusWebhook ~= 0 then
+	if not state.AutoStatusWebhook and runtime.nextStatusWebhook ~= 0 then
 		return
 	end
 	if state.WebhookURL == "" then
 		return
 	end
-	rt.nextStatusWebhook = rt.nextStatusWebhook or (tick() + state.AutoStatusInterval * 60)
-	if tick() < rt.nextStatusWebhook then
+	runtime.nextStatusWebhook = runtime.nextStatusWebhook or (tick() + state.AutoStatusInterval * 60)
+	if tick() < runtime.nextStatusWebhook then
 		return
 	end
-	rt.nextStatusWebhook = tick() + state.AutoStatusInterval * 60
+	runtime.nextStatusWebhook = tick() + state.AutoStatusInterval * 60
 	local counts = {}
 	local total = 0
 	local function addTool(tool)
@@ -4877,13 +4419,13 @@ makeSupervisor("WebhookStatus", 5, function()
 		counts[rarity] = (counts[rarity] or 0) + 1
 		total = total + 1
 	end
-	if LP.Backpack then
-		for _, tool in ipairs(LP.Backpack:GetChildren()) do
+	if LocalPlayer.Backpack then
+		for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
 			addTool(tool)
 		end
 	end
-	if LP.Character then
-		for _, tool in ipairs(LP.Character:GetChildren()) do
+	if LocalPlayer.Character then
+		for _, tool in ipairs(LocalPlayer.Character:GetChildren()) do
 			addTool(tool)
 		end
 	end
@@ -4919,38 +4461,31 @@ makeSupervisor("Battle", 4, function()
 	refreshRemotes()
 	local status = currentBattleStatus()
 
-	if rt.battleCooldownUntil and tick() < rt.battleCooldownUntil then
-		return
-	end
-
-	if rt.lastBattleStatus == "Battle" and (status == nil or status == "None") then
-		rt.battleCooldownUntil = tick() + 20
-		rt.lastBattleStatus = nil
-		return
-	end
-	rt.lastBattleStatus = status
-
+	-- Not in any battle state: try to create a new lobby
 	if status == nil and remotes.battleCreate then
-		if tick() < (rt.nextBattleCreate or 0) then
+		if tick() < (runtime.nextBattleCreate or 0) then
 			return
 		end
-		rt.nextBattleCreate = tick() + 8
+		runtime.nextBattleCreate = tick() + 8  -- longer cooldown avoids spam
 		task.spawn(function()
+			-- battleCreate is a RemoteEvent (rev_bs_battle_create), use FireServer
 			safeCall("BattleCreate", function()
-				fireRemote(remotes.battleCreate, state.BattleGamepass, tonumber(state.BattleRounds) or 3)
+				fireRemote(remotes.battleCreate,
+					{ GP = state.BattleGamepass, R = tonumber(state.BattleRounds) or 3 })
 			end)
-			rt.cachedBattleStatusAt = 0
 		end)
 		return
 	end
 
+	-- In the lobby: invite all players and start when ready
 	if status == "Lobby" or status == "GP" then
-		if remotes.battleInvite and tick() >= (rt.nextBattleInvite or 0) then
-			rt.nextBattleInvite = tick() + 5
+		if remotes.battleInvite and tick() >= (runtime.nextBattleInvite or 0) then
+			runtime.nextBattleInvite = tick() + 5
 			for _, player in ipairs(Players:GetPlayers()) do
-				if player ~= LP then
+				if player ~= LocalPlayer then
 					task.spawn(function()
 						safeCall("BattleInvite", function()
+							-- battleInvite is a RemoteEvent, use FireServer
 							fireRemote(remotes.battleInvite, player)
 						end)
 					end)
@@ -4959,16 +4494,17 @@ makeSupervisor("Battle", 4, function()
 			end
 		end
 
+		-- Count other players shown in the KickBattles lobby GUI
 		local playersInLobby = 0
 		local countedPlayers = {}
-		local playerGui = LP:FindFirstChild("PlayerGui")
+		local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
 		local battleGui = playerGui and playerGui:FindFirstChild("KickBattles")
 		if battleGui then
 			for _, label in ipairs(battleGui:GetDescendants()) do
 				if label:IsA("TextLabel") and label.Visible and label.Text ~= "" then
 					for _, player in ipairs(Players:GetPlayers()) do
 						if
-							player ~= LP
+							player ~= LocalPlayer
 							and (label.Text:find(player.DisplayName, 1, true)
 								or label.Text:find(player.Name, 1, true))
 						then
@@ -4982,6 +4518,7 @@ makeSupervisor("Battle", 4, function()
 				end
 			end
 		end
+		-- Also count by Players service as a fallback (if GUI count is unreliable)
 		if playersInLobby == 0 then
 			playersInLobby = math.max(0, #Players:GetPlayers() - 1)
 		end
@@ -4989,9 +4526,9 @@ makeSupervisor("Battle", 4, function()
 		if
 			remotes.battleStart
 			and playersInLobby >= (state.BattleMinPlayers - 1)
-			and tick() >= (rt.nextBattleStart or 0)
+			and tick() >= (runtime.nextBattleStart or 0)
 		then
-			rt.nextBattleStart = tick() + 4
+			runtime.nextBattleStart = tick() + 4
 			safeCall("BattleStart", function()
 				remotes.battleStart:FireServer()
 			end)
@@ -5004,7 +4541,7 @@ makeSupervisor("AcceptBattle", 4, function()
 	if not state.AAutoAcceptBattle or not connectionFetcher then
 		return
 	end
-	local gui = LP:FindFirstChild("PlayerGui")
+	local gui = LocalPlayer:FindFirstChild("PlayerGui")
 	if not gui then
 		return
 	end
@@ -5036,72 +4573,111 @@ end)
 
 makeSupervisor("Mastery", 1, function()
 	if not state.AAutoMastery then
-		rt.masteryBusy = false
+		runtime.masteryBusy = false
 		return
 	end
-	if rt.masteryBusy or tick() < (rt.nextMasteryAction or 0) then
+	if runtime.masteryBusy or tick() < (runtime.nextMasteryAction or 0) then
 		return
 	end
 	if state.AFarm then
 		updateMasteryStatus("Paused - Auto Kick On")
-		rt.nextMasteryAction = tick() + 2
+		runtime.nextMasteryAction = tick() + 2
 		return
 	end
-	rt.masteryBusy = true
+	runtime.masteryBusy = true
 
 	local function finish(delay)
-		rt.nextMasteryAction = tick() + (delay or 0.6)
-		rt.masteryBusy = false
+		runtime.nextMasteryAction = tick() + (delay or 0.6)
+		runtime.masteryBusy = false
 	end
 
+	-- Wrap the entire body so masteryBusy ALWAYS gets cleared even if something
+	-- throws. Without this guard a single error locks mastery forever.
 	local _bodyOk, _bodyErr = pcall(function()
 		updateMasteryStatus("Scanning...")
 		refreshRemotes()
 		local _, humanoid, root = characterParts()
-		local kickReady = Ws:FindFirstChild("Areas") and Ws.Areas:FindFirstChild("KickReady")
+		local kickReady = Workspace:FindFirstChild("Areas") and Workspace.Areas:FindFirstChild("KickReady")
 		if not humanoid or not root or humanoid.Health <= 0 or not kickReady or not remotes.kick then
 			updateMasteryStatus("Waiting")
 			finish(1)
 			return
 		end
-		local inGame = LP:GetAttribute("InGame") or ""
-		if inGame ~= "" then
-			updateMasteryStatus("Resetting")
+		local inGame = LocalPlayer:GetAttribute("InGame") or ""
+		if inGame == "" then
+			if (root.Position - kickReady.Position).Magnitude > 5 then
+				updateMasteryStatus("Moving")
+				root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
+				finish(0.4)
+			else
+				updateMasteryStatus("Kicking...")
+				safeCall("MasteryKick", function()
+					remotes.kick:FireServer(0, (state.MasteryKickPower or 50) / 100)
+				end)
+				runtime.masteryKickCount = (runtime.masteryKickCount or 0) + 1
+				finish(1.2)
+			end
+		elseif state.MasteryResetMethod == "TP" then
+			updateMasteryStatus("Resetting (TP)")
+			local timeout = tick() + 4
+			while state.HubRunning and state.AAutoMastery and tick() < timeout do
+				if (LocalPlayer:GetAttribute("InGame") or "") == "" then
+					break
+				end
+				root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
+				root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+				task.wait(0.05)
+			end
+			-- TP out of the minigame arena entirely
+			root.CFrame = kickReady.CFrame * CFrame.new(0, -8, 0)
+			task.wait(0.2)
+			root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
+			finish(1)
+		else
+			updateMasteryStatus("Resetting (Died)")
+			local gui2 = LocalPlayer:FindFirstChild("PlayerGui")
+			-- KickMinigame is the minigame GUI that appears while a round is active
+			local minigame = gui2 and (
+				gui2:FindFirstChild("KickMinigame")
+				or gui2:FindFirstChild("MinigameUI")
+				or gui2:FindFirstChild("Minigame")
+			)
+			local timeout = tick() + 3
+			if minigame then
+				-- Wait for minigame to become enabled (round started)
+				while not minigame.Enabled and tick() < timeout and state.AAutoMastery do
+					task.wait(0.05)
+				end
+				-- Wait for minigame to finish
+				while minigame.Enabled and tick() < timeout and state.AAutoMastery do
+					task.wait(0.05)
+				end
+			else
+				task.wait(1.5)
+			end
+			restoreCamera(humanoid)
 			humanoid.Health = 0
-			local oldCharacter = LP.Character
+			updateMasteryStatus("Resetting (Died)", { ["Last Reset"] = os.date("%H:%M:%S") })
+			local oldCharacter = LocalPlayer.Character
 			local respawnTimeout = tick() + 10
 			while
 				state.HubRunning
 				and state.AAutoMastery
-				and LP.Character == oldCharacter
+				and LocalPlayer.Character == oldCharacter
 				and tick() < respawnTimeout
 			do
 				task.wait(0.1)
 			end
-			local newCharacter = LP.Character
-			local newRoot = newCharacter and newCharacter:WaitForChild("HumanoidRootPart", 5)
-			local newHumanoid = newCharacter and newCharacter:WaitForChild("Humanoid", 5)
-			if newRoot and newHumanoid then
-				task.wait(0.2)
-				newRoot.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
-				restoreCamera(newHumanoid)
-			end
-			finish(1.5)
-			return
 		end
-		if (root.Position - kickReady.Position).Magnitude > 5 then
-			updateMasteryStatus("Moving")
-			root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
-			finish(0.4)
-			return
+		local newCharacter = LocalPlayer.Character
+		local newRoot = newCharacter and newCharacter:WaitForChild("HumanoidRootPart", 5)
+		local newHumanoid = newCharacter and newCharacter:WaitForChild("Humanoid", 5)
+		if newRoot and newHumanoid then
+			task.wait(0.2)
+			newRoot.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
+			restoreCamera(newHumanoid)
 		end
-		updateMasteryStatus("Kicking...")
-		safeCall("MasteryKick", function()
-			local accuracy, power = kickPower()
-			remotes.kick:FireServer(accuracy, power)
-		end)
-		rt.masteryKickCount = (rt.masteryKickCount or 0) + 1
-		finish(1.2)
+		finish(1.5)
 	end)
 end)
 
@@ -5109,11 +4685,10 @@ local function resolveWeather(name)
 	if not modules.sacrificeData or not modules.sacrificeData.Recipes then
 		return nil
 	end
-	name = tostring(name or ""):lower()
-	for key, recipe in pairs(modules.sacrificeData.Recipes) do
-		local recipeName = tostring(type(key) == "string" and key or recipe.Name or recipe.RecipeName or key)
-		if recipeName:lower() == name then
-			return recipeName
+	name = tostring(name or "")
+	for recipe in pairs(modules.sacrificeData.Recipes) do
+		if recipe:lower() == name:lower() then
+			return recipe
 		end
 	end
 	return nil
@@ -5123,34 +4698,14 @@ local function isWeatherActive(recipe)
 	if not recipe then
 		return false
 	end
-	if modules.weatherService then
-		local ok, result = pcall(function()
-			local events = modules.weatherService.Events
-			if events then
-				local expiresAt = events[recipe]
-				if tonumber(expiresAt) and tonumber(expiresAt) > os.time() then
-					return true
-				end
-			end
-			local active = modules.weatherService.ActiveWeather
-			if active then
-				return active[recipe] == true
-			end
-			if modules.weatherService.GetActiveWeather then
-				local list = modules.weatherService:GetActiveWeather()
-				if type(list) == "table" then
-					for _, name in ipairs(list) do
-						if tostring(name):lower() == tostring(recipe):lower() then
-							return true
-						end
-					end
-				end
-			end
-			return false
-		end)
-		if ok then
-			return result
+	if modules.weatherService and modules.weatherService.Events then
+		local expiresAt = modules.weatherService.Events[recipe]
+		if tonumber(expiresAt) and tonumber(expiresAt) > os.time() then
+			return true
 		end
+	end
+	if modules.weatherService and modules.weatherService.ActiveWeather then
+		return modules.weatherService.ActiveWeather[recipe] == true
 	end
 	return false
 end
@@ -5171,8 +4726,8 @@ local function sacrificeTools()
 			end
 		end
 	end
-	add(LP.Backpack)
-	add(LP.Character)
+	add(LocalPlayer.Backpack)
+	add(LocalPlayer.Character)
 	return tools
 end
 
@@ -5217,116 +4772,9 @@ makeSupervisor("Weather", 5, function()
 	end
 	if not isWeatherActive(recipe) and canSummonWeather(recipe) then
 		safeCall("SummonWeather", function()
-			local ok, err = pcall(function()
-				remotes.weather:FireServer(recipe)
-			end)
-			if not ok then
-				pcall(function()
-					remotes.weather:FireServer(unpack(sacrificeTools()))
-				end)
-			end
+			remotes.weather:FireServer(recipe)
 		end)
 		task.wait(5)
-	end
-end)
-
-makeSupervisor("AutoAntiCheat", 4, function()
-	refreshRemotes()
-	local _, humanoid, root = characterParts()
-	if not humanoid or not root then
-		return
-	end
-	if root.Position.Y < -50 and humanoid.Health > 0 then
-		humanoid.Health = 0
-	end
-	local gui = LP:FindFirstChild("PlayerGui")
-	if gui then
-		for _, v in ipairs(gui:GetDescendants()) do
-			if v:IsA("Frame") or v:IsA("TextLabel") then
-				local text = (v:FindFirstChildOfClass("TextLabel") or v).Text or v.Name
-				local lt = text:lower()
-				if lt:find("ban") or lt:find("kick") or lt:find("detect") or lt:find("warning") or lt:find("suspicious") or lt:find("flag") or lt:find("alert") then
-					local vis = v.Visible or (v:FindFirstChildOfClass("BoolValue") and v:FindFirstChildOfClass("BoolValue").Value)
-					if vis then
-						v.Visible = false
-						rt.lastAntiCheatTrigger = tick()
-						rt.acTriggerCount = rt.acTriggerCount + 1
-					end
-				end
-			end
-		end
-	end
-	if rt.lastAntiCheatTrigger and tick() - rt.lastAntiCheatTrigger < 10 then
-		task.wait(humanize(0.5, 0.3))
-	end
-end)
-
-do
-	local staffNames = {
-		["admin"] = true,
-		["mod"] = true,
-		["staff"] = true,
-		["owner"] = true,
-		["dev"] = true,
-		["developer"] = true,
-		["creator"] = true,
-	}
-	rt.staffDetected = false
-	rt.staffDetectedName = nil
-	rt.staffDetectionTime = 0
-	rt.staffNotifyCooldown = 0
-
-	local function checkPlayer(player)
-		if not player then return end
-		local name = player.Name:lower()
-		local display = player.DisplayName:lower()
-		if staffNames[name] or staffNames[display] then
-			rt.staffDetected = true
-			rt.staffDetectedName = player.Name
-			rt.staffDetectionTime = tick()
-		end
-	end
-
-	for _, player in ipairs(Players:GetPlayers()) do
-		checkPlayer(player)
-	end
-
-	track(Plrs.PlayerAdded:Connect(function(player)
-		checkPlayer(player)
-	end), "StaffDetectorAdded")
-
-	track(Plrs.PlayerRemoving:Connect(function(player)
-		if rt.staffDetectedName == player.Name then
-			rt.staffDetected = false
-			rt.staffDetectedName = nil
-			rt.staffDetectionTime = 0
-		end
-	end), "StaffDetectorRemoved")
-end
-
-makeSupervisor("StaffWatch", 2, function()
-	local sw = Hub._StarlightWindow
-	if rt.staffDetected then
-		if sw and not starlight.Minimized then
-			if tick() >= rt.staffNotifyCooldown then
-				rt.staffNotifyCooldown = tick() + 30
-				notify("Staff Detected", rt.staffDetectedName .. " joined! Hiding UI.", 5)
-			end
-			if sw.Instance then
-				sw.Instance.Visible = false
-			end
-			starlight.Minimized = true
-		end
-		if state.AFarm or state.AAutoMastery or state.AAutoBattle then
-			state.AFarm = false
-			state.AAutoMastery = false
-			state.AAutoBattle = false
-		end
-	elseif starlight.Minimized and not rt.staffDetected then
-		if sw and sw.Instance then
-			sw.Instance.Visible = true
-		end
-		starlight.Minimized = false
 	end
 end)
 
@@ -5334,52 +4782,4 @@ if state.AAutoFav then
 	scanTools()
 end
 
-Hub:RegisterGame({
-	name = "Kick a Lucky Block",
-	placeIds = { 89469502395769 },
-})
-
-coroutine.wrap(function()
-	while state.HubRunning do
-		if starlight and starlight.Minimized then
-			task.wait(5)
-		elseif Hub._DashboardStatus and Hub._DashboardStatus.Update then
-			local elapsed = math.floor(tick() - rt.sessionStart)
-			local mins = math.floor(elapsed / 60)
-			local secs = elapsed % 60
-			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Session", string.format("%02d:%02d", mins, secs))
-			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Version", VERSION)
-			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Total Kicks", tostring(rt.sessionKicks))
-			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Total Errors", tostring(#rt.errLog))
-			if state.AFarm or state.AAutoMastery or state.AAutoBattle or state.AAutoWeather or state.AAutoStyle then
-				local count = (state.AFarm and 1 or 0) + (state.AAutoMastery and 1 or 0) + (state.AAutoBattle and 1 or 0) + (state.AAutoWeather and 1 or 0) + (state.AAutoStyle and 1 or 0)
-				pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Active Features", tostring(count))
-			else
-				pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Active Features", "0")
-			end
-			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Session Errors", tostring(rt.seshErrs))
-		end
-		if Hub._QuickStatus and Hub._QuickStatus.Update then
-			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Farming", state.AFarm and "On" or "Off")
-			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Mastery", state.AAutoMastery and "On" or "Off")
-			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Battles", state.AAutoBattle and "On" or "Off")
-			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Weather", state.AAutoWeather and "On" or "Off")
-			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Styles", state.AAutoStyle and "On" or "Off")
-		end
-		if Hub._SecurityStatus and Hub._SecurityStatus.Update then
-			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Anti-Cheat", "Active")
-			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Staff Detection", rt.staffDetected and "Active" or "Standby")
-			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Staff Status", rt.staffDetected and (rt.staffDetectedName .. " ^^^") or "None")
-			pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Anti-Cheat Triggers", tostring(rt.acTriggerCount))
-			if rt.lastAntiCheatTrigger > 0 then
-				pcall(Hub._SecurityStatus.Update, Hub._SecurityStatus, "Last Check", string.format("%.0fs ago", tick() - rt.lastAntiCheatTrigger))
-			end
-		end
-		task.wait(3)
-	end
-end)()
-
-notify("Alleral Hub", "v" .. VERSION .. " ready.", 5)
-end)()
-end)()
-end)()
+notify("Alleral", "v" .. VERSION .. " ready.", 5)
