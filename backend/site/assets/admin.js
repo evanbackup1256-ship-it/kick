@@ -3,17 +3,36 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const STATUSES = ["working", "detected", "broken", "maintenance", "testing"];
   const TOKEN_KEY = "alleral_admin_token";
+  const TOKEN_EXP_KEY = "alleral_admin_token_exp";
+  const REMEMBER_KEY = "alleral_admin_remember";
+  const KEY_KEY = "alleral_admin_key";
+
   const toast = $("#toast");
   const errorEl = $("#error");
   const adminKey = $("#adminKey");
   const adminStatus = $("#adminStatus");
+  const rememberAdmin = $("#rememberAdmin");
+  const sessionLabel = $("#sessionLabel");
+  const sessionExpiry = $("#sessionExpiry");
+  const signOutBtn = $("#signOutAdmin");
+  const refreshSessionBtn = $("#refreshSession");
+
   let activeTab = "scripts";
   let authReady = false;
   let authFailed = false;
+  let authBusy = false;
   let banSearchTimer = 0;
+  let playerSearchTimer = 0;
+  let playerSearchSeq = 0;
+  let selectedPlayer = null;
+  let banTypeFilter = "all";
+  let cachedBans = [];
 
-  if (localStorage.getItem("alleral_admin_key")) {
-    adminKey.value = localStorage.getItem("alleral_admin_key");
+  if (localStorage.getItem(KEY_KEY)) {
+    adminKey.value = localStorage.getItem(KEY_KEY);
+  }
+  if (localStorage.getItem(REMEMBER_KEY) === "1") {
+    rememberAdmin.checked = true;
   }
 
   function apiBase() {
@@ -22,8 +41,53 @@
     return window.location.origin.replace(/\/+$/, "");
   }
 
+  function esc(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function rememberEnabled() {
+    return rememberAdmin?.checked !== false;
+  }
+
   function adminToken() {
+    const remembered = localStorage.getItem(REMEMBER_KEY) === "1";
+    if (remembered) {
+      const token = localStorage.getItem(TOKEN_KEY) || "";
+      const exp = Number(localStorage.getItem(TOKEN_EXP_KEY) || 0);
+      if (token && exp && Date.now() < exp) return token;
+      clearStoredToken(false);
+    }
     return sessionStorage.getItem(TOKEN_KEY) || "";
+  }
+
+  function storeToken(token, expiresAt, remember) {
+    sessionStorage.setItem(TOKEN_KEY, token);
+    if (remember) {
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(REMEMBER_KEY, "1");
+      const ms = expiresAt ? Date.parse(expiresAt) : Date.now() + 86400000;
+      localStorage.setItem(TOKEN_EXP_KEY, String(Number.isFinite(ms) ? ms : Date.now() + 86400000));
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(TOKEN_EXP_KEY);
+      localStorage.removeItem(REMEMBER_KEY);
+    }
+    updateSessionUi(expiresAt, remember);
+  }
+
+  function clearStoredToken(clearKey = false) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_EXP_KEY);
+    if (clearKey) {
+      localStorage.removeItem(KEY_KEY);
+      if (adminKey) adminKey.value = "";
+    }
+    authReady = false;
+    updateSessionUi(null, false);
   }
 
   function titleCase(value) {
@@ -46,7 +110,7 @@
       h["X-Admin-Token"] = token;
       return h;
     }
-    const key = adminKey?.value?.trim() || "";
+    const key = adminKey?.value?.trim() || localStorage.getItem(KEY_KEY) || "";
     if (key) h["X-Admin-Key"] = key;
     return h;
   }
@@ -57,46 +121,71 @@
     adminStatus.classList.toggle("online", online);
   }
 
+  function updateSessionUi(expiresAt, signedIn) {
+    if (sessionLabel) {
+      sessionLabel.textContent = signedIn ? "Signed in" : "Not signed in";
+    }
+    if (sessionExpiry) {
+      if (signedIn && expiresAt) {
+        const date = new Date(expiresAt);
+        sessionExpiry.textContent = Number.isFinite(date.getTime())
+          ? `Expires ${date.toLocaleString()}`
+          : "";
+      } else {
+        sessionExpiry.textContent = "";
+      }
+    }
+    signOutBtn?.classList.toggle("hidden", !signedIn);
+    refreshSessionBtn?.classList.toggle("hidden", !signedIn);
+  }
+
   async function loginAdmin(silent = false) {
+    if (authBusy) return authReady;
+    authBusy = true;
     authFailed = false;
-    const key = adminKey?.value?.trim() || "";
+    const key = adminKey?.value?.trim() || localStorage.getItem(KEY_KEY) || "";
     if (!key) {
       authReady = false;
       setAdminStatus("No key", false);
       if (!silent) errorEl.textContent = "Enter your ADMIN_API_KEY from Railway.";
+      authBusy = false;
       return false;
     }
     try {
+      const remember = rememberEnabled();
       const res = await fetch(`${apiBase()}/api/admin/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key }),
+        body: JSON.stringify({ key, remember }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
         authReady = false;
         authFailed = true;
-        sessionStorage.removeItem(TOKEN_KEY);
+        clearStoredToken(false);
         setAdminStatus("Auth failed", false);
         const hint = data.hint ? ` ${data.hint}` : "";
         errorEl.textContent = (data.error === "unauthorized"
           ? "Invalid admin key — use ADMIN_API_KEY from Railway."
           : data.error || "Login failed") + hint;
         if (!silent) flash("Admin login failed", true);
+        authBusy = false;
         return false;
       }
-      sessionStorage.setItem(TOKEN_KEY, data.token);
+      storeToken(data.token, data.expiresAt, remember || data.remember);
       authReady = true;
       authFailed = false;
       setAdminStatus("Signed in", true);
       errorEl.textContent = "";
       if (!silent) flash("Admin session active");
+      authBusy = false;
       return true;
     } catch (e) {
       authReady = false;
       authFailed = true;
       errorEl.textContent = e.message || "Could not reach relay";
       setAdminStatus("Offline", false);
+      authBusy = false;
       return false;
     }
   }
@@ -104,6 +193,7 @@
   async function ensureAuth(force = false) {
     if (authReady && !force) return true;
     if (authFailed && !force) return false;
+
     const token = adminToken();
     if (token && !force) {
       try {
@@ -111,14 +201,15 @@
           headers: { "X-Admin-Token": token },
           cache: "no-store",
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (res.ok && data.ok) {
           authReady = true;
           authFailed = false;
           setAdminStatus("Signed in", true);
+          updateSessionUi(data.expiresAt, true);
           return true;
         }
-        sessionStorage.removeItem(TOKEN_KEY);
+        clearStoredToken(false);
       } catch {
         /* fall through to login */
       }
@@ -126,13 +217,55 @@
     return loginAdmin(true);
   }
 
+  async function recoverAuth() {
+    authFailed = false;
+    clearStoredToken(false);
+    return loginAdmin(true);
+  }
+
   function handleAuthError(data) {
-    if (data?.error === "unauthorized") {
-      authReady = false;
-      authFailed = true;
-      sessionStorage.removeItem(TOKEN_KEY);
-      setAdminStatus("Session expired", false);
-      errorEl.textContent = "Session expired — click Sign In again.";
+    if (data?.error !== "unauthorized") return false;
+    authReady = false;
+    setAdminStatus("Session expired", false);
+    const key = adminKey?.value?.trim() || localStorage.getItem(KEY_KEY) || "";
+    if (key) {
+      void recoverAuth().then((ok) => {
+        if (ok) {
+          errorEl.textContent = "";
+          flash("Session refreshed");
+          if (activeTab === "bans") void loadBans();
+        } else {
+          authFailed = true;
+          errorEl.textContent = "Session expired — click Sign In again.";
+        }
+      });
+      return true;
+    }
+    authFailed = true;
+    clearStoredToken(false);
+    errorEl.textContent = "Session expired — click Sign In again.";
+    return true;
+  }
+
+  async function signOut() {
+    const token = adminToken();
+    if (token) {
+      try {
+        await fetch(`${apiBase()}/api/admin/logout`, {
+          method: "POST",
+          headers: { "X-Admin-Token": token },
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+    authFailed = false;
+    clearStoredToken(false);
+    setAdminStatus("Signed out", false);
+    errorEl.textContent = "";
+    flash("Signed out");
+    if (activeTab === "bans") {
+      $("#bansGrid").innerHTML = '<div class="panel admin-empty-auth"><strong>Sign in required</strong>Enter your admin key above to manage bans.</div>';
     }
   }
 
@@ -151,7 +284,7 @@
       p.classList.toggle("hidden", !show);
       if (show) animatePanel(p);
     });
-    errorEl.textContent = "";
+    if (name !== "bans") errorEl.textContent = "";
     if (name === "scripts") loadScripts();
     if (name === "bans") void loadBans();
     if (name === "stats") loadStats();
@@ -190,12 +323,12 @@
     card.innerHTML = `
       <div class="modal-head">
         <div>
-          <h3>${entry.name || id}</h3>
-          <p class="modal-meta">${id} · v${entry.version || "?"} · ${entry.updatedAt || "?"}</p>
+          <h3>${esc(entry.name || id)}</h3>
+          <p class="modal-meta">${esc(id)} · v${esc(entry.version || "?")} · ${esc(entry.updatedAt || "?")}</p>
         </div>
         <span class="status-chip ${status}">${titleCase(status)}</span>
       </div>
-      <p class="modal-desc">${entry.message || "No status message."}</p>
+      <p class="modal-desc">${esc(entry.message || "No status message.")}</p>
       <form class="form admin-script-form">
         <label>Status
           <div class="select-wrap">
@@ -203,8 +336,8 @@
           </div>
         </label>
         <p class="admin-auto-note">Status is computed automatically from inject telemetry (48h window).</p>
-        <label>Version<input data-f="version" class="field-input" value="${entry.version || ""}" /></label>
-        <label>Message<textarea data-f="message" class="field-textarea">${entry.message || ""}</textarea></label>
+        <label>Version<input data-f="version" class="field-input" value="${esc(entry.version || "")}" /></label>
+        <label>Message<textarea data-f="message" class="field-textarea">${esc(entry.message || "")}</textarea></label>
         <button class="btn btn-fill" type="submit">Save Script</button>
       </form>`;
     card.querySelector("form").addEventListener("submit", async (ev) => {
@@ -219,8 +352,7 @@
       });
       const out = await res.json();
       if (!res.ok || !out.ok) {
-        handleAuthError(out);
-        errorEl.textContent = out.error || "Save failed";
+        if (!handleAuthError(out)) errorEl.textContent = out.error || "Save failed";
         return;
       }
       flash(`Updated ${id}`);
@@ -229,10 +361,75 @@
     root.appendChild(card);
   }
 
+  function filterBans(bans) {
+    if (banTypeFilter === "all") return bans;
+    return bans.filter((ban) => String(ban.ban_type || "").toLowerCase() === banTypeFilter);
+  }
+
+  function renderBanCards(bans) {
+    const root = $("#bansGrid");
+    const filtered = filterBans(bans);
+    root.innerHTML = "";
+    if (!filtered.length) {
+      root.innerHTML = '<p class="empty">No active bans match your search.</p>';
+      return;
+    }
+    filtered.forEach((ban, i) => {
+      const profileUrl = ban.roblox_user_id
+        ? `https://www.roblox.com/users/${ban.roblox_user_id}/profile`
+        : (ban.ban_type === "userid" ? `https://www.roblox.com/users/${ban.value}/profile` : "");
+      const card = document.createElement("article");
+      card.className = "panel admin-card card-enter";
+      card.style.animationDelay = `${i * 0.04}s`;
+      card.innerHTML = `
+        <div class="modal-head">
+          <div>
+            <h3>${esc(ban.player_name || ban.value)}</h3>
+            <p class="modal-meta">#${ban.id} · ${titleCase(ban.ban_type)} · ${esc(ban.value)}${ban.roblox_user_id ? ` · Roblox ${esc(ban.roblox_user_id)}` : ""}</p>
+          </div>
+          <span class="status-chip broken">${titleCase(ban.ban_type)}</span>
+        </div>
+        <p class="modal-desc">${esc(ban.reason || "No reason provided.")}</p>
+        <dl class="ban-card-meta-grid">
+          <div>Created <span>${esc(ban.created_at || "—")}</span></div>
+          <div>By <span>${esc(ban.created_by || "admin")}</span></div>
+          ${ban.expires_at ? `<div>Expires <span>${esc(ban.expires_at)}</span></div>` : ""}
+        </dl>
+        <div class="ban-card-actions">
+          <button class="btn btn-outline btn-sm" type="button" data-copy="${esc(ban.value)}">Copy Value</button>
+          ${profileUrl ? `<a class="btn btn-outline btn-sm" href="${esc(profileUrl)}" target="_blank" rel="noopener">Profile</a>` : ""}
+          <button class="btn btn-outline btn-sm" type="button" data-remove="${ban.id}">Remove Ban</button>
+        </div>`;
+      card.querySelector("[data-copy]")?.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(ban.value);
+          flash("Copied ban value");
+        } catch {
+          flash("Copy failed", true);
+        }
+      });
+      card.querySelector("[data-remove]")?.addEventListener("click", async () => {
+        const label = ban.player_name || ban.value;
+        if (!window.confirm(`Remove ban #${ban.id} for ${label}?`)) return;
+        if (!(await ensureAuth())) return;
+        const del = await fetch(`${apiBase()}/admin/bans/${ban.id}`, { method: "DELETE", headers: headers() });
+        const out = await del.json();
+        if (!del.ok || !out.ok) {
+          if (!handleAuthError(out)) errorEl.textContent = out.error || "Remove failed";
+          return;
+        }
+        flash(`Removed ban #${ban.id}`);
+        loadBans();
+      });
+      root.appendChild(card);
+    });
+  }
+
   async function loadBans() {
     const root = $("#bansGrid");
     if (!(await ensureAuth())) {
-      root.innerHTML = '<p class="empty">Sign in with your admin key to view bans.</p>';
+      root.innerHTML = '<div class="panel admin-empty-auth"><strong>Sign in required</strong>Enter your admin key above to search players and manage bans.</div>';
+      $("#banCountLabel").innerHTML = 'Active bans: <strong>—</strong>';
       return;
     }
     if (authFailed) return;
@@ -242,47 +439,104 @@
       const res = await fetch(`${apiBase()}/admin/bans?q=${q}`, { headers: headers(), cache: "no-store" });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        handleAuthError(data);
-        errorEl.textContent = data.error || "Failed to load bans";
+        if (!handleAuthError(data)) errorEl.textContent = data.error || "Failed to load bans";
         root.innerHTML = "";
         return;
       }
-      root.innerHTML = "";
-      if (!(data.bans || []).length) {
-        root.innerHTML = '<p class="empty">No active bans match your search.</p>';
-        return;
-      }
-      data.bans.forEach((ban, i) => {
-        const card = document.createElement("article");
-        card.className = "panel admin-card card-enter";
-        card.style.animationDelay = `${i * 0.04}s`;
-        card.innerHTML = `
-          <div class="modal-head">
-            <div>
-              <h3>${ban.player_name || ban.value}</h3>
-              <p class="modal-meta">#${ban.id} · ${titleCase(ban.ban_type)} · ${ban.value}${ban.roblox_user_id ? ` · Roblox ${ban.roblox_user_id}` : ""}</p>
-            </div>
-            <span class="status-chip broken">${titleCase(ban.ban_type)}</span>
-          </div>
-          <p class="modal-desc">${ban.reason || "No reason provided."}</p>
-          <button class="btn btn-outline" type="button">Remove Ban</button>`;
-        card.querySelector("button").onclick = async () => {
-          if (!(await ensureAuth())) return;
-          const del = await fetch(`${apiBase()}/admin/bans/${ban.id}`, { method: "DELETE", headers: headers() });
-          const out = await del.json();
-          if (!del.ok || !out.ok) {
-            handleAuthError(out);
-            errorEl.textContent = out.error || "Remove failed";
-            return;
-          }
-          flash(`Removed ban #${ban.id}`);
-          loadBans();
-        };
-        root.appendChild(card);
-      });
+      cachedBans = data.bans || [];
+      $("#banCountLabel").innerHTML = `Active bans: <strong>${cachedBans.length}</strong>`;
+      renderBanCards(cachedBans);
     } catch (e) {
       errorEl.textContent = e.message;
       root.innerHTML = "";
+    }
+  }
+
+  function setSelectedPlayer(player) {
+    selectedPlayer = player;
+    const preview = $("#playerPreview");
+    if (!player) {
+      preview?.classList.add("hidden");
+      return;
+    }
+    preview?.classList.remove("hidden");
+    $("#playerPreviewName").textContent = player.displayName || player.name || "Player";
+    $("#playerPreviewMeta").textContent = `@${player.name || "?"} · ${player.id || "?"}`;
+    const avatar = $("#playerPreviewAvatar");
+    if (player.headshot) {
+      avatar.src = player.headshot;
+      avatar.alt = player.displayName || player.name || "Player avatar";
+    } else {
+      avatar.removeAttribute("src");
+      avatar.alt = "";
+    }
+    const profile = player.profileUrl || `https://www.roblox.com/users/${player.id}/profile`;
+    $("#playerPreviewProfile").href = profile;
+    $("#robloxUsername").value = player.name || "";
+    $("#robloxUserId").value = String(player.id || "");
+  }
+
+  function hidePlayerDropdown() {
+    const dropdown = $("#playerLookupDropdown");
+    dropdown?.classList.add("hidden");
+    dropdown.innerHTML = "";
+  }
+
+  async function searchPlayers(query) {
+    const dropdown = $("#playerLookupDropdown");
+    if (!dropdown) return;
+    const text = String(query || "").trim();
+    if (text.length < 2) {
+      hidePlayerDropdown();
+      return;
+    }
+    if (!(await ensureAuth())) {
+      hidePlayerDropdown();
+      return;
+    }
+    const seq = ++playerSearchSeq;
+    dropdown.classList.remove("hidden");
+    dropdown.innerHTML = '<button class="player-lookup-item" type="button" disabled>Searching…</button>';
+    try {
+      const res = await fetch(`${apiBase()}/api/admin/users/search?q=${encodeURIComponent(text)}&limit=8`, {
+        headers: headers(),
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (seq !== playerSearchSeq) return;
+      if (!res.ok || !data.ok) {
+        if (handleAuthError(data)) {
+          hidePlayerDropdown();
+          return;
+        }
+        dropdown.innerHTML = `<button class="player-lookup-item" type="button" disabled>${esc(data.error || "Search failed")}</button>`;
+        return;
+      }
+      const users = data.users || [];
+      if (!users.length) {
+        dropdown.innerHTML = '<button class="player-lookup-item" type="button" disabled>No players found</button>';
+        return;
+      }
+      dropdown.innerHTML = users.map((user, index) => `
+        <button class="player-lookup-item${index === 0 ? " focused" : ""}" type="button" data-index="${index}">
+          ${user.headshot
+            ? `<img class="player-lookup-avatar" src="${esc(user.headshot)}" alt="" width="40" height="40" />`
+            : '<span class="player-lookup-avatar placeholder">?</span>'}
+          <span class="player-lookup-copy">
+            <strong>${esc(user.displayName || user.name)}</strong>
+            <span>@${esc(user.name)} · ${user.id}</span>
+          </span>
+        </button>`).join("");
+      dropdown.querySelectorAll(".player-lookup-item[data-index]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const user = users[Number(btn.dataset.index)];
+          setSelectedPlayer(user);
+          hidePlayerDropdown();
+        });
+      });
+    } catch (e) {
+      if (seq !== playerSearchSeq) return;
+      dropdown.innerHTML = `<button class="player-lookup-item" type="button" disabled>${esc(e.message || "Search error")}</button>`;
     }
   }
 
@@ -300,15 +554,15 @@
       const games = Object.values(site.games || {});
       const working = games.filter((g) => (g.status || "").toLowerCase() === "working").length;
       root.innerHTML = `
-        <article class="stat-card card-enter"><span class="stat-card-label">Relay Version</span><strong>v${health.version || "?"}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.05s"><span class="stat-card-label">GitHub Commit</span><strong>${sync.commit || health.githubCommit || "—"}</strong></article>
+        <article class="stat-card card-enter"><span class="stat-card-label">Relay Version</span><strong>v${esc(health.version || "?")}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.05s"><span class="stat-card-label">GitHub Commit</span><strong>${esc(sync.commit || health.githubCommit || "—")}</strong></article>
         <article class="stat-card card-enter" style="animation-delay:0.1s"><span class="stat-card-label">Last Auto Sync</span><strong>${sync.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleTimeString() : "—"}</strong></article>
         <article class="stat-card card-enter" style="animation-delay:0.15s"><span class="stat-card-label">Active Bans</span><strong>${banStatus.activeBans ?? health.bans ?? 0}</strong></article>
         <article class="stat-card card-enter" style="animation-delay:0.2s"><span class="stat-card-label">Games Listed</span><strong>${games.length}</strong></article>
         <article class="stat-card card-enter" style="animation-delay:0.25s"><span class="stat-card-label">Working Scripts</span><strong>${working}</strong></article>
       `;
     } catch (e) {
-      root.innerHTML = `<p class="empty">${e.message}</p>`;
+      root.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
     }
   }
 
@@ -324,8 +578,7 @@
     const res = await fetch(`${apiBase()}/admin/bans`, { method: "POST", headers: headers(), body: JSON.stringify(payload) });
     const data = await res.json();
     if (!res.ok || !data.ok) {
-      handleAuthError(data);
-      errorEl.textContent = data.error || "Ban failed";
+      if (!handleAuthError(data)) errorEl.textContent = data.error || "Ban failed";
       return;
     }
     $("#banValue").value = "";
@@ -356,11 +609,11 @@
     });
     const data = await res.json();
     if (!res.ok || !data.ok) {
-      handleAuthError(data);
-      errorEl.textContent = data.error || "Roblox ban failed";
+      if (!handleAuthError(data)) errorEl.textContent = data.error || "Roblox ban failed";
       return;
     }
     flash(`Banned ${data.bans?.length || 1} identifier(s)`);
+    $("#robloxReason").value = "";
     loadBans();
   }
 
@@ -395,22 +648,39 @@
     const res = await fetch(`${apiBase()}/api/site`, { method: "PATCH", headers: headers(), body: JSON.stringify(payload) });
     const data = await res.json();
     if (!res.ok || !data.ok) {
-      handleAuthError(data);
-      errorEl.textContent = data.error || "Site save failed";
+      if (!handleAuthError(data)) errorEl.textContent = data.error || "Site save failed";
       return;
     }
     flash("Site content saved");
   }
 
   $("#saveKey")?.addEventListener("click", () => {
-    localStorage.setItem("alleral_admin_key", adminKey.value.trim());
-    flash("Key remembered locally");
+    localStorage.setItem(KEY_KEY, adminKey.value.trim());
+    flash("Key remembered on this device");
   });
 
   $("#signInAdmin")?.addEventListener("click", () => {
+    authFailed = false;
     void loginAdmin(false).then((ok) => {
       if (ok && activeTab === "bans") void loadBans();
     });
+  });
+
+  $("#signOutAdmin")?.addEventListener("click", () => void signOut());
+
+  $("#refreshSession")?.addEventListener("click", () => {
+    authFailed = false;
+    void loginAdmin(false);
+  });
+
+  rememberAdmin?.addEventListener("change", () => {
+    if (rememberAdmin.checked) {
+      localStorage.setItem(REMEMBER_KEY, "1");
+    } else {
+      localStorage.removeItem(REMEMBER_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(TOKEN_EXP_KEY);
+    }
   });
 
   $("#reload")?.addEventListener("click", () => {
@@ -421,23 +691,106 @@
   $$(".admin-tabs button").forEach((b) => {
     b.onclick = () => setTab(b.dataset.tab);
   });
+
+  $$("[data-ban-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      banTypeFilter = btn.dataset.banFilter || "all";
+      $$("[data-ban-filter]").forEach((chip) => chip.classList.toggle("active", chip === btn));
+      renderBanCards(cachedBans);
+    });
+  });
+
+  $$(".admin-quick-reasons button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      $("#robloxReason").value = btn.dataset.reason || "";
+    });
+  });
+
   $("#addBan")?.addEventListener("click", () => void addBan());
   $("#banRobloxPlayer")?.addEventListener("click", () => void banRobloxPlayer());
+
   $("#banSearch")?.addEventListener("input", () => {
-    if (authFailed || !authReady) return;
+    if (!authReady || authFailed) return;
     clearTimeout(banSearchTimer);
     banSearchTimer = setTimeout(() => void loadBans(), 300);
   });
+
+  $("#robloxUsername")?.addEventListener("input", (ev) => {
+    setSelectedPlayer(null);
+    clearTimeout(playerSearchTimer);
+    const value = ev.target.value;
+    playerSearchTimer = setTimeout(() => void searchPlayers(value), 250);
+  });
+
+  $("#robloxUsername")?.addEventListener("focus", (ev) => {
+    const value = ev.target.value.trim();
+    if (value.length >= 2) void searchPlayers(value);
+  });
+
+  $("#robloxUsername")?.addEventListener("keydown", (ev) => {
+    const dropdown = $("#playerLookupDropdown");
+    const items = dropdown ? $$(".player-lookup-item[data-index]", dropdown) : [];
+    if (!items.length || dropdown?.classList.contains("hidden")) return;
+    const current = items.findIndex((el) => el.classList.contains("focused"));
+    if (ev.key === "ArrowDown") {
+      ev.preventDefault();
+      const next = current < items.length - 1 ? current + 1 : 0;
+      items.forEach((el, i) => el.classList.toggle("focused", i === next));
+    } else if (ev.key === "ArrowUp") {
+      ev.preventDefault();
+      const prev = current > 0 ? current - 1 : items.length - 1;
+      items.forEach((el, i) => el.classList.toggle("focused", i === prev));
+    } else if (ev.key === "Enter") {
+      const focused = items.find((el) => el.classList.contains("focused"));
+      if (focused) {
+        ev.preventDefault();
+        focused.click();
+      }
+    } else if (ev.key === "Escape") {
+      hidePlayerDropdown();
+    }
+  });
+
+  document.addEventListener("click", (ev) => {
+    if (!ev.target.closest(".player-lookup")) hidePlayerDropdown();
+  });
+
+  $("#playerPreviewClear")?.addEventListener("click", () => {
+    setSelectedPlayer(null);
+    $("#robloxUsername").value = "";
+    $("#robloxUserId").value = "";
+  });
+
+  $("#playerPreviewCopyId")?.addEventListener("click", async () => {
+    const id = selectedPlayer?.id || $("#robloxUserId").value.trim();
+    if (!id) return;
+    try {
+      await navigator.clipboard.writeText(String(id));
+      flash("Copied UserId");
+    } catch {
+      flash("Copy failed", true);
+    }
+  });
+
   $("#saveSite")?.addEventListener("click", () => void saveSite());
 
   window.addEventListener("scroll", () => {
     $("#siteNav")?.classList.toggle("nav-scrolled", window.scrollY > 8);
   }, { passive: true });
 
-  void ensureAuth(true).then((ok) => {
-    if (!ok) setAdminStatus("Sign in required", false);
+  void (async () => {
+    const hasStoredKey = Boolean(localStorage.getItem(KEY_KEY) || adminKey?.value?.trim());
+    if (hasStoredKey && rememberEnabled()) {
+      const ok = await ensureAuth(true);
+      if (!ok) setAdminStatus("Sign in required", false);
+    } else if (adminToken()) {
+      const ok = await ensureAuth(false);
+      if (!ok) setAdminStatus("Sign in required", false);
+    } else {
+      setAdminStatus("Sign in required", false);
+    }
     setTab("scripts");
-  });
+  })();
 
   setInterval(() => {
     if (activeTab === "scripts") loadScripts();

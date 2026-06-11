@@ -4,17 +4,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Alleral Admin</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232997ff'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='18' fill='white' font-family='sans-serif'%3EA%3C/text%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/style.css" />
   <link rel="stylesheet" href="/assets/animations.css" />
+  <link rel="stylesheet" href="/assets/admin.css" />
   <script src="/assets/config.js"></script>
 </head>
 <body class="admin-page">
   <div class="aurora" aria-hidden="true"></div>
-  <div class="cursor-glow" aria-hidden="true"></div>
-
   <header class="nav-shell admin-nav">
     <nav class="nav-bar wrap">
       <a class="nav-logo" href="/admin">Alleral Admin</a>
@@ -25,6 +25,7 @@
       </div>
       <div class="nav-actions">
         <span id="adminStatus" class="status-pill"><span class="status-dot"></span>Ready</span>
+        <button id="signOutAdmin" class="btn btn-outline btn-sm hidden" type="button">Sign Out</button>
       </div>
     </nav>
   </header>
@@ -48,6 +49,17 @@
           <button id="reload" class="btn btn-outline" type="button">Reload Tab</button>
         </div>
       </form>
+      <label class="checkbox-label"><input id="rememberAdmin" type="checkbox" checked /> Stay signed in on this device (365 days)</label>
+      <div class="admin-session-bar">
+        <div class="admin-session-meta">
+          <span>Session:</span>
+          <strong id="sessionLabel">Not signed in</strong>
+          <span id="sessionExpiry" class="muted-inline"></span>
+        </div>
+        <div class="admin-auth-actions">
+          <button id="refreshSession" class="btn btn-outline btn-sm hidden" type="button">Refresh Session</button>
+        </div>
+      </div>
       <div id="error" class="form-error"></div>
     </div>
 
@@ -63,18 +75,41 @@
     </section>
 
     <section data-tab-panel="bans" class="admin-panel hidden">
+      <div id="playerPreview" class="player-preview hidden" aria-live="polite">
+        <img id="playerPreviewAvatar" src="" alt="" width="56" height="56" />
+        <div class="player-preview-meta">
+          <h4 id="playerPreviewName">Player</h4>
+          <p id="playerPreviewMeta">@username · UserId</p>
+        </div>
+        <div class="player-preview-actions">
+          <a id="playerPreviewProfile" class="btn btn-outline btn-sm" href="#" target="_blank" rel="noopener">Open Profile</a>
+          <button id="playerPreviewCopyId" class="btn btn-outline btn-sm" type="button">Copy UserId</button>
+          <button id="playerPreviewClear" class="btn btn-outline btn-sm" type="button">Clear</button>
+        </div>
+      </div>
+
       <div class="admin-split">
         <div class="panel admin-card">
           <h3>Ban Roblox Player</h3>
-          <p class="admin-card-lead">Resolves username to UserId and can cascade HWID, fingerprint, IP, and executor bans.</p>
+          <p class="admin-card-lead">Start typing a username — matching players appear in a dropdown. Select one to auto-fill UserId.</p>
           <form class="form" onsubmit="return false">
-            <label>Roblox Username<input id="robloxUsername" class="field-input" placeholder="Player username" /></label>
-            <label>Roblox UserId <span class="muted-inline">optional</span><input id="robloxUserId" class="field-input" placeholder="123456789" /></label>
+            <label class="player-lookup">Roblox Username
+              <input id="robloxUsername" class="field-input" placeholder="Search username…" autocomplete="off" spellcheck="false" />
+              <div id="playerLookupDropdown" class="player-lookup-dropdown hidden" role="listbox" aria-label="Player search results"></div>
+            </label>
+            <label>Roblox UserId <span class="muted-inline">optional</span><input id="robloxUserId" class="field-input" placeholder="123456789" inputmode="numeric" /></label>
             <div class="form-row">
               <label>HWID<input id="robloxHwid" class="field-input" placeholder="Optional HWID" /></label>
               <label>Fingerprint<input id="robloxFingerprint" class="field-input" placeholder="Optional fingerprint" /></label>
             </div>
-            <label>Reason<textarea id="robloxReason" class="field-textarea" placeholder="Why is this player banned?"></textarea></label>
+            <label>Reason</label>
+            <div class="admin-quick-reasons">
+              <button type="button" data-reason="Exploiting / cheating">Exploiting</button>
+              <button type="button" data-reason="Harassment / toxicity">Harassment</button>
+              <button type="button" data-reason="Ban evasion">Ban evasion</button>
+              <button type="button" data-reason="Abuse of hub systems">Hub abuse</button>
+            </div>
+            <textarea id="robloxReason" class="field-textarea" placeholder="Why is this player banned?"></textarea>
             <label class="checkbox-label"><input id="robloxCascade" type="checkbox" checked /> Cascade ban across UserId, username, and hardware identifiers</label>
             <button id="banRobloxPlayer" class="btn btn-fill" type="button">Ban Player</button>
           </form>
@@ -103,8 +138,21 @@
         </div>
       </div>
 
+      <div class="admin-ban-toolbar">
+        <p id="banCountLabel" class="admin-ban-count">Active bans: <strong>—</strong></p>
+        <div id="banTypeFilters" class="admin-filter-row">
+          <button class="admin-filter-chip active" data-ban-filter="all" type="button">All</button>
+          <button class="admin-filter-chip" data-ban-filter="userid" type="button">UserId</button>
+          <button class="admin-filter-chip" data-ban-filter="username" type="button">Username</button>
+          <button class="admin-filter-chip" data-ban-filter="hwid" type="button">HWID</button>
+          <button class="admin-filter-chip" data-ban-filter="fingerprint" type="button">Fingerprint</button>
+          <button class="admin-filter-chip" data-ban-filter="ip" type="button">IP</button>
+          <button class="admin-filter-chip" data-ban-filter="executor" type="button">Executor</button>
+        </div>
+      </div>
+
       <div class="panel admin-card admin-search-card">
-        <label>Search Bans<input id="banSearch" class="field-input" placeholder="Search by value, username, reason…" /></label>
+        <label>Search Bans<input id="banSearch" class="field-input" placeholder="Search by value, username, reason…" autocomplete="off" /></label>
       </div>
       <div id="bansGrid" class="admin-grid"></div>
     </section>

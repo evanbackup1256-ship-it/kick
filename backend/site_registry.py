@@ -29,6 +29,9 @@ class SiteRegistry:
         "bugCategories",
         "games",
         "links",
+        "credits",
+        "executors",
+        "resources",
     })
 
     def __init__(self, path: Path | None = None) -> None:

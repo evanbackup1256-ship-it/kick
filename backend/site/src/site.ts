@@ -1,4 +1,4 @@
-import type { GameEntry, SitePayload } from "./types";
+import type { CreditMember, CreditRenderMember, GameEntry, SitePayload } from "./types";
 
 (() => {
   const GRADIENTS = [
@@ -21,12 +21,23 @@ import type { GameEntry, SitePayload } from "./types";
     site: null as SitePayload | null,
     changelogShown: 2,
     gameFilter: "all",
+    gameQuery: "",
+    faqQuery: "",
     siteSignature: "",
     thumbs: {} as Record<string, string>,
+    creditRenders: {} as Record<string, CreditRenderMember>,
     gamesRenderToken: 0,
   };
   const SITE_POLL_MS = 30000;
   const VISIT_KEY = "alleral_hub_logged";
+
+  function escapeHtml(value: unknown): string {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
 
   function flash(text: string, isError = false): void {
     if (!toastEl) return;
@@ -184,9 +195,9 @@ import type { GameEntry, SitePayload } from "./types";
     }
     items.forEach((text, i) => {
       const card = document.createElement("article");
-      card.className = "feature-card card-enter tilt-card";
+      card.className = "feature-card card-enter";
       card.style.animationDelay = `${i * 0.07}s`;
-      card.innerHTML = `<p>${text}</p>`;
+      card.innerHTML = `<p>${escapeHtml(text)}</p>`;
       root.appendChild(card);
     });
     afterRender();
@@ -247,6 +258,13 @@ import type { GameEntry, SitePayload } from "./types";
     if (filter !== "all") {
       games = games.filter((g) => (g.status || "working").toLowerCase() === filter);
     }
+    const query = state.gameQuery.trim().toLowerCase();
+    if (query) {
+      games = games.filter((g) => {
+        const hay = `${g.name || ""} ${g.id || ""} ${g.description || ""} ${g.message || ""}`.toLowerCase();
+        return hay.includes(query);
+      });
+    }
     if (!games.length) {
       if (token !== state.gamesRenderToken) return;
       root.innerHTML = '<p class="empty reveal">No games match this filter.</p>';
@@ -265,21 +283,21 @@ import type { GameEntry, SitePayload } from "./types";
       const pid = placeIdOf(game);
       const thumb = pid ? state.thumbs[pid] : null;
       const card = document.createElement("article");
-      card.className = "game-card card-enter tilt-card";
+      card.className = "game-card card-enter";
       card.style.animationDelay = `${i * 0.06}s`;
       card.innerHTML = `
         <div class="game-art">
-          ${thumb ? `<img class="game-thumb" src="${thumb}" alt="${game.name || game.id}" loading="lazy" />` : ""}
+          ${thumb ? `<img class="game-thumb" src="${escapeHtml(thumb)}" alt="${escapeHtml(game.name || game.id)}" loading="lazy" />` : ""}
           <div class="game-art-fallback" style="background:${grad}"></div>
           <div class="game-art-shine"></div>
         </div>
         <div class="game-body">
-          <h3>${game.name || game.id}</h3>
+          <h3>${escapeHtml(game.name || game.id)}</h3>
           <div class="game-meta">
             ${statusChipHtml(status, statusLabel)}
-            <span class="game-version">v${game.version || "?"}</span>
+            <span class="game-version">v${escapeHtml(game.version || "?")}</span>
           </div>
-          <p class="game-desc">${game.description || game.message || ""}</p>
+          <p class="game-desc">${escapeHtml(game.description || game.message || "")}</p>
           <button class="btn-link" type="button">View Details</button>
         </div>
       `;
@@ -297,6 +315,7 @@ import type { GameEntry, SitePayload } from "./types";
 
     if (token !== state.gamesRenderToken) return;
     root.classList.remove("is-updating");
+    renderGameStatsBar(site);
 
     const bugGame = $("#bugGame") as HTMLSelectElement | null;
     if (bugGame) {
@@ -329,11 +348,11 @@ import type { GameEntry, SitePayload } from "./types";
     slice.forEach((entry, i) => {
       if (root.children[i]) return;
       const node = document.createElement("article");
-      node.className = "changelog-card reveal tilt-card";
+      node.className = "changelog-card reveal";
       node.innerHTML = `
-        <h3>${entry.title || "Update"}</h3>
-        <p class="cl-date">${formatChangelogDate(entry.date)}</p>
-        <ul>${(entry.items || []).map((item) => `<li>${item}</li>`).join("")}</ul>
+        <h3>${escapeHtml(entry.title || "Update")}</h3>
+        <p class="cl-date">${escapeHtml(formatChangelogDate(entry.date))}</p>
+        <ul>${(entry.items || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
       `;
       root.appendChild(node);
     });
@@ -352,20 +371,38 @@ import type { GameEntry, SitePayload } from "./types";
 
   function renderFaq(site: SitePayload): void {
     const root = $("#faqList");
+    const empty = $("#faqEmpty");
     if (!root) return;
     root.innerHTML = "";
-    (site.faq || []).forEach((item, i) => {
+    const query = state.faqQuery.trim().toLowerCase();
+    const items = (site.faq || []).filter((item) => {
+      if (!query) return true;
+      const hay = `${item.q || ""} ${item.a || ""}`.toLowerCase();
+      return hay.includes(query);
+    });
+
+    if (empty) empty.classList.toggle("hidden", items.length > 0);
+
+    items.forEach((item, i) => {
       const node = document.createElement("details");
       node.className = "reveal faq-item";
+      node.id = `faq-${i}`;
       node.style.transitionDelay = `${Math.min(i * 0.04, 0.24)}s`;
       const q = item.q || "Question";
+      const a = item.a || "";
       node.innerHTML = `
-        <summary>${q}</summary>
-        <div class="faq-answer"><p>${item.a || ""}</p></div>
-        <div class="faq-feedback">
-          <span class="faq-feedback-label">Was this helpful?</span>
-          <button type="button" class="faq-feedback-btn" data-helpful="yes">Yes</button>
-          <button type="button" class="faq-feedback-btn" data-helpful="no">No</button>
+        <summary>${escapeHtml(q)}</summary>
+        <div class="faq-answer">
+          <div class="faq-answer-inner">
+            <p>${escapeHtml(a)}</p>
+            <div class="faq-feedback">
+              <span class="faq-feedback-label">Was this helpful?</span>
+              <div class="faq-feedback-actions">
+                <button type="button" class="faq-feedback-btn" data-helpful="yes">Yes</button>
+                <button type="button" class="faq-feedback-btn" data-helpful="no">No</button>
+              </div>
+            </div>
+          </div>
         </div>
       `;
       node.querySelectorAll(".faq-feedback-btn").forEach((btn) => {
@@ -374,12 +411,20 @@ import type { GameEntry, SitePayload } from "./types";
           e.stopPropagation();
           const helpful = (btn as HTMLButtonElement).dataset.helpful === "yes";
           const bar = node.querySelector(".faq-feedback");
+          node.querySelectorAll(".faq-feedback-btn").forEach((b) => {
+            (b as HTMLButtonElement).disabled = true;
+            b.classList.toggle("selected", b === btn);
+          });
           try {
             await sendFaqFeedback(q, helpful);
             if (bar) {
               bar.innerHTML = `<span class="faq-feedback-thanks">Thanks for letting us know.</span>`;
             }
           } catch (err) {
+            node.querySelectorAll(".faq-feedback-btn").forEach((b) => {
+              (b as HTMLButtonElement).disabled = false;
+              b.classList.remove("selected");
+            });
             flash(err instanceof Error ? err.message : "Could not send feedback", true);
           }
         });
@@ -400,6 +445,332 @@ import type { GameEntry, SitePayload } from "./types";
       select.appendChild(opt);
     });
     window.AlleralSelect?.refresh?.(select);
+  }
+
+  function initials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  function renderGameStatsBar(site: SitePayload): void {
+    const root = $("#gameStatsBar");
+    if (!root) return;
+    const games = Object.values(site.games || {});
+    const counts: Record<string, number> = {
+      all: games.length,
+      working: 0,
+      testing: 0,
+      maintenance: 0,
+      broken: 0,
+    };
+    games.forEach((g) => {
+      const s = (g.status || "working").toLowerCase();
+      if (s in counts) counts[s] += 1;
+    });
+    const labels: Record<string, string> = {
+      all: "All",
+      working: "Working",
+      testing: "Testing",
+      maintenance: "Maintenance",
+      broken: "Broken",
+    };
+    root.innerHTML = Object.entries(counts)
+      .map(([key, n]) => {
+        const dot = key === "all" ? "" : `<span class="dot ${key}"></span>`;
+        return `<button type="button" class="game-stat-chip${state.gameFilter === key ? " active" : ""}" data-filter="${key}">${dot}${labels[key]} <strong>${n}</strong></button>`;
+      })
+      .join("");
+    root.querySelectorAll(".game-stat-chip").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.gameFilter = (btn as HTMLButtonElement).dataset.filter || "all";
+        $$<HTMLButtonElement>(".filter-pill").forEach((b) =>
+          b.classList.toggle("active", b.dataset.filter === state.gameFilter)
+        );
+        if (state.site) void renderGames(state.site);
+        renderGameStatsBar(state.site!);
+      });
+    });
+  }
+
+  async function fetchCreditRenders(): Promise<void> {
+    try {
+      const data = (await api("/api/credits/renders")) as { members?: Record<string, CreditRenderMember> };
+      state.creditRenders = data.members || {};
+    } catch {
+      state.creditRenders = {};
+    }
+  }
+
+  function creditAvatarHtml(member: CreditMember, render?: CreditRenderMember): string {
+    const img = render?.renders?.body || render?.renders?.bust || render?.renders?.headshot;
+    const name = member.displayName || render?.displayName || "Member";
+    if (img) {
+      return `<img class="credit-avatar-body" src="${escapeHtml(img)}" alt="${escapeHtml(name)} Roblox avatar" loading="lazy" />`;
+    }
+    return `<div class="credit-avatar-fallback" aria-hidden="true">${escapeHtml(initials(name))}</div>`;
+  }
+
+  function renderCredits(site: SitePayload): void {
+    const teamsRoot = $("#creditsTeams");
+    const thanksRoot = $("#creditsThanks");
+    if (!teamsRoot) return;
+
+    const credits = site.credits || {};
+    const headline = $("#creditsHeadline");
+    const sub = $("#creditsSubheadline");
+    if (headline) headline.textContent = credits.headline || "The team behind Alleral";
+    if (sub) sub.textContent = credits.subheadline || "";
+
+    teamsRoot.innerHTML = "";
+    (credits.teams || []).forEach((team) => {
+      const section = document.createElement("div");
+      section.className = "credits-team reveal";
+      section.innerHTML = `<h3 class="credits-team-title">${escapeHtml(team.title || "Team")}</h3>`;
+      const grid = document.createElement("div");
+      grid.className = "credits-grid";
+
+      (team.members || []).forEach((member) => {
+        const mid = member.id || member.displayName || "";
+        const render = state.creditRenders[mid];
+        const robloxName = render?.robloxUsername || member.robloxUsername || "";
+        const profileUrl = render?.profileUrl || (render?.robloxUserId ? `https://www.roblox.com/users/${render.robloxUserId}/profile` : "");
+
+        const card = document.createElement("article");
+        card.className = `credit-card reveal${member.featured ? " featured" : ""}`;
+        if (member.accent) {
+          card.style.setProperty("--credit-accent", member.accent);
+          card.dataset.accent = "1";
+        }
+
+        const tags = (member.tags || [])
+          .map((t) => `<span class="credit-tag">${escapeHtml(t)}</span>`)
+          .join("");
+        const links = Object.entries(member.links || {})
+          .map(([k, url]) => `<a class="credit-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(k)}</a>`)
+          .join("");
+
+        card.innerHTML = `
+          <div class="credit-render-stage">
+            <div class="credit-pedestal"></div>
+            <div class="credit-pedestal-ring"></div>
+            <div class="credit-avatar-glow"></div>
+            <div class="credit-avatar-ring"></div>
+            ${creditAvatarHtml(member, render)}
+          </div>
+          <div class="credit-meta">
+            <span class="credit-role-badge">${escapeHtml(member.role || "Member")}</span>
+            <h3>${escapeHtml(member.displayName || "Member")}</h3>
+            ${robloxName ? `<p class="credit-roblox-name">${profileUrl ? `<a href="${escapeHtml(profileUrl)}" target="_blank" rel="noopener">@${escapeHtml(robloxName)}</a>` : `@${escapeHtml(robloxName)}`}</p>` : ""}
+            <p class="credit-bio">${escapeHtml(member.bio || "")}</p>
+            ${tags ? `<div class="credit-tags">${tags}</div>` : ""}
+            ${links ? `<div class="credit-links">${links}</div>` : ""}
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      section.appendChild(grid);
+      teamsRoot.appendChild(section);
+    });
+
+    if (thanksRoot) {
+      const thanks = credits.specialThanks || [];
+      if (!thanks.length) {
+        thanksRoot.innerHTML = "";
+      } else {
+        thanksRoot.innerHTML = `
+          <div class="credits-thanks reveal">
+            <h3>Special thanks</h3>
+            <div class="credits-thanks-grid">
+              ${thanks.map((t) => `<div class="credits-thanks-item"><strong>${escapeHtml(t.name || "")}</strong><span>${escapeHtml(t.note || "")}</span></div>`).join("")}
+            </div>
+          </div>
+        `;
+      }
+    }
+    afterRender();
+  }
+
+  async function loadAndRenderCredits(site: SitePayload): Promise<void> {
+    await fetchCreditRenders();
+    renderCredits(site);
+  }
+
+  function resolveResourceUrl(site: SitePayload, item: { url?: string; urlKey?: string }): string {
+    if (item.url) {
+      if (item.url.startsWith("http") || item.url.startsWith("//")) return item.url;
+      const base = window.ALLERAL_API || window.location.origin;
+      return `${base.replace(/\/$/, "")}${item.url.startsWith("/") ? item.url : `/${item.url}`}`;
+    }
+    const key = item.urlKey || "";
+    const links = site.links || {};
+    const cfg = window.ALLERAL_CONFIG || {};
+    if (key === "github") return links.github || "";
+    if (key === "loaderRaw") return links.loaderRaw || "";
+    if (key === "admin") return links.admin || "";
+    if (key === "website") return links.website || cfg.publicUrl || "";
+    return (links as Record<string, string>)[key] || "";
+  }
+
+  async function renderSyncPanel(): Promise<void> {
+    const root = $("#syncPanelBody");
+    if (!root) return;
+    root.innerHTML = `<p class="tool-panel-desc">Loading sync status…</p>`;
+    try {
+      const base = window.ALLERAL_API || "";
+      const res = await fetch(`${base}/api/sync/status`, { cache: "no-store" });
+      const data = (await res.json()) as Record<string, unknown>;
+      const live = data.autoStatus === true || data.enabled === true;
+      root.innerHTML = `
+        <div class="sync-status-grid">
+          <div class="sync-stat"><span>Auto-sync</span><strong class="${live ? "live" : ""}">${live ? "Active" : "Off"}</strong></div>
+          <div class="sync-stat"><span>Commit</span><strong>${escapeHtml(String(data.commit || data.githubCommit || "—")).slice(0, 12)}</strong></div>
+          <div class="sync-stat"><span>Branch</span><strong>${escapeHtml(String(data.branch || "main"))}</strong></div>
+          <div class="sync-stat"><span>Last pull</span><strong>${escapeHtml(String(data.lastSyncAt || data.updatedAt || "—"))}</strong></div>
+        </div>
+      `;
+    } catch {
+      root.innerHTML = `<p class="tool-panel-desc">Could not reach sync endpoint.</p>`;
+    }
+  }
+
+  function renderTools(site: SitePayload): void {
+    const execRoot = $("#executorList");
+    if (execRoot) {
+      execRoot.innerHTML = (site.executors || [])
+        .map(
+          (ex) => `
+        <div class="executor-row">
+          <strong>${escapeHtml(ex.name || "Executor")}</strong>
+          <small>${escapeHtml(ex.note || "")}</small>
+          <span class="executor-badge ${escapeHtml(ex.status || "supported")}">${escapeHtml(ex.status || "supported")}</span>
+        </div>`
+        )
+        .join("");
+    }
+
+    const resRoot = $("#resourcesGrid");
+    if (resRoot) {
+      resRoot.innerHTML = (site.resources || [])
+        .map((item) => {
+          const url = resolveResourceUrl(site, item);
+          if (!url) return "";
+          return `<a class="resource-card reveal" href="${escapeHtml(url)}" target="_blank" rel="noopener"><strong>${escapeHtml(item.title || "Link")}</strong><span>${escapeHtml(item.desc || "")}</span></a>`;
+        })
+        .filter(Boolean)
+        .join("");
+    }
+
+    void renderSyncPanel();
+    afterRender();
+  }
+
+  function bindQuickActions(): void {
+    $("#quickCopyScript")?.addEventListener("click", () => void copyLoadstring());
+    $("#quickViewGames")?.addEventListener("click", () => {
+      location.hash = "#games";
+      $("#games")?.scrollIntoView({ behavior: "smooth" });
+    });
+    $("#quickSupport")?.addEventListener("click", () => {
+      location.hash = "#support";
+      $("#support")?.scrollIntoView({ behavior: "smooth" });
+    });
+    $("#quickTeam")?.addEventListener("click", () => {
+      location.hash = "#credits";
+      $("#credits")?.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
+  const CMD_ACTIONS = [
+    { label: "Go to Home", hash: "#home", keys: "G H" },
+    { label: "Go to Games", hash: "#games", keys: "G G" },
+    { label: "Go to Tools", hash: "#tools", keys: "G T" },
+    { label: "Go to Team / Credits", hash: "#credits", keys: "G C" },
+    { label: "Go to FAQ", hash: "#faq", keys: "G F" },
+    { label: "Go to Support", hash: "#support", keys: "G S" },
+    { label: "Copy loadstring", action: "copy", keys: "C L" },
+    { label: "Search games", action: "search", keys: "/" },
+  ];
+
+  function bindCommandPalette(): void {
+    const dialog = $("#cmdPalette") as HTMLDialogElement | null;
+    const input = $("#cmdInput") as HTMLInputElement | null;
+    const list = $("#cmdList");
+    if (!dialog || !input || !list) return;
+    const dlg = dialog;
+    const inp = input;
+    const lst = list;
+
+    let focusIdx = 0;
+
+    function renderList(query = "") {
+      const q = query.trim().toLowerCase();
+      const items = CMD_ACTIONS.filter((a) => a.label.toLowerCase().includes(q));
+      focusIdx = 0;
+      if (!items.length) {
+        lst.innerHTML = `<p class="cmd-palette-empty">No matching actions</p>`;
+        return;
+      }
+      lst.innerHTML = items
+        .map(
+          (a, i) =>
+            `<button type="button" class="cmd-palette-item${i === 0 ? " focused" : ""}" data-idx="${i}" data-hash="${a.hash || ""}" data-action="${a.action || ""}">${escapeHtml(a.label)}<kbd>${escapeHtml(a.keys)}</kbd></button>`
+        )
+        .join("");
+
+      lst.querySelectorAll(".cmd-palette-item").forEach((btn) => {
+        btn.addEventListener("click", () => runAction(items[parseInt((btn as HTMLElement).dataset.idx || "0", 10)]));
+      });
+    }
+
+    function runAction(item: (typeof CMD_ACTIONS)[number]) {
+      dlg.close();
+      if (item.hash) {
+        location.hash = item.hash;
+        document.querySelector(item.hash)?.scrollIntoView({ behavior: "smooth" });
+      } else if (item.action === "copy") void copyLoadstring();
+      else if (item.action === "search") ($("#gameSearch") as HTMLInputElement | null)?.focus();
+    }
+
+    function openPalette() {
+      inp.value = "";
+      renderList();
+      dlg.showModal();
+      inp.focus();
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        openPalette();
+      }
+    });
+
+    inp.addEventListener("input", () => renderList(inp.value));
+
+    inp.addEventListener("keydown", (e) => {
+      const items = lst.querySelectorAll(".cmd-palette-item");
+      if (!items.length) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        focusIdx = Math.min(focusIdx + 1, items.length - 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        focusIdx = Math.max(focusIdx - 1, 0);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        (items[focusIdx] as HTMLButtonElement)?.click();
+        return;
+      } else return;
+      items.forEach((el, i) => el.classList.toggle("focused", i === focusIdx));
+      (items[focusIdx] as HTMLElement)?.scrollIntoView({ block: "nearest" });
+    });
+
+    dlg.addEventListener("click", (e) => {
+      if (e.target === dlg) dlg.close();
+    });
   }
 
   function renderAccess(site: SitePayload): void {
@@ -449,6 +820,9 @@ import type { GameEntry, SitePayload } from "./types";
     else renderChangelog(data, false);
     renderFaq(data);
     renderBugCategories(data);
+    renderTools(data);
+    renderGameStatsBar(data);
+    void loadAndRenderCredits(data);
     if (notify && changed) flash("Synced from GitHub");
   }
 
@@ -463,10 +837,19 @@ import type { GameEntry, SitePayload } from "./types";
     }, SITE_POLL_MS);
   }
 
-  async function copyText(text: string, msg: string): Promise<void> {
+  async function copyText(text: string, msg: string, btn?: HTMLButtonElement | null): Promise<void> {
     try {
       await navigator.clipboard.writeText(text);
       flash(msg);
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = "Copied!";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = prev;
+          btn.classList.remove("copied");
+        }, 2000);
+      }
     } catch {
       flash("Copy failed", true);
     }
@@ -493,7 +876,18 @@ import type { GameEntry, SitePayload } from "./types";
 
   async function copyLoadstring(): Promise<void> {
     const text = state.site?.loadstring || $("#loadstringCode")?.textContent || "";
-    await copyText(text, "Script copied to clipboard");
+    await copyText(text, "Script copied to clipboard", $("#copyLoadstring") as HTMLButtonElement | null);
+  }
+
+  async function requireTurnstile(formId: string): Promise<string> {
+    const ts = window.AlleralTurnstile;
+    if (!ts?.getToken) return "";
+    const token = await ts.getToken(formId);
+    const mount = document.querySelector(`.form-turnstile[data-turnstile="${formId}"][data-rendered="1"]`);
+    if (mount && !token) {
+      throw new Error("Complete the security check below before submitting.");
+    }
+    return token;
   }
 
   async function submitBug(ev: Event): Promise<void> {
@@ -501,6 +895,7 @@ import type { GameEntry, SitePayload } from "./types";
     const err = $("#bugError");
     if (err) err.textContent = "";
     try {
+      const captcha = await requireTurnstile("bug");
       await api("/api/bug-report", {
         method: "POST",
         body: JSON.stringify({
@@ -512,10 +907,12 @@ import type { GameEntry, SitePayload } from "./types";
           contact: ($("#bugContact") as HTMLInputElement)?.value.trim(),
           description: ($("#bugDescription") as HTMLTextAreaElement)?.value.trim(),
           steps: ($("#bugSteps") as HTMLTextAreaElement)?.value.trim(),
+          turnstileToken: captcha,
           ...submissionMeta(),
         }),
       });
       ($("#bugForm") as HTMLFormElement)?.reset();
+      window.AlleralTurnstile?.reset?.("bug");
       flash("Report submitted — sent to Discord");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Submit failed";
@@ -529,6 +926,7 @@ import type { GameEntry, SitePayload } from "./types";
     const err = $("#featureError");
     if (err) err.textContent = "";
     try {
+      const captcha = await requireTurnstile("feature");
       await api("/api/feature-request", {
         method: "POST",
         body: JSON.stringify({
@@ -536,10 +934,12 @@ import type { GameEntry, SitePayload } from "./types";
           game: ($("#featureGame") as HTMLInputElement)?.value.trim(),
           contact: ($("#featureContact") as HTMLInputElement)?.value.trim(),
           idea: ($("#featureIdea") as HTMLTextAreaElement)?.value.trim(),
+          turnstileToken: captcha,
           ...submissionMeta(),
         }),
       });
       ($("#featureForm") as HTMLFormElement)?.reset();
+      window.AlleralTurnstile?.reset?.("feature");
       flash("Idea submitted — sent to Discord");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Submit failed";
@@ -553,6 +953,7 @@ import type { GameEntry, SitePayload } from "./types";
     const err = $("#supportError");
     if (err) err.textContent = "";
     try {
+      const captcha = await requireTurnstile("support");
       await api("/api/support", {
         method: "POST",
         body: JSON.stringify({
@@ -560,10 +961,12 @@ import type { GameEntry, SitePayload } from "./types";
           robloxUser: ($("#supportUser") as HTMLInputElement)?.value.trim(),
           contact: ($("#supportContact") as HTMLInputElement)?.value.trim(),
           question: ($("#supportQuestion") as HTMLTextAreaElement)?.value.trim(),
+          turnstileToken: captcha,
           ...submissionMeta(),
         }),
       });
       ($("#supportForm") as HTMLFormElement)?.reset();
+      window.AlleralTurnstile?.reset?.("support");
       flash("Question sent — we'll see it in Discord");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Submit failed";
@@ -580,11 +983,12 @@ import type { GameEntry, SitePayload } from "./types";
         $$("[data-panel-body]").forEach((body) => {
           const show = (body as HTMLElement).dataset.panelBody === panel;
           body.classList.toggle("hidden", !show);
-          if (show) {
-            body.classList.remove("panel-enter");
-            void (body as HTMLElement).offsetWidth;
-            body.classList.add("panel-enter");
-          }
+        if (show) {
+          body.classList.remove("panel-enter");
+          void (body as HTMLElement).offsetWidth;
+          body.classList.add("panel-enter");
+          void window.AlleralTurnstile?.mountVisible?.();
+        }
         });
         const me = e as MouseEvent;
         if (me.clientX != null) {
@@ -615,11 +1019,100 @@ import type { GameEntry, SitePayload } from "./types";
     });
   }
 
+  function bindGameSearch(): void {
+    const input = $("#gameSearch") as HTMLInputElement | null;
+    if (!input) return;
+    let timer = 0;
+    input.addEventListener("input", () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        state.gameQuery = input.value;
+        if (state.site) void renderGames(state.site);
+      }, 180);
+    });
+  }
+
+  function bindFaqSearch(): void {
+    const input = $("#faqSearch") as HTMLInputElement | null;
+    if (!input) return;
+    let timer = 0;
+    input.addEventListener("input", () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        state.faqQuery = input.value;
+        if (state.site) renderFaq(state.site);
+      }, 180);
+    });
+    $("#faqExpandAll")?.addEventListener("click", () => {
+      $$<HTMLDetailsElement>(".faq-item").forEach((item) => {
+        item.open = true;
+      });
+    });
+    $("#faqCollapseAll")?.addEventListener("click", () => {
+      $$<HTMLDetailsElement>(".faq-item").forEach((item) => {
+        item.open = false;
+      });
+    });
+  }
+
+  function bindKeyboardShortcuts(): void {
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      ($("#gameSearch") as HTMLInputElement | null)?.focus();
+    });
+  }
+
+  function bindBackToTop(): void {
+    const btn = $("#backToTop") as HTMLButtonElement | null;
+    if (!btn) return;
+    window.addEventListener("scroll", () => {
+      const show = window.scrollY > 480;
+      btn.hidden = !show;
+      btn.classList.toggle("visible", show);
+    }, { passive: true });
+    btn.addEventListener("click", () => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  function bindScrollSpy(): void {
+    const sections = $$("main section[id]");
+    if (!sections.length) return;
+    const links = $$<HTMLAnchorElement>(".nav-links a[data-section]");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible?.target?.id) return;
+        links.forEach((a) => a.classList.toggle("active", a.dataset.section === visible.target.id));
+      },
+      { rootMargin: "-40% 0px -45% 0px", threshold: [0, 0.15, 0.4] }
+    );
+    sections.forEach((s) => observer.observe(s));
+  }
+
   function bindMobileNav(): void {
     const toggle = $("#navToggle");
     const nav = $("#mainNav");
     toggle?.addEventListener("click", () => nav?.classList.toggle("open"));
     $$(".nav-links a").forEach((a) => a.addEventListener("click", () => nav?.classList.remove("open")));
+  }
+
+  async function initFormCaptcha(): Promise<void> {
+    try {
+      const data = await api("/api/gate/config");
+      if (data.serverVerify) {
+        void window.AlleralTurnstile?.mountVisible?.();
+      } else {
+        window.AlleralTurnstile?.hideAll?.();
+      }
+    } catch {
+      void window.AlleralTurnstile?.mountVisible?.();
+    }
   }
 
   function isGatePassed(): boolean {
@@ -640,7 +1133,7 @@ import type { GameEntry, SitePayload } from "./types";
 
     $("#copyLoadstring")?.addEventListener("click", () => void copyLoadstring());
     $("#copyPrimaryUrl")?.addEventListener("click", () => {
-      void copyText($("#primaryUrl")?.textContent || "", "Link copied");
+      void copyText($("#primaryUrl")?.textContent || "", "Link copied", $("#copyPrimaryUrl") as HTMLButtonElement | null);
     });
     $("#loadMoreChangelog")?.addEventListener("click", () => {
       state.changelogShown += 3;
@@ -654,8 +1147,16 @@ import type { GameEntry, SitePayload } from "./types";
     if (fy) fy.textContent = String(new Date().getFullYear());
     bindTabs();
     bindGameFilters();
+    bindGameSearch();
+    bindFaqSearch();
+    bindKeyboardShortcuts();
+    bindBackToTop();
+    bindScrollSpy();
     bindModal();
     bindMobileNav();
+    bindQuickActions();
+    bindCommandPalette();
+    void initFormCaptcha();
     setActiveNav();
     void checkLiveStatus();
     setInterval(() => void checkLiveStatus(), 60000);
@@ -670,7 +1171,7 @@ import type { GameEntry, SitePayload } from "./types";
       "alleral:gate-passed",
       () => {
         document.documentElement.classList.remove("cf-gate-lock");
-        document.body.classList.remove("cf-gate-lock");
+        document.body.classList.remove("cf-gate-lock", "cf-gate-active");
       },
       { once: true }
     );

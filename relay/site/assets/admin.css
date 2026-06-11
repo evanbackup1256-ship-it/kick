@@ -1,0 +1,268 @@
+/* Admin panel — ban tools, player lookup, session bar */
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  min-height: 32px;
+}
+
+.admin-session-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.admin-session-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-session-meta strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.admin-auth-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-ban-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.admin-ban-count {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.admin-ban-count strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.admin-filter-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-filter-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.admin-filter-chip:hover,
+.admin-filter-chip.active {
+  border-color: rgba(41, 151, 255, 0.45);
+  background: rgba(41, 151, 255, 0.08);
+  color: var(--text);
+}
+
+.player-lookup {
+  position: relative;
+}
+
+.player-lookup-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  max-height: 280px;
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(12, 12, 16, 0.98);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+}
+
+.player-lookup-dropdown.hidden {
+  display: none;
+}
+
+.player-lookup-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.player-lookup-item:hover,
+.player-lookup-item.focused {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.player-lookup-item + .player-lookup-item {
+  border-top: 1px solid var(--border);
+}
+
+.player-lookup-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.player-lookup-avatar.placeholder {
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.player-lookup-copy {
+  min-width: 0;
+}
+
+.player-lookup-copy strong {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-lookup-copy span {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.player-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(41, 151, 255, 0.25);
+  background: rgba(41, 151, 255, 0.06);
+}
+
+.player-preview.hidden {
+  display: none;
+}
+
+.player-preview img {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.player-preview-meta h4 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.player-preview-meta p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.player-preview-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ban-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.ban-card-meta-grid {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.ban-card-meta-grid span {
+  color: var(--text);
+}
+
+.admin-empty-auth {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.admin-empty-auth strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.admin-quick-reasons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: -4px 0 12px;
+}
+
+.admin-quick-reasons button {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.admin-quick-reasons button:hover {
+  border-color: rgba(41, 151, 255, 0.35);
+  color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .player-preview {
+    flex-wrap: wrap;
+  }
+  .player-preview-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+}

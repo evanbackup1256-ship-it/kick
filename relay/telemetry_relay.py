@@ -117,6 +117,7 @@ MAX_BODY_BYTES = int(os.environ.get("TELEMETRY_MAX_BODY_BYTES", "32768"))
 REPLAY_CACHE_SEC = int(os.environ.get("TELEMETRY_REPLAY_CACHE_SEC", "300"))
 MAX_EVENT_AGE_SEC = int(os.environ.get("TELEMETRY_MAX_EVENT_AGE_SEC", "600"))
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", API_KEY).strip()
+BAN_PARTNER_API_KEY = os.environ.get("BAN_PARTNER_API_KEY", ADMIN_API_KEY).strip()
 DEV_ACCESS_KEY = os.environ.get("DEV_ACCESS_KEY", "").strip()
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
@@ -186,7 +187,7 @@ except ImportError:
     ManageBackend = None  # type: ignore
 
 try:
-    from roblox_api import fetch_user, resolve_username, resolve_usernames
+    from roblox_api import fetch_user, resolve_username, resolve_usernames, fetch_avatar_renders, search_users
 except ImportError:
     def resolve_username(username: str):  # type: ignore
         raise RuntimeError("roblox_api unavailable")
@@ -197,6 +198,27 @@ except ImportError:
     def fetch_user(user_id: int | str):  # type: ignore
         raise RuntimeError("roblox_api unavailable")
 
+    def fetch_avatar_renders(user_ids: list[int | str]):  # type: ignore
+        return {}
+
+    def search_users(keyword: str, *, limit: int = 8):  # type: ignore
+        raise RuntimeError("roblox_api unavailable")
+
+try:
+    from weao_api import fetch_all_exploits, fetch_exploit, summarize_exploits, recent_changes
+except ImportError:
+    def fetch_all_exploits(*, force_refresh: bool = False, live: bool = False):  # type: ignore
+        raise RuntimeError("weao_api unavailable")
+
+    def fetch_exploit(slug: str):  # type: ignore
+        raise RuntimeError("weao_api unavailable")
+
+    def summarize_exploits(exploits: list):  # type: ignore
+        return {"total": 0}
+
+    def recent_changes(limit: int = 20):  # type: ignore
+        return []
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
 
@@ -204,7 +226,7 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
 @app.after_request
 def apply_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Alleral-Key, X-Admin-Key, X-Admin-Token, X-Dev-Token, Authorization"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Alleral-Key, X-Admin-Key, X-Admin-Token, X-Dev-Token, X-Ban-Api-Key, X-Ban-Partner-Key, X-Alleral-Ban-Key, Authorization"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
     return response
 
@@ -283,6 +305,7 @@ DEV_RATE_PER_MIN = int(os.environ.get("DEV_RATE_PER_MIN", "12"))
 ADMIN_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 ADMIN_SESSIONS: dict[str, float] = {}
 ADMIN_SESSION_TTL_SEC = int(os.environ.get("ADMIN_SESSION_TTL_SEC", str(86400)))
+ADMIN_REMEMBER_TTL_SEC = int(os.environ.get("ADMIN_REMEMBER_TTL_SEC", str(86400 * 365)))
 ADMIN_RATE_PER_MIN = int(os.environ.get("ADMIN_RATE_PER_MIN", "20"))
 THUMB_RATE_PER_MIN = int(os.environ.get("THUMB_RATE_PER_MIN", "60"))
 PUBLIC_RATE_PER_MIN = int(os.environ.get("PUBLIC_RATE_PER_MIN", "120"))
@@ -359,9 +382,10 @@ def admin_enabled() -> bool:
     return bool(ADMIN_API_KEY) and len(ADMIN_API_KEY) >= MIN_API_KEY_LEN
 
 
-def admin_issue_token() -> tuple[str, str]:
+def admin_issue_token(*, remember: bool = False) -> tuple[str, str]:
     token = secrets.token_urlsafe(48)
-    expiry = time.time() + ADMIN_SESSION_TTL_SEC
+    ttl = ADMIN_REMEMBER_TTL_SEC if remember else ADMIN_SESSION_TTL_SEC
+    expiry = time.time() + ttl
     ADMIN_SESSIONS[token] = expiry
     return token, datetime.fromtimestamp(expiry, tz=timezone.utc).replace(microsecond=0).isoformat()
 
@@ -405,6 +429,8 @@ def build_public_site_payload() -> dict[str, Any]:
             "universeIds": meta.get("universeIds") or [],
             "robloxUrl": meta.get("robloxUrl") or "",
             "description": meta.get("description") or entry.get("message") or "",
+            "uiTabs": meta.get("uiTabs") or [],
+            "scriptFeatures": meta.get("scriptFeatures") or [],
         }
     sync_meta = AUTO_SYNC.status() if AUTO_SYNC is not None else {"autoStatus": False}
     return {
@@ -419,6 +445,9 @@ def build_public_site_payload() -> dict[str, Any]:
         "changelog": site.get("changelog") or [],
         "bugCategories": site.get("bugCategories") or [],
         "links": site.get("links") or {},
+        "credits": site.get("credits") or {},
+        "executors": site.get("executors") or [],
+        "resources": site.get("resources") or [],
         "games": merged_games,
         "scriptsUpdatedAt": manifest.get("updatedAt"),
         "siteUpdatedAt": site.get("updatedAt"),
@@ -1176,6 +1205,67 @@ def admin_authorized() -> bool:
     return False
 
 
+def ban_partner_enabled() -> bool:
+    return bool(BAN_PARTNER_API_KEY) and len(BAN_PARTNER_API_KEY) >= MIN_API_KEY_LEN
+
+
+def ban_partner_authorized(*, write: bool = False) -> bool:
+    if admin_authorized():
+        return True
+    if not ban_partner_enabled():
+        return False
+    auth = (request.headers.get("Authorization") or "").strip()
+    if auth.lower().startswith("bearer "):
+        bearer = auth[7:].strip()
+        if secure_compare(bearer, BAN_PARTNER_API_KEY):
+            return True
+    for header in ("X-Ban-Api-Key", "X-Ban-Partner-Key", "X-Alleral-Ban-Key"):
+        provided = (request.headers.get(header) or "").strip()
+        if provided and secure_compare(provided, BAN_PARTNER_API_KEY):
+            return True
+    if not write and gate_authorized():
+        return True
+    return False
+
+
+def build_ban_api_docs(base: str) -> dict[str, Any]:
+    return {
+        "version": "1",
+        "title": "Alleral Ban API",
+        "description": "Third-party REST API for checking and managing Alleral bans.",
+        "authentication": {
+            "headers": [
+                "X-Ban-Api-Key: <BAN_PARTNER_API_KEY>",
+                "Authorization: Bearer <BAN_PARTNER_API_KEY>",
+                "X-Alleral-Key: <TELEMETRY_API_KEY> (check-only, loader compat)",
+            ],
+            "env": "Set BAN_PARTNER_API_KEY on Railway for partner integrations.",
+        },
+        "endpoints": [
+            {"method": "GET", "path": "/api/v1/bans/docs", "auth": False, "desc": "This documentation JSON"},
+            {"method": "GET", "path": "/api/v1/bans/status", "auth": False, "desc": "Public ban system stats"},
+            {"method": "POST", "path": "/api/v1/bans/check", "auth": True, "desc": "Check if a player/hardware ID is banned"},
+            {"method": "POST", "path": "/api/v1/bans/batch-check", "auth": True, "desc": "Check up to 25 players in one request"},
+            {"method": "GET", "path": "/api/v1/bans/lookup", "auth": True, "desc": "Lookup by banType + value query params"},
+            {"method": "GET", "path": "/api/v1/bans", "auth": True, "desc": "List active bans (optional ?q= search)"},
+            {"method": "POST", "path": "/api/v1/bans", "auth": True, "desc": "Create a ban entry"},
+            {"method": "DELETE", "path": "/api/v1/bans/{id}", "auth": True, "desc": "Remove a ban by ID"},
+            {"method": "POST", "path": "/api/v1/bans/roblox", "auth": True, "desc": "Ban Roblox player with cascade"},
+        ],
+        "checkExample": {
+            "url": f"{base}/api/v1/bans/check",
+            "headers": {"Content-Type": "application/json", "X-Ban-Api-Key": "<key>"},
+            "body": {
+                "player": {"userId": 123456789, "name": "PlayerName"},
+                "hwid": "optional-hwid",
+                "fingerprint": "optional-fingerprint",
+                "executor": "volt",
+                "context": {"placeId": 89469502395769, "universeId": 10004244222},
+            },
+        },
+    }
+
+
 @app.get("/scripts")
 def list_scripts():
     if AUTO_SYNC is not None:
@@ -1241,16 +1331,171 @@ def api_ban_status():
     client_ip = resolve_client_ip(request)
     if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
         return jsonify({"ok": False, "error": "rate_limited"}), 429
+    base = public_base_url()
     return jsonify({
         "ok": True,
         "activeBans": len(BAN_REGISTRY.list_bans()),
         "banTypes": sorted(VALID_BAN_TYPES),
+        "partnerApi": ban_partner_enabled(),
         "endpoints": {
             "check": "/api/ban/check",
             "gate": "/gate/check",
             "robloxResolve": "/api/ban/roblox/resolve",
+            "v1Docs": "/api/v1/bans/docs",
+            "v1Check": "/api/v1/bans/check",
+            "v1Lookup": "/api/v1/bans/lookup",
+            "v1List": "/api/v1/bans",
         },
+        "docs": build_ban_api_docs(base),
     })
+
+
+@app.get("/api/v1/bans/docs")
+def ban_api_v1_docs():
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    base = public_base_url()
+    payload = build_ban_api_docs(base)
+    payload["ok"] = True
+    payload["activeBans"] = len(BAN_REGISTRY.list_bans())
+    payload["banTypes"] = sorted(VALID_BAN_TYPES)
+    return jsonify(payload)
+
+
+@app.get("/api/v1/bans/status")
+def ban_api_v1_status():
+    return api_ban_status()
+
+
+@app.post("/api/v1/bans/check")
+def ban_api_v1_check():
+    if not ban_partner_authorized():
+        return jsonify({"ok": False, "error": "unauthorized", "hint": "Use X-Ban-Api-Key or X-Alleral-Key"}), 401
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    return jsonify(build_ban_response(body, client_ip))
+
+
+@app.post("/api/v1/bans/batch-check")
+def ban_api_v1_batch_check():
+    if not ban_partner_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    entries = body.get("players") or body.get("checks")
+    if not isinstance(entries, list) or not entries:
+        return jsonify({"ok": False, "error": "players_required"}), 400
+    results = []
+    for item in entries[:25]:
+        if not isinstance(item, dict):
+            continue
+        results.append(build_ban_response(item, client_ip))
+    return jsonify({"ok": True, "results": results, "count": len(results)})
+
+
+@app.get("/api/v1/bans/lookup")
+def ban_api_v1_lookup():
+    if not ban_partner_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    ban_type = str(request.args.get("banType") or request.args.get("type") or "").strip().lower()
+    value = str(request.args.get("value") or "").strip()
+    if not ban_type or not value:
+        return jsonify({"ok": False, "error": "banType_and_value_required"}), 400
+    body = {"banType": ban_type, "value": value}
+    if ban_type == "userid":
+        body = {"userId": value, "player": {"userId": value}}
+    elif ban_type == "username":
+        body = {"playerName": value, "player": {"name": value}}
+    elif ban_type == "hwid":
+        body = {"hwid": value}
+    elif ban_type == "fingerprint":
+        body = {"fingerprint": value}
+    elif ban_type == "ip":
+        body = {"context": {"clientIp": value}}
+    elif ban_type == "executor":
+        body = {"executor": value}
+    return jsonify(build_ban_response(body, client_ip))
+
+
+@app.get("/api/v1/bans")
+def ban_api_v1_list():
+    if not ban_partner_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    query = request.args.get("q", "")
+    bans = BAN_REGISTRY.list_bans(query=query)
+    return jsonify({"ok": True, "bans": bans, "count": len(bans), "validBanTypes": sorted(VALID_BAN_TYPES)})
+
+
+@app.post("/api/v1/bans")
+def ban_api_v1_create():
+    if not ban_partner_authorized(write=True):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    try:
+        created = BAN_REGISTRY.add_ban(
+            str(payload.get("banType") or payload.get("ban_type") or ""),
+            payload.get("value"),
+            reason=str(payload.get("reason") or ""),
+            player_name=str(payload.get("playerName") or payload.get("player_name") or ""),
+            roblox_user_id=str(payload.get("robloxUserId") or payload.get("roblox_user_id") or ""),
+            expires_at=str(payload.get("expiresAt") or payload.get("expires_at") or "") or None,
+            created_by=str(payload.get("createdBy") or payload.get("created_by") or "partner-api"),
+        )
+    except (ValueError, RuntimeError) as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    manage_audit("ban.partner.add", {"ban": created}, actor="partner-api")
+    return jsonify({"ok": True, "ban": created})
+
+
+@app.delete("/api/v1/bans/<int:ban_id>")
+def ban_api_v1_remove(ban_id: int):
+    if not ban_partner_authorized(write=True):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    if not BAN_REGISTRY.remove_ban(ban_id):
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    manage_audit("ban.partner.remove", {"banId": ban_id}, actor="partner-api")
+    return jsonify({"ok": True, "removed": ban_id})
+
+
+@app.post("/api/v1/bans/roblox")
+def ban_api_v1_roblox():
+    if not ban_partner_authorized(write=True):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    try:
+        result = BAN_REGISTRY.ban_roblox_player(
+            username=str(payload.get("username") or payload.get("playerName") or ""),
+            user_id=payload.get("userId") or payload.get("user_id"),
+            hwid=str(payload.get("hwid") or ""),
+            fingerprint=str(payload.get("fingerprint") or ""),
+            client_ip=str(payload.get("ip") or payload.get("clientIp") or ""),
+            executor=str(payload.get("executor") or ""),
+            reason=str(payload.get("reason") or ""),
+            expires_at=str(payload.get("expiresAt") or payload.get("expires_at") or "") or None,
+            created_by=str(payload.get("createdBy") or payload.get("created_by") or "partner-api"),
+            cascade=bool(payload.get("cascade", True)),
+            resolve_username=resolve_username,
+        )
+    except (ValueError, RuntimeError) as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    manage_audit("ban.partner.roblox", {"result": result}, actor="partner-api")
+    return jsonify(result)
 
 
 @app.post("/api/ban/roblox/resolve")
@@ -1420,6 +1665,7 @@ def gate_config():
         "required": True,
         "sessionHours": 4,
         "mode": "interactive",
+        "serverVerify": bool(TURNSTILE_SECRET_KEY),
     })
 
 
@@ -1449,6 +1695,28 @@ def gate_verify():
     except requests.RequestException as exc:
         print(f"[gate] turnstile verify failed: {exc}", file=sys.stderr)
         return jsonify({"ok": True, "verified": True, "mode": "degraded"})
+
+
+def verify_form_turnstile(body: dict, client_ip: str) -> tuple[bool, str | None]:
+    """Require a valid Turnstile token on form posts when secret key is configured."""
+    if not TURNSTILE_SECRET_KEY:
+        return True, None
+    token = str(body.get("turnstileToken") or body.get("token") or "").strip()
+    if not token:
+        return False, "captcha_required"
+    try:
+        resp = requests.post(
+            "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+            data={"secret": TURNSTILE_SECRET_KEY, "response": token, "remoteip": client_ip},
+            timeout=8,
+        )
+        data = resp.json()
+        if data.get("success"):
+            return True, None
+        return False, "captcha_failed"
+    except requests.RequestException as exc:
+        print(f"[gate] form turnstile verify failed: {exc}", file=sys.stderr)
+        return False, "captcha_unavailable"
 
 
 @app.get("/api/sync/status")
@@ -1507,6 +1775,125 @@ def game_thumbnails():
     return jsonify({"ok": True, "thumbnails": thumbnails})
 
 
+def _collect_credit_members(credits: dict[str, Any]) -> list[dict[str, Any]]:
+    members: list[dict[str, Any]] = []
+    teams = credits.get("teams") if isinstance(credits.get("teams"), list) else []
+    for team in teams:
+        if not isinstance(team, dict):
+            continue
+        for member in team.get("members") or []:
+            if isinstance(member, dict):
+                members.append(member)
+    return members
+
+
+@app.get("/api/credits/renders")
+def credits_renders():
+    """Resolve Roblox avatars for credits team members (full-body + bust + headshot)."""
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, THUMB_IP_HITS, THUMB_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+
+    site = SITE_REGISTRY.load()
+    credits = site.get("credits") if isinstance(site.get("credits"), dict) else {}
+    members = _collect_credit_members(credits)
+
+    profiles: dict[str, dict[str, Any]] = {}
+    user_ids: list[str] = []
+
+    for member in members:
+        mid = str(member.get("id") or member.get("displayName") or "").strip()
+        uid = str(member.get("robloxUserId") or member.get("userId") or "").strip()
+        uname = str(member.get("robloxUsername") or member.get("username") or "").strip()
+
+        profile: dict[str, Any] | None = None
+        if uid.isdigit():
+            try:
+                profile = fetch_user(uid)
+            except Exception:
+                profile = {"id": int(uid), "name": uname or uid, "displayName": member.get("displayName") or uname or uid}
+        elif uname:
+            try:
+                profile = resolve_username(uname)
+            except Exception:
+                profile = None
+
+        if not profile or not profile.get("id"):
+            if mid:
+                profiles[mid] = {
+                    "id": mid,
+                    "displayName": member.get("displayName") or uname or "Member",
+                    "role": member.get("role") or "",
+                    "renders": {},
+                }
+            continue
+
+        uid_str = str(profile["id"])
+        user_ids.append(uid_str)
+        profiles[mid or uid_str] = {
+            "id": mid or uid_str,
+            "robloxUserId": uid_str,
+            "robloxUsername": profile.get("name") or uname,
+            "displayName": profile.get("displayName") or member.get("displayName") or profile.get("name"),
+            "role": member.get("role") or "",
+            "profileUrl": f"https://www.roblox.com/users/{uid_str}/profile",
+        }
+
+    renders: dict[str, dict[str, str]] = {}
+    if user_ids:
+        try:
+            renders = fetch_avatar_renders(user_ids)
+        except Exception as exc:
+            print(f"[credits] avatar fetch failed: {exc}", file=sys.stderr)
+
+    for entry in profiles.values():
+        uid = str(entry.get("robloxUserId") or "")
+        entry["renders"] = renders.get(uid, {})
+
+    return jsonify({"ok": True, "members": profiles})
+
+
+@app.get("/api/weao/exploits")
+def weao_exploits():
+    """Live executor statuses from WEAO (WhatExpsAre.Online)."""
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, THUMB_IP_HITS, THUMB_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    force = str(request.args.get("refresh") or "").lower() in {"1", "true", "yes"}
+    live = force or str(request.args.get("live") or "").lower() in {"1", "true", "yes"}
+    try:
+        exploits, changes = fetch_all_exploits(force_refresh=force, live=live)
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+    summary = summarize_exploits(exploits)
+    return jsonify({
+        "ok": True,
+        "exploits": exploits,
+        "summary": summary,
+        "changes": changes,
+        "recentChanges": recent_changes(20),
+        "source": "weao",
+        "docs": "https://docs.weao.xyz",
+        "fetchedAt": utc_iso(),
+        "live": live,
+        "pollIntervalSec": 35 if live else 120,
+    })
+
+
+@app.get("/api/weao/exploits/<slug>")
+def weao_exploit_detail(slug: str):
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, THUMB_IP_HITS, THUMB_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    try:
+        entry = fetch_exploit(slug)
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+    if not entry:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    return jsonify({"ok": True, "exploit": entry, "source": "weao"})
+
+
 @app.get("/api/site")
 def public_site():
     client_ip = resolve_client_ip(request)
@@ -1545,6 +1932,10 @@ def public_bug_report():
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         return jsonify({"ok": False, "error": "bad_request"}), 400
+
+    ok_captcha, captcha_err = verify_form_turnstile(body, client_ip)
+    if not ok_captcha:
+        return jsonify({"ok": False, "error": captcha_err or "captcha_failed"}), 403
 
     description = clip(body.get("description") or body.get("message"), 1800)
     if len(description) < 8:
@@ -1647,6 +2038,10 @@ def public_feature_request():
     if not isinstance(body, dict):
         return jsonify({"ok": False, "error": "bad_request"}), 400
 
+    ok_captcha, captcha_err = verify_form_turnstile(body, client_ip)
+    if not ok_captcha:
+        return jsonify({"ok": False, "error": captcha_err or "captcha_failed"}), 403
+
     idea = clip(body.get("idea") or body.get("description"), 1800)
     if len(idea) < 8:
         return jsonify({"ok": False, "error": "idea_too_short"}), 400
@@ -1682,6 +2077,10 @@ def public_support_question():
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         return jsonify({"ok": False, "error": "bad_request"}), 400
+
+    ok_captcha, captcha_err = verify_form_turnstile(body, client_ip)
+    if not ok_captcha:
+        return jsonify({"ok": False, "error": captcha_err or "captcha_failed"}), 403
 
     question = clip(body.get("question") or body.get("message"), 1800)
     if len(question) < 8:
@@ -1774,9 +2173,41 @@ def admin_login():
     provided = str(body.get("key") or body.get("adminKey") or "").strip()
     if not provided or not secure_compare(provided, ADMIN_API_KEY):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
-    token, expires_at = admin_issue_token()
-    manage_audit("admin.login", {"ip": resolve_client_ip(request)}, actor="admin")
-    return jsonify({"ok": True, "token": token, "expiresAt": expires_at})
+    remember = bool(body.get("remember"))
+    token, expires_at = admin_issue_token(remember=remember)
+    manage_audit("admin.login", {"ip": resolve_client_ip(request), "remember": remember}, actor="admin")
+    return jsonify({"ok": True, "token": token, "expiresAt": expires_at, "remember": remember})
+
+
+@app.get("/api/admin/users/search")
+def admin_users_search():
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    query = str(request.args.get("q") or request.args.get("keyword") or "").strip()
+    if len(query) < 2:
+        return jsonify({"ok": True, "users": []})
+    try:
+        limit = int(request.args.get("limit") or 8)
+    except ValueError:
+        limit = 8
+    try:
+        users = search_users(query, limit=max(1, min(limit, 25)))
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+    ids = [row.get("id") for row in users if row.get("id")]
+    avatars = fetch_avatar_renders(ids) if ids else {}
+    enriched: list[dict[str, Any]] = []
+    for row in users:
+        uid = str(row.get("id") or "")
+        bucket = avatars.get(uid) or {}
+        enriched.append(
+            {
+                **row,
+                "headshot": bucket.get("headshot") or "",
+                "profileUrl": bucket.get("profile") or f"https://www.roblox.com/users/{uid}/profile",
+            }
+        )
+    return jsonify({"ok": True, "users": enriched, "query": query})
 
 
 @app.get("/api/admin/status")

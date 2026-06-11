@@ -12,6 +12,8 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232997ff'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='18' fill='white' font-family='sans-serif'%3EA%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./assets/style.css" />
   <link rel="stylesheet" href="./assets/animations.css" />
+  <link rel="stylesheet" href="./assets/renders.css" />
+  <link rel="stylesheet" href="./assets/credits.css" />
   <script src="./assets/config.js"></script>
   <script src="./assets/gate.js" defer></script>
 </head>
@@ -22,7 +24,6 @@
     <span class="hero-orb hero-orb-2"></span>
     <span class="hero-orb hero-orb-3"></span>
   </div>
-  <div class="cursor-glow" aria-hidden="true"></div>
   <div class="grain" aria-hidden="true"></div>
 
   <header class="nav-shell" id="siteNav">
@@ -32,7 +33,10 @@
         <a href="#home" data-section="home">Home</a>
         <a href="#features" data-section="features">Features</a>
         <a href="#games" data-section="games">Games</a>
+        <a href="#tools" data-section="tools">Tools</a>
+        <a href="#ban-api" data-section="ban-api">Ban API</a>
         <a href="#changelog" data-section="changelog">Updates</a>
+        <a href="#credits" data-section="credits">Creator</a>
         <a href="#faq" data-section="faq">FAQ</a>
         <a href="#support" data-section="support">Support</a>
       </div>
@@ -45,11 +49,67 @@
     </nav>
   </header>
 
-  <main>
+  <main class="site-content">
     <section id="home" class="hero wrap">
+      <div class="hero-render-wrap" aria-hidden="true">
+        <canvas id="heroMesh" class="hero-mesh-canvas"></canvas>
+        <div class="hero-render-scene">
+          <div class="render-beam render-beam-1"></div>
+          <div class="render-beam render-beam-2"></div>
+          <div class="render-beam render-beam-3"></div>
+          <div class="render-stage">
+            <div class="render-grid-floor"></div>
+            <div class="render-ring render-ring-1"></div>
+            <div class="render-ring render-ring-2"></div>
+            <div class="render-ring render-ring-3"></div>
+            <div class="render-core">
+              <div class="render-core-glow"></div>
+              <div class="render-cube">
+                <div class="render-cube-face"></div>
+                <div class="render-cube-face"></div>
+                <div class="render-cube-face"></div>
+                <div class="render-cube-face"></div>
+                <div class="render-cube-face"></div>
+                <div class="render-cube-face"></div>
+              </div>
+            </div>
+            <div class="render-float render-float-script">
+              <div class="render-mini-head">
+                <span class="render-mini-dot r"></span>
+                <span class="render-mini-dot y"></span>
+                <span class="render-mini-dot g"></span>
+                loader.luau
+              </div>
+              <div class="render-mini-code">
+                <span class="kw">loadstring</span>(<span class="fn">game</span>:<span class="fn">HttpGet</span>(<span class="str">"…"</span>))()
+              </div>
+            </div>
+            <div class="render-float render-float-game">
+              <div class="render-game-art"></div>
+              <div class="render-game-body">
+                <strong>Kick a Lucky Block</strong>
+                <span class="render-live-pill"><span></span>Working</span>
+              </div>
+            </div>
+            <div class="render-float render-float-status">
+              <div class="render-status-row">
+                <strong>Hub</strong> synced · live
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div id="announcement" class="announce-banner hidden reveal"></div>
       <h1 class="hero-brand"><span id="heroBrand">ALLERAL</span></h1>
       <p id="tagline" class="hero-lead">Roblox scripts that stay updated.</p>
+
+      <div class="quick-actions reveal">
+        <button id="quickCopyScript" class="quick-action" type="button">Copy Script</button>
+        <button id="quickViewGames" class="quick-action" type="button">Browse Games</button>
+        <button id="quickSupport" class="quick-action" type="button">Get Help</button>
+        <button id="quickExecutors" class="quick-action" type="button">Check Executors</button>
+        <button id="quickTeam" class="quick-action" type="button">Creator</button>
+      </div>
 
       <div class="script-panel reveal">
         <div class="script-panel-head">
@@ -74,7 +134,40 @@
       </div>
     </section>
 
-    <section id="features" class="section section-alt">
+    <section id="getting-started" class="section wrap">
+      <header class="section-intro reveal">
+        <p class="section-label">Quick Start</p>
+        <h2>Get running in 3 steps</h2>
+        <p class="section-desc">Copy the loader, inject with your executor, and pick a game from the hub.</p>
+      </header>
+      <ol class="steps-grid reveal" id="quickSteps">
+        <li class="step-card">
+          <div class="step-render step-render-copy" aria-hidden="true"></div>
+          <span class="step-num">1</span>
+          <h3>Copy the loader</h3>
+          <p>Use the script above or tap <strong>Copy Script</strong> — it auto-updates from GitHub.</p>
+        </li>
+        <li class="step-card">
+          <div class="step-render step-render-play" aria-hidden="true"></div>
+          <span class="step-num">2</span>
+          <h3>Execute in Roblox</h3>
+          <p>Open your executor, paste the loadstring, and run it in any supported game. Not sure yours works? Check <a href="#tools">live WEAO status</a>.</p>
+        </li>
+        <li class="step-card">
+          <div class="step-render step-render-game" aria-hidden="true"></div>
+          <span class="step-num">3</span>
+          <h3>Pick a game</h3>
+          <p>Check live status below — green means working. Join the game and the hub menu loads automatically.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section id="features" class="section section-alt section-with-render">
+      <div class="section-render-accent features-render" aria-hidden="true">
+        <div class="render-orb-stack">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
       <div class="wrap">
         <header class="section-intro reveal">
           <p class="section-label">Features</p>
@@ -85,12 +178,33 @@
       </div>
     </section>
 
-    <section id="games" class="section wrap">
+    <section id="games" class="section wrap section-with-render">
+      <div class="section-render-accent games-render" aria-hidden="true">
+        <div class="render-isometric-stack">
+          <div class="iso-layer iso-layer-1"></div>
+          <div class="iso-layer iso-layer-2"></div>
+          <div class="iso-layer iso-layer-3"></div>
+        </div>
+      </div>
       <header class="section-intro reveal">
         <p class="section-label">Games</p>
         <h2>Supported games</h2>
         <p class="section-desc">Same list the loader checks. Status updates from real injects.</p>
       </header>
+      <div id="gameStatsBar" class="game-stats-bar reveal"></div>
+      <div class="games-toolbar reveal">
+        <div class="search-field">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="gameSearch" class="search-input" type="search" placeholder="Search games…" autocomplete="off" aria-label="Search games" />
+          <kbd class="search-hint" aria-hidden="true">/</kbd>
+        </div>
+        <div class="status-legend" aria-label="Status legend">
+          <span class="legend-item"><span class="legend-dot working"></span>Working</span>
+          <span class="legend-item"><span class="legend-dot testing"></span>Testing</span>
+          <span class="legend-item"><span class="legend-dot maintenance"></span>Maintenance</span>
+          <span class="legend-item"><span class="legend-dot broken"></span>Broken</span>
+        </div>
+      </div>
       <div class="game-filters reveal" id="gameFilters">
         <button class="filter-pill active" data-filter="all" type="button">All</button>
         <button class="filter-pill" data-filter="working" type="button">Working</button>
@@ -99,6 +213,100 @@
         <button class="filter-pill" data-filter="broken" type="button">Broken</button>
       </div>
       <div id="gamesGrid" class="games-grid"></div>
+    </section>
+
+    <section id="tools" class="section section-alt">
+      <div class="wrap">
+        <header class="section-intro reveal">
+          <p class="section-label">Toolbox</p>
+          <h2>Helpful tools</h2>
+          <p class="section-desc">Live executor status from <a href="https://whatexpsare.online/" target="_blank" rel="noopener">WEAO</a>, sync health, and quick links. Press <kbd>Ctrl+K</kbd> for the command palette.</p>
+        </header>
+        <div id="weaoStats" class="weao-stats reveal"></div>
+        <div class="tools-grid reveal">
+          <div class="tool-panel">
+            <h3>Live sync</h3>
+            <p class="tool-panel-desc">GitHub auto-sync status from Railway.</p>
+            <div id="syncPanelBody"></div>
+          </div>
+          <div class="tool-panel tool-panel-compact">
+            <h3>Live status feed</h3>
+            <p class="tool-panel-desc">Patches, detections, and Roblox updates — streamed from WEAO while you watch this section.</p>
+            <div id="weaoActivityFeed" class="weao-activity-feed">
+              <p class="weao-feed-empty">Watching WEAO for changes…</p>
+            </div>
+          </div>
+        </div>
+        <div class="tool-panel tool-panel-wide reveal">
+          <div class="executor-panel-head">
+            <div>
+              <h3>All executors — live from WEAO</h3>
+              <p class="tool-panel-desc">Working, not working, detected, and patched — updates every ~35s when this section is visible.</p>
+            </div>
+            <div class="executor-panel-actions">
+              <span id="weaoLiveBadge" class="weao-live-badge">WEAO</span>
+              <button id="weaoRefresh" class="btn btn-outline btn-sm" type="button">Refresh now</button>
+            </div>
+          </div>
+          <div class="executor-toolbar">
+            <div class="search-field executor-search-field">
+              <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <input id="executorSearch" class="search-input" type="search" placeholder="Search Volt, Wave, Synapse…" autocomplete="off" aria-label="Search executors" list="executorDatalist" />
+            </div>
+            <div id="executorFilters" class="executor-filters">
+              <button class="admin-filter-chip active" data-weao-filter="all" type="button">All</button>
+              <button class="admin-filter-chip" data-weao-filter="working" type="button">Working</button>
+              <button class="admin-filter-chip" data-weao-filter="not_working" type="button">Not working</button>
+              <button class="admin-filter-chip" data-weao-filter="recommended" type="button">Best for Alleral</button>
+              <button class="admin-filter-chip" data-weao-filter="detected" type="button">Detected</button>
+              <button class="admin-filter-chip" data-weao-filter="outdated" type="button">Outdated</button>
+              <button class="admin-filter-chip" data-weao-filter="free" type="button">Free</button>
+            </div>
+          </div>
+          <p id="weaoCountdown" class="weao-meta weao-countdown"></p>
+          <p id="weaoUpdated" class="weao-meta"></p>
+          <div id="executorList" class="weao-executor-grid"></div>
+          <datalist id="executorDatalist"></datalist>
+        </div>
+        <div class="tool-panel reveal">
+          <h3>Quick links</h3>
+          <p class="tool-panel-desc">Jump to loader source, admin, health checks, and more.</p>
+          <div id="resourcesGrid" class="resources-grid"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="ban-api" class="section wrap">
+      <header class="section-intro reveal">
+        <p class="section-label">Integrations</p>
+        <h2>Third-party Ban API</h2>
+        <p class="section-desc">REST API for external tools, hubs, and scripts to check or manage Alleral bans. Set <code>BAN_PARTNER_API_KEY</code> on Railway for partner access.</p>
+      </header>
+      <div id="banApiStatus" class="ban-api-stats reveal"></div>
+      <div class="ban-api-grid reveal">
+        <div class="tool-panel">
+          <div class="ban-api-panel-head">
+            <h3>Endpoints</h3>
+            <button id="banApiCopyDocs" class="btn btn-outline btn-sm" type="button">Copy docs URL</button>
+          </div>
+          <div id="banApiEndpoints" class="ban-api-endpoints"></div>
+        </div>
+        <div class="tool-panel">
+          <h3>Live ban checker</h3>
+          <p class="tool-panel-desc">Test <code>POST /api/v1/bans/check</code> with an optional partner API key.</p>
+          <form class="form ban-api-test-form" onsubmit="return false">
+            <label>Partner API Key <span class="muted-inline">optional</span><input id="banTestKey" class="field-input field-mono" type="password" placeholder="X-Ban-Api-Key" autocomplete="off" /></label>
+            <div class="form-row">
+              <label>Roblox UserId<input id="banTestUserId" class="field-input" placeholder="123456789" inputmode="numeric" /></label>
+              <label>Username<input id="banTestUsername" class="field-input" placeholder="PlayerName" /></label>
+            </div>
+            <button id="banApiTestBtn" class="btn btn-fill" type="button">Run Check</button>
+          </form>
+          <pre id="banApiTestResult" class="ban-api-result">Results appear here.</pre>
+          <h4 class="ban-api-subhead">Example request body</h4>
+          <pre id="banApiExample" class="ban-api-example field-mono">Loading…</pre>
+        </div>
+      </div>
     </section>
 
     <section id="changelog" class="section section-alt">
@@ -117,9 +325,22 @@
 
     <section id="faq" class="section wrap">
       <header class="section-intro reveal">
-        <p class="section-label">Support</p>
+        <p class="section-label">FAQ</p>
         <h2>Frequently Asked Questions</h2>
+        <p class="section-desc">Search answers or expand a question. Your feedback helps us improve.</p>
       </header>
+      <div class="faq-toolbar reveal">
+        <div class="search-field faq-search-field">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="faqSearch" class="search-input" type="search" placeholder="Search FAQ…" autocomplete="off" aria-label="Search FAQ" />
+        </div>
+        <div class="faq-toolbar-actions">
+          <button id="faqExpandAll" class="btn-text" type="button">Expand all</button>
+          <span class="toolbar-divider" aria-hidden="true"></span>
+          <button id="faqCollapseAll" class="btn-text" type="button">Collapse all</button>
+        </div>
+      </div>
+      <p id="faqEmpty" class="empty hidden">No questions match your search.</p>
       <div id="faqList" class="faq-list"></div>
     </section>
 
@@ -164,12 +385,13 @@
               </label>
               <div class="form-row">
                 <label>Roblox Username<input id="bugUser" class="field-input" placeholder="Your username" /></label>
-                <label>Executor<input id="bugExecutor" class="field-input" placeholder="Volt, Wave, Synapse…" /></label>
+                <label>Executor<input id="bugExecutor" class="field-input" placeholder="Search in Tools or type name…" list="executorDatalist" /></label>
               </div>
               <label>Contact <span class="muted-inline">optional</span><input id="bugContact" class="field-input" placeholder="Discord or email" /></label>
               <label>Description<textarea id="bugDescription" class="field-textarea" required placeholder="What happened?"></textarea></label>
               <label>Steps to Reproduce<textarea id="bugSteps" class="field-textarea" placeholder="1. Join game…"></textarea></label>
               <div id="bugError" class="form-error"></div>
+              <div class="form-turnstile" data-turnstile="bug"></div>
               <button class="btn btn-fill" type="submit">Submit Report</button>
             </form>
           </div>
@@ -181,6 +403,7 @@
               <label>Contact <span class="muted-inline">optional</span><input id="featureContact" class="field-input" placeholder="Discord or email" /></label>
               <label>Your Idea<textarea id="featureIdea" class="field-textarea" required placeholder="Describe the feature…"></textarea></label>
               <div id="featureError" class="form-error"></div>
+              <div class="form-turnstile" data-turnstile="feature"></div>
               <button class="btn btn-fill" type="submit">Submit Idea</button>
             </form>
           </div>
@@ -204,6 +427,7 @@
               </div>
               <label>Your question<textarea id="supportQuestion" class="field-textarea" required placeholder="What do you need help with?"></textarea></label>
               <div id="supportError" class="form-error"></div>
+              <div class="form-turnstile" data-turnstile="support"></div>
               <button class="btn btn-fill" type="submit">Send Question</button>
             </form>
           </div>
@@ -211,7 +435,24 @@
       </div>
     </section>
 
-    <section id="access" class="section wrap">
+    <section id="credits" class="section wrap section-with-render">
+      <div class="credits-scene" aria-hidden="true">
+        <div class="credits-scene-beam"></div>
+        <span class="credits-scene-orb credits-scene-orb-1"></span>
+        <span class="credits-scene-orb credits-scene-orb-2"></span>
+      </div>
+      <div class="wrap">
+        <header class="section-intro credits-headline reveal">
+          <p class="section-label">Credits</p>
+          <h2 id="creditsHeadline">The team</h2>
+          <p id="creditsSubheadline" class="section-desc">Creator of Alleral.</p>
+        </header>
+        <div id="creditsTeams"></div>
+        <div id="creditsThanks"></div>
+      </div>
+    </section>
+
+    <section id="access" class="section section-alt wrap">
       <header class="section-intro reveal">
         <p class="section-label">Share</p>
         <h2>Share the Hub</h2>
@@ -229,11 +470,20 @@
       <p>© <span id="footerYear"></span> Alleral</p>
       <div class="footer-links">
         <a id="footerSiteLink" href="#">Hub</a>
+        <a href="#credits">Creator</a>
+        <a href="#tools">Tools</a>
         <a href="/admin" target="_blank" rel="noopener">Admin</a>
         <a href="https://github.com/evanbackup1256-ship-it/kick" target="_blank" rel="noopener">GitHub</a>
       </div>
     </div>
   </footer>
+
+  <dialog id="cmdPalette" class="cmd-palette">
+    <div class="cmd-palette-inner modal-enter">
+      <input id="cmdInput" class="cmd-palette-input" type="search" placeholder="Search actions…" autocomplete="off" aria-label="Command palette" />
+      <div id="cmdList" class="cmd-palette-list"></div>
+    </div>
+  </dialog>
 
   <dialog id="gameModal" class="game-modal">
     <div class="game-modal-inner modal-enter">
@@ -245,7 +495,10 @@
           <span id="modalBadge" class="status-chip status-animated working"><span class="status-ring"></span><span class="status-dot-core"></span>Working</span>
         </div>
         <p id="modalMeta" class="modal-meta"></p>
+        <p id="modalFeatureCount" class="modal-feature-count"></p>
+        <div id="modalTabs" class="game-ui-tabs hidden"></div>
         <p id="modalDesc" class="modal-desc"></p>
+        <div id="modalFeatures" class="game-features-modal"></div>
         <div class="modal-actions">
           <a id="modalRoblox" class="btn btn-fill hidden" href="#" target="_blank" rel="noopener">Open on Roblox</a>
           <button class="btn btn-outline modal-close-btn" type="button">Close</button>
@@ -254,9 +507,15 @@
     </div>
   </dialog>
 
+  <button id="backToTop" class="back-to-top" type="button" aria-label="Back to top" hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5M12 5l-6 6M12 5l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+
   <div id="toast" class="toast"></div>
   <script src="./assets/select-ui.js"></script>
   <script src="./assets/effects.js"></script>
+  <script src="./assets/renders.js"></script>
+  <script src="./assets/turnstile-forms.js"></script>
   <script src="./assets/app.js"></script>
 </body>
 </html>

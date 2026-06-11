@@ -19,10 +19,18 @@ declare global {
     turnstileSiteKey?: string;
   }
 
+  interface AlleralTurnstileApi {
+    mountVisible?: () => Promise<void>;
+    getToken?: (formId: string) => Promise<string>;
+    reset?: (formId: string) => void;
+    hideAll?: () => void;
+  }
+
   interface Window {
     ALLERAL_API?: string;
     ALLERAL_CONFIG?: AlleralConfig;
     AlleralEffects?: AlleralEffectsApi;
     AlleralSelect?: AlleralSelectApi;
+    AlleralTurnstile?: AlleralTurnstileApi;
   }
 }

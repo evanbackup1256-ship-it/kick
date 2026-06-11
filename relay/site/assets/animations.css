@@ -1,7 +1,7 @@
-/* Ponder-inspired motion: slow settles, blur fades, no bounce */
+/* Apple/Linear-style motion: opacity + translate only, no content blur */
 
 /* ── Global motion ── */
-  .btn,
+.btn,
   .btn-link,
   .filter-pill,
   .nav-links a,
@@ -27,11 +27,10 @@
       border-color 0.45s var(--ease-out),
       background 0.45s var(--ease-out),
       color 0.35s var(--ease-out),
-      filter var(--motion-hover) var(--ease-out),
       opacity 0.45s var(--ease-out);
-  }
+}
 
-  .btn:hover:not(:disabled) {
+.btn:hover:not(:disabled) {
     transform: translateY(-3px);
     box-shadow: 0 14px 40px rgba(255, 255, 255, 0.1);
   }
@@ -154,33 +153,29 @@
   .hero-lead {
     animation: hero-settle 1.4s var(--ease-out) 0.12s both;
   }
-  @keyframes hero-settle {
-    from {
-      opacity: 0;
-      transform: translateY(40px) scale(0.96);
-      filter: blur(12px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-      filter: blur(0);
-    }
+@keyframes hero-settle {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
   }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 
-  .field-input:hover,
-  .field-textarea:hover {
-    border-color: rgba(255, 255, 255, 0.16);
-  }
+.field-input:hover,
+.field-textarea:hover {
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 /* ── Game cards with thumbnails ── */
 .game-card {
   position: relative;
-  transform-style: preserve-3d;
-  will-change: transform;
   transition:
-    transform 0.65s var(--ease-out),
-    box-shadow 0.65s var(--ease-out);
+    transform 0.45s var(--ease-out),
+    box-shadow 0.45s var(--ease-out),
+    border-color 0.45s var(--ease-out);
 }
 .game-card::before {
   content: "";
@@ -200,7 +195,9 @@
 }
 .game-card:hover::before { opacity: 1; }
 .game-card:hover {
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42);
+  transform: translateY(-4px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .game-art {
@@ -268,8 +265,8 @@
   animation: grid-settle 0.55s var(--ease-out);
 }
 @keyframes grid-settle {
-  from { opacity: 0.4; transform: translateY(16px); filter: blur(4px); }
-  to { opacity: 1; transform: none; filter: blur(0); }
+  from { opacity: 0.55; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* ── Animated status chips ── */
@@ -391,14 +388,12 @@
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
   opacity: 0;
   visibility: hidden;
-  transform: translateY(-10px) scale(0.985);
+  transform: translateY(-8px) scale(0.98);
   transform-origin: top center;
-  filter: blur(6px);
   transition:
-    opacity 0.45s var(--ease-out),
-    transform 0.55s var(--ease-out),
-    filter 0.45s var(--ease-out),
-    visibility 0.45s;
+    opacity 0.35s var(--ease-out),
+    transform 0.4s var(--ease-out),
+    visibility 0.35s;
   max-height: 240px;
   overflow-y: auto;
 }
@@ -406,7 +401,6 @@
   opacity: 1;
   visibility: visible;
   transform: translateY(0) scale(1);
-  filter: blur(0);
 }
 .custom-select-option {
   display: block;
@@ -450,8 +444,8 @@
   animation: modal-img-in 0.85s var(--ease-out);
 }
 @keyframes modal-img-in {
-  from { transform: scale(1.06); filter: blur(8px); opacity: 0.6; }
-  to { transform: scale(1); filter: blur(0); opacity: 1; }
+  from { transform: scale(1.04); opacity: 0.75; }
+  to { transform: scale(1); opacity: 1; }
 }
 .modal-art .modal-art-fallback {
   position: absolute;
@@ -489,8 +483,8 @@
   animation: toast-settle 0.65s var(--ease-out);
 }
 @keyframes toast-settle {
-  from { opacity: 0; transform: translateX(-50%) translateY(16px) scale(0.96); filter: blur(6px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); filter: blur(0); }
+  from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
 /* ── Extra polish ── */
@@ -523,8 +517,8 @@
     animation: announce-settle 0.75s var(--ease-out);
   }
   @keyframes announce-settle {
-    from { opacity: 0; transform: translateY(-10px); filter: blur(6px); }
-    to { opacity: 1; transform: none; filter: blur(0); }
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: none; }
   }
 
   .field-input:focus,
@@ -589,13 +583,11 @@
     @keyframes view-reveal {
       from {
         opacity: 0;
-        transform: translateY(40px) scale(0.97);
-        filter: blur(10px);
+        transform: translateY(28px);
       }
       to {
         opacity: 1;
         transform: none;
-        filter: blur(0);
       }
     }
 
@@ -711,23 +703,6 @@
     100% { transform: translate3d(40px, -30px, 0) scale(1.08); }
   }
 
-  .cursor-glow {
-    position: fixed;
-    width: 420px;
-    height: 420px;
-    margin: -210px 0 0 -210px;
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 1;
-    opacity: 0;
-    background: radial-gradient(circle, rgba(41, 151, 255, 0.12), transparent 65%);
-    transition: opacity 0.4s var(--ease-out);
-    mix-blend-mode: screen;
-  }
-  body.has-cursor-glow .cursor-glow {
-    opacity: 1;
-  }
-
   .nav-shell.nav-scrolled {
     backdrop-filter: blur(24px) saturate(180%);
     background: rgba(0, 0, 0, 0.72);
@@ -759,29 +734,10 @@
   .game-card,
   .changelog-card {
     position: relative;
-    isolation: isolate;
   }
-  .feature-card::after,
-  .changelog-card::after {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    background: conic-gradient(from 180deg, transparent, rgba(41, 151, 255, 0.35), transparent, rgba(191, 90, 242, 0.25), transparent);
-    opacity: 0;
-    z-index: -1;
-    transition: opacity 0.65s var(--ease-out);
-    animation: border-spin 8s linear infinite;
-    animation-play-state: paused;
-    pointer-events: none;
-  }
-  .feature-card:hover::after,
-  .changelog-card:hover::after {
-    opacity: 1;
-    animation-play-state: running;
-  }
-  @keyframes border-spin {
-    to { transform: rotate(360deg); }
+  .feature-card:hover,
+  .changelog-card:hover {
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   .support-tabs button {
@@ -828,25 +784,13 @@
   }
 
   .card-enter {
-    animation: card-enter-modern 0.75s var(--ease-out) both;
-  }
-  @keyframes card-enter-modern {
-    from {
-      opacity: 0;
-      transform: translateY(28px) scale(0.96) rotateX(8deg);
-      filter: blur(8px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-      filter: blur(0);
-    }
+    animation: card-rise-in 0.65s var(--ease-out) both;
   }
 
   .modal-enter {
-    animation: modal-pop 0.55s var(--ease-out) both;
+    animation: modal-pop 0.45s var(--ease-out) both;
   }
   @keyframes modal-pop {
-    from { opacity: 0; transform: scale(0.92) translateY(20px); filter: blur(6px); }
-    to { opacity: 1; transform: none; filter: blur(0); }
+    from { opacity: 0; transform: scale(0.96) translateY(12px); }
+    to { opacity: 1; transform: none; }
   }

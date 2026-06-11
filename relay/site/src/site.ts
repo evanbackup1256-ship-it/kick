@@ -1,4 +1,4 @@
-import type { GameEntry, SitePayload } from "./types";
+import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePayload, WeaoChange, WeaoExploit, WeaoSummary } from "./types";
 
 (() => {
   const GRADIENTS = [
@@ -21,12 +21,40 @@ import type { GameEntry, SitePayload } from "./types";
     site: null as SitePayload | null,
     changelogShown: 2,
     gameFilter: "all",
+    gameQuery: "",
+    faqQuery: "",
     siteSignature: "",
     thumbs: {} as Record<string, string>,
+    creditRenders: {} as Record<string, CreditRenderMember>,
     gamesRenderToken: 0,
+    weaoExploits: [] as WeaoExploit[],
+    weaoSummary: {} as WeaoSummary,
+    weaoQuery: "",
+    weaoFilter: "all",
+    weaoFetchedAt: "",
+    weaoPollSec: 35,
+    weaoLive: false,
+    weaoChanges: [] as WeaoChange[],
+    weaoRecentChanges: [] as WeaoChange[],
+    weaoChangedSlugs: {} as Record<string, number>,
+    weaoFingerprints: {} as Record<string, string>,
+    weaoPollTimer: 0,
+    weaoCountdownTimer: 0,
+    weaoNextPollAt: 0,
   };
+  const WEAO_LIVE_POLL_MS = 35000;
+  const WEAO_IDLE_POLL_MS = 120000;
   const SITE_POLL_MS = 30000;
+  const EXECUTOR_PREF_KEY = "alleral_last_executor";
   const VISIT_KEY = "alleral_hub_logged";
+
+  function escapeHtml(value: unknown): string {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
 
   function flash(text: string, isError = false): void {
     if (!toastEl) return;
@@ -184,9 +212,9 @@ import type { GameEntry, SitePayload } from "./types";
     }
     items.forEach((text, i) => {
       const card = document.createElement("article");
-      card.className = "feature-card card-enter tilt-card";
+      card.className = "feature-card card-enter";
       card.style.animationDelay = `${i * 0.07}s`;
-      card.innerHTML = `<p>${text}</p>`;
+      card.innerHTML = `<p>${escapeHtml(text)}</p>`;
       root.appendChild(card);
     });
     afterRender();
@@ -201,6 +229,73 @@ import type { GameEntry, SitePayload } from "./types";
     `;
   }
 
+  function gameFeatureText(game: GameEntry): string {
+    return (game.scriptFeatures || [])
+      .map((f) => `${f.name || ""} ${f.category || ""} ${f.desc || ""}`)
+      .join(" ");
+  }
+
+  function renderFeatureChips(features: ScriptFeature[], limit = 4): string {
+    if (!features.length) return "";
+    const shown = features.slice(0, limit);
+    const rest = features.length - shown.length;
+    return `
+      <div class="game-features-preview">
+        ${shown.map((f) => `<span class="game-feature-chip" title="${escapeHtml(f.desc || f.category || "")}">${escapeHtml(f.name || "Feature")}</span>`).join("")}
+        ${rest > 0 ? `<span class="game-feature-more">+${rest} more</span>` : ""}
+      </div>`;
+  }
+
+  function renderModalFeatures(game: GameEntry): void {
+    const tabsRoot = $("#modalTabs");
+    const featuresRoot = $("#modalFeatures");
+    const countEl = $("#modalFeatureCount");
+    const features = game.scriptFeatures || [];
+    const tabs = game.uiTabs || [];
+
+    if (countEl) countEl.textContent = features.length ? `${features.length} features` : "";
+
+    if (tabsRoot) {
+      if (!tabs.length) {
+        tabsRoot.innerHTML = "";
+        tabsRoot.classList.add("hidden");
+      } else {
+        tabsRoot.classList.remove("hidden");
+        tabsRoot.innerHTML = tabs.map((tab) => `<span class="game-ui-tab">${escapeHtml(tab)}</span>`).join("");
+      }
+    }
+
+    if (!featuresRoot) return;
+    if (!features.length) {
+      featuresRoot.innerHTML = `<p class="modal-desc">Feature list coming soon for this script.</p>`;
+      return;
+    }
+
+    const byCategory: Record<string, ScriptFeature[]> = {};
+    features.forEach((f) => {
+      const cat = f.category || "General";
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(f);
+    });
+
+    featuresRoot.innerHTML = Object.entries(byCategory)
+      .map(
+        ([cat, items]) => `
+      <section class="game-feature-group">
+        <h4>${escapeHtml(cat)}</h4>
+        <ul class="game-feature-list">
+          ${items
+            .map(
+              (f) =>
+                `<li><strong>${escapeHtml(f.name || "Feature")}</strong>${f.desc ? `<span>${escapeHtml(f.desc)}</span>` : ""}</li>`
+            )
+            .join("")}
+        </ul>
+      </section>`
+      )
+      .join("");
+  }
+
   function openGameModal(game: GameEntry, gradient: string, thumbUrl: string | null): void {
     if (!modal) return;
     const title = $("#modalTitle");
@@ -209,6 +304,7 @@ import type { GameEntry, SitePayload } from "./types";
     if (title) title.textContent = game.name || game.id || "Game";
     if (meta) meta.textContent = `Version ${game.version || "?"} · ${game.id || ""}`;
     if (desc) desc.textContent = game.description || game.message || "No description available.";
+    renderModalFeatures(game);
     const status = (game.status || "working").toLowerCase();
     const badge = $("#modalBadge");
     if (badge) {
@@ -247,6 +343,13 @@ import type { GameEntry, SitePayload } from "./types";
     if (filter !== "all") {
       games = games.filter((g) => (g.status || "working").toLowerCase() === filter);
     }
+    const query = state.gameQuery.trim().toLowerCase();
+    if (query) {
+      games = games.filter((g) => {
+        const hay = `${g.name || ""} ${g.id || ""} ${g.description || ""} ${g.message || ""} ${gameFeatureText(g)}`.toLowerCase();
+        return hay.includes(query);
+      });
+    }
     if (!games.length) {
       if (token !== state.gamesRenderToken) return;
       root.innerHTML = '<p class="empty reveal">No games match this filter.</p>';
@@ -265,22 +368,23 @@ import type { GameEntry, SitePayload } from "./types";
       const pid = placeIdOf(game);
       const thumb = pid ? state.thumbs[pid] : null;
       const card = document.createElement("article");
-      card.className = "game-card card-enter tilt-card";
+      card.className = "game-card card-enter";
       card.style.animationDelay = `${i * 0.06}s`;
       card.innerHTML = `
         <div class="game-art">
-          ${thumb ? `<img class="game-thumb" src="${thumb}" alt="${game.name || game.id}" loading="lazy" />` : ""}
+          ${thumb ? `<img class="game-thumb" src="${escapeHtml(thumb)}" alt="${escapeHtml(game.name || game.id)}" loading="lazy" />` : ""}
           <div class="game-art-fallback" style="background:${grad}"></div>
           <div class="game-art-shine"></div>
         </div>
         <div class="game-body">
-          <h3>${game.name || game.id}</h3>
+          <h3>${escapeHtml(game.name || game.id)}</h3>
           <div class="game-meta">
             ${statusChipHtml(status, statusLabel)}
-            <span class="game-version">v${game.version || "?"}</span>
+            <span class="game-version">v${escapeHtml(game.version || "?")}</span>
           </div>
-          <p class="game-desc">${game.description || game.message || ""}</p>
-          <button class="btn-link" type="button">View Details</button>
+          <p class="game-desc">${escapeHtml(game.description || game.message || "")}</p>
+          ${renderFeatureChips(game.scriptFeatures || [])}
+          <button class="btn-link" type="button">View${(game.scriptFeatures || []).length ? ` ${(game.scriptFeatures || []).length}` : ""} Features</button>
         </div>
       `;
       const img = card.querySelector(".game-thumb") as HTMLImageElement | null;
@@ -297,6 +401,7 @@ import type { GameEntry, SitePayload } from "./types";
 
     if (token !== state.gamesRenderToken) return;
     root.classList.remove("is-updating");
+    renderGameStatsBar(site);
 
     const bugGame = $("#bugGame") as HTMLSelectElement | null;
     if (bugGame) {
@@ -329,11 +434,11 @@ import type { GameEntry, SitePayload } from "./types";
     slice.forEach((entry, i) => {
       if (root.children[i]) return;
       const node = document.createElement("article");
-      node.className = "changelog-card reveal tilt-card";
+      node.className = "changelog-card reveal";
       node.innerHTML = `
-        <h3>${entry.title || "Update"}</h3>
-        <p class="cl-date">${formatChangelogDate(entry.date)}</p>
-        <ul>${(entry.items || []).map((item) => `<li>${item}</li>`).join("")}</ul>
+        <h3>${escapeHtml(entry.title || "Update")}</h3>
+        <p class="cl-date">${escapeHtml(formatChangelogDate(entry.date))}</p>
+        <ul>${(entry.items || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
       `;
       root.appendChild(node);
     });
@@ -352,20 +457,38 @@ import type { GameEntry, SitePayload } from "./types";
 
   function renderFaq(site: SitePayload): void {
     const root = $("#faqList");
+    const empty = $("#faqEmpty");
     if (!root) return;
     root.innerHTML = "";
-    (site.faq || []).forEach((item, i) => {
+    const query = state.faqQuery.trim().toLowerCase();
+    const items = (site.faq || []).filter((item) => {
+      if (!query) return true;
+      const hay = `${item.q || ""} ${item.a || ""}`.toLowerCase();
+      return hay.includes(query);
+    });
+
+    if (empty) empty.classList.toggle("hidden", items.length > 0);
+
+    items.forEach((item, i) => {
       const node = document.createElement("details");
       node.className = "reveal faq-item";
+      node.id = `faq-${i}`;
       node.style.transitionDelay = `${Math.min(i * 0.04, 0.24)}s`;
       const q = item.q || "Question";
+      const a = item.a || "";
       node.innerHTML = `
-        <summary>${q}</summary>
-        <div class="faq-answer"><p>${item.a || ""}</p></div>
-        <div class="faq-feedback">
-          <span class="faq-feedback-label">Was this helpful?</span>
-          <button type="button" class="faq-feedback-btn" data-helpful="yes">Yes</button>
-          <button type="button" class="faq-feedback-btn" data-helpful="no">No</button>
+        <summary>${escapeHtml(q)}</summary>
+        <div class="faq-answer">
+          <div class="faq-answer-inner">
+            <p>${escapeHtml(a)}</p>
+            <div class="faq-feedback">
+              <span class="faq-feedback-label">Was this helpful?</span>
+              <div class="faq-feedback-actions">
+                <button type="button" class="faq-feedback-btn" data-helpful="yes">Yes</button>
+                <button type="button" class="faq-feedback-btn" data-helpful="no">No</button>
+              </div>
+            </div>
+          </div>
         </div>
       `;
       node.querySelectorAll(".faq-feedback-btn").forEach((btn) => {
@@ -374,12 +497,20 @@ import type { GameEntry, SitePayload } from "./types";
           e.stopPropagation();
           const helpful = (btn as HTMLButtonElement).dataset.helpful === "yes";
           const bar = node.querySelector(".faq-feedback");
+          node.querySelectorAll(".faq-feedback-btn").forEach((b) => {
+            (b as HTMLButtonElement).disabled = true;
+            b.classList.toggle("selected", b === btn);
+          });
           try {
             await sendFaqFeedback(q, helpful);
             if (bar) {
               bar.innerHTML = `<span class="faq-feedback-thanks">Thanks for letting us know.</span>`;
             }
           } catch (err) {
+            node.querySelectorAll(".faq-feedback-btn").forEach((b) => {
+              (b as HTMLButtonElement).disabled = false;
+              b.classList.remove("selected");
+            });
             flash(err instanceof Error ? err.message : "Could not send feedback", true);
           }
         });
@@ -400,6 +531,726 @@ import type { GameEntry, SitePayload } from "./types";
       select.appendChild(opt);
     });
     window.AlleralSelect?.refresh?.(select);
+  }
+
+  function initials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  function renderGameStatsBar(site: SitePayload): void {
+    const root = $("#gameStatsBar");
+    if (!root) return;
+    const games = Object.values(site.games || {});
+    const counts: Record<string, number> = {
+      all: games.length,
+      working: 0,
+      testing: 0,
+      maintenance: 0,
+      broken: 0,
+    };
+    games.forEach((g) => {
+      const s = (g.status || "working").toLowerCase();
+      if (s in counts) counts[s] += 1;
+    });
+    const labels: Record<string, string> = {
+      all: "All",
+      working: "Working",
+      testing: "Testing",
+      maintenance: "Maintenance",
+      broken: "Broken",
+    };
+    root.innerHTML = Object.entries(counts)
+      .map(([key, n]) => {
+        const dot = key === "all" ? "" : `<span class="dot ${key}"></span>`;
+        return `<button type="button" class="game-stat-chip${state.gameFilter === key ? " active" : ""}" data-filter="${key}">${dot}${labels[key]} <strong>${n}</strong></button>`;
+      })
+      .join("");
+    const totalFeatures = games.reduce((n, g) => n + (g.scriptFeatures || []).length, 0);
+    if (totalFeatures) {
+      root.innerHTML += `<span class="game-stat-chip game-stat-static">Script features <strong>${totalFeatures}</strong></span>`;
+    }
+    root.querySelectorAll(".game-stat-chip").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.gameFilter = (btn as HTMLButtonElement).dataset.filter || "all";
+        $$<HTMLButtonElement>(".filter-pill").forEach((b) =>
+          b.classList.toggle("active", b.dataset.filter === state.gameFilter)
+        );
+        if (state.site) void renderGames(state.site);
+        renderGameStatsBar(state.site!);
+      });
+    });
+  }
+
+  async function fetchCreditRenders(): Promise<void> {
+    try {
+      const data = (await api("/api/credits/renders")) as { members?: Record<string, CreditRenderMember> };
+      state.creditRenders = data.members || {};
+    } catch {
+      state.creditRenders = {};
+    }
+  }
+
+  function creditAvatarHtml(member: CreditMember, render?: CreditRenderMember): string {
+    const img = render?.renders?.body || render?.renders?.bust || render?.renders?.headshot;
+    const name = member.displayName || render?.displayName || "Member";
+    if (img) {
+      return `<img class="credit-avatar-body" src="${escapeHtml(img)}" alt="${escapeHtml(name)} Roblox avatar" loading="lazy" />`;
+    }
+    return `<div class="credit-avatar-fallback" aria-hidden="true">${escapeHtml(initials(name))}</div>`;
+  }
+
+  function renderCredits(site: SitePayload): void {
+    const teamsRoot = $("#creditsTeams");
+    const thanksRoot = $("#creditsThanks");
+    if (!teamsRoot) return;
+
+    const credits = site.credits || {};
+    const headline = $("#creditsHeadline");
+    const sub = $("#creditsSubheadline");
+    if (headline) headline.textContent = credits.headline || "The team behind Alleral";
+    if (sub) sub.textContent = credits.subheadline || "";
+
+    teamsRoot.innerHTML = "";
+    const totalMembers = (credits.teams || []).reduce((n, t) => n + (t.members || []).length, 0);
+    (credits.teams || []).forEach((team) => {
+      const section = document.createElement("div");
+      section.className = "credits-team reveal";
+      section.innerHTML = `<h3 class="credits-team-title">${escapeHtml(team.title || "Team")}</h3>`;
+      const grid = document.createElement("div");
+      grid.className = `credits-grid${totalMembers <= 1 ? " solo" : ""}`;
+
+      (team.members || []).forEach((member) => {
+        const mid = member.id || member.displayName || "";
+        const render = state.creditRenders[mid];
+        const robloxName = render?.robloxUsername || member.robloxUsername || "";
+        const profileUrl = render?.profileUrl || (render?.robloxUserId ? `https://www.roblox.com/users/${render.robloxUserId}/profile` : "");
+
+        const card = document.createElement("article");
+        card.className = `credit-card reveal${member.featured ? " featured" : ""}`;
+        if (member.accent) {
+          card.style.setProperty("--credit-accent", member.accent);
+          card.dataset.accent = "1";
+        }
+
+        const tags = (member.tags || [])
+          .map((t) => `<span class="credit-tag">${escapeHtml(t)}</span>`)
+          .join("");
+        const links = Object.entries(member.links || {})
+          .map(([k, url]) => `<a class="credit-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(k)}</a>`)
+          .join("");
+
+        card.innerHTML = `
+          <div class="credit-render-stage">
+            <div class="credit-pedestal"></div>
+            <div class="credit-pedestal-ring"></div>
+            <div class="credit-avatar-glow"></div>
+            <div class="credit-avatar-ring"></div>
+            ${creditAvatarHtml(member, render)}
+          </div>
+          <div class="credit-meta">
+            <span class="credit-role-badge">${escapeHtml(member.role || "Member")}</span>
+            <h3>${escapeHtml(member.displayName || "Member")}</h3>
+            ${robloxName ? `<p class="credit-roblox-name">${profileUrl ? `<a href="${escapeHtml(profileUrl)}" target="_blank" rel="noopener">@${escapeHtml(robloxName)}</a>` : `@${escapeHtml(robloxName)}`}</p>` : ""}
+            <p class="credit-bio">${escapeHtml(member.bio || "")}</p>
+            ${tags ? `<div class="credit-tags">${tags}</div>` : ""}
+            ${links ? `<div class="credit-links">${links}</div>` : ""}
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      section.appendChild(grid);
+      teamsRoot.appendChild(section);
+    });
+
+    if (thanksRoot) {
+      const thanks = credits.specialThanks || [];
+      if (!thanks.length) {
+        thanksRoot.innerHTML = "";
+      } else {
+        thanksRoot.innerHTML = `
+          <div class="credits-thanks reveal">
+            <h3>Special thanks</h3>
+            <div class="credits-thanks-grid">
+              ${thanks.map((t) => `<div class="credits-thanks-item"><strong>${escapeHtml(t.name || "")}</strong><span>${escapeHtml(t.note || "")}</span></div>`).join("")}
+            </div>
+          </div>
+        `;
+      }
+    }
+    afterRender();
+  }
+
+  async function loadAndRenderCredits(site: SitePayload): Promise<void> {
+    await fetchCreditRenders();
+    renderCredits(site);
+  }
+
+  function resolveResourceUrl(site: SitePayload, item: { url?: string; urlKey?: string }): string {
+    if (item.url) {
+      if (item.url.startsWith("#")) return item.url;
+      if (item.url.startsWith("http") || item.url.startsWith("//")) return item.url;
+      const base = window.ALLERAL_API || window.location.origin;
+      return `${base.replace(/\/$/, "")}${item.url.startsWith("/") ? item.url : `/${item.url}`}`;
+    }
+    const key = item.urlKey || "";
+    const links = site.links || {};
+    const cfg = window.ALLERAL_CONFIG || {};
+    if (key === "github") return links.github || "";
+    if (key === "loaderRaw") return links.loaderRaw || "";
+    if (key === "admin") return links.admin || "";
+    if (key === "website") return links.website || cfg.publicUrl || "";
+    return (links as Record<string, string>)[key] || "";
+  }
+
+  async function renderBanApiPanel(): Promise<void> {
+    const statusRoot = $("#banApiStatus");
+    const endpointsRoot = $("#banApiEndpoints");
+    const exampleRoot = $("#banApiExample");
+    try {
+      const base = window.ALLERAL_API || window.location.origin;
+      const res = await fetch(`${base.replace(/\/$/, "")}/api/v1/bans/docs`, { cache: "no-store" });
+      const data = (await res.json()) as Record<string, unknown>;
+      if (statusRoot) {
+        statusRoot.innerHTML = `
+          <div class="ban-api-stat"><span>Active bans</span><strong>${escapeHtml(String(data.activeBans ?? "—"))}</strong></div>
+          <div class="ban-api-stat"><span>API version</span><strong>v${escapeHtml(String(data.version || "1"))}</strong></div>
+          <div class="ban-api-stat"><span>Ban types</span><strong>${escapeHtml(String((data.banTypes as string[] | undefined)?.length ?? 0))}</strong></div>
+        `;
+      }
+      const endpoints = (data.endpoints as { method?: string; path?: string; auth?: boolean; desc?: string }[]) || [];
+      if (endpointsRoot) {
+        endpointsRoot.innerHTML = endpoints
+          .map(
+            (ep) => `
+          <article class="ban-api-endpoint">
+            <div class="ban-api-endpoint-head">
+              <span class="ban-api-method">${escapeHtml(ep.method || "GET")}</span>
+              <code>${escapeHtml(ep.path || "")}</code>
+              ${ep.auth ? `<span class="ban-api-auth">Auth</span>` : `<span class="ban-api-auth public">Public</span>`}
+            </div>
+            <p>${escapeHtml(ep.desc || "")}</p>
+          </article>`
+          )
+          .join("");
+      }
+      const example = data.checkExample as { url?: string; body?: Record<string, unknown> } | undefined;
+      if (exampleRoot && example?.body) {
+        exampleRoot.textContent = JSON.stringify(example.body, null, 2);
+      }
+    } catch {
+      if (statusRoot) statusRoot.innerHTML = `<p class="tool-panel-desc">Could not load Ban API docs.</p>`;
+    }
+  }
+
+  async function runBanApiTest(): Promise<void> {
+    const out = $("#banApiTestResult");
+    const key = ($("#banTestKey") as HTMLInputElement | null)?.value.trim() || "";
+    const userId = ($("#banTestUserId") as HTMLInputElement | null)?.value.trim() || "";
+    const username = ($("#banTestUsername") as HTMLInputElement | null)?.value.trim() || "";
+    if (!userId && !username) {
+      flash("Enter a Roblox UserId or username", true);
+      return;
+    }
+    const base = window.ALLERAL_API || window.location.origin;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (key) headers["X-Ban-Api-Key"] = key;
+    try {
+      const res = await fetch(`${base.replace(/\/$/, "")}/api/v1/bans/check`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          player: { userId: userId || undefined, name: username || undefined },
+        }),
+      });
+      const data = await res.json();
+      if (out) {
+        out.textContent = JSON.stringify(data, null, 2);
+        out.classList.toggle("banned", data.allowed === false);
+        out.classList.toggle("allowed", data.allowed === true);
+      }
+      if (!res.ok) flash(String(data.error || "Check failed"), true);
+      else flash(data.allowed ? "Player allowed" : "Player banned");
+    } catch (e) {
+      if (out) out.textContent = e instanceof Error ? e.message : "Request failed";
+      flash("Ban check failed", true);
+    }
+  }
+
+  function bindBanApiTools(): void {
+    $("#banApiTestBtn")?.addEventListener("click", () => void runBanApiTest());
+    $("#banApiCopyDocs")?.addEventListener("click", () => {
+      void copyText(`${window.location.origin}/api/v1/bans/docs`, "Docs URL copied");
+    });
+  }
+
+  async function renderSyncPanel(): Promise<void> {
+    const root = $("#syncPanelBody");
+    if (!root) return;
+    root.innerHTML = `<p class="tool-panel-desc">Loading sync status…</p>`;
+    try {
+      const base = window.ALLERAL_API || "";
+      const res = await fetch(`${base}/api/sync/status`, { cache: "no-store" });
+      const data = (await res.json()) as Record<string, unknown>;
+      const live = data.autoStatus === true || data.enabled === true;
+      root.innerHTML = `
+        <div class="sync-status-grid">
+          <div class="sync-stat"><span>Auto-sync</span><strong class="${live ? "live" : ""}">${live ? "Active" : "Off"}</strong></div>
+          <div class="sync-stat"><span>Commit</span><strong>${escapeHtml(String(data.commit || data.githubCommit || "—")).slice(0, 12)}</strong></div>
+          <div class="sync-stat"><span>Branch</span><strong>${escapeHtml(String(data.branch || "main"))}</strong></div>
+          <div class="sync-stat"><span>Last pull</span><strong>${escapeHtml(String(data.lastSyncAt || data.updatedAt || "—"))}</strong></div>
+        </div>
+      `;
+    } catch {
+      root.innerHTML = `<p class="tool-panel-desc">Could not reach sync endpoint.</p>`;
+    }
+  }
+
+  function weaoStatusLabel(status: string): string {
+    const map: Record<string, string> = {
+      recommended: "Best pick",
+      supported: "Supported",
+      detected: "Detected",
+      outdated: "Outdated",
+      working: "Working",
+      not_working: "Not working",
+    };
+    return map[status] || titleCaseStatus(status);
+  }
+
+  function formatWeaoChangeTime(at?: number): string {
+    if (!at) return "Just now";
+    const diff = Math.max(0, Date.now() - at * 1000);
+    if (diff < 60000) return "Just now";
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    return new Date(at * 1000).toLocaleTimeString();
+  }
+
+  function filterWeaoList(): WeaoExploit[] {
+    let list = state.weaoExploits;
+    const q = state.weaoQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (entry) =>
+          (entry.title || "").toLowerCase().includes(q) ||
+          (entry.slug || "").includes(q) ||
+          (entry.platform || "").toLowerCase().includes(q)
+      );
+    }
+    if (state.weaoFilter === "free") return list.filter((entry) => entry.free);
+    if (state.weaoFilter === "working") return list.filter((entry) => entry.liveStatus === "working");
+    if (state.weaoFilter === "not_working") return list.filter((entry) => entry.liveStatus === "not_working");
+    if (state.weaoFilter !== "all") {
+      return list.filter(
+        (entry) => entry.alleralStatus === state.weaoFilter || entry.liveStatus === state.weaoFilter
+      );
+    }
+    return list;
+  }
+
+  function updateExecutorDatalist(): void {
+    const dl = $("#executorDatalist");
+    if (!dl) return;
+    dl.innerHTML = state.weaoExploits
+      .map((entry) => `<option value="${escapeHtml(entry.title || "")}"></option>`)
+      .join("");
+  }
+
+  function setBugExecutor(name: string): void {
+    const input = $("#bugExecutor") as HTMLInputElement | null;
+    if (!input || !name) return;
+    input.value = name;
+    localStorage.setItem(EXECUTOR_PREF_KEY, name);
+    flash(`Executor set to ${name}`);
+  }
+
+  function renderWeaoStats(): void {
+    const root = $("#weaoStats");
+    if (!root) return;
+    const s = state.weaoSummary;
+    if (!s.total) {
+      root.innerHTML = "";
+      return;
+    }
+    root.innerHTML = `
+      <div class="weao-stat"><span>Tracked</span><strong>${s.total || 0}</strong></div>
+      <div class="weao-stat"><span>Working</span><strong class="live">${s.working || 0}</strong></div>
+      <div class="weao-stat"><span>Not working</span><strong class="warn">${s.notWorking || 0}</strong></div>
+      <div class="weao-stat"><span>Detected</span><strong>${s.detected || 0}</strong></div>
+      <div class="weao-stat"><span>Best for Alleral</span><strong>${s.recommended || 0}</strong></div>
+    `;
+  }
+
+  function renderWeaoLiveBadge(): void {
+    const badge = $("#weaoLiveBadge");
+    const countdown = $("#weaoCountdown");
+    if (!badge) return;
+    if (state.weaoLive) {
+      badge.innerHTML = `<span class="weao-live-dot"></span> Live · WEAO`;
+      badge.classList.add("active");
+    } else {
+      badge.innerHTML = `WEAO`;
+      badge.classList.remove("active");
+    }
+    if (countdown && state.weaoNextPollAt) {
+      const sec = Math.max(0, Math.ceil((state.weaoNextPollAt - Date.now()) / 1000));
+      countdown.textContent = state.weaoLive ? `Next check in ${sec}s` : `Paused · scroll to Tools for live updates`;
+    }
+  }
+
+  function renderWeaoActivityFeed(): void {
+    const feed = $("#weaoActivityFeed");
+    if (!feed) return;
+    const items = [...(state.weaoChanges || []), ...(state.weaoRecentChanges || [])]
+      .filter((item, index, arr) => arr.findIndex((x) => x.message === item.message && x.slug === item.slug) === index)
+      .slice(0, 12);
+
+    if (!items.length) {
+      feed.innerHTML = `<p class="weao-feed-empty">Watching WEAO — status changes appear here in real time when Roblox or executors patch.</p>`;
+      return;
+    }
+
+    feed.innerHTML = items
+      .map(
+        (item) => `
+      <div class="weao-feed-item severity-${escapeHtml(item.severity || "warning")}">
+        <span class="weao-feed-time">${escapeHtml(formatWeaoChangeTime(item.at))}</span>
+        <p>${escapeHtml(item.message || "Status changed")}</p>
+      </div>`
+      )
+      .join("");
+  }
+
+  function markWeaoClientChanges(prev: Record<string, string>, next: WeaoExploit[]): WeaoChange[] {
+    const changes: WeaoChange[] = [];
+    for (const entry of next) {
+      const slug = entry.slug || "";
+      if (!slug) continue;
+      const fp = entry.fingerprint || "";
+      const old = prev[slug];
+      if (old && fp && old !== fp) {
+        changes.push({
+          slug,
+          title: entry.title,
+          severity: entry.liveStatus === "working" ? "good" : entry.liveStatus === "not_working" ? "bad" : "warning",
+          message: `${entry.title}: ${entry.liveLabel || "Status updated"}`,
+          at: Date.now() / 1000,
+        });
+        state.weaoChangedSlugs[slug] = Date.now();
+      }
+      if (slug && fp) prev[slug] = fp;
+    }
+    return changes;
+  }
+
+  function renderWeaoExecutors(): void {
+    const root = $("#executorList");
+    if (!root) return;
+    const list = filterWeaoList();
+    const updated = $("#weaoUpdated");
+    if (updated) {
+      updated.textContent = state.weaoFetchedAt
+        ? `Last sync ${new Date(state.weaoFetchedAt).toLocaleTimeString()} · ${state.weaoExploits.length} executors from WEAO`
+        : "";
+    }
+    renderWeaoLiveBadge();
+    renderWeaoActivityFeed();
+
+    if (!state.weaoExploits.length) {
+      root.innerHTML = `<p class="tool-panel-desc">Loading live executor data from WEAO…</p>`;
+      return;
+    }
+    if (!list.length) {
+      root.innerHTML = `<p class="tool-panel-desc">No executors match your search. Try clearing filters.</p>`;
+      return;
+    }
+
+    const now = Date.now();
+    root.innerHTML = list
+      .map((ex) => {
+        const slug = ex.slug || "";
+        const changed = slug && state.weaoChangedSlugs[slug] && now - state.weaoChangedSlugs[slug] < 120000;
+        const live = ex.liveStatus || "supported";
+        return `
+      <article class="weao-exec-card status-${escapeHtml(live)}${changed ? " weao-changed" : ""}" data-slug="${escapeHtml(slug)}">
+        <div class="weao-exec-live-row">
+          <span class="weao-live-pill ${escapeHtml(live)}"><span class="weao-live-pill-dot"></span>${escapeHtml(ex.liveLabel || weaoStatusLabel(live))}</span>
+          ${ex.updatedDate ? `<span class="weao-updated-date">${escapeHtml(ex.updatedDate)}</span>` : ""}
+        </div>
+        <div class="weao-exec-head">
+          ${
+            ex.logo
+              ? `<img class="weao-exec-logo" src="${escapeHtml(ex.logo)}" alt="" width="44" height="44" loading="lazy" />`
+              : `<span class="weao-exec-logo-fallback">${escapeHtml((ex.title || "?").charAt(0))}</span>`
+          }
+          <div class="weao-exec-title">
+            <strong>${escapeHtml(ex.title || "Executor")}</strong>
+            <small>v${escapeHtml(ex.version || "?")} · ${escapeHtml(ex.platform || "Windows")}</small>
+            ${ex.liveDetail ? `<span class="weao-exec-detail">${escapeHtml(ex.liveDetail)}</span>` : ""}
+          </div>
+          <span class="executor-badge ${escapeHtml(ex.alleralStatus || "supported")}">${escapeHtml(weaoStatusLabel(ex.alleralStatus || "supported"))}</span>
+        </div>
+        <dl class="weao-exec-meta">
+          <div><dt>Hyperion</dt><dd>${ex.detected ? "Detected" : "Undetected"}</dd></div>
+          <div><dt>Roblox patch</dt><dd>${ex.updateStatus ? "Executor updated" : "Needs update"}</dd></div>
+          ${ex.suncPercentage != null ? `<div><dt>sUNC</dt><dd>${ex.suncPercentage}%</dd></div>` : ""}
+          <div><dt>Cost</dt><dd>${escapeHtml(ex.cost || (ex.free ? "Free" : "Paid"))}</dd></div>
+        </dl>
+        <div class="weao-exec-actions">
+          ${ex.websitelink ? `<a class="btn btn-outline btn-sm" href="${escapeHtml(ex.websitelink)}" target="_blank" rel="noopener">Website</a>` : ""}
+          ${ex.discordlink ? `<a class="btn btn-outline btn-sm" href="${escapeHtml(ex.discordlink)}" target="_blank" rel="noopener">Discord</a>` : ""}
+          <button type="button" class="btn btn-outline btn-sm" data-use-exec="${escapeHtml(ex.title || "")}">Use in report</button>
+          <button type="button" class="btn btn-outline btn-sm" data-copy-exec="${escapeHtml(ex.title || "")}">Copy</button>
+        </div>
+      </article>`;
+      })
+      .join("");
+
+    root.querySelectorAll("[data-use-exec]").forEach((btn) => {
+      btn.addEventListener("click", () => setBugExecutor((btn as HTMLElement).dataset.useExec || ""));
+    });
+    root.querySelectorAll("[data-copy-exec]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        void copyText((btn as HTMLElement).dataset.copyExec || "", "Executor copied");
+      });
+    });
+    afterRender();
+  }
+
+  function scheduleWeaoPoll(delayMs?: number): void {
+    clearTimeout(state.weaoPollTimer);
+    const ms = delayMs ?? (state.weaoLive ? WEAO_LIVE_POLL_MS : WEAO_IDLE_POLL_MS);
+    state.weaoNextPollAt = Date.now() + ms;
+    state.weaoPollTimer = window.setTimeout(() => {
+      void fetchWeaoExploits(false, state.weaoLive);
+    }, ms);
+  }
+
+  function startWeaoCountdown(): void {
+    clearInterval(state.weaoCountdownTimer);
+    state.weaoCountdownTimer = window.setInterval(() => renderWeaoLiveBadge(), 1000);
+  }
+
+  async function fetchWeaoExploits(refresh = false, live = state.weaoLive): Promise<void> {
+    const root = $("#executorList");
+    try {
+      const params = new URLSearchParams();
+      if (refresh) params.set("refresh", "1");
+      if (live) params.set("live", "1");
+      const qs = params.toString();
+      const data = await api(`/api/weao/exploits${qs ? `?${qs}` : ""}`);
+      const prevPrints = { ...state.weaoFingerprints };
+      const nextExploits = (data.exploits as WeaoExploit[]) || [];
+      const serverChanges = (data.changes as WeaoChange[]) || [];
+      const clientChanges = markWeaoClientChanges(prevPrints, nextExploits);
+      state.weaoFingerprints = prevPrints;
+
+      state.weaoExploits = nextExploits;
+      state.weaoSummary = (data.summary as WeaoSummary) || {};
+      state.weaoFetchedAt = String(data.fetchedAt || "");
+      state.weaoPollSec = Number(data.pollIntervalSec) || (live ? 35 : 120);
+      state.weaoChanges = serverChanges.length ? serverChanges : clientChanges;
+      state.weaoRecentChanges = (data.recentChanges as WeaoChange[]) || [];
+
+      for (const change of state.weaoChanges) {
+        if (change.slug) state.weaoChangedSlugs[change.slug] = Date.now();
+      }
+
+      renderWeaoStats();
+      renderWeaoExecutors();
+      updateExecutorDatalist();
+
+      if (state.weaoChanges.length && state.weaoLive) {
+        const headline = state.weaoChanges[0]?.message;
+        if (headline) flash(headline);
+      }
+
+      scheduleWeaoPoll(state.weaoPollSec * 1000);
+    } catch {
+      if (root) {
+        root.innerHTML = `<p class="tool-panel-desc">Could not reach WEAO. <button type="button" class="btn-text" id="weaoRetry">Retry</button></p>`;
+        $("#weaoRetry")?.addEventListener("click", () => void fetchWeaoExploits(true, true));
+      }
+      scheduleWeaoPoll(WEAO_IDLE_POLL_MS);
+    }
+  }
+
+  function bindExecutorTools(): void {
+    $("#executorSearch")?.addEventListener("input", (e) => {
+      state.weaoQuery = (e.target as HTMLInputElement).value;
+      renderWeaoExecutors();
+    });
+    $("#weaoRefresh")?.addEventListener("click", () => void fetchWeaoExploits(true, true));
+    $$("[data-weao-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.weaoFilter = (btn as HTMLElement).dataset.weaoFilter || "all";
+        $$("[data-weao-filter]").forEach((chip) => chip.classList.toggle("active", chip === btn));
+        renderWeaoExecutors();
+      });
+    });
+    const bugExec = $("#bugExecutor") as HTMLInputElement | null;
+    const savedExec = localStorage.getItem(EXECUTOR_PREF_KEY);
+    if (bugExec && savedExec) bugExec.value = savedExec;
+    bugExec?.addEventListener("change", () => {
+      const value = bugExec.value.trim();
+      if (value) localStorage.setItem(EXECUTOR_PREF_KEY, value);
+    });
+
+    const tools = $("#tools");
+    if (tools) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries.some((e) => e.isIntersecting);
+          const wasLive = state.weaoLive;
+          state.weaoLive = visible;
+          renderWeaoLiveBadge();
+          if (visible && !wasLive) void fetchWeaoExploits(false, true);
+          else if (visible !== wasLive) scheduleWeaoPoll(visible ? WEAO_LIVE_POLL_MS : WEAO_IDLE_POLL_MS);
+        },
+        { threshold: 0.15 }
+      );
+      observer.observe(tools);
+    }
+  }
+
+  function startWeaoPolling(): void {
+    startWeaoCountdown();
+    scheduleWeaoPoll(WEAO_IDLE_POLL_MS);
+  }
+
+  function renderTools(site: SitePayload): void {
+    void fetchWeaoExploits(false, false);
+    void renderBanApiPanel();
+
+    const resRoot = $("#resourcesGrid");
+    if (resRoot) {
+      resRoot.innerHTML = (site.resources || [])
+        .map((item) => {
+          const url = resolveResourceUrl(site, item);
+          if (!url) return "";
+          const external = !url.startsWith("#");
+          return `<a class="resource-card reveal" href="${escapeHtml(url)}"${external ? ' target="_blank" rel="noopener"' : ""}><strong>${escapeHtml(item.title || "Link")}</strong><span>${escapeHtml(item.desc || "")}</span></a>`;
+        })
+        .filter(Boolean)
+        .join("");
+    }
+
+    void renderSyncPanel();
+    afterRender();
+  }
+
+  function bindQuickActions(): void {
+    $("#quickCopyScript")?.addEventListener("click", () => void copyLoadstring());
+    $("#quickViewGames")?.addEventListener("click", () => {
+      location.hash = "#games";
+      $("#games")?.scrollIntoView({ behavior: "smooth" });
+    });
+    $("#quickSupport")?.addEventListener("click", () => {
+      location.hash = "#support";
+      $("#support")?.scrollIntoView({ behavior: "smooth" });
+    });
+    $("#quickExecutors")?.addEventListener("click", () => {
+      location.hash = "#tools";
+      $("#tools")?.scrollIntoView({ behavior: "smooth" });
+      setTimeout(() => ($("#executorSearch") as HTMLInputElement | null)?.focus(), 350);
+    });
+    $("#quickTeam")?.addEventListener("click", () => {
+      location.hash = "#credits";
+      $("#credits")?.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
+  const CMD_ACTIONS = [
+    { label: "Go to Home", hash: "#home", keys: "G H" },
+    { label: "Go to Games", hash: "#games", keys: "G G" },
+    { label: "Go to Ban API", hash: "#ban-api", keys: "G B" },
+    { label: "Go to Creator", hash: "#credits", keys: "G C" },
+    { label: "Go to FAQ", hash: "#faq", keys: "G F" },
+    { label: "Go to Support", hash: "#support", keys: "G S" },
+    { label: "Copy loadstring", action: "copy", keys: "C L" },
+    { label: "Search games", action: "search", keys: "/" },
+  ];
+
+  function bindCommandPalette(): void {
+    const dialog = $("#cmdPalette") as HTMLDialogElement | null;
+    const input = $("#cmdInput") as HTMLInputElement | null;
+    const list = $("#cmdList");
+    if (!dialog || !input || !list) return;
+    const dlg = dialog;
+    const inp = input;
+    const lst = list;
+
+    let focusIdx = 0;
+
+    function renderList(query = "") {
+      const q = query.trim().toLowerCase();
+      const items = CMD_ACTIONS.filter((a) => a.label.toLowerCase().includes(q));
+      focusIdx = 0;
+      if (!items.length) {
+        lst.innerHTML = `<p class="cmd-palette-empty">No matching actions</p>`;
+        return;
+      }
+      lst.innerHTML = items
+        .map(
+          (a, i) =>
+            `<button type="button" class="cmd-palette-item${i === 0 ? " focused" : ""}" data-idx="${i}" data-hash="${a.hash || ""}" data-action="${a.action || ""}">${escapeHtml(a.label)}<kbd>${escapeHtml(a.keys)}</kbd></button>`
+        )
+        .join("");
+
+      lst.querySelectorAll(".cmd-palette-item").forEach((btn) => {
+        btn.addEventListener("click", () => runAction(items[parseInt((btn as HTMLElement).dataset.idx || "0", 10)]));
+      });
+    }
+
+    function runAction(item: (typeof CMD_ACTIONS)[number]) {
+      dlg.close();
+      if (item.hash) {
+        location.hash = item.hash;
+        document.querySelector(item.hash)?.scrollIntoView({ behavior: "smooth" });
+      } else if (item.action === "copy") void copyLoadstring();
+      else if (item.action === "search") ($("#gameSearch") as HTMLInputElement | null)?.focus();
+    }
+
+    function openPalette() {
+      inp.value = "";
+      renderList();
+      dlg.showModal();
+      inp.focus();
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        openPalette();
+      }
+    });
+
+    inp.addEventListener("input", () => renderList(inp.value));
+
+    inp.addEventListener("keydown", (e) => {
+      const items = lst.querySelectorAll(".cmd-palette-item");
+      if (!items.length) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        focusIdx = Math.min(focusIdx + 1, items.length - 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        focusIdx = Math.max(focusIdx - 1, 0);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        (items[focusIdx] as HTMLButtonElement)?.click();
+        return;
+      } else return;
+      items.forEach((el, i) => el.classList.toggle("focused", i === focusIdx));
+      (items[focusIdx] as HTMLElement)?.scrollIntoView({ block: "nearest" });
+    });
+
+    dlg.addEventListener("click", (e) => {
+      if (e.target === dlg) dlg.close();
+    });
   }
 
   function renderAccess(site: SitePayload): void {
@@ -449,6 +1300,9 @@ import type { GameEntry, SitePayload } from "./types";
     else renderChangelog(data, false);
     renderFaq(data);
     renderBugCategories(data);
+    renderTools(data);
+    renderGameStatsBar(data);
+    void loadAndRenderCredits(data);
     if (notify && changed) flash("Synced from GitHub");
   }
 
@@ -463,10 +1317,19 @@ import type { GameEntry, SitePayload } from "./types";
     }, SITE_POLL_MS);
   }
 
-  async function copyText(text: string, msg: string): Promise<void> {
+  async function copyText(text: string, msg: string, btn?: HTMLButtonElement | null): Promise<void> {
     try {
       await navigator.clipboard.writeText(text);
       flash(msg);
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = "Copied!";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = prev;
+          btn.classList.remove("copied");
+        }, 2000);
+      }
     } catch {
       flash("Copy failed", true);
     }
@@ -493,7 +1356,18 @@ import type { GameEntry, SitePayload } from "./types";
 
   async function copyLoadstring(): Promise<void> {
     const text = state.site?.loadstring || $("#loadstringCode")?.textContent || "";
-    await copyText(text, "Script copied to clipboard");
+    await copyText(text, "Script copied to clipboard", $("#copyLoadstring") as HTMLButtonElement | null);
+  }
+
+  async function requireTurnstile(formId: string): Promise<string> {
+    const ts = window.AlleralTurnstile;
+    if (!ts?.getToken) return "";
+    const token = await ts.getToken(formId);
+    const mount = document.querySelector(`.form-turnstile[data-turnstile="${formId}"][data-rendered="1"]`);
+    if (mount && !token) {
+      throw new Error("Complete the security check below before submitting.");
+    }
+    return token;
   }
 
   async function submitBug(ev: Event): Promise<void> {
@@ -501,6 +1375,7 @@ import type { GameEntry, SitePayload } from "./types";
     const err = $("#bugError");
     if (err) err.textContent = "";
     try {
+      const captcha = await requireTurnstile("bug");
       await api("/api/bug-report", {
         method: "POST",
         body: JSON.stringify({
@@ -512,10 +1387,12 @@ import type { GameEntry, SitePayload } from "./types";
           contact: ($("#bugContact") as HTMLInputElement)?.value.trim(),
           description: ($("#bugDescription") as HTMLTextAreaElement)?.value.trim(),
           steps: ($("#bugSteps") as HTMLTextAreaElement)?.value.trim(),
+          turnstileToken: captcha,
           ...submissionMeta(),
         }),
       });
       ($("#bugForm") as HTMLFormElement)?.reset();
+      window.AlleralTurnstile?.reset?.("bug");
       flash("Report submitted — sent to Discord");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Submit failed";
@@ -529,6 +1406,7 @@ import type { GameEntry, SitePayload } from "./types";
     const err = $("#featureError");
     if (err) err.textContent = "";
     try {
+      const captcha = await requireTurnstile("feature");
       await api("/api/feature-request", {
         method: "POST",
         body: JSON.stringify({
@@ -536,10 +1414,12 @@ import type { GameEntry, SitePayload } from "./types";
           game: ($("#featureGame") as HTMLInputElement)?.value.trim(),
           contact: ($("#featureContact") as HTMLInputElement)?.value.trim(),
           idea: ($("#featureIdea") as HTMLTextAreaElement)?.value.trim(),
+          turnstileToken: captcha,
           ...submissionMeta(),
         }),
       });
       ($("#featureForm") as HTMLFormElement)?.reset();
+      window.AlleralTurnstile?.reset?.("feature");
       flash("Idea submitted — sent to Discord");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Submit failed";
@@ -553,6 +1433,7 @@ import type { GameEntry, SitePayload } from "./types";
     const err = $("#supportError");
     if (err) err.textContent = "";
     try {
+      const captcha = await requireTurnstile("support");
       await api("/api/support", {
         method: "POST",
         body: JSON.stringify({
@@ -560,10 +1441,12 @@ import type { GameEntry, SitePayload } from "./types";
           robloxUser: ($("#supportUser") as HTMLInputElement)?.value.trim(),
           contact: ($("#supportContact") as HTMLInputElement)?.value.trim(),
           question: ($("#supportQuestion") as HTMLTextAreaElement)?.value.trim(),
+          turnstileToken: captcha,
           ...submissionMeta(),
         }),
       });
       ($("#supportForm") as HTMLFormElement)?.reset();
+      window.AlleralTurnstile?.reset?.("support");
       flash("Question sent — we'll see it in Discord");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Submit failed";
@@ -580,11 +1463,12 @@ import type { GameEntry, SitePayload } from "./types";
         $$("[data-panel-body]").forEach((body) => {
           const show = (body as HTMLElement).dataset.panelBody === panel;
           body.classList.toggle("hidden", !show);
-          if (show) {
-            body.classList.remove("panel-enter");
-            void (body as HTMLElement).offsetWidth;
-            body.classList.add("panel-enter");
-          }
+        if (show) {
+          body.classList.remove("panel-enter");
+          void (body as HTMLElement).offsetWidth;
+          body.classList.add("panel-enter");
+          void window.AlleralTurnstile?.mountVisible?.();
+        }
         });
         const me = e as MouseEvent;
         if (me.clientX != null) {
@@ -615,11 +1499,100 @@ import type { GameEntry, SitePayload } from "./types";
     });
   }
 
+  function bindGameSearch(): void {
+    const input = $("#gameSearch") as HTMLInputElement | null;
+    if (!input) return;
+    let timer = 0;
+    input.addEventListener("input", () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        state.gameQuery = input.value;
+        if (state.site) void renderGames(state.site);
+      }, 180);
+    });
+  }
+
+  function bindFaqSearch(): void {
+    const input = $("#faqSearch") as HTMLInputElement | null;
+    if (!input) return;
+    let timer = 0;
+    input.addEventListener("input", () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        state.faqQuery = input.value;
+        if (state.site) renderFaq(state.site);
+      }, 180);
+    });
+    $("#faqExpandAll")?.addEventListener("click", () => {
+      $$<HTMLDetailsElement>(".faq-item").forEach((item) => {
+        item.open = true;
+      });
+    });
+    $("#faqCollapseAll")?.addEventListener("click", () => {
+      $$<HTMLDetailsElement>(".faq-item").forEach((item) => {
+        item.open = false;
+      });
+    });
+  }
+
+  function bindKeyboardShortcuts(): void {
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      ($("#gameSearch") as HTMLInputElement | null)?.focus();
+    });
+  }
+
+  function bindBackToTop(): void {
+    const btn = $("#backToTop") as HTMLButtonElement | null;
+    if (!btn) return;
+    window.addEventListener("scroll", () => {
+      const show = window.scrollY > 480;
+      btn.hidden = !show;
+      btn.classList.toggle("visible", show);
+    }, { passive: true });
+    btn.addEventListener("click", () => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  function bindScrollSpy(): void {
+    const sections = $$("main section[id]");
+    if (!sections.length) return;
+    const links = $$<HTMLAnchorElement>(".nav-links a[data-section]");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible?.target?.id) return;
+        links.forEach((a) => a.classList.toggle("active", a.dataset.section === visible.target.id));
+      },
+      { rootMargin: "-40% 0px -45% 0px", threshold: [0, 0.15, 0.4] }
+    );
+    sections.forEach((s) => observer.observe(s));
+  }
+
   function bindMobileNav(): void {
     const toggle = $("#navToggle");
     const nav = $("#mainNav");
     toggle?.addEventListener("click", () => nav?.classList.toggle("open"));
     $$(".nav-links a").forEach((a) => a.addEventListener("click", () => nav?.classList.remove("open")));
+  }
+
+  async function initFormCaptcha(): Promise<void> {
+    try {
+      const data = await api("/api/gate/config");
+      if (data.serverVerify) {
+        void window.AlleralTurnstile?.mountVisible?.();
+      } else {
+        window.AlleralTurnstile?.hideAll?.();
+      }
+    } catch {
+      void window.AlleralTurnstile?.mountVisible?.();
+    }
   }
 
   function isGatePassed(): boolean {
@@ -640,7 +1613,7 @@ import type { GameEntry, SitePayload } from "./types";
 
     $("#copyLoadstring")?.addEventListener("click", () => void copyLoadstring());
     $("#copyPrimaryUrl")?.addEventListener("click", () => {
-      void copyText($("#primaryUrl")?.textContent || "", "Link copied");
+      void copyText($("#primaryUrl")?.textContent || "", "Link copied", $("#copyPrimaryUrl") as HTMLButtonElement | null);
     });
     $("#loadMoreChangelog")?.addEventListener("click", () => {
       state.changelogShown += 3;
@@ -654,8 +1627,19 @@ import type { GameEntry, SitePayload } from "./types";
     if (fy) fy.textContent = String(new Date().getFullYear());
     bindTabs();
     bindGameFilters();
+    bindGameSearch();
+    bindFaqSearch();
+    bindKeyboardShortcuts();
+    bindBackToTop();
+    bindScrollSpy();
     bindModal();
     bindMobileNav();
+    bindQuickActions();
+    bindCommandPalette();
+    bindExecutorTools();
+    bindBanApiTools();
+    startWeaoPolling();
+    void initFormCaptcha();
     setActiveNav();
     void checkLiveStatus();
     setInterval(() => void checkLiveStatus(), 60000);

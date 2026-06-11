@@ -2,8 +2,7 @@
   const STORAGE_KEY = "alleral_gate_ok";
   const DEV_TOKEN_KEY = "alleral_dev_token";
   const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
-  const FALLBACK_SITE_KEY = "1x00000000000000000000AA";
-  const INTERACTIVE_SITE_KEY = "3x00000000000000000000FF";
+  const TEST_SITE_KEY = "3x00000000000000000000FF";
   const cfg = window.ALLERAL_CONFIG || {};
 
   function randomRay() {
@@ -125,7 +124,7 @@
     let verified = false;
     let renderAttempt = 0;
     let widgetId = null;
-    let activeSiteKey = INTERACTIVE_SITE_KEY;
+    let activeSiteKey = TEST_SITE_KEY;
 
     function setProgress(pct) {
       if (bar) bar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
@@ -171,7 +170,7 @@
       } catch {
         /* interactive default */
       }
-      return INTERACTIVE_SITE_KEY;
+      return TEST_SITE_KEY;
     }
 
     async function verifyToken(token) {
@@ -240,11 +239,6 @@
         "before-interactive-callback": () => showWidget(),
         "after-interactive-callback": () => showWidget(),
         "error-callback": () => {
-          if (renderAttempt < 1) {
-            renderAttempt += 1;
-            renderTurnstile(FALLBACK_SITE_KEY);
-            return;
-          }
           showError("Challenge error. Click Try Again.");
         },
         "expired-callback": () => {
@@ -255,7 +249,7 @@
           showError("Challenge timed out. Click Try Again.");
         },
       });
-      setTimeout(showWidget, 1200);
+      showWidget();
     }
 
     function loadTurnstileScript() {
@@ -290,7 +284,10 @@
       }
     }
 
-    retryBtn?.addEventListener("click", () => startChallenge());
+    retryBtn?.addEventListener("click", () => {
+      renderAttempt += 1;
+      void startChallenge();
+    });
     startChallenge();
   }
 
