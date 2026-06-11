@@ -11,7 +11,8 @@ loader.luau (GitHub HttpGet — only entry point)
     ├── download core/alleral_core.luau
     ├── load analytics, helpers, telemetry
     ├── preload Obsidian UI
-    └── run games/*.luau
+    ├── run games/*.luau
+    └── auto-update poll → reload on GitHub changes
 ```
 
 ## WEAO integration
@@ -37,7 +38,7 @@ The WEAO client tries every base × transport × cache-busted URL, validates JSO
 
 | Component | Version | File |
 |-----------|---------|------|
-| Loader | 7.1.0 | `loader.luau`, `config/release.json` |
+| Loader | 7.2.0 | `loader.luau`, `config/release.json` |
 | Core | 2.1 | `core/alleral_core.luau` |
 | UI | Obsidian | `vendor/obsidian/` |
 | Telemetry | 3.0 | `core/telemetry.luau`, `config/telemetry.json` |
@@ -54,3 +55,12 @@ Run `powershell tools/verify_versions.ps1` before pushing.
 - Call WEAO without `WEAO-3PService` user-agent
 - Embed core or loader with `[=[` long strings (breaks Volt)
 - Ship v3.x loaders — loader purges them from executor workspace on run
+- Push without updating `config/release.json` (`commit`, `updatedAt`, or versions) when you expect live auto-update
+
+## Auto-update
+
+Loader polls GitHub every `updatePollSeconds` (default 45) using `config/release.json` + `config/scripts_manifest.json`. When the release fingerprint changes, the hub purges stale workspace files and calls `Alleral_Reload()`.
+
+Player commands: `Alleral_CheckUpdate()` · `Alleral_PurgeCache()` · `Alleral_Reload()`
+
+Maintainer: run `powershell tools/bump_release.ps1` before push to refresh `commit` and `updatedAt`.

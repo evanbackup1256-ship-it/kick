@@ -1,12 +1,15 @@
-{
-  "loader": "7.1.0",
-  "core": "2.1",
-  "weao": "1.0",
-  "ui": "Obsidian",
-  "commit": "7692924",
-  "minLoader": "7.1.0",
-  "minCore": "2.1",
-  "analytics": "1.0",
-  "telemetry": "3.0",
-  "helpers": "1.0"
+﻿{
+    "loader":  "7.2.0",
+    "core":  "2.1",
+    "weao":  "1.0",
+    "ui":  "Obsidian",
+    "commit":  "7f6dc1d",
+    "updatedAt":  "2026-06-11T03:40:55Z",
+    "updatePollSeconds":  45,
+    "autoUpdate":  true,
+    "minLoader":  "7.1.0",
+    "minCore":  "2.1",
+    "analytics":  "1.0",
+    "telemetry":  "3.0",
+    "helpers":  "1.0"
 }

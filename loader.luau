@@ -3,15 +3,20 @@
 	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "7.1.0"
+local LOADER_VERSION = "7.2.0"
 local MIN_CORE = "2.1"
+local DEFAULT_UPDATE_POLL_SECONDS = 45
 local CORE_MIN_BYTES = 50000
 local RELEASE_FALLBACK = {
-	core = "2.0",
+	loader = "7.2.0",
+	core = "2.1",
 	analytics = "1.0",
 	telemetry = "3.0",
 	helpers = "1.0",
 	weao = "1.0",
+	commit = "",
+	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
+	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
 	"",
@@ -874,8 +879,49 @@ local function compileAndRun(source, chunkName, runEnv)
 	return true
 end
 
+local function clampNumber(value, minValue, maxValue)
+	value = tonumber(value) or minValue
+	if value < minValue then
+		return minValue
+	end
+	if value > maxValue then
+		return maxValue
+	end
+	return value
+end
+
+local function versionParts(value)
+	local parts = {}
+	for piece in tostring(value or "0"):gmatch("%d+") do
+		table.insert(parts, tonumber(piece) or 0)
+	end
+	if #parts == 0 then
+		table.insert(parts, 0)
+	end
+	return parts
+end
+
+local function compareVersions(a, b)
+	local left, right = versionParts(a), versionParts(b)
+	local count = math.max(#left, #right)
+	for index = 1, count do
+		local lv, rv = left[index] or 0, right[index] or 0
+		if lv < rv then
+			return -1
+		end
+		if lv > rv then
+			return 1
+		end
+	end
+	return 0
+end
+
+local function versionLt(a, b)
+	return compareVersions(a, b) < 0
+end
+
 local function coreVersionOk(v)
-	return type(v) == "string" and v >= MIN_CORE
+	return type(v) == "string" and compareVersions(v, MIN_CORE) >= 0
 end
 
 local function coreValid(src)
@@ -884,9 +930,6 @@ local function coreValid(src)
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
 	if not coreVersionOk(ver) then
-		return false
-	end
-	if src:find("fakeUiInstance", 1, true) and not src:find("AlleralGroupShell", 1, true) then
 		return false
 	end
 	if not loadStringFn then
@@ -1075,7 +1118,6 @@ local function wireTelemetry(profile)
 		gameId = profile and profile.id,
 		scriptVersion = profile and profile.version,
 	}
-	telemetry:ReportInject("start", meta)
 	telemetry:ReportSessionStart(meta)
 	telemetry:StartHeartbeat()
 end
@@ -1094,6 +1136,9 @@ do
 			if bridge.Alleral_WeaoConfig then g.Alleral_WeaoConfig = bridge.Alleral_WeaoConfig end
 			if bridge.Alleral_Boot then g.Alleral_Boot = bridge.Alleral_Boot end
 			if bridge.Alleral_LoaderMeta then g.Alleral_LoaderMeta = bridge.Alleral_LoaderMeta end
+			if bridge.Alleral_ReportError then g.Alleral_ReportError = bridge.Alleral_ReportError end
+			if bridge.Alleral_LogEvent then g.Alleral_LogEvent = bridge.Alleral_LogEvent end
+			if bridge.Alleral_OwnerTelemetry then g.Alleral_OwnerTelemetry = bridge.Alleral_OwnerTelemetry end
 			if bridge.Alleral_UI then g.Alleral_UI = bridge.Alleral_UI end
 			g.Alleral_State = g.Alleral_State or bridge.Alleral_State or {}
 			bridge.Alleral_State = g.Alleral_State
@@ -1113,6 +1158,9 @@ local function publishBridge()
 		shared.Alleral_WeaoConfig = ENV.Alleral_WeaoConfig
 		shared.Alleral_Boot = ENV.Alleral_Boot
 		shared.Alleral_LoaderMeta = ENV.Alleral_LoaderMeta
+		shared.Alleral_ReportError = ENV.Alleral_ReportError
+		shared.Alleral_LogEvent = ENV.Alleral_LogEvent
+		shared.Alleral_OwnerTelemetry = ENV.Alleral_OwnerTelemetry
 		shared.Alleral_State = ENV.Alleral_State or {}
 	end)
 end
@@ -1138,7 +1186,7 @@ local GAMES = {
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
 		scriptUrl = "games/kick_a_lucky_block.luau",
-		sourceMarker = "Alleral_Rayfield",
+		sourceMarker = "buildUiWindow",
 		minBytes = 100000,
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Shared" }, 20)
@@ -1275,19 +1323,25 @@ end
 
 local function fetchExpectedVersions()
 	local expected = {
-		loader = LOADER_VERSION,
+		loader = RELEASE_FALLBACK.loader,
 		core = RELEASE_FALLBACK.core,
 		analytics = RELEASE_FALLBACK.analytics,
 		telemetry = RELEASE_FALLBACK.telemetry,
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
+		commit = RELEASE_FALLBACK.commit,
+		updatedAt = "",
+		minLoader = LOADER_VERSION,
+		minCore = MIN_CORE,
+		updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
+		autoUpdate = true,
 		games = {},
 	}
 	for _, gameProfile in ipairs(GAMES) do
 		expected.games[gameProfile.id] = gameProfile.version
 	end
 
-	local release = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/release.json")))
+	local release = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/release.json?t=" .. tick())))
 	if release then
 		expected.loader = release.loader or expected.loader
 		expected.core = release.core or expected.core
@@ -1295,14 +1349,24 @@ local function fetchExpectedVersions()
 		expected.telemetry = release.telemetry or expected.telemetry
 		expected.helpers = release.helpers or expected.helpers
 		expected.weao = release.weao or expected.weao
+		expected.commit = release.commit or expected.commit
+		expected.updatedAt = release.updatedAt or expected.updatedAt
+		expected.minLoader = release.minLoader or expected.minLoader
+		expected.minCore = release.minCore or expected.minCore
+		if type(release.updatePollSeconds) == "number" then
+			expected.updatePollSeconds = clampNumber(release.updatePollSeconds, 15, 600)
+		end
+		if release.autoUpdate ~= nil then
+			expected.autoUpdate = release.autoUpdate == true
+		end
 	end
 
-	local weaoCfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/weao.json")))
+	local weaoCfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/weao.json?t=" .. tick())))
 	if weaoCfg then
 		ENV._Alleral_WeaoConfigRemote = weaoCfg
 	end
 
-	local manifest = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/scripts_manifest.json")))
+	local manifest = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/scripts_manifest.json?t=" .. tick())))
 	if manifest and type(manifest.scripts) == "table" then
 		for id, entry in pairs(manifest.scripts) do
 			if type(entry) == "table" and type(entry.version) == "string" then
@@ -1317,6 +1381,106 @@ local function fetchExpectedVersions()
 	end
 
 	return expected
+end
+
+local function buildUpdateFingerprint(expected, profile)
+	if type(expected) ~= "table" then
+		return ""
+	end
+	local parts = {
+		"commit=" .. tostring(expected.commit or ""),
+		"updated=" .. tostring(expected.updatedAt or ""),
+		"loader=" .. tostring(expected.loader or ""),
+		"core=" .. tostring(expected.core or ""),
+		"telemetry=" .. tostring(expected.telemetry or ""),
+		"analytics=" .. tostring(expected.analytics or ""),
+		"helpers=" .. tostring(expected.helpers or ""),
+		"weao=" .. tostring(expected.weao or ""),
+	}
+	if profile and profile.id then
+		table.insert(parts, "game=" .. tostring(profile.id) .. "@" .. tostring(expected.games and expected.games[profile.id] or profile.version or ""))
+	end
+	return table.concat(parts, "|")
+end
+
+local function stopAutoUpdater()
+	ENV._Alleral_AutoUpdateRunning = false
+	ENV._Alleral_AutoUpdateToken = nil
+end
+
+local function applyRemoteUpdate(profile, expected, reason)
+	if ENV._Alleral_UpdateApplying then
+		return
+	end
+	ENV._Alleral_UpdateApplying = true
+	stopAutoUpdater()
+	log("Update available (" .. tostring(reason) .. ") — refreshing from GitHub")
+	notify("Alleral", "Update detected. Reloading...", 4)
+	ENV._Alleral_ExpectedVersions = expected
+	purgeOutdatedWorkspace()
+	recordInstalledVersions()
+	task.defer(function()
+		ENV._Alleral_UpdateApplying = false
+		if ENV.Alleral_Reload then
+			ENV.Alleral_Reload()
+		end
+	end)
+end
+
+local function checkForRemoteUpdate(profile, quiet)
+	local expected = fetchExpectedVersions()
+	local fingerprint = buildUpdateFingerprint(expected, profile)
+	local previous = ENV._Alleral_UpdateFingerprint
+	ENV._Alleral_ExpectedVersions = expected
+
+	if type(previous) ~= "string" or previous == "" then
+		ENV._Alleral_UpdateFingerprint = fingerprint
+		if not quiet then
+			log("Auto-update armed (" .. tostring(expected.commit ~= "" and expected.commit or "release") .. ")")
+		end
+		return false
+	end
+
+	if fingerprint == previous then
+		return false
+	end
+
+	local reason = "release changed"
+	if expected.commit ~= "" and not previous:find(tostring(expected.commit), 1, true) then
+		reason = "commit " .. tostring(expected.commit)
+	elseif expected.loader and not previous:find("loader=" .. tostring(expected.loader), 1, true) then
+		reason = "loader v" .. tostring(expected.loader)
+	elseif profile and expected.games and expected.games[profile.id] then
+		reason = profile.name .. " v" .. tostring(expected.games[profile.id])
+	end
+
+	applyRemoteUpdate(profile, expected, reason)
+	return true
+end
+
+local function startAutoUpdater(profile)
+	stopAutoUpdater()
+	local expected = ENV._Alleral_ExpectedVersions or fetchExpectedVersions()
+	if expected.autoUpdate == false then
+		return
+	end
+	local pollSeconds = tonumber(expected.updatePollSeconds) or DEFAULT_UPDATE_POLL_SECONDS
+	pollSeconds = clampNumber(math.floor(pollSeconds), 15, 600)
+	ENV._Alleral_AutoUpdateRunning = true
+	local token = tick()
+	ENV._Alleral_AutoUpdateToken = token
+	task.spawn(function()
+		while ENV._Alleral_AutoUpdateRunning and ENV._Alleral_AutoUpdateToken == token do
+			task.wait(pollSeconds)
+			if ENV._Alleral_AutoUpdateToken ~= token then
+				break
+			end
+			pcall(function()
+				checkForRemoteUpdate(profile, true)
+			end)
+		end
+	end)
+	log("Auto-update polling every " .. tostring(pollSeconds) .. "s")
 end
 
 local function buildManagedFiles()
@@ -1346,6 +1510,15 @@ local function buildManagedFiles()
 			paths = { "core/weao.luau" },
 			expectedKey = "weao",
 			extract = "weao",
+		},
+		{
+			paths = {
+				"vendor/obsidian/Library.lua",
+				"vendor/obsidian/addons/ThemeManager.lua",
+				"vendor/obsidian/addons/SaveManager.lua",
+			},
+			expectedKey = "loader",
+			purgeOnLoaderChange = true,
 		},
 		{
 			paths = { "config/weao.json" },
@@ -1454,7 +1627,7 @@ local function isLegacyAlleralLoader(src)
 		end
 	end
 	local ver = src:match('LOADER_VERSION%s*=%s*"([%d%.]+)"')
-	if ver and ver < "5.0" then
+	if ver and versionLt(ver, "5.0") then
 		return true
 	end
 	if src:find("Alleral loader", 1, true) and src:find("Detected Kick", 1, true) then
@@ -1741,11 +1914,23 @@ local function main()
 	ENV.Alleral_Weao = nil
 	ENV.Alleral_StartupFailed = nil
 
-	if type(PREVIOUS_LOADER_VERSION) == "string" and PREVIOUS_LOADER_VERSION < LOADER_VERSION then
+	if type(PREVIOUS_LOADER_VERSION) == "string" and versionLt(PREVIOUS_LOADER_VERSION, LOADER_VERSION) then
 		log("Upgrading from loader v" .. PREVIOUS_LOADER_VERSION .. " — purging stale workspace cache")
 	end
 
 	purgeOutdatedWorkspace()
+	local expectedVersions = ENV._Alleral_ExpectedVersions or fetchExpectedVersions()
+	if expectedVersions.minLoader and versionLt(LOADER_VERSION, expectedVersions.minLoader) then
+		local msg = "Loader v"
+			.. LOADER_VERSION
+			.. " is below minimum v"
+			.. tostring(expectedVersions.minLoader)
+			.. ". Re-run the GitHub loadstring."
+		notify("Alleral", msg, 10)
+		log(msg, true)
+		ENV.Alleral_LoaderRunning = false
+		return
+	end
 
 	loadWeaoStack()
 
@@ -1775,7 +1960,7 @@ local function main()
 		end
 	end
 
-	if type(PREVIOUS_LOADER_VERSION) == "string" and PREVIOUS_LOADER_VERSION < "5.0" then
+	if type(PREVIOUS_LOADER_VERSION) == "string" and versionLt(PREVIOUS_LOADER_VERSION, "5.0") then
 		log(
 			"Old loader v"
 				.. PREVIOUS_LOADER_VERSION
@@ -1802,6 +1987,7 @@ local function main()
 		EXECUTOR.slug,
 		EXECUTOR.weaoVerified and " · WEAO" or ""
 	))
+	ENV._Alleral_ActiveProfile = profile
 
 	if profile.preload then
 		local ready, preloadErr = profile.preload()
@@ -1824,7 +2010,6 @@ local function main()
 	loadModule({ "core/analytics.luau" }, "core/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
 	loadModule({ "core/game_helpers.luau" }, "core/game_helpers.luau", "GameHelpers", "Alleral/helpers")
 	loadModule({ "core/telemetry.luau" }, "core/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
-	wireTelemetry(profile)
 
 	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadUi) == "function" then
 		local ui, uiErr = ENV.Alleral_Core.loadUi()
@@ -1841,6 +2026,9 @@ local function main()
 	if not src then
 		notify("Alleral", "Game script failed: " .. tostring(label), 8)
 		log("Game script failed: " .. tostring(label), true)
+		if ENV.Alleral_Telemetry and ENV.Alleral_Telemetry.ReportInject then
+			ENV.Alleral_Telemetry:ReportInject("failed", { error = tostring(label), gameId = profile.id })
+		end
 		ENV.Alleral_LoaderRunning = false
 		return
 	end
@@ -1874,12 +2062,16 @@ local function main()
 		})
 	end
 
+	wireTelemetry(profile)
 	recordInstalledVersions()
+	checkForRemoteUpdate(profile, true)
+	startAutoUpdater(profile)
 	notify("Alleral", profile.name .. " loaded.", 4)
 	log("Ready")
 end
 
 ENV.Alleral_Reload = function()
+	stopAutoUpdater()
 	if ENV.Alleral_State and type(ENV.Alleral_State.Alleral_Unload) == "function" then
 		pcall(ENV.Alleral_State.Alleral_Unload)
 	end
@@ -1913,7 +2105,18 @@ end
 
 ENV.Alleral_PurgeCache = function()
 	purgeOutdatedWorkspace()
+	checkForRemoteUpdate(ENV._Alleral_ActiveProfile, false)
 	print("[Alleral v" .. LOADER_VERSION .. "] Workspace cache purge complete")
+end
+
+ENV.Alleral_CheckUpdate = function()
+	local profile = ENV._Alleral_ActiveProfile
+	if checkForRemoteUpdate(profile, false) then
+		print("[Alleral v" .. LOADER_VERSION .. "] Update found — reloading")
+		return true
+	end
+	print("[Alleral v" .. LOADER_VERSION .. "] Already up to date")
+	return false
 end
 
 print("=== Alleral " .. LOADER_VERSION .. " active ===")

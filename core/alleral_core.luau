@@ -885,8 +885,6 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 			end
 			if labels.Notice and nextStatus.message ~= "" then
 				labels.Notice:Set({ Name = "Notice: " .. nextStatus.message })
-			elseif labels.Notice and labels.Notice.Instance then
-				labels.Notice.Instance.Visible = nextStatus.message ~= ""
 			end
 			local refreshedWeao = Core.fetchWeaoExecutorStatus()
 			if refreshedWeao and labels.WEAO and labels.WEAO.Set then
@@ -1617,7 +1615,12 @@ function Core.prepareGame(state)
 	if state.AntiAFK ~= false then
 		core.setupAntiAfk(game:GetService("Players").LocalPlayer)
 	end
-	local uiLibrary, err = core.loadUi()
+	local cachedUi = ENV.Alleral_UI or ENV.Alleral_Rayfield
+	local uiLibrary = type(cachedUi) == "table" and type(cachedUi.Library) == "table" and cachedUi or nil
+	local err
+	if not uiLibrary then
+		uiLibrary, err = core.loadUi()
+	end
 	if not uiLibrary then
 		local msg = err or "UI unavailable"
 		signalBootFailure(msg)
@@ -2034,7 +2037,16 @@ end
 
 function Core.buildUiTab(section, name, icon, columns, id)
 	local window = section._window or section
-	local rawTab = window:AddTab(name)
+	local iconArg = nil
+	if icon then
+		local numeric = tonumber(Core.uiIcon(icon))
+		if numeric then
+			iconArg = numeric
+		elseif type(icon) == "string" and icon ~= "" and not icon:find("rbxassetid", 1, true) then
+			iconArg = icon
+		end
+	end
+	local rawTab = iconArg and window:AddTab(name, iconArg) or window:AddTab(name)
 	return Core.wrapUiTab(rawTab, window._ui or section._ui, window)
 end
 

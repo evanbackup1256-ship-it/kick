@@ -15,13 +15,28 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-i
 You should see:
 
 ```
-=== Alleral 7.1.0 active ===
+=== Alleral 7.2.0 active ===
+Auto-update polling every 45s
 ```
 
 If you see an old version, delete saved Alleral scripts in Volt and run the line above again.
 
-Reload: `getgenv().Alleral_Reload()`
+## Live updates
 
-Clear cached files: `getgenv().Alleral_PurgeCache()`
+After the hub loads, it polls GitHub every **45 seconds** (configurable in `config/release.json`). When you push a new commit or bump a version, players get **Update detected. Reloading...** automatically.
 
-Scan for old loaders: `getgenv().Alleral_ScanLegacy()`
+Manual controls:
+
+- Reload now: `getgenv().Alleral_Reload()`
+- Check for updates: `getgenv().Alleral_CheckUpdate()`
+- Clear cached files: `getgenv().Alleral_PurgeCache()`
+
+## Bump a release on GitHub
+
+When you ship changes, update `config/release.json`:
+
+1. Bump `loader`, `core`, or game versions in `config/scripts_manifest.json`
+2. Set `commit` to the new git short hash
+3. Set `updatedAt` to the current UTC time
+
+Push to `main` — connected clients pick it up within one poll cycle.
