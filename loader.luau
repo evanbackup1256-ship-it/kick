@@ -90,6 +90,82 @@ local readFile = firstExecFunc("readfile")
 local isFile = firstExecFunc("isfile")
 local loadStringFn = firstExecFunc("loadstring", "LoadString") or loadstring
 
+local LAUNCH_BOOTSTRAP_URL = REPO_BASE .. "/launch.luau"
+
+local function bootstrapViaLaunch()
+	if rawget(_G, "__Alleral_LaunchHandled") then
+		return false
+	end
+	if type(ENV) == "table" and (ENV.Alleral_DevMode == true or ENV.Alleral_SkipLaunchBootstrap == true) then
+		return false
+	end
+
+	local function cacheBust(url)
+		local nonce = typeof(tick) == "function" and tick() or math.random()
+		return url .. (url:find("?", 1, true) and "&" or "?") .. "t=" .. tostring(nonce)
+	end
+
+	local function httpGet(url)
+		url = cacheBust(url)
+		if httpRequest then
+			local ok, res = pcall(httpRequest, {
+				Url = url,
+				Method = "GET",
+				Headers = {
+					["Cache-Control"] = "no-cache, no-store, must-revalidate",
+					["Pragma"] = "no-cache",
+				},
+			})
+			if ok and res then
+				local status = res.StatusCode or res.status or 200
+				local body = res.Body or res.body
+				if status >= 200 and status < 300 and type(body) == "string" and body ~= "" then
+					return body
+				end
+			end
+		end
+		if type(game.HttpGet) == "function" then
+			local ok, body = pcall(game.HttpGet, game, url, true)
+			if ok and type(body) == "string" and body ~= "" then
+				return body
+			end
+			ok, body = pcall(game.HttpGet, game, url)
+			if ok and type(body) == "string" and body ~= "" then
+				return body
+			end
+		end
+		return nil
+	end
+
+	if type(loadStringFn) ~= "function" then
+		warn("[Alleral Loader] This executor needs loadstring.")
+		return true
+	end
+
+	_G.__Alleral_LaunchHandled = true
+	local source = httpGet(LAUNCH_BOOTSTRAP_URL)
+	if type(source) ~= "string" or source == "" then
+		warn("[Alleral Loader] Could not download launch bootstrap.")
+		return true
+	end
+
+	local fn, compileErr = loadStringFn(source, "Alleral/launch")
+	if type(fn) ~= "function" then
+		warn("[Alleral Loader] Launch failed to compile" .. (compileErr and (": " .. tostring(compileErr)) or "."))
+		return true
+	end
+
+	local ok, runErr = pcall(fn)
+	if not ok then
+		warn("[Alleral Loader] " .. tostring(runErr))
+	end
+	return true
+end
+
+if bootstrapViaLaunch() then
+	return
+end
+
 local function notify(title, text, duration)
 	pcall(function()
 		game:GetService("StarterGui"):SetCore("SendNotification", {

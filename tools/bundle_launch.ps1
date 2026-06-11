@@ -46,6 +46,5 @@ if ($template -notmatch '--EMBED_LOADER_HERE--') {
 
 $launch = $template.Replace("--EMBED_LOADER_HERE--", $embedded.TrimEnd())
 Set-Content -Path $launchPath -Value $launch -Encoding UTF8 -NoNewline
-Copy-Item -Path $launchPath -Destination (Join-Path $root "bootstrap.luau") -Force
 Write-Host "[ok] Bundled loader v$version into launch.luau ($($launch.Length) bytes)"
-Write-Host "[ok] Copied to bootstrap.luau (use if launch.luau is cached stale)"
+Write-Host "[ok] bootstrap.luau is the tiny autoexec entry (not overwritten)"

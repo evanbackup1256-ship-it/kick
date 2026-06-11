@@ -456,6 +456,7 @@ local function runLoader(body, version, sourceLabel)
 	if type(loadStringFn) ~= "function" then
 		error("[Alleral Bootstrap] This executor needs loadstring to run Alleral.")
 	end
+	_G.__Alleral_LaunchHandled = true
 	local fn, compileErr = loadStringFn(body, "Alleral/loader@" .. tostring(version))
 	if type(fn) ~= "function" then
 		if type(EMBEDDED_LOADER) == "string" and body ~= EMBEDDED_LOADER then

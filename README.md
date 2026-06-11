@@ -12,11 +12,13 @@ Copy **Alleral Hub** into your executor workspace, then from the repo root:
 loadstring(readfile("loader.luau"))()
 ```
 
-Remote (recommended — includes bundled fallback if CDN is stale):
+Remote (recommended — use `bootstrap.luau`, not `launch.luau`):
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/launch.luau?t=" .. tick()))()
+(getgenv().loadstring or loadstring or load)(game.HttpGet(game, "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=" .. tick(), true))()
 ```
+
+Or save `bootstrap.luau` from the repo into your executor autoexec folder (no one-liner needed).
 
 Reload: `getgenv().Alleral_Reload()` · Debug: `getgenv().Alleral_LoaderInfo()`
 
