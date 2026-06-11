@@ -911,8 +911,6 @@ config:CreateButton("Reset settings", function()
 end, "Clears saved config and restores defaults.")
 
 settingsTab:BuildThemeGroupbox(1)
-Core.buildScriptStatusGroupbox(settingsTab, 1, "speed_keyboard_escape", VERSION)
-Core.buildHubActionsGroup(settingsTab, 2)
 Core.buildConfigProfileGroup(settingsTab, {
 	state = state,
 	savedKeys = savedKeys,

@@ -1719,8 +1719,6 @@ performance:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Stops Roblox from 
 end)
 
 settingsTab:BuildThemeGroupbox(1)
-Core.buildScriptStatusGroupbox(settingsTab, 1, "slime_rng", VERSION)
-Core.buildHubActionsGroup(settingsTab, 2)
 Core.buildConfigProfileGroup(settingsTab, {
 	state = state,
 	savedKeys = savedKeys,

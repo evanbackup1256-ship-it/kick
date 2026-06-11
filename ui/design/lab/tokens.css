@@ -1,14 +1,14 @@
 /* Generated from ui/design/tokens.json — edit tokens.json first, then mirror here */
 :root {
   --accent: #53fc18;
-  --accent-soft: #7dff35;
-  --accent-hot: #30ff6a;
-  --canvas: #0f0f0f;
-  --surface: #141414;
-  --card: #161616;
-  --card-hover: #1c1c1c;
-  --text: #ffffff;
-  --muted: #a1a1aa;
+  --accent-soft: #8dff52;
+  --accent-hot: #2dff62;
+  --canvas: #070708;
+  --surface: #0e0e11;
+  --card: #131318;
+  --card-hover: #1a1a22;
+  --text: #f4f4f8;
+  --muted: #9ca3af;
   --divider: rgba(255, 255, 255, 0.1);
   --divider-strong: rgba(255, 255, 255, 0.9);
   --track-off: #2a2a34;
@@ -17,12 +17,12 @@
   --warn: #ffd166;
   --error: #ff5c5c;
 
-  --radius-window: 10px;
+  --radius-window: 12px;
   --radius-tab: 8px;
   --radius-section: 10px;
 
   --pad-window: 24px;
-  --sidebar-width: 276px;
+  --sidebar-width: 280px;
   --gap-element: 16px;
   --gap-section: 15px;
   --pad-section-top: 22px;
@@ -37,7 +37,7 @@
   --row-height: 38px;
   --window-width: 860px;
   --window-height: 560px;
-  --topbar-height: 63px;
+  --topbar-height: 68px;
 
   --tab-text-idle: 0.42;
   --tab-text-active: 0.92;

@@ -1946,8 +1946,6 @@ Core.makeSupervisor(state, loops, loopControllers, "Stats", 2, function()
 end)
 
 settingsTab:BuildThemeGroupbox(1)
-Core.buildScriptStatusGroupbox(settingsTab, 1, "build_a_ring_farm", VERSION)
-Core.buildHubActionsGroup(settingsTab, 2)
 Core.buildConfigProfileGroup(settingsTab, {
 	state = state,
 	savedKeys = savedKeys,

@@ -1,9 +1,10 @@
 --[[
-	Loads aller.luau onto a WindUI instance.
+	Loads arrrel.luau onto a WindUI instance.
 	Used by main.lua; can also be required from core as a fallback.
 ]]
 
-local PATCH_FILE = "aller.luau"
+local PATCH_FILE = "arrrel.luau"
+local PATCH_FALLBACK = "aller.luau"
 local PATCH_ROOTS = {
 	"ui/windui/",
 	"vendor/windui/",
@@ -13,6 +14,8 @@ local PATCH_ROOTS = {
 }
 
 local PATCH_URLS = {
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/arrrel.luau",
+	"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/arrrel.luau",
 	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/aller.luau",
 	"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/aller.luau",
 }
@@ -20,7 +23,7 @@ local PATCH_URLS = {
 local function validPatchSource(body)
 	return type(body) == "string"
 		and #body > 800
-		and body:find("ALLERAL_UI_VERSION", 1, true) ~= nil
+		and (body:find("ARRREL_UI_VERSION", 1, true) ~= nil or body:find("ALLERAL_UI_VERSION", 1, true) ~= nil)
 		and body:find("return function", 1, true) ~= nil
 end
 
@@ -55,12 +58,14 @@ local function readLocalPatch()
 		return nil
 	end
 
-	for _, root in ipairs(PATCH_ROOTS) do
-		local path = root .. PATCH_FILE
-		if isFileFn(path) then
-			local ok, body = pcall(readFn, path)
-			if ok and validPatchSource(body) then
-				return body, path
+	for _, fileName in ipairs({ PATCH_FILE, PATCH_FALLBACK }) do
+		for _, root in ipairs(PATCH_ROOTS) do
+			local path = root .. fileName
+			if isFileFn(path) then
+				local ok, body = pcall(readFn, path)
+				if ok and validPatchSource(body) then
+					return body, path
+				end
 			end
 		end
 	end
@@ -88,31 +93,31 @@ return function(WindUI)
 		source, label = fetchRemotePatch()
 	end
 	if not source then
-		warn("[Alleral] aller.luau missing — UI patch skipped")
+		warn("[Arrrel] arrrel.luau missing — UI patch skipped")
 		return WindUI
 	end
 
 	local compile = loadstring or load
 	if type(compile) ~= "function" then
-		warn("[Alleral] loadstring missing — UI patch skipped")
+		warn("[Arrrel] loadstring missing — UI patch skipped")
 		return WindUI
 	end
 
 	local chunk, compileErr = compile(source, "@" .. tostring(label or PATCH_FILE))
 	if not chunk then
-		warn("[Alleral] UI patch compile: " .. tostring(compileErr))
+		warn("[Arrrel] UI patch compile: " .. tostring(compileErr))
 		return WindUI
 	end
 
 	local ok, patchOrErr = pcall(chunk)
 	if not ok or type(patchOrErr) ~= "function" then
-		warn("[Alleral] UI patch load: " .. tostring(patchOrErr))
+		warn("[Arrrel] UI patch load: " .. tostring(patchOrErr))
 		return WindUI
 	end
 
 	local applied, applyErr = pcall(patchOrErr, WindUI)
 	if not applied then
-		warn("[Alleral] UI patch apply: " .. tostring(applyErr))
+		warn("[Arrrel] UI patch apply: " .. tostring(applyErr))
 	end
 
 	return WindUI

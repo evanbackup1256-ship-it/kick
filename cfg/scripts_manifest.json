@@ -5,8 +5,8 @@
     "kick_a_lucky_block": {
       "name": "Kick a Lucky Block",
       "status": "working",
-      "version": "6.7.0",
-      "message": "",
+      "version": "6.8.0",
+      "message": "Advanced tracker filters, cloud configs, webhook and performance fixes.",
       "updatedAt": "2026-06-10T00:00:00+00:00",
       "updatedBy": "system"
     },

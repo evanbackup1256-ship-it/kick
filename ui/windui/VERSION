@@ -1,6 +1,7 @@
-1.6.64-fix-aller17
+1.0.0-arrrel2
 Base: https://github.com/Footagesus/WindUI/releases/tag/1.6.64-fix
-Patch: ui/windui/aller.luau
+Patch: ui/windui/arrrel.luau
+Legacy: ui/windui/aller.luau
 Motion: ui/windui/motion.luau
 Loader: ui/windui/bootstrap.lua
 Layout: sidebar + section spacing from ui/design/tokens.json

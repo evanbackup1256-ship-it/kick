@@ -6,7 +6,8 @@
     "label": "Luau",
     "language": "lua",
     "importPaths": {
-      "aller": ["ui/windui/aller.luau"],
+      "arrrel": ["ui/windui/arrrel.luau"],
+      "aller": ["ui/windui/arrrel.luau"],
       "windui": ["ui/windui/main.lua"],
       "core": ["hub/core.luau"]
     }

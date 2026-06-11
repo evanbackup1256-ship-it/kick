@@ -3,15 +3,10 @@ do
 	if type(bridge) == "table" and getgenv then
 		local g = getgenv()
 		if type(g) == "table" then
-			if bridge.Alleral_Rayfield
-				and bridge.Alleral_Rayfield.InterfaceBuild == "WindUI"
-				and type(bridge.Alleral_Rayfield.CreateWindow) == "function" then
-				g.Alleral_Rayfield = bridge.Alleral_Rayfield
-				g.Alleral_UI = bridge.Alleral_Rayfield
-			end
 			if bridge.Alleral_UI and type(bridge.Alleral_UI.CreateWindow) == "function" then
 				g.Alleral_UI = bridge.Alleral_UI
-				g.Alleral_Rayfield = bridge.Alleral_UI
+			elseif bridge.Alleral_Rayfield and type(bridge.Alleral_Rayfield.CreateWindow) == "function" then
+				g.Alleral_UI = bridge.Alleral_Rayfield
 			end
 			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
 			if bridge.Alleral_Analytics then g.Alleral_Analytics = bridge.Alleral_Analytics end
@@ -41,7 +36,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "6.7.0"
+local VERSION = "6.8.0"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -76,6 +71,8 @@ local runtime = {
 	sessionResets = 0,
 	sessionMatches = 0,
 	sessionBestCps = 0,
+	lastStatusSnapshot = nil,
+	nextWeatherAttempt = 0,
 	kickRateWindow = {},
 	kicksPerMin = 0,
 	nextAutoSell = 0,
@@ -142,6 +139,8 @@ local function syncTrackerConfig()
 	Tracker.Config.webhookUrl = state.WebhookURL or ""
 	Tracker.Config.webhookEnabled = state.AWebhook == true
 	Tracker.Config.brand = "Alleral"
+	Tracker.Config.brainrotFilter = state.TrackerFilterBrainrot or state.StatusFilterBrainrot
+	Tracker.Config.rarityFilter = state.TrackerFilterRarity or state.StatusFilterRarity
 end
 
 if state.Alleral_Unload then
@@ -197,8 +196,11 @@ local defaults = {
 	AWebhook = false,
 	StatusFilterBrainrot = { "Any" },
 	StatusFilterRarity = { "Any" },
+	TrackerFilterBrainrot = { "Any" },
+	TrackerFilterRarity = { "Any" },
 	AutoStatusInterval = 15,
 	AutoStatusWebhook = false,
+	AutoStatusRequireItems = true,
 	AAutoBattle = false,
 	AAutoAcceptBattle = false,
 	BattleRounds = "3",
@@ -270,8 +272,11 @@ local savedKeys = {
 	"AWebhook",
 	"StatusFilterBrainrot",
 	"StatusFilterRarity",
+	"TrackerFilterBrainrot",
+	"TrackerFilterRarity",
 	"AutoStatusInterval",
 	"AutoStatusWebhook",
+	"AutoStatusRequireItems",
 	"AAutoBattle",
 	"AAutoAcceptBattle",
 	"BattleRounds",
@@ -318,6 +323,12 @@ for key, value in pairs(defaults) do
 	if state[key] == nil then
 		state[key] = copyValue(value)
 	end
+end
+if type(state.TrackerFilterBrainrot) ~= "table" then
+	state.TrackerFilterBrainrot = copyValue(state.StatusFilterBrainrot or { "Any" })
+end
+if type(state.TrackerFilterRarity) ~= "table" then
+	state.TrackerFilterRarity = copyValue(state.StatusFilterRarity or { "Any" })
 end
 state.HubRunning = true
 
@@ -794,6 +805,14 @@ local function safeFindRemote(network, aliases)
 		end
 		if remote then
 			runtime.remoteLookupCache[alias] = remote
+			local cacheCount = 0
+			for _ in pairs(runtime.remoteLookupCache) do
+				cacheCount += 1
+			end
+			if cacheCount > 200 then
+				table.clear(runtime.remoteLookupCache)
+				runtime.remoteLookupCache[alias] = remote
+			end
 			return remote
 		end
 	end
@@ -835,6 +854,16 @@ state.Alleral_Unload = function()
 	for _, loopState in pairs(loops) do
 		loopState.enabled = false
 	end
+	for tool, toolConnections in pairs(runtime.favoriteTools) do
+		for _, connection in ipairs(toolConnections) do
+			untrack(connection)
+		end
+		runtime.favoriteTools[tool] = nil
+	end
+	table.clear(runtime.seenWebhookGuids)
+	table.clear(runtime.seenWebhookOrder)
+	table.clear(runtime.remoteLookupCache)
+	runtime.lastStatusSnapshot = nil
 	restoreHumanoidMovement(LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid"))
 end
 
@@ -857,7 +886,7 @@ local function loadLuaSource(source, label)
 	end
 	if getgenv then
 		local env = getgenv()
-		return env.Alleral_Rayfield or env.Alleral_UI or env.Library or env.AlleralLib
+		return env.Alleral_UI or env.Library or env.AlleralLib
 	end
 return nil
 end
@@ -2974,12 +3003,14 @@ local function totalLoggedErrors()
 	return total
 end
 
-local function sendStatusReport()
+local function sendStatusReport(forceSend)
 	if state.WebhookURL == "" then
 		return false, "Webhook URL missing"
 	end
 	local breakdown = {}
 	local total = 0
+	local filterBrainrot = state.TrackerFilterBrainrot or state.StatusFilterBrainrot
+	local filterRarity = state.TrackerFilterRarity or state.StatusFilterRarity
 	local function addTool(tool)
 		if not tool:IsA("Tool") or not tool:GetAttribute("GUID") then
 			return
@@ -2987,10 +3018,10 @@ local function sendStatusReport()
 		local name = tool.Name
 		local rarity = rarityFor(name, tool:GetAttribute("Rarity") or "Unknown")
 		local mutation = normalizeMutation(tool:GetAttribute("Mutation") or "None")
-		if not selectionMatches(state.StatusFilterBrainrot, name, normalizeText) then
+		if not selectionMatches(filterBrainrot, name, normalizeText) then
 			return
 		end
-		if not selectionMatches(state.StatusFilterRarity, rarity, normalizeText) then
+		if not selectionMatches(filterRarity, rarity, normalizeText) then
 			return
 		end
 		breakdown[rarity] = breakdown[rarity] or {}
@@ -3008,6 +3039,14 @@ local function sendStatusReport()
 			addTool(tool)
 		end
 	end
+	if state.AutoStatusRequireItems == true and total == 0 and forceSend ~= true then
+		return false, "empty_inventory"
+	end
+	local snapshotKey = HttpService:JSONEncode(breakdown) .. ":" .. tostring(total)
+	if state.AutoStatusRequireItems == true and runtime.lastStatusSnapshot == snapshotKey and forceSend ~= true then
+		return false, "unchanged"
+	end
+	runtime.lastStatusSnapshot = snapshotKey
 	local fields = {
 		{ name = "Coins", value = "```" .. formatNumber(currentCoins()) .. "```", inline = true },
 		{ name = "Kick level", value = "```" .. tostring(runtime.kickLevel or 0) .. "```", inline = true },
@@ -3044,20 +3083,21 @@ local function sendStatusReport()
 			breakdown,
 			runtime.rebirthLevel or 0
 		)
-	else
-		ok, err = sendWebhook(state.WebhookURL, {
-			username = "Alleral",
-			embeds = {
-				{
-					title = "Bag check",
-					color = 16733440,
-					fields = fields,
-					footer = { text = "Alleral" },
-					timestamp = DateTime.now():ToIsoDate(),
+		else
+			local okSend, sendErr = sendWebhook(state.WebhookURL, {
+				username = "Alleral",
+				embeds = {
+					{
+						title = "Bag check",
+						color = 16733440,
+						fields = fields,
+						footer = { text = "Alleral" },
+						timestamp = DateTime.now():ToIsoDate(),
+					},
 				},
-			},
-		})
-	end
+			})
+			ok, err = okSend, sendErr
+		end
 	if not ok then
 		logError("WebhookStatus", err)
 	end
@@ -3166,8 +3206,6 @@ local tuningGroup = createUiGroup(configTab, "Speed tweaks", "rbxassetid://10734
 local diagnosticsGroup = createUiGroup(configTab, "Debug info", "rbxassetid://10734950309", 2)
 local profileGroup = createUiGroup(configTab, "Save slots", "rbxassetid://10734950309", 1)
 configTab:BuildThemeGroupbox(2)
-Core.buildScriptStatusGroupbox(configTab, 1, "kick_a_lucky_block", VERSION)
-Core.buildHubActionsGroup(configTab, 2)
 Core.buildStandardSettingsExtras(configTab, {
 	state = state,
 	savedKeys = savedKeys,
@@ -3176,6 +3214,11 @@ Core.buildStandardSettingsExtras(configTab, {
 	settingsFile = "KickBlox_v4_" .. tostring(LocalPlayer.UserId) .. ".json",
 	version = VERSION,
 	window = uiWindow,
+	scriptId = "kick_a_lucky_block",
+	onApply = function()
+		syncTrackerConfig()
+		rebuildUpgradeBase()
+	end,
 })
 local protectedDropdown
 local upgradeDropdown
@@ -4424,6 +4467,35 @@ webhookGroup:AddDropdown("WebhookMutation", {
 	end,
 })
 webhookGroup:CreateDivider()
+webhookGroup:AddDropdown("TrackerBrainrot", {
+	Text = "Brainrot tracker filter",
+	Values = gameData.BrainrotOptions,
+	Default = state.TrackerFilterBrainrot,
+	Multi = true,
+	Searchable = true,
+	Tooltip = "Only these brainrots count toward auto bag check-ins.",
+	Callback = function(selection)
+		state.TrackerFilterBrainrot = selectedDropdownKeys(selection)
+		state.StatusFilterBrainrot = copyValue(state.TrackerFilterBrainrot)
+		syncTrackerConfig()
+		saveSettings()
+	end,
+})
+webhookGroup:AddDropdown("TrackerRarity", {
+	Text = "Rarity tracker filter",
+	Values = gameData.RarityOptions,
+	Default = state.TrackerFilterRarity,
+	Multi = true,
+	Searchable = true,
+	Tooltip = "Only these rarities count toward auto bag check-ins.",
+	Callback = function(selection)
+		state.TrackerFilterRarity = selectedDropdownKeys(selection)
+		state.StatusFilterRarity = copyValue(state.TrackerFilterRarity)
+		syncTrackerConfig()
+		saveSettings()
+	end,
+})
+webhookGroup:CreateDivider()
 webhookGroup:CreateToggle(
 	"Bag check-ins",
 	state.AutoStatusWebhook,
@@ -4436,7 +4508,7 @@ webhookGroup:CreateToggle(
 	"AutoStatusWebhook"
 )
 webhookGroup:CreateSlider(
-	"How often (min)",
+	"Auto send interval (min)",
 	1,
 	120,
 	state.AutoStatusInterval,
@@ -4445,42 +4517,28 @@ webhookGroup:CreateSlider(
 		runtime.nextStatusWebhook = tick() + (value * 60)
 		saveSettings()
 	end,
-	"Minutes between bag check-in messages.",
+	"Minutes between automatic bag check-in messages.",
 	nil,
 	"AutoStatusInterval"
+)
+webhookGroup:CreateToggle(
+	"Inventory check before send",
+	state.AutoStatusRequireItems,
+	"Skip auto sends when nothing matches your tracker filters or when the bag snapshot hasn't changed.",
+	function(value)
+		state.AutoStatusRequireItems = value == true
+		runtime.lastStatusSnapshot = nil
+		saveSettings()
+	end,
+	"AutoStatusRequireItems"
 )
 webhookGroup:CreateButton(
 	"Post bag count now",
 	function()
-		sendStatusReport()
+		sendStatusReport(true)
 	end,
 	"Send the bag update right now."
 )
-webhookGroup:CreateDivider()
-webhookGroup:AddDropdown("Status Brainrot", {
-	Text = "Count these names",
-	Values = gameData.BrainrotOptions,
-	Default = state.StatusFilterBrainrot,
-	Multi = true,
-	Searchable = true,
-	Tooltip = "Only these show up in the bag count.",
-	Callback = function(selection)
-		state.StatusFilterBrainrot = selectedDropdownKeys(selection)
-		saveSettings()
-	end,
-})
-webhookGroup:AddDropdown("Status Rarity", {
-	Text = "Count these rarities",
-	Values = gameData.RarityOptions,
-	Default = state.StatusFilterRarity,
-	Multi = true,
-	Searchable = true,
-	Tooltip = "Filter the bag count by rarity.",
-	Callback = function(selection)
-		state.StatusFilterRarity = selectedDropdownKeys(selection)
-		saveSettings()
-	end,
-})
 
 	if predictionStatus and predictionStatus.SetVisible then
 		predictionStatus:SetVisible(state.APredict)
@@ -4743,6 +4801,9 @@ makeSupervisor("Prediction", 1, function()
 			runtime.lastRareNotify = signature
 			notify("Rare!", name .. " · " .. rarity .. " · " .. mutation, 6)
 		end
+	end
+	if ui.predictionStatus then
+		ui.predictionStatus:Update("Result", matchesFilter and "keep" or "skip")
 	end
 	if not shouldRefreshUi then
 		return
@@ -5116,7 +5177,7 @@ makeSupervisor("WebhookStatus", 5, function()
 		return
 	end
 	runtime.nextStatusWebhook = tick() + state.AutoStatusInterval * 60
-	sendStatusReport()
+	sendStatusReport(false)
 end)
 
 makeSupervisor("Battle", 4, function()
@@ -5413,13 +5474,14 @@ local function sacrificeTools()
 	return tools
 end
 
-local function canSummonWeather(recipe)
+local function gatherWeatherSacrificeGuids(recipe)
 	local recipes = modules.sacrificeData and modules.sacrificeData.Recipes
 	local requirements = recipes and recipes[recipe]
 	if not requirements then
-		return false
+		return nil
 	end
 	local used = {}
+	local guids = {}
 	local available = sacrificeTools()
 	for _, requirement in ipairs(requirements) do
 		local neededName = requirement.Name
@@ -5432,32 +5494,46 @@ local function canSummonWeather(recipe)
 				and (neededMutation == "Any" or neededMutation == tool.Mutation)
 			then
 				used[tool.GUID] = true
+				table.insert(guids, tool.GUID)
 				found = true
 				break
 			end
 		end
 		if not found then
-			return false
+			return nil
 		end
 	end
-	return true
+	return guids
+end
+
+local function canSummonWeather(recipe)
+	return gatherWeatherSacrificeGuids(recipe) ~= nil
 end
 
 makeSupervisor("Weather", 2, function()
 	if not state.AAutoSummonWeather or state.TTargetWeatherEvent == "None" then
 		return
 	end
+	if tick() < (runtime.nextWeatherAttempt or 0) then
+		return
+	end
 	refreshRemotes()
+	retryMissingModules()
 	local recipe = resolveWeather(state.TTargetWeatherEvent)
 	if not recipe or not remotes.weather then
 		return
 	end
-	if not isWeatherActive(recipe) and canSummonWeather(recipe) then
-		safeCall("SummonWeather", function()
-			remotes.weather:FireServer(recipe)
-		end)
-		task.wait(5)
+	if isWeatherActive(recipe) then
+		return
 	end
+	local guids = gatherWeatherSacrificeGuids(recipe)
+	if not guids or #guids == 0 then
+		return
+	end
+	runtime.nextWeatherAttempt = tick() + 8
+	safeCall("SummonWeather", function()
+		remotes.weather:FireServer(recipe, guids)
+	end)
 end)
 
 if state.AAutoFav then

@@ -1,7 +1,8 @@
 local Core = {}
 Core.VERSION = "2.7.0"
-Core.UI_LIBRARY = "WindUI"
-Core.WINDUI_VERSION = "1.6.64-fix-aller17"
+Core.UI_LIBRARY = "Alleral"
+Core.ALLERAL_UI_VERSION = "1.0.0-arrrel2"
+Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -13,16 +14,76 @@ local WINDUI_MIRROR_URLS = {
 }
 local WINDUI_LOCAL_ROOTS = {
 	"ui/windui/",
+	"ui/alleral/",
 	"kick/ui/windui/",
 	"kick/kick/ui/windui/",
 	"vendor/windui/",
+	"vendor/alleral/",
 	"windui/",
+	"alleral/",
 }
 local WINDUI_FILE = "main.lua"
-local WINDUI_PATCH_FILE = "aller.luau"
+local WINDUI_PATCH_FILE = "arrrel.luau"
+local WINDUI_PATCH_FALLBACK = "aller.luau"
 local WINDUI_MIN_BYTES = 50000
 local ALLERAL_ACCENT = Color3.fromHex("#53fc18")
 local ALLERAL_ACCENT_ALT = Color3.fromHex("#30ff6a")
+
+-- Keep in sync with loader.luau GAMES (place/universe ids for runtime resolution).
+Core.GAME_REGISTRY = {
+	kick_a_lucky_block = {
+		name = "Kick a Lucky Block",
+		placeIds = { 89469502395769 },
+		universeIds = { 10004244222 },
+	},
+	speed_keyboard_escape = {
+		name = "Speed Keyboard Escape",
+		placeIds = { 95082159892680 },
+	},
+	slime_rng = {
+		name = "Slime RNG",
+		placeIds = { 92416421522960 },
+		universeIds = { 9792947201 },
+	},
+	build_a_ring_farm = {
+		name = "Build A Ring Farm",
+		placeIds = { 107646426076756 },
+	},
+	survive_a_zombie_arena = {
+		name = "Survive a Zombie Arena",
+		placeIds = { 114204398207377 },
+	},
+}
+
+function Core.resolveActiveGameId(options)
+	options = type(options) == "table" and options or {}
+	local explicit = options.scriptId or options.gameId or options.id
+	if explicit and tostring(explicit) ~= "" then
+		return tostring(explicit)
+	end
+	if ENV.Alleral_ActiveScriptId and tostring(ENV.Alleral_ActiveScriptId) ~= "" then
+		return tostring(ENV.Alleral_ActiveScriptId)
+	end
+	local placeId = game.PlaceId
+	local universeId = game.GameId
+	for gameId, meta in pairs(Core.GAME_REGISTRY) do
+		if type(meta.placeIds) == "table" then
+			for _, pid in ipairs(meta.placeIds) do
+				if pid == placeId then
+					return gameId
+				end
+			end
+		end
+		if type(meta.universeIds) == "table" then
+			for _, uid in ipairs(meta.universeIds) do
+				if uid == universeId then
+					return gameId
+				end
+			end
+		end
+	end
+	return nil
+end
 
 local function genv()
 	local ok, env = pcall(function()
@@ -169,9 +230,14 @@ function Core.installResilience()
 		"fetchWeaoExploits",
 		"fetchWeaoExecutorStatus",
 		"buildHubActionsGroup",
+		"buildThemeStudioGroup",
+		"buildSystemPanelGroup",
+		"buildAdvancedHubGroup",
 		"buildStandardSettingsExtras",
+		"resolveActiveGameId",
 		"buildUiPreferencesGroup",
 		"buildConfigProfileGroup",
+		"buildCloudConfigGroup",
 		"buildScriptStatusGroupbox",
 		"postWebhook",
 		"writeFile",
@@ -1402,45 +1468,157 @@ function Core.toggleUiVisibility()
 end
 
 function Core.setGlobalMusicMuted(muted)
+	muted = muted == true
 	local SoundService = game:GetService("SoundService")
-	if muted then
-		if ENV.Alleral_MusicMuted ~= true then
-			ENV._Alleral_PrevMasterVolume = SoundService.Volume
+	ENV._AlleralMutedSounds = ENV._AlleralMutedSounds or {}
+
+	local function muteSound(sound)
+		if not sound or not sound:IsA("Sound") then
+			return
 		end
-		SoundService.Volume = 0
-	else
-		SoundService.Volume = ENV._Alleral_PrevMasterVolume or 0.5
+		if ENV._AlleralMutedSounds[sound] == nil then
+			ENV._AlleralMutedSounds[sound] = sound.Volume
+		end
+		pcall(function()
+			sound.Volume = 0
+		end)
 	end
-	ENV.Alleral_MusicMuted = muted == true
+
+	local function restoreSound(sound, volume)
+		if not sound or not sound:IsA("Sound") then
+			return
+		end
+		pcall(function()
+			sound.Volume = tonumber(volume) or 0.5
+		end)
+	end
+
+	if muted then
+		for _, desc in ipairs(game:GetDescendants()) do
+			if desc:IsA("Sound") then
+				muteSound(desc)
+			end
+		end
+		if not ENV._AlleralSoundMuteConn then
+			ENV._AlleralSoundMuteConn = game.DescendantAdded:Connect(function(desc)
+				if ENV.Alleral_MusicMuted == true and desc:IsA("Sound") then
+					muteSound(desc)
+				end
+			end)
+		end
+	else
+		for sound, volume in pairs(ENV._AlleralMutedSounds) do
+			if typeof(sound) == "Instance" and sound.Parent then
+				restoreSound(sound, volume)
+			end
+		end
+		table.clear(ENV._AlleralMutedSounds)
+		if ENV._AlleralSoundMuteConn then
+			pcall(function()
+				ENV._AlleralSoundMuteConn:Disconnect()
+			end)
+			ENV._AlleralSoundMuteConn = nil
+		end
+	end
+
+	-- Legacy path: some executors expose a master SoundGroup or deprecated Volume.
+	pcall(function()
+		local master = SoundService:FindFirstChild("AlleralMaster")
+		if not master then
+			master = Instance.new("SoundGroup")
+			master.Name = "AlleralMaster"
+			master.Volume = 1
+			master.Parent = SoundService
+		end
+		if muted then
+			if ENV._Alleral_PrevMasterVolume == nil then
+				ENV._Alleral_PrevMasterVolume = master.Volume
+			end
+			master.Volume = 0
+		else
+			master.Volume = ENV._Alleral_PrevMasterVolume or 1
+		end
+	end)
+
+	ENV.Alleral_MusicMuted = muted
 end
 
 function Core.setLowGraphics(enabled)
+	enabled = enabled == true
 	local Lighting = game:GetService("Lighting")
-	local ok, gameSettings = pcall(function()
-		return game:GetService("UserSettings"):GetService("UserGameSettings")
-	end)
+	local Terrain = workspace:FindFirstChildOfClass("Terrain")
+	ENV._AlleralDisabledEffects = ENV._AlleralDisabledEffects or {}
+
+	local function setQuality(enabledNow)
+		pcall(function()
+			local gameSettings = UserSettings():GetService("UserGameSettings")
+			if enabledNow then
+				if ENV._Alleral_PrevQuality == nil then
+					ENV._Alleral_PrevQuality = gameSettings.SavedQualityLevel
+				end
+				gameSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
+			elseif ENV._Alleral_PrevQuality ~= nil then
+				gameSettings.SavedQualityLevel = ENV._Alleral_PrevQuality
+			end
+		end)
+		pcall(function()
+			if enabledNow then
+				settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+				settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
+			end
+		end)
+	end
+
 	if enabled then
 		ENV._Alleral_PrevShadows = Lighting.GlobalShadows
 		Lighting.GlobalShadows = false
-		if ok and gameSettings then
-			ENV._Alleral_PrevQuality = gameSettings.SavedQualityLevel
-			pcall(function()
-				gameSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
-			end)
+		pcall(function()
+			if ENV._Alleral_PrevTechnology == nil then
+				ENV._Alleral_PrevTechnology = Lighting.Technology
+			end
+			Lighting.Technology = Enum.Technology.Compatibility
+		end)
+		pcall(function()
+			if Terrain and ENV._Alleral_PrevDecoration == nil then
+				ENV._Alleral_PrevDecoration = Terrain.Decoration
+				Terrain.Decoration = false
+			end
+		end)
+		for _, effect in ipairs(Lighting:GetDescendants()) do
+			if effect:IsA("PostEffect") and effect.Enabled then
+				ENV._AlleralDisabledEffects[effect] = true
+				effect.Enabled = false
+			end
 		end
+		setQuality(true)
 	else
 		if ENV._Alleral_PrevShadows ~= nil then
 			Lighting.GlobalShadows = ENV._Alleral_PrevShadows
 		else
 			Lighting.GlobalShadows = true
 		end
-		if ok and gameSettings and ENV._Alleral_PrevQuality then
-			pcall(function()
-				gameSettings.SavedQualityLevel = ENV._Alleral_PrevQuality
-			end)
+		pcall(function()
+			if ENV._Alleral_PrevTechnology ~= nil then
+				Lighting.Technology = ENV._Alleral_PrevTechnology
+			end
+		end)
+		pcall(function()
+			if Terrain and ENV._Alleral_PrevDecoration ~= nil then
+				Terrain.Decoration = ENV._Alleral_PrevDecoration
+			end
+		end)
+		for effect in pairs(ENV._AlleralDisabledEffects) do
+			if typeof(effect) == "Instance" and effect.Parent then
+				pcall(function()
+					effect.Enabled = true
+				end)
+			end
 		end
+		table.clear(ENV._AlleralDisabledEffects)
+		setQuality(false)
 	end
-	ENV.Alleral_LowGraphics = enabled == true
+
+	ENV.Alleral_LowGraphics = enabled
 end
 
 function Core.buildWebJoinUrl(placeId, jobId)
@@ -1756,19 +1934,26 @@ function Core.buildQuickTogglesGroup(tab, options)
 	local column = options.column or 2
 	local group = Core.buildUiGroup(tab, "Quick toggles", column, nil, nil, "QuickToggles")
 
-	group:CreateToggle("Mute all audio", ENV.Alleral_MusicMuted == true, "Sets SoundService volume to 0.", function(value)
+	group:CreateToggle("Mute all audio", ENV.Alleral_MusicMuted == true, "Mutes in-game Sound instances.", function(value)
 		Core.setGlobalMusicMuted(value)
 		if type(saveFn) == "function" then
 			saveFn()
 		end
 	end)
 
-	group:CreateToggle("Low graphics", ENV.Alleral_LowGraphics == true, "Lowest quality + no shadows.", function(value)
+	group:CreateToggle("Low graphics", ENV.Alleral_LowGraphics == true, "Lowest quality, no shadows, fewer effects.", function(value)
 		Core.setLowGraphics(value)
 		if type(saveFn) == "function" then
 			saveFn()
 		end
 	end)
+
+	if ENV.Alleral_MusicMuted == true then
+		pcall(Core.setGlobalMusicMuted, true)
+	end
+	if ENV.Alleral_LowGraphics == true then
+		pcall(Core.setLowGraphics, true)
+	end
 
 	group:CreateToggle(
 		"Auto relaunch on teleport",
@@ -2041,14 +2226,186 @@ function Core.buildAutomationStatusGroup(tab, options)
 	return group, status, refresh
 end
 
+function Core.hsvToColor(h, s, v)
+	h = (tonumber(h) or 0) % 360
+	s = math.clamp(tonumber(s) or 0, 0, 1)
+	v = math.clamp(tonumber(v) or 0, 0, 1)
+	local c = v * s
+	local x = c * (1 - math.abs((h / 60) % 2 - 1))
+	local m = v - c
+	local r, g, b = 0, 0, 0
+	if h < 60 then
+		r, g, b = c, x, 0
+	elseif h < 120 then
+		r, g, b = x, c, 0
+	elseif h < 180 then
+		r, g, b = 0, c, x
+	elseif h < 240 then
+		r, g, b = 0, x, c
+	elseif h < 300 then
+		r, g, b = x, 0, c
+	else
+		r, g, b = c, 0, x
+	end
+	return Color3.new(r + m, g + m, b + m)
+end
+
+function Core.applyThemeAccent(windUi, color)
+	if type(windUi) ~= "table" or typeof(color) ~= "Color3" then
+		return false
+	end
+	if type(windUi.SetAccentColor) == "function" then
+		pcall(function()
+			windUi:SetAccentColor(color)
+			if type(windUi.FlashAccent) == "function" then
+				windUi:FlashAccent()
+			end
+		end)
+		return true
+	end
+	return false
+end
+
+function Core.buildThemeStudioGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local column = options.column or 1
+	local uiBundle = options.uiBundle
+	if not uiBundle and type(options.window) == "table" then
+		uiBundle = options.window._ui
+	end
+	local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
+	local group = Core.buildUiGroup(tab, "Theme studio", column, nil, nil, "ThemeStudio")
+
+	ENV.Alleral_AccentHue = tonumber(ENV.Alleral_AccentHue) or 108
+	ENV.Alleral_AccentSat = tonumber(ENV.Alleral_AccentSat) or 0.92
+	ENV.Alleral_AccentVal = tonumber(ENV.Alleral_AccentVal) or 0.96
+	ENV.Alleral_UiRgbLive = ENV.Alleral_UiRgbLive ~= false
+
+	local function pushAccent()
+		local color = Core.hsvToColor(ENV.Alleral_AccentHue, ENV.Alleral_AccentSat, ENV.Alleral_AccentVal)
+		Core.applyThemeAccent(windUi, color)
+	end
+
+	group:CreateToggle("Live preview", ENV.Alleral_UiRgbLive ~= false, "Update accent while dragging sliders.", function(value)
+		ENV.Alleral_UiRgbLive = value ~= false
+	end)
+
+	group:CreateSlider("Hue", 0, 360, ENV.Alleral_AccentHue, function(value)
+		ENV.Alleral_AccentHue = value
+		if ENV.Alleral_UiRgbLive ~= false then
+			pushAccent()
+		end
+	end, "Accent hue on the color wheel.", 1)
+
+	group:CreateSlider("Saturation", 0, 100, math.floor(ENV.Alleral_AccentSat * 100), function(value)
+		ENV.Alleral_AccentSat = value / 100
+		if ENV.Alleral_UiRgbLive ~= false then
+			pushAccent()
+		end
+	end, "Color intensity.", 1)
+
+	group:CreateSlider("Brightness", 0, 100, math.floor(ENV.Alleral_AccentVal * 100), function(value)
+		ENV.Alleral_AccentVal = value / 100
+		if ENV.Alleral_UiRgbLive ~= false then
+			pushAccent()
+		end
+	end, "How bright the accent reads.", 1)
+
+	group:CreateButton("Apply accent", pushAccent, "Commit the wheel color to the UI.")
+	group:CreateButton("Reset to mint", function()
+		ENV.Alleral_AccentHue = 108
+		ENV.Alleral_AccentSat = 0.92
+		ENV.Alleral_AccentVal = 0.96
+		if windUi and type(windUi.ApplyAccentPreset) == "function" then
+			pcall(function()
+				windUi:ApplyAccentPreset("Mint")
+				if type(windUi.FlashAccent) == "function" then
+					windUi:FlashAccent()
+				end
+			end)
+		else
+			pushAccent()
+		end
+	end, "Restore the default Arrrel mint accent.")
+
+	return group
+end
+
+function Core.buildSystemPanelGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local column = options.column or 2
+	local group = Core.buildUiGroup(tab, "System", column, nil, nil, "SystemPanel")
+	local Players = game:GetService("Players")
+	local lp = Players.LocalPlayer
+	local stats = {
+		Hub = Core.UI_LIBRARY or "Alleral",
+		UI = Core.ALLERAL_UI_VERSION or "--",
+		Core = Core.VERSION or "--",
+		Loader = tostring(ENV.Alleral_LoaderVersion or "--"),
+		Player = lp and lp.Name or "--",
+		Display = lp and lp.DisplayName or "--",
+	}
+	local status = group:CreateStatus("Runtime", stats)
+	group:CreateButton("Refresh system info", function()
+		status:Update("Hub", Core.UI_LIBRARY or "Arrrel")
+		status:Update("UI", Core.ALLERAL_UI_VERSION or "--")
+		status:Update("Core", Core.VERSION or "--")
+		status:Update("Loader", tostring(ENV.Alleral_LoaderVersion or "--"))
+		status:Update("Player", lp and lp.Name or "--")
+		status:Update("Display", lp and lp.DisplayName or "--")
+	end, "Refresh version and player labels.")
+	return group, status
+end
+
+function Core.buildAdvancedHubGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local column = options.column or 1
+	local group = Core.buildUiGroup(tab, "Advanced", column, nil, nil, "AdvancedHub")
+	group:CreateToggle(
+		"Force script load",
+		ENV.Alleral_ForceLoad == true,
+		"Skip manifest version checks on next reload.",
+		function(value)
+			ENV.Alleral_ForceLoad = value == true
+			getgenv().Alleral_ForceLoad = value == true
+		end
+	)
+	group:CreateButton("Repair UI", function()
+		local ui = ENV.Alleral_UI or ENV.Alleral_Rayfield
+		local windUi = ui and (ui.WindUI or ui.Library)
+		if windUi and type(windUi.RepairWindow) == "function" then
+			local ok = windUi:RepairWindow()
+			Core.notify("Arrrel", ok and "UI repaired." or "Repair failed.", 3, ok and "success" or "error")
+		else
+			Core.notify("Arrrel", "Repair unavailable.", 3, "warn")
+		end
+	end, "Re-apply Arrrel chrome and polish.")
+	group:CreateButton("Stop hub loops", Core.stateHubStop, "Stop automation loops tied to this session.")
+	return group
+end
+
 function Core.buildStandardSettingsExtras(tab, options)
 	options = type(options) == "table" and options or {}
 	Core.installErrorLogHook()
 	if type(options.window) == "table" then
 		Core.registerUiWindow(options.window)
 	end
+	local scriptId = Core.resolveActiveGameId(options)
+	local profileVersion = options.version or options.profileVersion
+	if scriptId and options.skipScriptStatus ~= true then
+		Core.buildScriptStatusGroupbox(tab, options.scriptStatusColumn or 1, scriptId, profileVersion)
+	end
+	if options.skipHubActions ~= true then
+		Core.buildHubActionsGroup(tab, options.hubActionsColumn or 2)
+	end
+	if options.skipCloudConfig ~= true and type(options.savedKeys) == "table" and #options.savedKeys > 0 then
+		Core.buildCloudConfigGroup(tab, options)
+	end
 	Core.buildSessionStatsGroup(tab, options.sessionColumn or 1)
 	Core.buildServerToolsGroup(tab, options.serverColumn or 1)
+	Core.buildThemeStudioGroup(tab, options)
+	Core.buildSystemPanelGroup(tab, options)
+	Core.buildAdvancedHubGroup(tab, options)
 	Core.buildQuickTogglesGroup(tab, options)
 	Core.buildUiPreferencesGroup(tab, options)
 	Core.buildErrorLogGroup(tab, options.errorColumn or 2)
@@ -2277,6 +2634,167 @@ function Core.buildConfigProfileGroup(tab, options)
 	return group
 end
 
+function Core.buildCloudConfigGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local state = options.state or ENV.Alleral_State or {}
+	local savedKeys = options.savedKeys or {}
+	local saveFn = options.saveFn or function() end
+	local onApply = options.onApply
+	local scriptVersion = options.version or options.profileVersion or "1.0"
+	local gameId = Core.resolveActiveGameId(options) or options.gameId or "unknown"
+	local column = options.column or 1
+	local shareCode = tostring(state.Alleral_CloudConfigCode or "")
+	local sharePublic = state.Alleral_CloudConfigPublic ~= false
+	local previewText = ""
+
+	local function collectSnapshot()
+		local snapshot = {}
+		for _, key in ipairs(savedKeys) do
+			snapshot[key] = Core.copyValue(state[key])
+		end
+		snapshot.__meta = {
+			version = scriptVersion,
+			gameId = gameId,
+			createdAt = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+			brand = "Alleral",
+		}
+		return snapshot
+	end
+
+	local function applySnapshot(snapshot)
+		if type(snapshot) ~= "table" then
+			return false, "Invalid cloud config."
+		end
+		for _, key in ipairs(savedKeys) do
+			if snapshot[key] ~= nil then
+				state[key] = Core.copyValue(snapshot[key])
+			end
+		end
+		if type(onApply) == "function" then
+			pcall(onApply, snapshot)
+		end
+		saveFn()
+		return true, nil
+	end
+
+	local function countDiff(remote)
+		if type(remote) ~= "table" then
+			return 0
+		end
+		local changed = 0
+		for _, key in ipairs(savedKeys) do
+			local localValue = state[key]
+			local remoteValue = remote[key]
+			if remoteValue ~= nil and HttpService:JSONEncode(localValue) ~= HttpService:JSONEncode(remoteValue) then
+				changed += 1
+			end
+		end
+		return changed
+	end
+
+	local group = Core.buildUiGroup(tab, "Cloud configs", column, nil, nil, "CloudConfigs")
+	group:CreateInput("Setup name", "my public build", state.Alleral_CloudConfigName or "My setup", function(value)
+		state.Alleral_CloudConfigName = trimText(value)
+		saveFn()
+	end, "Name shown in the community browser.")
+	group:CreateToggle("List publicly", sharePublic, "Public configs appear in browse — the twist: each upload gets a DNA fingerprint so players preview before importing.", function(value)
+		sharePublic = value ~= false
+		state.Alleral_CloudConfigPublic = sharePublic
+		saveFn()
+	end)
+	group:CreateButton("Upload to cloud", function()
+		local base = Core.resolveRelayBase()
+		local payload = {
+			gameId = gameId,
+			name = state.Alleral_CloudConfigName or "My setup",
+			author = (game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.DisplayName) or "Player",
+			scriptVersion = scriptVersion,
+			public = sharePublic,
+			tags = { "alleral", gameId },
+			data = collectSnapshot(),
+		}
+		local decoded, err = Core.httpPostJson(base .. "/api/configs/publish", payload)
+		if not decoded or decoded.ok ~= true or not decoded.code then
+			Core.notify("Alleral", tostring(err or decoded and decoded.error or "Upload failed."), 5, "error")
+			return
+		end
+		shareCode = tostring(decoded.code)
+		state.Alleral_CloudConfigCode = shareCode
+		saveFn()
+		local dna = decoded.dna and (" · DNA " .. tostring(decoded.dna)) or ""
+		Core.notify("Alleral", "Uploaded! Share code: " .. shareCode .. dna, 6, "success")
+		if Core.setClipboard then
+			pcall(Core.setClipboard, shareCode)
+		end
+	end, "Publishes your current settings and copies the share code.")
+	group:CreateInput("Share code", "ABC123", shareCode, function(value)
+		shareCode = trimText(value):upper()
+		state.Alleral_CloudConfigCode = shareCode
+		saveFn()
+	end, "6-character code from a friend or the community browser.")
+	group:CreateButton("Preview DNA", function()
+		if shareCode == "" then
+			Core.notify("Alleral", "Enter a share code first.", 4, "warn")
+			return
+		end
+		local base = Core.resolveRelayBase()
+		local decoded = Core.httpGetJson(base .. "/api/configs/" .. shareCode)
+		if not decoded or decoded.ok ~= true or type(decoded.data) ~= "table" then
+			Core.notify("Alleral", "Config not found.", 4, "error")
+			return
+		end
+		local diff = countDiff(decoded.data)
+		previewText = string.format(
+			"%s by %s · v%s · %s downloads · DNA %s · %s keys would change",
+			tostring(decoded.name or "Untitled"),
+			tostring(decoded.author or "?"),
+			tostring(decoded.scriptVersion or "?"),
+			tostring(decoded.downloads or 0),
+			tostring(decoded.dna or "?"),
+			tostring(diff)
+		)
+		Core.notify("Alleral", previewText, 7, "info")
+	end, "Shows what would change before you import.")
+	group:CreateButton("Import from cloud", function()
+		if shareCode == "" then
+			Core.notify("Alleral", "Enter a share code first.", 4, "warn")
+			return
+		end
+		local base = Core.resolveRelayBase()
+		local decoded = Core.httpGetJson(base .. "/api/configs/" .. shareCode)
+		if not decoded or decoded.ok ~= true or type(decoded.data) ~= "table" then
+			Core.notify("Alleral", "Config not found.", 4, "error")
+			return
+		end
+		local applied, err = applySnapshot(decoded.data)
+		if applied then
+			Core.notify("Alleral", "Imported '" .. tostring(decoded.name or shareCode) .. "'. Reload UI if labels look stale.", 6, "success")
+		else
+			Core.notify("Alleral", tostring(err), 5, "error")
+		end
+	end, "Applies a shared cloud config to this session.")
+	group:CreateButton("Browse community", function()
+		local base = Core.resolveRelayBase()
+		local decoded = Core.httpGetJson(base .. "/api/configs/browse?game=" .. HttpService:UrlEncode(gameId) .. "&limit=12")
+		if not decoded or decoded.ok ~= true or type(decoded.configs) ~= "table" or #decoded.configs == 0 then
+			Core.notify("Alleral", "No public configs yet — upload yours first.", 5, "warn")
+			return
+		end
+		local top = decoded.configs[1]
+		shareCode = tostring(top.code or "")
+		state.Alleral_CloudConfigCode = shareCode
+		saveFn()
+		Core.notify(
+			"Alleral",
+			string.format("Top pick: %s by %s [%s] · %s downloads", top.name or "?", top.author or "?", shareCode, tostring(top.downloads or 0)),
+			7,
+			"info"
+		)
+	end, "Pulls the most-downloaded public config for this game.")
+
+	return group
+end
+
 function Core.normalizeWebhookUrl(url)
 	local text = trimText(url)
 	if text == "" then
@@ -2483,10 +3001,10 @@ local function compileWindUiModule(source, label)
 		return result
 	end
 	if not ok then
-		Core.logWarn("WindUI compile error: " .. tostring(result))
+		Core.logWarn("Alleral UI compile error: " .. tostring(result))
 	end
 	if ENV.Alleral_WindUiLastGood and type(ENV.Alleral_WindUiLastGood.CreateWindow) == "function" then
-		Core.logWarn("WindUI compile failed, using last good copy")
+		Core.logWarn("Alleral UI compile failed, using last good copy")
 		return ENV.Alleral_WindUiLastGood
 	end
 	return nil, ok and "Invalid WindUI module" or tostring(result)
@@ -2530,8 +3048,13 @@ end
 local function patchSourceValid(body)
 	return type(body) == "string"
 		and #body > 400
-		and body:find("ALLERAL_UI_VERSION", 1, true) ~= nil
+		and (body:find("ARRREL_UI_VERSION", 1, true) ~= nil or body:find("ALLERAL_UI_VERSION", 1, true) ~= nil)
 		and body:find("return function", 1, true) ~= nil
+end
+
+local function patchApplied(windUi)
+	return type(windUi) == "table"
+		and (type(windUi.GetArrrelVersion) == "function" or type(windUi.GetAlleralVersion) == "function")
 end
 
 local function bootstrapSourceValid(body)
@@ -2541,7 +3064,7 @@ local function bootstrapSourceValid(body)
 end
 
 local function applyAlleralWindUiPatch(windUi)
-	if type(windUi) ~= "table" or type(windUi.GetAlleralVersion) == "function" then
+	if type(windUi) ~= "table" or patchApplied(windUi) then
 		return windUi
 	end
 
@@ -2569,46 +3092,56 @@ local function applyAlleralWindUiPatch(windUi)
 			Core.logWarn("UI patch: " .. tostring(applyErr))
 			return false
 		end
-		return type(windUi.GetAlleralVersion) == "function"
+		return patchApplied(windUi)
 	end
 
 	local bootstrapSource, bootstrapPath = readWindUiLocal("bootstrap.lua")
-	if runPatchLoader(bootstrapSource, "@Alleral/bootstrap:" .. tostring(bootstrapPath or "local")) then
+	if runPatchLoader(bootstrapSource, "@Arrrel/bootstrap:" .. tostring(bootstrapPath or "local")) then
 		return windUi
 	end
 
 	for _, base in ipairs(WINDUI_MIRROR_URLS) do
 		local body = Core.httpGet(base .. "bootstrap.lua")
-		if bootstrapSourceValid(body) and runPatchLoader(body, "@Alleral/bootstrap:remote") then
+		if bootstrapSourceValid(body) and runPatchLoader(body, "@Arrrel/bootstrap:remote") then
 			return windUi
 		end
 	end
 
 	local patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FILE)
+	if not patchSource then
+		patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FALLBACK)
+	end
 	if patchSource and patchSourceValid(patchSource) then
-		local chunk, compileErr = loadStringFn(patchSource, "@Alleral/aller:" .. tostring(patchPath))
+		local chunk, compileErr = loadStringFn(patchSource, "@Arrrel/patch:" .. tostring(patchPath))
 		if chunk then
 			local ok, patchFn = pcall(chunk)
 			if ok and type(patchFn) == "function" then
 				pcall(patchFn, windUi)
+				if patchApplied(windUi) then
+					return windUi
+				end
 			end
 		else
 			Core.logWarn("UI patch compile: " .. tostring(compileErr))
 		end
 	end
 
-	for _, base in ipairs(WINDUI_MIRROR_URLS) do
-		local body = Core.httpGet(base .. WINDUI_PATCH_FILE)
-		if patchSourceValid(body) then
-			local chunk, compileErr = loadStringFn(body, "@Alleral/aller:remote")
-			if chunk then
-				local ok, patchFn = pcall(chunk)
-				if ok and type(patchFn) == "function" then
-					pcall(patchFn, windUi)
-					break
+	for _, patchName in ipairs({ WINDUI_PATCH_FILE, WINDUI_PATCH_FALLBACK }) do
+		for _, base in ipairs(WINDUI_MIRROR_URLS) do
+			local body = Core.httpGet(base .. patchName)
+			if patchSourceValid(body) then
+				local chunk, compileErr = loadStringFn(body, "@Arrrel/patch:remote:" .. patchName)
+				if chunk then
+					local ok, patchFn = pcall(chunk)
+					if ok and type(patchFn) == "function" then
+						pcall(patchFn, windUi)
+						if patchApplied(windUi) then
+							return windUi
+						end
+					end
+				else
+					Core.logWarn("UI patch compile: " .. tostring(compileErr))
 				end
-			else
-				Core.logWarn("UI patch compile: " .. tostring(compileErr))
 			end
 		end
 	end
@@ -2630,13 +3163,13 @@ local function loadWindUiModule()
 		if module then
 			return applyAlleralWindUiPatch(module)
 		end
-		Core.logWarn("local WindUI failed (" .. tostring(localPath) .. "): " .. tostring(err))
+		Core.logWarn("local Alleral UI failed (" .. tostring(localPath) .. "): " .. tostring(err))
 	end
 	local remoteSource, remoteUrl = fetchWindUiRemote(WINDUI_FILE)
 	if remoteSource then
 		local module, err = compileWindUiModule(remoteSource, "@WindUI/remote:" .. tostring(remoteUrl))
 		if module then
-			Core.say("WindUI pulled from " .. tostring(remoteUrl))
+			Core.say("Alleral UI pulled from " .. tostring(remoteUrl))
 			return applyAlleralWindUiPatch(module)
 		end
 		Core.logWarn("remote WindUI failed: " .. tostring(err))
@@ -2662,7 +3195,7 @@ local function listUiThemes(windUi)
 		end
 	end
 	if #names == 0 then
-		return { "Alleral", "AlleralNeon", "AlleralMidnight", "Dark", "Light" }
+		return { "Arrrel", "ArrrelNeon", "ArrrelMidnight", "ArrrelAurora", "Dark", "Light" }
 	end
 	return names
 end
@@ -2676,14 +3209,19 @@ local function applyAlleralTheme(bundle)
 		return
 	end
 	pcall(function()
-		windUi:SetTheme("Alleral")
+		windUi:SetTheme("Arrrel")
 	end)
 end
 
 local function cacheUi(bundle)
 	stampUi(bundle)
 	ENV.Alleral_UI = bundle
-	ENV.Alleral_Rayfield = bundle
+	if getgenv then
+		local g = getgenv()
+		if type(g) == "table" then
+			g.Alleral_UI = bundle
+		end
+	end
 	return bundle
 end
 
@@ -2693,7 +3231,6 @@ function Core.loadUi()
 		return cacheUi(cached)
 	end
 	ENV.Alleral_UI = nil
-	ENV.Alleral_Rayfield = nil
 
 	local loadStringFn = Core.loadStringFn()
 	if not loadStringFn then
@@ -2704,10 +3241,10 @@ function Core.loadUi()
 	if not WindUI and ENV.Alleral_WindUiLastGood then
 		WindUI = ENV.Alleral_WindUiLastGood
 		libErr = nil
-		Core.say("using cached WindUI")
+		Core.say("using cached Alleral UI")
 	end
 	if not WindUI then
-		return nil, libErr or "WindUI missing"
+		return nil, libErr or "Alleral UI missing"
 	end
 
 	ENV.Alleral_WindUiLastGood = WindUI
@@ -2715,8 +3252,9 @@ function Core.loadUi()
 	Core.clearUiStateBindings()
 
 	local bundle = {
-		WindUI = WindUI,
+		Alleral = WindUI,
 		Library = WindUI,
+		WindUI = WindUI,
 		CreateWindow = function(_, settings)
 			return Core.safeCall("UI:CreateWindow", function()
 				return WindUI:CreateWindow(settings)
@@ -2797,7 +3335,7 @@ function Core.loadUi()
 			WindUI:SetHaptics(true)
 		end)
 	end
-	Core.say("WindUI " .. tostring(WindUI.GetAlleralVersion and WindUI:GetAlleralVersion() or Core.WINDUI_VERSION) .. " loaded")
+	Core.say("Alleral " .. tostring(WindUI.GetArrrelVersion and WindUI:GetArrrelVersion() or WindUI.GetAlleralVersion and WindUI:GetAlleralVersion() or Core.ALLERAL_UI_VERSION) .. " loaded")
 	task.defer(function()
 		if type(WindUI.Preload) == "function" then
 			pcall(function()
@@ -2807,8 +3345,6 @@ function Core.loadUi()
 	end)
 	return cacheUi(bundle)
 end
-
-Core.loadRayfield = Core.loadUi
 
 function Core.preloadUi()
 	local cached = ENV.Alleral_UI or ENV.Alleral_Rayfield
@@ -2958,6 +3494,63 @@ function Core.httpGetJson(url)
 	return decoded
 end
 
+function Core.httpPostJson(url, payload, headers)
+	local sender = Core.requestFunction()
+	if not sender then
+		return nil, "HTTP unavailable"
+	end
+	local encoded = HttpService:JSONEncode(payload or {})
+	local ok, response = pcall(function()
+		return sender({
+			Url = url,
+			Method = "POST",
+			Headers = headers or { ["Content-Type"] = "application/json" },
+			Body = encoded,
+		})
+	end)
+	if not ok then
+		return nil, tostring(response)
+	end
+	local body = type(response) == "table" and (response.Body or response.body) or (type(response) == "string" and response)
+	if type(body) == "string" and body ~= "" then
+		local decodedOk, decoded = pcall(function()
+			return HttpService:JSONDecode(body)
+		end)
+		if decodedOk and type(decoded) == "table" then
+			return decoded
+		end
+	end
+	local code = type(response) == "table" and (response.StatusCode or response.Status or response.status_code) or nil
+	if type(code) == "number" and (code < 200 or code >= 300) then
+		return nil, "HTTP " .. tostring(code)
+	end
+	return { ok = true }, nil
+end
+
+function Core.resolveRelayBase()
+	local telemetry = ENV.Alleral_Telemetry
+	if type(telemetry) == "table" and type(telemetry.GetConfig) == "function" then
+		local ok, cfg = pcall(function()
+			return telemetry:GetConfig()
+		end)
+		if ok and type(cfg) == "table" and cfg.relayUrl and cfg.relayUrl ~= "" then
+			local base = tostring(cfg.relayUrl):gsub("/+$", ""):gsub("/ingest$", "")
+			return base
+		end
+	end
+	if ENV.Alleral_RelayUrl and tostring(ENV.Alleral_RelayUrl) ~= "" then
+		return tostring(ENV.Alleral_RelayUrl):gsub("/+$", ""):gsub("/ingest$", "")
+	end
+	return "https://alleral-telemetry-production.up.railway.app"
+end
+
+function Core.uiLibrary(bundle)
+	if type(bundle) ~= "table" then
+		return nil
+	end
+	return bundle.Alleral or bundle.Library or bundle.WindUI
+end
+
 function Core.setClipboard(text)
 	local clip = Core.execFunction("setclipboard") or Core.execFunction("toclipboard")
 	if clip then
@@ -2999,6 +3592,19 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 	rawGroup = rawGroup or {}
 	uiBundle = uiBundle or {}
 	local serial = 0
+	local windUi = Core.uiLibrary(uiBundle)
+
+	local function attachTooltip(handle, tooltip)
+		if type(handle) ~= "table" or not tooltip or tostring(tooltip) == "" then
+			return
+		end
+		if not handle.Desc and not handle.Description then
+			handle.Desc = tostring(tooltip)
+		end
+		if windUi and type(windUi.HookElementTooltip) == "function" then
+			pcall(windUi.HookElementTooltip, windUi, handle)
+		end
+	end
 
 	local function nextFlag(name, explicit)
 		serial += 1
@@ -3068,6 +3674,7 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 			Desc = settings.Tooltip,
 			Callback = settings.Callback or function() end,
 		})
+		attachTooltip(handle, settings.Tooltip)
 		return wrapElement(function(nextSettings)
 			if nextSettings.CurrentValue ~= nil then
 				setElementValue(handle, nextSettings.CurrentValue == true)
@@ -3094,6 +3701,7 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 			},
 			Callback = settings.Callback or function() end,
 		})
+		attachTooltip(handle, settings.Tooltip)
 		return wrapElement(function(nextSettings)
 			if nextSettings.CurrentValue ~= nil then
 				setElementValue(handle, tonumber(nextSettings.CurrentValue) or minValue)
@@ -3106,11 +3714,12 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 	end
 
 	function groupbox:CreateButton(settings, id)
-		rawGroup:Button({
+		local handle = rawGroup:Button({
 			Title = settings.Name,
 			Desc = settings.Tooltip,
 			Callback = settings.Callback or function() end,
 		})
+		attachTooltip(handle, settings.Tooltip)
 		return { Set = function() end }
 	end
 
@@ -3131,6 +3740,7 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 			end,
 		})
 		acceptInput = true
+		attachTooltip(handle, settings.Tooltip)
 		return wrapElement(function(nextSettings)
 			if nextSettings.CurrentValue ~= nil then
 				setElementValue(handle, tostring(nextSettings.CurrentValue))
@@ -3157,6 +3767,7 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 				end
 			end,
 		})
+		attachTooltip(handle, settings.Tooltip)
 		return wrapElement(function(nextSettings)
 			if not handle then
 				return
@@ -3224,8 +3835,6 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 	return groupbox
 end
 
-Core.createObsidianGroupbox = Core.createWindUiGroupbox
-
 function Core.wrapUiTab(rawTab, uiBundle, window)
 	local tab = {
 		_rawTab = rawTab,
@@ -3276,7 +3885,7 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 	function tab:BuildThemeGroupbox(column)
 		local group = Core.buildUiGroup(tab, "Appearance", column or 1)
 		local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
-		local themes = (uiBundle and uiBundle.ThemeNames) or { "Alleral", "AlleralNeon", "Dark", "Light" }
+		local themes = (uiBundle and uiBundle.ThemeNames) or { "Arrrel", "ArrrelNeon", "ArrrelAurora", "Dark", "Light" }
 		if windUi and type(windUi.ListThemeNames) == "function" then
 			local ok, listed = pcall(function()
 				return windUi:ListThemeNames()
@@ -3285,7 +3894,7 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 				themes = listed
 			end
 		end
-		local current = "Alleral"
+		local current = "Arrrel"
 		if windUi and type(windUi.GetCurrentTheme) == "function" then
 			local ok, theme = pcall(function()
 				return windUi:GetCurrentTheme()
@@ -3316,7 +3925,7 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 			end
 		end, "Cycles through available presets.")
 
-		local accentPresets = { "Mint", "Cyan", "Violet", "Rose", "Amber", "Ice" }
+		local accentPresets = { "Mint", "Cyan", "Violet", "Rose", "Amber", "Ice", "Aurora" }
 		group:CreateDropdown("Accent color", accentPresets, "Mint", function(selected)
 			if windUi and type(windUi.ApplyAccentPreset) == "function" then
 				pcall(function()
@@ -3333,6 +3942,7 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 					Rose = "#fb7185",
 					Amber = "#fbbf24",
 					Ice = "#93c5fd",
+					Aurora = "#7cf7ff",
 				})[selected] or "#53fc18"
 				pcall(function()
 					windUi:SetAccentColor(Color3.fromHex(hex))
@@ -3390,10 +4000,10 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 		end)
 
 		group:CreateToggle("Startup animation", ENV.Alleral_UiStartup ~= false, "Opening sweep when the menu loads.", function(value)
-			ENV.Alleral_UiStartup = value == true
+			ENV.Alleral_UiStartup = value ~= false
 			if windUi and type(windUi.SetStartupEffect) == "function" then
 				pcall(function()
-					windUi:SetStartupEffect(value == true)
+					windUi:SetStartupEffect(value ~= false)
 				end)
 			end
 		end)
@@ -4146,18 +4756,21 @@ function Core.buildUiWindow(ui, settings)
 	if not lib then
 		return nil
 	end
+	local Players = game:GetService("Players")
+	local lp = Players.LocalPlayer
+	local playerLabel = lp and ((lp.DisplayName ~= "" and lp.DisplayName) or lp.Name) or ""
 	local windowSettings = {
 		Title = settings.Name or "Alleral",
-		Author = settings.Subtitle or "",
+		Author = settings.Subtitle or playerLabel,
 		Folder = (settings.FileSettings or {}).RootFolder or (settings.FileSettings or {}).ConfigFolder or "Alleral_Configs",
 		Icon = Core.windUiIcon(settings.Icon or "leaf"),
-		Theme = "Alleral",
+		Theme = "Arrrel",
 		NewElements = true,
 		HideSearchBar = false,
-		UICorner = 20,
-		UIPadding = 20,
-		SideBarWidth = 256,
-		ElementPadding = 14,
+		UICorner = 12,
+		UIPadding = 24,
+		SideBarWidth = 280,
+		ElementPadding = 16,
 		Resizable = true,
 		OpenButton = {
 			Title = "Alleral",
@@ -4176,7 +4789,7 @@ function Core.buildUiWindow(ui, settings)
 		rawWindow = lib:CreateWindow(windowSettings)
 	end
 	if not rawWindow then
-		Core.logWarn("WindUI window create failed")
+		Core.logWarn("Alleral window create failed")
 		return nil
 	end
 	applyAlleralTheme(ui)
@@ -4237,10 +4850,6 @@ function Core.buildUiTab(section, name, icon, columns, id)
 	return wrapped
 end
 
-Core.buildRayfieldWindow = Core.buildUiWindow
-Core.buildRayfieldSection = Core.buildUiSection
-Core.buildRayfieldTab = Core.buildUiTab
-
 function Core.onUiSave(saveFn)
 	return function(_, callback)
 		return function(...)
@@ -4264,8 +4873,6 @@ function Core.buildUiGroup(tab, name, column, callbackWrapper, icon, id)
 	end
 	return Core.wrapUiGroup(groupbox)
 end
-
-Core.buildRayfieldGroup = Core.buildUiGroup
 
 function Core.filterDropdownOptions(values, query)
 	query = tostring(query or ""):lower()

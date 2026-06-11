@@ -9,7 +9,7 @@ local UI = "ui"
 local RELEASE_FALLBACK = {
 	loader = "7.6.0",
 	core = "2.7.0",
-	ui = "WindUI",
+	ui = "Alleral",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -1415,9 +1415,9 @@ do
 	if type(bridge) == "table" and getgenv then
 		local g = getgenv()
 		if type(g) == "table" then
-			if bridge.Alleral_Rayfield then g.Alleral_Rayfield = bridge.Alleral_Rayfield; g.Alleral_UI = bridge.Alleral_Rayfield end
+			if bridge.Alleral_UI then g.Alleral_UI = bridge.Alleral_UI end
+			if bridge.Alleral_Rayfield and not g.Alleral_UI then g.Alleral_UI = bridge.Alleral_Rayfield end
 			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
-			if bridge.Alleral_Analytics then g.Alleral_Analytics = bridge.Alleral_Analytics end
 			if bridge.Alleral_Telemetry then g.Alleral_Telemetry = bridge.Alleral_Telemetry end
 			if bridge.Alleral_Weao then g.Alleral_Weao = bridge.Alleral_Weao end
 			if bridge.Alleral_WeaoConfig then g.Alleral_WeaoConfig = bridge.Alleral_WeaoConfig end
@@ -1440,7 +1440,6 @@ end
 
 local function publishBridge()
 	pcall(function()
-		shared.Alleral_Rayfield = ENV.Alleral_Rayfield
 		shared.Alleral_UI = ENV.Alleral_UI
 		shared.Alleral_Core = ENV.Alleral_Core
 		shared.Alleral_Analytics = ENV.Alleral_Analytics
@@ -1478,7 +1477,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "6.7.0",
+		version = "6.8.0",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
@@ -1840,9 +1839,11 @@ local function buildManagedFiles()
 		{
 			paths = {
 				UI .. "/windui/main.lua",
+				UI .. "/windui/arrrel.luau",
 				UI .. "/windui/aller.luau",
 				UI .. "/windui/bootstrap.lua",
 				"vendor/windui/main.lua",
+				"vendor/windui/arrrel.luau",
 				"vendor/windui/aller.luau",
 				"vendor/windui/bootstrap.lua",
 				UI .. "/addons/ThemeManager.lua",
@@ -2640,9 +2641,8 @@ local function main()
 	end
 
 	if uiBundle then
-		ENV.Alleral_Rayfield = uiBundle
 		ENV.Alleral_UI = uiBundle
-		log("WindUI ready")
+		log("Alleral ready")
 	elseif uiErr then
 		log("UI skipped: " .. tostring(uiErr), true)
 	end

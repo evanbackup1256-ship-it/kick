@@ -762,8 +762,6 @@ Core.makeSupervisor(state, loops, loopControllers, "Stats", 1.5, function()
 end)
 
 settingsTab:BuildThemeGroupbox(1)
-Core.buildScriptStatusGroupbox(settingsTab, 1, "survive_a_zombie_arena", VERSION)
-Core.buildHubActionsGroup(settingsTab, 2)
 Core.buildConfigProfileGroup(settingsTab, {
 	state = state,
 	savedKeys = savedKeys,
