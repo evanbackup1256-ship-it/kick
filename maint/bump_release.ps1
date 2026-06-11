@@ -30,6 +30,7 @@ $relayFiles = @(
     "ban_registry.py",
     "site_registry.py",
     "roblox_api.py",
+    "auto_sync.py",
     "requirements.txt",
     "Dockerfile",
     "railway.toml",

@@ -164,6 +164,11 @@ from ban_registry import BanRegistry, VALID_BAN_TYPES
 from site_registry import SiteRegistry
 
 try:
+    from auto_sync import AutoSyncEngine
+except ImportError:
+    AutoSyncEngine = None  # type: ignore
+
+try:
     from roblox_api import fetch_user, resolve_username, resolve_usernames
 except ImportError:
     def resolve_username(username: str):  # type: ignore
@@ -191,6 +196,7 @@ def apply_cors(response):
 @app.route("/api/site", methods=["OPTIONS"])
 @app.route("/api/gate/config", methods=["OPTIONS"])
 @app.route("/api/gate/verify", methods=["OPTIONS"])
+@app.route("/api/sync/status", methods=["OPTIONS"])
 @app.route("/api/bug-report", methods=["OPTIONS"])
 @app.route("/api/feature-request", methods=["OPTIONS"])
 @app.route("/api/ban/check", methods=["OPTIONS"])
@@ -200,10 +206,28 @@ def cors_preflight():
 
 
 BAN_DB_PATH = Path(os.environ.get("BAN_DB_PATH", str(APP_DIR / "data" / "bans.db")))
+DATA_DIR = Path(os.environ.get("ALLERAL_DATA_DIR", str(APP_DIR / "data")))
+GITHUB_REPO = os.environ.get("GITHUB_REPO", "evanbackup1256-ship-it/kick").strip()
+GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "main").strip()
+GITHUB_SYNC_SECONDS = int(os.environ.get("GITHUB_SYNC_SECONDS", "30"))
+AUTO_SYNC_ENABLED = os.environ.get("AUTO_SYNC_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
 GATE_RATE_PER_MIN = int(os.environ.get("GATE_RATE_PER_MIN", "90"))
 SCRIPT_REGISTRY = ScriptRegistry(SCRIPTS_MANIFEST_PATH)
 BAN_REGISTRY = BanRegistry(BAN_DB_PATH)
 SITE_REGISTRY = SiteRegistry(resolve_site_path())
+
+AUTO_SYNC = None
+if AutoSyncEngine is not None:
+    AUTO_SYNC = AutoSyncEngine(
+        repo=GITHUB_REPO,
+        branch=GITHUB_BRANCH,
+        script_registry=SCRIPT_REGISTRY,
+        site_registry=SITE_REGISTRY,
+        data_dir=DATA_DIR,
+        interval_sec=GITHUB_SYNC_SECONDS,
+        enabled=AUTO_SYNC_ENABLED,
+    )
+    AUTO_SYNC.start()
 GATE_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 BUG_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 BUG_RATE_PER_MIN = int(os.environ.get("BUG_RATE_PER_MIN", "6"))
@@ -240,6 +264,11 @@ def public_allow_ip(ip: str, bucket: dict[str, deque[float]], limit: int) -> boo
 
 
 def build_public_site_payload() -> dict[str, Any]:
+    if AUTO_SYNC is not None:
+        try:
+            AUTO_SYNC.sync_if_stale(force=False)
+        except Exception as exc:
+            print(f"[auto-sync] site refresh failed: {exc}", file=sys.stderr)
     site = SITE_REGISTRY.load()
     manifest = SCRIPT_REGISTRY.list_scripts()
     scripts = manifest.get("scripts", {})
@@ -257,6 +286,7 @@ def build_public_site_payload() -> dict[str, Any]:
             "robloxUrl": meta.get("robloxUrl") or "",
             "description": meta.get("description") or entry.get("message") or "",
         }
+    sync_meta = AUTO_SYNC.status() if AUTO_SYNC is not None else {"autoStatus": False}
     return {
         "ok": True,
         "brand": site.get("brand") or BRAND,
@@ -272,6 +302,9 @@ def build_public_site_payload() -> dict[str, Any]:
         "games": merged_games,
         "scriptsUpdatedAt": manifest.get("updatedAt"),
         "siteUpdatedAt": site.get("updatedAt"),
+        "githubCommit": site.get("githubCommit") or sync_meta.get("commit") or "",
+        "autoManaged": bool(site.get("autoManaged") or sync_meta.get("autoStatus")),
+        "sync": sync_meta,
     }
 
 
@@ -837,12 +870,16 @@ ENGINE = RelayEngine()
 
 @app.get("/health")
 def health():
+    sync_meta = AUTO_SYNC.status() if AUTO_SYNC is not None else {}
     return jsonify({
         "ok": True,
-        "version": "3.6",
+        "version": "3.7",
         "gate": True,
         "banApi": True,
         "site": True,
+        "autoSync": sync_meta.get("enabled", False),
+        "githubCommit": sync_meta.get("commit") or "",
+        "lastSyncAt": sync_meta.get("lastSyncAt"),
         "bans": len(BAN_REGISTRY.list_bans()),
         "time": utc_iso(),
     })
@@ -883,6 +920,12 @@ def ingest():
     if not ENGINE.allow_session_event(payload):
         return jsonify({"ok": True, "status": "throttled"}), 202
 
+    if AUTO_SYNC is not None:
+        try:
+            AUTO_SYNC.record_telemetry(payload)
+        except Exception as exc:
+            print(f"[auto-sync] telemetry record failed: {exc}", file=sys.stderr)
+
     ok, status = ENGINE.enqueue(payload)
     if not ok:
         if status == "stale":
@@ -901,8 +944,13 @@ def admin_authorized() -> bool:
 
 @app.get("/scripts")
 def list_scripts():
+    if AUTO_SYNC is not None:
+        try:
+            AUTO_SYNC.sync_if_stale(force=False)
+        except Exception as exc:
+            print(f"[auto-sync] scripts refresh failed: {exc}", file=sys.stderr)
     data = SCRIPT_REGISTRY.list_scripts()
-    return jsonify({"ok": True, "scripts": data.get("scripts", {}), "updatedAt": data.get("updatedAt")})
+    return jsonify({"ok": True, "scripts": data.get("scripts", {}), "updatedAt": data.get("updatedAt"), "autoManaged": True})
 
 
 @app.get("/scripts/<script_id>")
@@ -1162,6 +1210,16 @@ def gate_verify():
     except requests.RequestException as exc:
         print(f"[gate] turnstile verify failed: {exc}", file=sys.stderr)
         return jsonify({"ok": True, "verified": True, "mode": "degraded"})
+
+
+@app.get("/api/sync/status")
+def sync_status():
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    if AUTO_SYNC is None:
+        return jsonify({"ok": True, "enabled": False, "autoStatus": False})
+    return jsonify({"ok": True, **AUTO_SYNC.status()})
 
 
 @app.get("/api/site")

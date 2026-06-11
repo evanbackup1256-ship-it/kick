@@ -102,9 +102,10 @@
       <form class="form admin-script-form">
         <label>Status
           <div class="select-wrap">
-            <select data-f="status" class="field-select">${STATUSES.map((s) => `<option value="${s}" ${s === status ? "selected" : ""}>${titleCase(s)}</option>`).join("")}</select>
+            <select data-f="status" class="field-select" disabled title="Auto-managed from telemetry">${STATUSES.map((s) => `<option value="${s}" ${s === status ? "selected" : ""}>${titleCase(s)}</option>`).join("")}</select>
           </div>
         </label>
+        <p class="admin-auto-note">Status is computed automatically from inject telemetry (48h window).</p>
         <label>Version<input data-f="version" class="field-input" value="${entry.version || ""}" /></label>
         <label>Message<textarea data-f="message" class="field-textarea">${entry.message || ""}</textarea></label>
         <button class="btn btn-fill" type="submit">Save Script</button>
@@ -174,20 +175,21 @@
     const root = $("#statsGrid");
     root.innerHTML = '<p class="empty">Loading stats…</p>';
     try {
-      const [health, banStatus, site] = await Promise.all([
+      const [health, banStatus, site, sync] = await Promise.all([
         fetch("/health").then((r) => r.json()),
         fetch("/api/ban/status").then((r) => r.json()),
         fetch("/api/site").then((r) => r.json()),
+        fetch("/api/sync/status").then((r) => r.json()),
       ]);
       const games = Object.values(site.games || {});
       const working = games.filter((g) => (g.status || "").toLowerCase() === "working").length;
       root.innerHTML = `
         <article class="stat-card card-enter"><span class="stat-card-label">Relay Version</span><strong>v${health.version || "?"}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.05s"><span class="stat-card-label">Active Bans</span><strong>${banStatus.activeBans ?? health.bans ?? 0}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.1s"><span class="stat-card-label">Games Listed</span><strong>${games.length}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.15s"><span class="stat-card-label">Working Scripts</span><strong>${working}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.2s"><span class="stat-card-label">Ban Types</span><strong>${(banStatus.banTypes || []).length}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.25s"><span class="stat-card-label">Gate API</span><strong>${health.gate ? "Online" : "Offline"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.05s"><span class="stat-card-label">GitHub Commit</span><strong>${sync.commit || health.githubCommit || "—"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.1s"><span class="stat-card-label">Last Auto Sync</span><strong>${sync.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleTimeString() : "—"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.15s"><span class="stat-card-label">Active Bans</span><strong>${banStatus.activeBans ?? health.bans ?? 0}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.2s"><span class="stat-card-label">Games Listed</span><strong>${games.length}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.25s"><span class="stat-card-label">Working Scripts</span><strong>${working}</strong></article>
       `;
     } catch (e) {
       root.innerHTML = `<p class="empty">${e.message}</p>`;
@@ -285,4 +287,8 @@
   }, { passive: true });
 
   setTab("scripts");
+  setInterval(() => {
+    if (activeTab === "scripts") loadScripts();
+    if (activeTab === "stats") loadStats();
+  }, 30000);
 })();

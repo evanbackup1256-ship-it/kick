@@ -15,7 +15,8 @@
 
   const toastEl = $("#toast");
   const modal = $("#gameModal");
-  const state = { site: null, changelogShown: 2, gameFilter: "all" };
+  const state = { site: null, changelogShown: 2, gameFilter: "all", siteSignature: "" };
+  const SITE_POLL_MS = 30000;
 
   function flash(text, isError = false) {
     if (!toastEl) return;
@@ -260,9 +261,23 @@
     if (footerEl) footerEl.href = primary;
   }
 
-  async function loadSite() {
-    const data = await api("/api/site");
+  function siteSignature(data) {
+    if (!data) return "";
+    return [
+      data.scriptsUpdatedAt,
+      data.siteUpdatedAt,
+      data.githubCommit,
+      data.loaderVersion,
+      Object.keys(data.games || {}).length,
+    ].join("|");
+  }
+
+  function applySite(data, { notify = false } = {}) {
+    const prev = state.siteSignature;
+    const sig = siteSignature(data);
+    const changed = prev && sig !== prev;
     state.site = data;
+    state.siteSignature = sig;
     const brand = data.brand || "Alleral";
     document.title = `${brand} — Script Library`;
     $("#brandName").textContent = brand;
@@ -271,9 +286,22 @@
     renderHero(data);
     renderFeatures(data);
     renderGames(data);
-    renderChangelog(data, true);
+    if (changed) renderChangelog(data, true);
+    else renderChangelog(data, false);
     renderFaq(data);
     renderBugCategories(data);
+    if (notify && changed) flash("Hub synced from GitHub");
+  }
+
+  async function loadSite(notify = false) {
+    const data = await api("/api/site");
+    applySite(data, { notify });
+  }
+
+  function startSitePolling() {
+    setInterval(() => {
+      loadSite(true).catch(() => {});
+    }, SITE_POLL_MS);
   }
 
   async function copyText(text, msg) {
@@ -294,8 +322,9 @@
       const data = await res.json();
       if (data.ok) {
         el.className = "status-pill online";
-        el.innerHTML = '<span class="status-dot"></span>Online';
-        el.title = `Relay v${data.version || "?"} · ${data.bans ?? 0} bans`;
+        el.innerHTML = '<span class="status-dot"></span>Live';
+        const commit = data.githubCommit ? ` · ${data.githubCommit}` : "";
+        el.title = `Relay v${data.version || "?"} · Auto-sync${commit}`;
       } else throw new Error();
     } catch {
       el.className = "status-pill offline";
@@ -419,7 +448,8 @@
     setActiveNav();
     checkLiveStatus();
     setInterval(checkLiveStatus, 60000);
-    loadSite().catch((e) => flash(e.message, true));
+    loadSite(false).catch((e) => flash(e.message, true));
+    startSitePolling();
   }
 
   if (sessionStorage.getItem("alleral_gate_ok")) {

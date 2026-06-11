@@ -1237,6 +1237,22 @@ body.admin-page {
   letter-spacing: -0.03em;
 }
 
+.auto-banner {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(41, 151, 255, 0.1);
+  border: 1px solid rgba(41, 151, 255, 0.22);
+  color: #9fd0ff;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.admin-auto-note {
+  margin: -8px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .wrap { width: calc(100% - 32px); }

@@ -1,6 +1,6 @@
 {
     "version":  1,
-    "updatedAt":  "2026-06-11T04:16:43Z",
+    "updatedAt":  "2026-06-11T04:19:17Z",
     "brand":  "Alleral",
     "tagline":  "The Ultimate Roblox Script Library",
     "loaderVersion":  "7.4.0",
@@ -12,13 +12,15 @@
                      "Auto-detects the correct game script on inject",
                      "Obsidian UI with live script status",
                      "Advanced Roblox ban API with HWID and UserId enforcement",
+                     "100% auto-synced from GitHub â€” no manual site maintenance",
+                     "Live script status computed from player telemetry",
                      "Pulls updates from GitHub within ~45 seconds of a push",
                      "Runs on Volt, Synapse, Wave, and most HTTP-capable executors"
                  ],
     "faq":  [
                 {
                     "q":  "How Do I Visit the Alleral Website?",
-                    "a":  "Open the hub in any normal browser on your phone or PC. Bookmark the main link in the Share section Ã¢â‚¬â€ no Roblox account is needed to browse. You only need Roblox and an executor when you run the loadstring."
+                    "a":  "Open the hub in any normal browser on your phone or PC. Bookmark the main link in the Share section ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â no Roblox account is needed to browse. You only need Roblox and an executor when you run the loadstring."
                 },
                 {
                     "q":  "How Do I Load Alleral?",
@@ -26,7 +28,7 @@
                 },
                 {
                     "q":  "Which Games Are Supported?",
-                    "a":  "Check the Games section Ã¢â‚¬â€ status updates live from the hub. Only games marked Working or Testing will load."
+                    "a":  "Check the Games section ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â status updates live from the hub. Only games marked Working or Testing will load."
                 },
                 {
                     "q":  "Why Did the Script Not Load?",
