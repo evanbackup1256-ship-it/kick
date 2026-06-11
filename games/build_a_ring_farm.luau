@@ -119,38 +119,10 @@ local defaults = {
 	ActivePresetName = "Default",
 }
 
-local savedKeys = {
-	"AutoPlaceSeed", "AutoUnlockPlot", "AutoSell", "AutoBuySeed", "AutoRollManual",
-	"AutoDiscardSeed", "TargetDiscardSeed", "AutoUpgradeSeed", "AutoRemoveSeed",
-	"TargetPlantAction", "TargetPlantActionRarity", "TargetPlaceSeed", "TargetSeed",
-	"TargetSeedRarity", "MaxUpgradeLevel", "SellDelay", "RollDelay", "TargetPlaceSeedRarity",
-	"TargetPlantPlot", "TargetDiscardSeedRarity", "AutoBuyGear", "TargetGear",
-	"AutoUpgradeSeedRolls", "AutoUpgradeSeedLuck", "AutoExpandFarm", "AutoUpgradeSawRange",
-	"AutoUpgradeSawYield", "AutoUpgradeSprinklerRange", "AutoUpgradeSprinklerPower",
-	"TargetUpgradeFloor", "AutoBuyEgg", "AutoUnlockEgg", "TargetEgg", "AutoBuyEventShop",
-	"TargetEventItem", "AutoSubmitEventSeed", "TargetEventSeed", "TargetEventSeedRarity",
-	"AutoShootEvent", "AutoCollectRushDrops", "AutoCollectAlienDrop", "TargetEnemyPriority",
-	"AutoComposter", "AutoPullLever", "TargetComposterTier", "TargetCompostSeed",
-	"TargetCompostRarity", "TargetComposterFloor", "AutoHoney", "AutoRollHoney",
-	"AutoContractSubmit", "AutoContractReroll", "TargetContractSlot", "IgnoreContractSeeds",
-	"AntiAFK", "EnableFly", "FlySpeed", "AutoSpray", "AutoFertilizer", "TargetFertilizer",
-	"AutoFeedPet", "TargetFeedPet", "AutoOptimizePets", "TargetPetTreat", "TargetSprayPlant",
-	"TargetSprayType", "AutoSellPet", "TargetSellPetRarity", "TargetSellPetName",
-	"TargetSellPetLive", "AutoClaimPlaytime", "AutoOpenBox", "AutoUpgradePlotStats",
-	"TargetPlotStats", "ActivePresetName",
-}
+local savedKeys
+local saveSettings
 
-for key, value in pairs(defaults) do
-	if state[key] == nil then
-		state[key] = value
-	end
-end
-
-Core.loadSettings(state, savedKeys, SETTINGS_FILE)
-
-local function saveSettings()
-	Core.saveSettings(state, savedKeys, SETTINGS_FILE)
-end
+saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE)
 
 local function notify(title, text, duration)
 	Core.notify(title, text, duration)
@@ -1959,8 +1931,28 @@ util:CreateToggle("Anti AFK", state.AntiAFK, "So you don't get booted for sittin
 end)
 util:CreateButton("Save now", saveSettings)
 
+local liveStatus = util:CreateStatus("Live stats", {
+	Cash = tostring(getPlayerCash()),
+	Plot = runtime.playerPlot and "Ready" or "Finding...",
+	Planting = state.AutoPlaceSeed and "On" or "Off",
+})
+
+Core.makeSupervisor(state, loops, loopControllers, "Stats", 2, function()
+	liveStatus:Update("Cash", tostring(getPlayerCash()))
+	liveStatus:Update("Plot", runtime.playerPlot and tostring(runtime.playerPlot.Name or "Ready") or "Finding...")
+	liveStatus:Update("Planting", state.AutoPlaceSeed and "On" or "Off")
+end)
+
 settingsTab:BuildThemeGroupbox(1)
 Core.buildScriptStatusGroupbox(settingsTab, 1, "build_a_ring_farm", VERSION)
+Core.buildHubActionsGroup(settingsTab, 2)
+Core.buildConfigProfileGroup(settingsTab, {
+	state = state,
+	savedKeys = savedKeys,
+	saveFn = saveSettings,
+	version = VERSION,
+	column = 2,
+})
 
 notify("Alleral", "Loaded. Hover toggles for tips.")
 

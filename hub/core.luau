@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "2.3"
+Core.VERSION = "2.5"
 Core.UI_LIBRARY = "WindUI"
 
 local HttpService = game:GetService("HttpService")
@@ -853,6 +853,7 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 	addRow("Script", status.name)
 	addRow("Version", status.version)
 	addRow("Executor", (Core.executorProfile().displayName))
+	addRow("Access", "Public · no key required")
 	local weao = Core.fetchWeaoExecutorStatus()
 	if weao then
 		addRow("WEAO", Core.weaoStatusLabel(weao))
@@ -865,6 +866,19 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 	end
 	if evaluation.force then
 		addRow("Force load", "Enabled")
+	end
+
+	if not evaluation.allowed then
+		groupbox:CreateToggle({
+			Name = "Force load anyway",
+			Value = ENV.Alleral_ForceLoad == true,
+			Tooltip = "Bypass broken/maintenance blocks for this session.",
+			Callback = function(value)
+				ENV.Alleral_ForceLoad = value == true
+				getgenv().Alleral_ForceLoad = value == true
+				Core.notify("Alleral", value and "Force load enabled — reload to apply." or "Force load off.", 4)
+			end,
+		}, "ForceLoadToggle")
 	end
 
 	groupbox:CreateButton({
@@ -895,6 +909,261 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 		profileVersion = profileVersion,
 	}
 	return groupbox, evaluation
+end
+
+function Core.buildHubActionsGroup(tab, column)
+	local groupbox = tab:CreateGroupbox({
+		Name = "Hub controls",
+		Column = column or 2,
+		Icon = 6031075938,
+	}, "HubActions")
+	local group = Core.wrapUiGroup(groupbox)
+
+	group:CreateButton("Reload script", function()
+		local reload = getgenv().Alleral_Reload
+		if type(reload) == "function" then
+			Core.notify("Alleral", "Reloading...", 3)
+			task.defer(reload)
+		else
+			Core.notify("Alleral", "Reload unavailable — re-run the loadstring.", 5)
+		end
+	end, "Runs getgenv().Alleral_Reload().")
+
+	group:CreateButton("Check for update", function()
+		local check = getgenv().Alleral_CheckUpdate
+		if type(check) == "function" then
+			check()
+		else
+			Core.notify("Alleral", "Update check unavailable.", 4)
+		end
+	end, "Pulls the latest loader/core from GitHub.")
+
+	group:CreateButton("Stop automation", function()
+		stateHubStop()
+	end, "Stops loops without closing the UI.")
+
+	group:CreateButton("Purge cache", function()
+		local purge = getgenv().Alleral_PurgeCache
+		if type(purge) == "function" then
+			purge()
+			Core.notify("Alleral", "Workspace cache purged.", 4)
+		else
+			Core.notify("Alleral", "Purge unavailable.", 4)
+		end
+	end, "Clears cached hub files and reloads fresh.")
+
+	return group
+end
+
+function stateHubStop()
+	local state = ENV.Alleral_State
+	if type(state) == "table" then
+		state.HubRunning = false
+		if type(state.Alleral_Unload) == "function" then
+			pcall(state.Alleral_Unload)
+		end
+	end
+	Core.notify("Alleral", "Automation stopped.", 3)
+end
+
+Core.stateHubStop = stateHubStop
+
+function Core.sanitizeProfileName(name)
+	name = trimText(name):gsub("[^%w%-_%s]", ""):gsub("%s+", "_")
+	if name == "" then
+		return "Default"
+	end
+	return name:sub(1, 32)
+end
+
+function Core.buildConfigProfileGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local state = options.state or ENV.Alleral_State or {}
+	local savedKeys = options.savedKeys or {}
+	local profileFolder = options.profileFolder or "Alleral_Configs/Profiles"
+	local saveFn = options.saveFn or function() end
+	local onApply = options.onApply
+	local scriptVersion = options.version or "1.0"
+	local column = options.column or 2
+
+	local writeFile = Core.execFunction("writefile")
+	local readFile = Core.execFunction("readfile")
+	local isFile = Core.execFunction("isfile")
+	local isFolder = Core.execFunction("isfolder")
+	local makeFolder = Core.execFunction("makefolder")
+	local listFiles = Core.execFunction("listfiles")
+	local deleteFile = Core.execFunction("delfile")
+	local setClipboard = Core.execFunction("setclipboard") or Core.execFunction("setclipboard", true)
+
+	local function ensureFolder()
+		if type(makeFolder) ~= "function" then
+			return false
+		end
+		pcall(makeFolder, "Alleral_Configs")
+		pcall(makeFolder, profileFolder)
+		return true
+	end
+
+	local function profilePath(name)
+		return profileFolder .. "/" .. Core.sanitizeProfileName(name) .. ".json"
+	end
+
+	local function collectSnapshot()
+		local snapshot = {}
+		for _, key in ipairs(savedKeys) do
+			snapshot[key] = Core.copyValue(state[key])
+		end
+		snapshot.__meta = {
+			version = scriptVersion,
+			createdAt = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+		}
+		return snapshot
+	end
+
+	local function applySnapshot(snapshot)
+		if type(snapshot) ~= "table" then
+			return false, "Invalid profile file."
+		end
+		for _, key in ipairs(savedKeys) do
+			if snapshot[key] ~= nil then
+				state[key] = Core.copyValue(snapshot[key])
+			end
+		end
+		if type(onApply) == "function" then
+			pcall(onApply, snapshot)
+		end
+		saveFn()
+		return true, nil
+	end
+
+	local function listProfiles()
+		local names = {}
+		if type(listFiles) == "function" and type(isFolder) == "function" and isFolder(profileFolder) then
+			for _, path in ipairs(listFiles(profileFolder)) do
+				local name = tostring(path):match("([^/\\]+)%.json$")
+				if name then
+					table.insert(names, name)
+				end
+			end
+		end
+		table.sort(names)
+		if #names == 0 then
+			table.insert(names, "Default")
+		end
+		return names
+	end
+
+	local profileName = Core.sanitizeProfileName(state.ActiveProfileName or "Default")
+	local groupbox = tab:CreateGroupbox({
+		Name = "Config profiles",
+		Column = column,
+		Icon = 6031075938,
+	}, "ConfigProfiles")
+	local group = Core.wrapUiGroup(groupbox)
+
+	group:CreateInput("Profile name", "my setup", profileName, function(value)
+		profileName = Core.sanitizeProfileName(value)
+		state.ActiveProfileName = profileName
+		saveFn()
+	end, "Name used when saving or loading.")
+
+	group:CreateButton("Save profile", function()
+		if type(writeFile) ~= "function" then
+			Core.notify("Alleral", "Your executor can't save files.", 5)
+			return
+		end
+		ensureFolder()
+		local ok = Core.writeFile(profilePath(profileName), HttpService:JSONEncode(collectSnapshot()))
+		if ok then
+			state.ActiveProfileName = profileName
+			saveFn()
+			Core.notify("Alleral", "Saved '" .. profileName .. "'.", 4)
+		end
+	end, "Writes all settings to disk under this name.")
+
+	group:CreateButton("Load profile", function()
+		if type(readFile) ~= "function" or type(isFile) ~= "function" then
+			Core.notify("Alleral", "Your executor can't read files.", 5)
+			return
+		end
+		local path = profilePath(profileName)
+		if not isFile(path) then
+			Core.notify("Alleral", "No profile named '" .. profileName .. "'.", 5)
+			return
+		end
+		local raw = readFile(path)
+		local decodedOk, decoded = pcall(function()
+			return HttpService:JSONDecode(raw)
+		end)
+		if not decodedOk then
+			Core.notify("Alleral", "Profile JSON is corrupt.", 5)
+			return
+		end
+		local applied, err = applySnapshot(decoded)
+		if applied then
+			Core.notify("Alleral", "Loaded '" .. profileName .. "'. Reload to refresh UI.", 5)
+		else
+			Core.notify("Alleral", tostring(err), 5)
+		end
+	end, "Applies a saved profile to this session.")
+
+	group:CreateButton("Delete profile", function()
+		if type(deleteFile) ~= "function" then
+			Core.notify("Alleral", "Your executor can't delete files.", 5)
+			return
+		end
+		local path = profilePath(profileName)
+		if type(isFile) == "function" and not isFile(path) then
+			Core.notify("Alleral", "Nothing to delete.", 4)
+			return
+		end
+		pcall(deleteFile, path)
+		Core.notify("Alleral", "Deleted '" .. profileName .. "'.", 4)
+	end)
+
+	group:CreateButton("Copy to clipboard", function()
+		if type(setClipboard) ~= "function" then
+			Core.notify("Alleral", "Clipboard not supported.", 4)
+			return
+		end
+		pcall(setClipboard, HttpService:JSONEncode(collectSnapshot()))
+		Core.notify("Alleral", "Profile copied — paste to share.", 4)
+	end)
+
+	group:CreateButton("Paste from clipboard", function()
+		local clip = Core.execFunction("getclipboard") or Core.execFunction("getclipboard", true)
+		if type(clip) ~= "function" then
+			Core.notify("Alleral", "Clipboard not supported.", 4)
+			return
+		end
+		local ok, raw = pcall(clip)
+		if not ok or type(raw) ~= "string" or raw == "" then
+			Core.notify("Alleral", "Clipboard is empty.", 4)
+			return
+		end
+		local decodedOk, decoded = pcall(function()
+			return HttpService:JSONDecode(raw)
+		end)
+		if not decodedOk then
+			Core.notify("Alleral", "Clipboard doesn't contain valid JSON.", 5)
+			return
+		end
+		local applied, err = applySnapshot(decoded)
+		if applied then
+			Core.notify("Alleral", "Imported profile from clipboard.", 4)
+		else
+			Core.notify("Alleral", tostring(err), 5)
+		end
+	end)
+
+	local names = listProfiles()
+	group:CreateDropdown("Saved profiles", names, profileName, function(value)
+		profileName = Core.sanitizeProfileName(value)
+		state.ActiveProfileName = profileName
+		saveFn()
+	end, "Quick-pick a profile you've saved before.")
+
+	return group
 end
 
 local function trimText(value)
@@ -1449,13 +1718,22 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 	end
 
 	function groupbox:CreateInput(settings, id)
+		local initialValue = tostring(settings.CurrentValue or settings.Default or "")
+		local userCallback = settings.Callback or function() end
+		local acceptInput = false
 		local handle = rawGroup:Input({
 			Title = settings.Name,
-			Value = settings.CurrentValue or settings.Default or "",
+			Value = initialValue,
 			Placeholder = settings.PlaceholderText or settings.Placeholder or "",
 			Desc = settings.Tooltip,
-			Callback = settings.Callback or function() end,
+			Callback = function(value)
+				if not acceptInput then
+					return
+				end
+				userCallback(value)
+			end,
 		})
+		acceptInput = true
 		return wrapElement(function(nextSettings)
 			if nextSettings.CurrentValue ~= nil then
 				setElementValue(handle, tostring(nextSettings.CurrentValue))
@@ -1655,7 +1933,7 @@ function Core.prepareGame(state)
 		signalBootFailure(msg)
 		return nil, nil, msg
 	end
-	state.HubRunning = state.HubRunning ~= false
+	state.HubRunning = true
 	core.initAnalytics()
 	if state.AntiAFK ~= false then
 		core.setupAntiAfk(game:GetService("Players").LocalPlayer)
@@ -1690,7 +1968,20 @@ function Core.prepareGame(state)
 			core.notifyExecutorCompat()
 		end
 	end)
+	if type(ENV._Alleral_EnsureTeleportWatch) == "function" then
+		pcall(ENV._Alleral_EnsureTeleportWatch)
+	end
 	return core, uiLibrary
+end
+
+function Core.wireTeleportRelaunch(state)
+	state = state or ENV.Alleral_State
+	if state then
+		state.HubRunning = true
+	end
+	if type(ENV._Alleral_EnsureTeleportWatch) == "function" then
+		pcall(ENV._Alleral_EnsureTeleportWatch)
+	end
 end
 
 function Core.stopAutomation(state, connections, loopControllers, loops, onStop)
@@ -1717,12 +2008,57 @@ function Core.stopAutomation(state, connections, loopControllers, loops, onStop)
 	end
 end
 
+function Core.copyValue(value)
+	if type(value) ~= "table" then
+		return value
+	end
+	local output = {}
+	for key, item in pairs(value) do
+		output[key] = Core.copyValue(item)
+	end
+	return output
+end
+
+function Core.mergeDefaults(state, defaults)
+	for key, value in pairs(defaults or {}) do
+		if state[key] == nil then
+			state[key] = Core.copyValue(value)
+		end
+	end
+end
+
+function Core.buildSavedKeys(defaults, exclude)
+	exclude = exclude or { HubRunning = true }
+	local keys = {}
+	for key in pairs(defaults or {}) do
+		if not exclude[key] then
+			table.insert(keys, key)
+		end
+	end
+	table.sort(keys)
+	return keys
+end
+
+function Core.initSettings(state, defaults, filename, exclude)
+	Core.mergeDefaults(state, defaults)
+	local savedKeys = Core.buildSavedKeys(defaults, exclude)
+	Core.loadSettings(state, savedKeys, filename)
+	local function saveSettings()
+		return Core.saveSettings(state, savedKeys, filename)
+	end
+	return saveSettings, savedKeys
+end
+
 function Core.saveSettings(state, keys, filename)
 	local payload = {}
 	for _, key in ipairs(keys) do
 		payload[key] = state[key]
 	end
-	Core.writeFile("Alleral_Configs/" .. filename, HttpService:JSONEncode(payload))
+	local ok = Core.writeFile("Alleral_Configs/" .. filename, HttpService:JSONEncode(payload))
+	if not ok then
+		Core.notify("Alleral", "Couldn't save settings. Your executor may not support writefile.", 5)
+	end
+	return ok
 end
 
 function Core.loadSettings(state, keys, filename)
@@ -2160,6 +2496,25 @@ end
 
 function Core.uiElementId(text)
 	return (tostring(text or "Element"):gsub("[^%w_]", "_"))
+end
+
+function Core.hasPremiumAccess()
+	if getgenv().JD_IS_PREMIUM == true then
+		return true
+	end
+	local access = ENV.Alleral_Access
+	if type(access) == "table" and type(access.isPremium) == "function" then
+		return access.isPremium() == true
+	end
+	return true
+end
+
+function Core.accessMode()
+	local access = ENV.Alleral_Access
+	if type(access) == "table" and type(access.mode) == "function" then
+		return access.mode()
+	end
+	return "public"
 end
 
 function Core.buildUiWindow(ui, settings)

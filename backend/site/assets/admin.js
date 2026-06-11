@@ -617,7 +617,7 @@
     dropdown.classList.remove("hidden");
     dropdown.innerHTML = '<button class="player-lookup-item" type="button" disabled>Searching…</button>';
     try {
-      const res = await fetch(`${apiBase()}/api/admin/users/search?q=${encodeURIComponent(text)}&limit=8`, {
+      const res = await fetch(`${apiBase()}/api/admin/users/search?q=${encodeURIComponent(text)}&limit=10`, {
         headers: headers(),
         cache: "no-store",
       });

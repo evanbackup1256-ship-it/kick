@@ -13,6 +13,7 @@ except ImportError:
 ROBLOX_USERS_URL = "https://users.roblox.com/v1/usernames/users"
 ROBLOX_USER_URL = "https://users.roblox.com/v1/users/{user_id}"
 ROBLOX_USER_SEARCH_URL = "https://users.roblox.com/v1/users/search"
+_VALID_SEARCH_LIMITS = (10, 25, 50, 100)
 _CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _CACHE_TTL_SEC = 300
 
@@ -92,41 +93,74 @@ def resolve_username(username: str) -> dict[str, Any] | None:
     return rows[0] if rows else None
 
 
-def search_users(keyword: str, *, limit: int = 8) -> list[dict[str, Any]]:
+def _normalize_search_limit(limit: int) -> int:
+    try:
+        requested = int(limit or 10)
+    except (TypeError, ValueError):
+        requested = 10
+    requested = max(1, min(requested, 100))
+    for valid in _VALID_SEARCH_LIMITS:
+        if requested <= valid:
+            return valid
+    return 100
+
+
+def search_users(keyword: str, *, limit: int = 10) -> list[dict[str, Any]]:
     """Search Roblox users by partial username or display name."""
     if requests is None:
         raise RuntimeError("requests is not installed")
     text = str(keyword or "").strip()
     if len(text) < 2:
         return []
-    capped = max(1, min(int(limit or 8), 25))
+    capped = _normalize_search_limit(limit)
     cache_key = f"search:{text.lower()}:{capped}"
     hit = _cache_get(cache_key)
     if hit and isinstance(hit.get("users"), list):
         return hit["users"]
 
-    response = requests.get(
-        ROBLOX_USER_SEARCH_URL,
-        params={"keyword": text, "limit": capped},
-        timeout=10,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(f"Roblox API HTTP {response.status_code}")
-    payload = response.json()
-    users: list[dict[str, Any]] = []
-    for item in payload.get("data") or []:
-        if not isinstance(item, dict) or not item.get("id"):
+    last_error = "Roblox user search failed"
+    for attempt in range(3):
+        try:
+            response = requests.get(
+                ROBLOX_USER_SEARCH_URL,
+                params={"keyword": text, "limit": capped},
+                timeout=10,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(f"Roblox API unreachable: {exc}") from exc
+
+        if response.status_code == 429 and attempt < 2:
+            time.sleep(1.5 * (attempt + 1))
             continue
-        users.append(
-            {
-                "id": item.get("id"),
-                "name": item.get("name") or "",
-                "displayName": item.get("displayName") or item.get("name") or "",
-                "hasVerifiedBadge": bool(item.get("hasVerifiedBadge")),
-            }
-        )
-    _cache_set(cache_key, {"users": users})
-    return users
+
+        if response.status_code >= 400:
+            detail = last_error
+            try:
+                payload = response.json()
+                errors = payload.get("errors") if isinstance(payload, dict) else None
+                if isinstance(errors, list) and errors:
+                    detail = str(errors[0].get("message") or errors[0].get("code") or detail)
+            except ValueError:
+                detail = response.text[:200] or detail
+            raise RuntimeError(f"Roblox API HTTP {response.status_code}: {detail}")
+
+        payload = response.json()
+        users: list[dict[str, Any]] = []
+        for item in payload.get("data") or []:
+            if not isinstance(item, dict) or not item.get("id"):
+                continue
+            users.append(
+                {
+                    "id": item.get("id"),
+                    "name": item.get("name") or "",
+                    "displayName": item.get("displayName") or item.get("name") or "",
+                    "hasVerifiedBadge": bool(item.get("hasVerifiedBadge")),
+                }
+            )
+        _cache_set(cache_key, {"users": users})
+        return users
+
+    raise RuntimeError(last_error)
 
 
 def fetch_user(user_id: int | str) -> dict[str, Any] | None:

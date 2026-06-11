@@ -2331,7 +2331,9 @@ def admin_users_search():
     try:
         users = search_users(query, limit=max(1, min(limit, 25)))
     except RuntimeError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 502
+        message = str(exc)
+        status = 429 if "HTTP 429" in message else 502
+        return jsonify({"ok": False, "error": message}), status
     ids = [row.get("id") for row in users if row.get("id")]
     avatars = fetch_avatar_renders(ids) if ids else {}
     enriched: list[dict[str, Any]] = []

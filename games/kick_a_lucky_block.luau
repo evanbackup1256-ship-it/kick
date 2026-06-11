@@ -41,7 +41,8 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "6.6"
+local VERSION = "6.6.2"
+getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
 local connections = {}
@@ -295,6 +296,7 @@ local savedKeys = {
 	"KickVarianceMs",
 	"AAutoSell",
 	"AutoSellMaxBackpack",
+	"NotifyOnError",
 }
 
 local function copyValue(value)
@@ -500,9 +502,9 @@ local function loadSettings()
 	if not ok or type(decoded) ~= "table" then
 		return
 	end
-	for key, value in pairs(decoded) do
-		if defaults[key] ~= nil then
-			state[key] = value
+	for _, key in ipairs(savedKeys) do
+		if decoded[key] ~= nil then
+			state[key] = decoded[key]
 		end
 	end
 end
@@ -2242,7 +2244,7 @@ local function tryAutoSell()
 		task.wait(1)
 	end
 	safeCall("AutoSellAll", function()
-		remotes.sellAll:InvokeServer()
+		fireRemote(remotes.sellAll)
 	end)
 	notify("Auto sell", "Bag was full so I sold everything.", 3)
 end
@@ -2467,10 +2469,68 @@ local function speedUpgradeCost(tier)
 	return nil
 end
 
-local equipWeight
-local getOwnedWeightTools
+local function getOwnedWeightTools()
+	local tools = {}
+	local character = LocalPlayer.Character
+	if LocalPlayer.Backpack then
+		for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
+			if item:IsA("Tool") then
+				table.insert(tools, item)
+			end
+		end
+	end
+	if character then
+		local equipped = character:FindFirstChildOfClass("Tool")
+		if equipped then
+			table.insert(tools, equipped)
+		end
+	end
+	return tools
+end
+
+local function ownsWeight(weight)
+	if not weight or weight == "None" then
+		return false
+	end
+	for _, tool in ipairs(getOwnedWeightTools()) do
+		if tool.Name == weight then
+			return true
+		end
+	end
+	return false
+end
+
+local function equipOwnedWeight(weight)
+	local character, humanoid = characterParts()
+	if not character or not humanoid or not weight or weight == "None" then
+		return
+	end
+	if remotes.weightEquip then
+		safeCall("EquipWeightRemote", function()
+			fireRemote(remotes.weightEquip, weight)
+		end)
+	end
+	local equipped = character:FindFirstChildOfClass("Tool")
+	if equipped and equipped.Name == weight then
+		return
+	end
+	if LocalPlayer.Backpack then
+		local tool = LocalPlayer.Backpack:FindFirstChild(weight)
+		if tool and tool:IsA("Tool") then
+			safeCall("EquipWeightTool", function()
+				humanoid:EquipTool(tool)
+			end)
+		end
+	end
+end
 
 local function buyBestWeight()
+	if type(getOwnedWeightTools) ~= "function" or type(ownsWeight) ~= "function" or type(equipOwnedWeight) ~= "function" then
+		return
+	end
+	if type(fireRemote) ~= "function" then
+		return
+	end
 	refreshRemotes()
 	if not remotes.shopBuy then
 		return
@@ -2506,7 +2566,7 @@ local function buyBestWeight()
 	end
 	local before = currentCoins()
 	safeCall("BuyBestWeight", function()
-		remotes.shopBuy:FireServer("WeightShop", target)
+		fireRemote(remotes.shopBuy, "WeightShop", target)
 	end)
 	task.wait(1.5)
 	local after = currentCoins()
@@ -2518,43 +2578,7 @@ local function buyBestWeight()
 	end
 end
 
-local function ownsWeight(weight)
-	if not weight or weight == "None" then
-		return false
-	end
-	for _, tool in ipairs(getOwnedWeightTools()) do
-		if tool.Name == weight then
-			return true
-		end
-	end
-	return false
-end
-
-local function equipOwnedWeight(weight)
-	local character, humanoid = characterParts()
-	if not character or not humanoid or not weight or weight == "None" then
-		return
-	end
-	if remotes.weightEquip then
-		safeCall("EquipWeightRemote", function()
-			remotes.weightEquip:FireServer(weight)
-		end)
-	end
-	local equipped = character:FindFirstChildOfClass("Tool")
-	if equipped and equipped.Name == weight then
-		return
-	end
-	if LocalPlayer.Backpack then
-		local tool = LocalPlayer.Backpack:FindFirstChild(weight)
-		if tool and tool:IsA("Tool") then
-			safeCall("EquipWeightTool", function()
-				humanoid:EquipTool(tool)
-			end)
-		end
-	end
-end
-
-equipWeight = function(weight)
+local function equipWeight(weight)
 	refreshRemotes()
 	if not weight or weight == "None" then
 		return
@@ -2571,39 +2595,20 @@ equipWeight = function(weight)
 	local before = currentCoins()
 	safeCall("BuyWeight", function()
 		if remotes.shopBuy then
-			remotes.shopBuy:FireServer("WeightShop", weight)
+			fireRemote(remotes.shopBuy, "WeightShop", weight)
 		end
 	end)
 	task.wait(1.5)
 	if currentCoins() < before then
 		if remotes.weightEquip then
 			safeCall("EquipWeightRemote", function()
-				remotes.weightEquip:FireServer(weight)
+				fireRemote(remotes.weightEquip, weight)
 			end)
 		end
 		equipOwnedWeight(weight)
 	else
 		runtime.nextWeightBuyAttempt[weight] = tick() + 8
 	end
-end
-
-getOwnedWeightTools = function()
-	local tools = {}
-	local character = LocalPlayer.Character
-	if LocalPlayer.Backpack then
-		for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
-			if item:IsA("Tool") then
-				table.insert(tools, item)
-			end
-		end
-	end
-	if character then
-		local equipped = character:FindFirstChildOfClass("Tool")
-		if equipped then
-			table.insert(tools, equipped)
-		end
-	end
-	return tools
 end
 
 local function getBestOwnedWeightTool()
@@ -2635,7 +2640,7 @@ local function equipBestOwnedWeight()
 	if not equipped or equipped.Name ~= tool.Name then
 		if remotes.weightEquip then
 			safeCall("EquipBestWeightRemote", function()
-				remotes.weightEquip:FireServer(tool.Name)
+				fireRemote(remotes.weightEquip, tool.Name)
 			end)
 		end
 		if tool.Parent == LocalPlayer.Backpack then
@@ -2658,7 +2663,7 @@ local function buySpeedUpgrade()
 		if cost and coins >= cost then
 			local before = currentCoins()
 			safeCall("BuySpeedUpgrade", function()
-				remotes.speedUpgrade:FireServer(tier)
+				fireRemote(remotes.speedUpgrade, tier)
 			end)
 			task.wait(0.2)
 			if currentCoins() < before then
@@ -2697,14 +2702,14 @@ local function equipKickStyle(styleName)
 	runtime.nextKickStyleAttempt = tick() + 10
 	safeCall("KickStyleBuy", function()
 		if remotes.shopBuy then
-			remotes.shopBuy:FireServer("KickStyles", styleName)
+			fireRemote(remotes.shopBuy, "KickStyles", styleName)
 		end
 	end)
 	safeCall("KickStyleEquip", function()
 		if remotes.kickStyle then
-			remotes.kickStyle:FireServer(styleName)
+			fireRemote(remotes.kickStyle, styleName)
 		elseif remotes.shopBuy then
-			remotes.shopBuy:FireServer("KickStyle", styleName)
+			fireRemote(remotes.shopBuy, "KickStyle", styleName)
 		end
 	end)
 end
@@ -2959,6 +2964,7 @@ local diagnosticsGroup = createUiGroup(configTab, "Debug info", "rbxassetid://10
 local profileGroup = createUiGroup(configTab, "Save slots", "rbxassetid://10734950309", 1)
 configTab:BuildThemeGroupbox(2)
 Core.buildScriptStatusGroupbox(configTab, 1, "kick_a_lucky_block", VERSION)
+Core.buildHubActionsGroup(configTab, 2)
 local protectedDropdown
 local upgradeDropdown
 
@@ -4062,9 +4068,10 @@ serverGroup:CreateDivider()
 serverGroup:CreateInput(
 	"Server link or job id",
 	"paste invite link",
-	nil,
+	state.JoinJobId or "",
 	function(value)
 		state.JoinJobId = trim(value)
+		saveSettings()
 	end,
 	"Full roblox share link or raw job id both work."
 )
@@ -4096,11 +4103,13 @@ webhookGroup:CreateToggle(
 webhookGroup:CreateInput(
 	"Webhook link",
 	"paste discord webhook",
-	nil,
+	state.WebhookURL or "",
 	function(value)
 		local normalized, err = normalizeWebhookUrl(value)
 		if not normalized then
-			notify("Webhook", err, 4)
+			if trim(value) ~= "" then
+				notify("Webhook", err, 4)
+			end
 			return
 		end
 		state.WebhookURL = normalized
@@ -4700,44 +4709,80 @@ makeSupervisor("AutoPlaceBest", 1.5, function()
 	autoPlaceBest()
 end)
 
-makeSupervisor("Economy", 2, function()
+local function economyTick()
 	refreshRemotes()
+
 	if state.ABuySpeed and tick() >= (runtime.nextSpeedBuyAttempt or 0) then
-		if not buySpeedUpgrade() then
+		local ok, result = pcall(function()
+			return buySpeedUpgrade()
+		end)
+		if not ok then
+			logError("Economy:Speed", result)
+			runtime.nextSpeedBuyAttempt = tick() + 10
+		elseif not result then
 			runtime.nextSpeedBuyAttempt = tick() + 5
 		end
 	end
+
 	if state.ABuyBest then
-		buyBestWeight()
+		local ok, err = pcall(buyBestWeight)
+		if not ok then
+			logError("Economy:BuyBest", err)
+		end
 	elseif state.ABuyWeights and state.TTargetWeight ~= "None" then
-		equipWeight(state.TTargetWeight)
-	end
-	if state.ARebirth and remotes.rebirth and tick() >= (runtime.nextRebirthAttempt or 0) then
-		local requirement = rebirthCoinRequirement()
-		if currentCoins() >= requirement then
-			safeCall("AutoRebirth", function()
-				remotes.rebirth:FireServer()
-			end)
-			runtime.nextRebirthAttempt = tick() + 5
-		else
-			runtime.nextRebirthAttempt = tick() + 5
+		local ok, err = pcall(equipWeight, state.TTargetWeight)
+		if not ok then
+			logError("Economy:BuyWeight", err)
 		end
 	end
-	if state.APlotUpgrade and remotes.plotUpgrade and tick() >= (runtime.nextPlotUpgrade or 0) then
-		local before = currentCoins()
-		safeCall("AutoPlotUpgrade", function()
-			remotes.plotUpgrade:FireServer()
+
+	if state.ARebirth and remotes.rebirth and tick() >= (runtime.nextRebirthAttempt or 0) then
+		local ok, err = pcall(function()
+			local requirement = rebirthCoinRequirement()
+			if currentCoins() >= requirement then
+				safeCall("AutoRebirth", function()
+					fireRemote(remotes.rebirth)
+				end)
+			end
+			runtime.nextRebirthAttempt = tick() + 5
 		end)
-		task.wait(1)
-		if currentCoins() >= before then
+		if not ok then
+			logError("Economy:Rebirth", err)
+			runtime.nextRebirthAttempt = tick() + 10
+		end
+	end
+
+	if state.APlotUpgrade and remotes.plotUpgrade and tick() >= (runtime.nextPlotUpgrade or 0) then
+		local ok, err = pcall(function()
+			local before = currentCoins()
+			safeCall("AutoPlotUpgrade", function()
+				fireRemote(remotes.plotUpgrade)
+			end)
+			task.wait(1)
+			if currentCoins() >= before then
+				runtime.nextPlotUpgrade = tick() + 10
+			end
+		end)
+		if not ok then
+			logError("Economy:PlotUpgrade", err)
 			runtime.nextPlotUpgrade = tick() + 10
 		end
 	end
+
 	if state.AAutoKickStyle then
-		equipKickStyle(state.TargetKickStyle)
+		local ok, err = pcall(equipKickStyle, state.TargetKickStyle)
+		if not ok then
+			logError("Economy:KickStyle", err)
+		end
 	end
-	tryAutoSell()
-end)
+
+	local ok, err = pcall(tryAutoSell)
+	if not ok then
+		logError("Economy:AutoSell", err)
+	end
+end
+
+makeSupervisor("Economy", 2, economyTick)
 
 makeSupervisor("AutoUpgrade", 1.5, function()
 	if not state.AAutoUpgrade then

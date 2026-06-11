@@ -6,7 +6,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.2"
+local VERSION = "1.3"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {}
@@ -42,6 +42,12 @@ local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 
 local SETTINGS_FILE = "slime_rng.json"
+local SETTINGS_EXCLUDE = {
+	HubRunning = true,
+	PotionTracker = true,
+	LastTeleportedZone = true,
+	PreviousKnownMaxZone = true,
+}
 local defaults = {
 	HubRunning = true,
 	AutoBestArea = false,
@@ -79,58 +85,15 @@ local defaults = {
 	DisableMusic = false,
 	Freecam = false,
 	AntiAFK = true,
+	AutoFarmPreset = false,
 	LastTeleportedZone = nil,
 	PreviousKnownMaxZone = nil,
 }
 
-local savedKeys = {
-	"AutoBestArea",
-	"TargetZone",
-	"AutoRoll",
-	"AutoEquip",
-	"BestMode",
-	"AutoRebirth",
-	"RunSpeed",
-	"AutoClaimIndex",
-	"TargetIndexCategory",
-	"AutoCollectLoot",
-	"TargetLoot",
-	"AutoGun",
-	"ShootPriority",
-	"TargetType",
-	"AutoUpgradeTree",
-	"TargetTree",
-	"AutoUnlockMachine",
-	"AutoCollectRecipes",
-	"AutoCraft",
-	"TargetCraft",
-	"AutoFeedPet",
-	"FeedSlime",
-	"FeedFood",
-	"AutoPotion",
-	"TargetPotion",
-	"PotionMaxUses",
-	"AutoFruit",
-	"TargetSlimeFruit",
-	"TargetFruit",
-	"Noclip",
-	"FPSBoost",
-	"DisableMusic",
-	"Freecam",
-	"AntiAFK",
-}
+local savedKeys
+local saveSettings
 
-for key, value in pairs(defaults) do
-	if state[key] == nil then
-		state[key] = value
-	end
-end
-
-Core.loadSettings(state, savedKeys, SETTINGS_FILE)
-
-local function saveSettings()
-	Core.saveSettings(state, savedKeys, SETTINGS_FILE)
-end
+saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE, SETTINGS_EXCLUDE)
 
 local function resetSettings()
 	local env = getgenv and getgenv() or {}
@@ -144,12 +107,74 @@ local function resetSettings()
 	saveSettings()
 end
 
+local function normalizeMultiSelection(selection)
+	if Core and type(Core.normalizeMultiSelection) == "function" then
+		return Core.normalizeMultiSelection(selection)
+	end
+	if type(selection) == "string" then
+		return { selection }
+	end
+	if type(selection) ~= "table" then
+		return {}
+	end
+	local output = {}
+	local arrayLike = false
+	for key, value in pairs(selection) do
+		if type(key) == "number" then
+			arrayLike = true
+			if value ~= nil and value ~= false then
+				local text = type(value) == "string" and value or tostring(value)
+				if text ~= "" then
+					table.insert(output, text)
+				end
+			end
+		elseif value == true and type(key) == "string" then
+			table.insert(output, key)
+		end
+	end
+	if arrayLike then
+		table.sort(output)
+	end
+	return output
+end
+
+local function selectionFirst(selection, fallback)
+	if Core and type(Core.selectionFirst) == "function" then
+		return Core.selectionFirst(selection, fallback)
+	end
+	local items = normalizeMultiSelection(selection)
+	if items[1] and items[1] ~= "" then
+		return items[1]
+	end
+	return fallback or ""
+end
+
 local function listContains(list, value)
-	return Core.listContains(list, value)
+	if Core and type(Core.listContains) == "function" then
+		return Core.listContains(list, value)
+	end
+	return table.find(normalizeMultiSelection(list), value) ~= nil
 end
 
 local function listMatches(list, value)
-	return Core.listMatches(list, value)
+	if Core and type(Core.listMatches) == "function" then
+		return Core.listMatches(list, value)
+	end
+	local items = normalizeMultiSelection(list)
+	if #items == 0 then
+		return true
+	end
+	if listContains(items, "Any") or listContains(items, "All") or listContains(items, "any") then
+		return true
+	end
+	return listContains(items, value)
+end
+
+local function mutationDisplayName(baseName, mutations)
+	if Mutations and type(Mutations.getDisplayName) == "function" then
+		return Mutations.getDisplayName(baseName, mutations)
+	end
+	return baseName
 end
 
 local function getRemoteFunction(serviceName)
@@ -451,7 +476,7 @@ local function refreshSlimeNameList()
 		end
 		local slimeInfo = Slimes.getSlime and Slimes.getSlime(slimeData.id)
 		if slimeInfo and slimeInfo.name then
-			local displayName = Mutations.getDisplayName(slimeInfo.name, slimeData.mutations)
+			local displayName = mutationDisplayName(slimeInfo.name, slimeData.mutations)
 			if type(slimeValue) == "number" then
 				displayName = displayName .. " x" .. slimeValue
 			else
@@ -715,7 +740,7 @@ local function pickSlimeKey(targetList, inventory)
 		end
 		local slimeInfo = Slimes.getSlime and Slimes.getSlime(slimeData.id)
 		if slimeInfo and slimeInfo.name then
-			local displayName = Mutations.getDisplayName(slimeInfo.name, slimeData.mutations)
+			local displayName = mutationDisplayName(slimeInfo.name, slimeData.mutations)
 			if listContains(targetList, displayName) or listContains(targetList, sanitizeDisplayName(displayName)) then
 				return slimeKey
 			end
@@ -882,7 +907,7 @@ local function equipBestSlimes()
 	local ok, err = pcall(function()
 		local upgrades = dataClient:get("upgrades") or {}
 		local slotCount = inventoryUtilsCall("getOwnedSlotCount", upgrades, 0) or 1
-		local mode = Core.selectionFirst(state.BestMode, "Any")
+		local mode = selectionFirst(state.BestMode, "Any")
 		local ranked = {}
 		for slimeKey, slimeValue in pairs(inventory) do
 			local slimeData = inventoryUtilsCall("getSlimeData", slimeKey, slimeValue)
@@ -982,7 +1007,7 @@ local function usePotionIfAvailable()
 	if not inventoryRemote then
 		return
 	end
-	local selectedPotion = Core.selectionFirst(state.TargetPotion, "Any")
+	local selectedPotion = selectionFirst(state.TargetPotion, "Any")
 	local potionId
 	if selectedPotion == "Any" then
 		for name, id in pairs(potionNameToId) do
@@ -1020,7 +1045,7 @@ local function useFruitIfAvailable()
 	if not inventoryRemote then
 		return
 	end
-	local targetFruit = Core.selectionFirst(state.TargetFruit, "Any")
+	local targetFruit = selectionFirst(state.TargetFruit, "Any")
 	local fruitInfo = fruitUnlockInfo[targetFruit]
 	if targetFruit == "Any" then
 		for name, info in pairs(fruitUnlockInfo) do
@@ -1504,6 +1529,7 @@ local roll = Core.buildUiGroup(mainTab, "Rolling", 2, saveWrap, nil, "roll")
 local gun = Core.buildUiGroup(mainTab, "Combat", 1, saveWrap, nil, "gun")
 local tree = Core.buildUiGroup(autoTab, "Skill tree", 1, saveWrap, nil, "tree")
 local craft = Core.buildUiGroup(autoTab, "Crafting", 2, saveWrap, nil, "craft")
+local preset = Core.buildUiGroup(autoTab, "Preset", 2, saveWrap, nil, "preset")
 local loot = Core.buildUiGroup(autoTab, "Loot & index", 1, saveWrap, nil, "loot")
 local pet = Core.buildUiGroup(inventoryTab, "Feeding", 1, saveWrap, nil, "feed")
 local potion = Core.buildUiGroup(inventoryTab, "Potions", 2, saveWrap, nil, "potions")
@@ -1530,6 +1556,31 @@ end
 addMultiDropdown(zone, "TargetZone", "Zones to farm", zonesList, state.TargetZone, function(value)
 	state.TargetZone = value
 end)
+
+local function applyAutoFarmPreset(enabled)
+	if enabled then
+		state.AutoBestArea = true
+		state.TargetZone = { "Any" }
+		state.AutoRoll = true
+		state.AutoEquip = true
+		state.AutoRebirth = true
+		state.AutoCollectLoot = true
+		state.TargetLoot = { "Any" }
+		state.AutoGun = true
+		state.AutoUpgradeTree = true
+		state.AutoUnlockMachine = true
+		Core.notify("Alleral", "Auto farm preset enabled.", 3)
+	else
+		Core.notify("Alleral", "Auto farm preset disabled.", 3)
+	end
+	saveSettings()
+end
+
+preset:CreateToggle("Auto farm preset", state.AutoFarmPreset, "Zone farm, roll, equip, rebirth, loot, gun, and upgrades.", function(value)
+	state.AutoFarmPreset = value
+	applyAutoFarmPreset(value)
+end)
+
 zone:CreateToggle("Farm best zone", state.AutoBestArea, "Farms your best unlocked zone.", function(value)
 	state.AutoBestArea = value
 	if value then
@@ -1654,6 +1705,25 @@ config:CreateButton("Reset settings", function()
 	resetSettings()
 end)
 
+local liveStatus = config:CreateStatus("Live stats", {
+	Zone = "?",
+	Coins = "?",
+	Rolls = "?",
+	Equipped = "?",
+})
+
+Core.makeSupervisor(state, loops, loopControllers, "Stats", 2, function()
+	if not dataClient or type(dataClient.get) ~= "function" then
+		return
+	end
+	local zone = dataClient:get("maxZone") or dataClient:get("zone") or "?"
+	liveStatus:Update("Zone", tostring(zone))
+	liveStatus:Update("Coins", tostring(dataClient:get("coins") or 0))
+	liveStatus:Update("Rolls", tostring(dataClient:get("rollCurrency") or 0))
+	local equipped = dataClient:get("equipped") or {}
+	liveStatus:Update("Equipped", tostring(#equipped))
+end)
+
 performance:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Stops Roblox from kicking you while you farm.", function(value)
 	state.AntiAFK = value
 	if value then
@@ -1663,6 +1733,14 @@ end)
 
 settingsTab:BuildThemeGroupbox(1)
 Core.buildScriptStatusGroupbox(settingsTab, 1, "slime_rng", VERSION)
+Core.buildHubActionsGroup(settingsTab, 2)
+Core.buildConfigProfileGroup(settingsTab, {
+	state = state,
+	savedKeys = savedKeys,
+	saveFn = saveSettings,
+	version = VERSION,
+	column = 2,
+})
 
 state.Alleral_Unload = function()
 	Core.stopAutomation(state, connections, loopControllers, loops, function()

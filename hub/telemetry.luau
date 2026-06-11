@@ -449,7 +449,7 @@ function Telemetry:_context(extra)
 		gameId = loaderMeta.profile,
 		gameName = placeName,
 		scriptName = loaderMeta.profile,
-		scriptVersion = loaderMeta.scriptVersion,
+		scriptVersion = loaderMeta.scriptVersion or ENV.Alleral_ActiveScriptVersion,
 		placeId = srv.placeId,
 		universeId = srv.universeId,
 		jobId = srv.jobId,

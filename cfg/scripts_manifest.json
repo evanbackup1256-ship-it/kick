@@ -5,15 +5,15 @@
     "kick_a_lucky_block": {
       "name": "Kick a Lucky Block",
       "status": "working",
-      "version": "6.6",
-      "message": "WindUI with searchable dropdowns and live status panels.",
+      "version": "6.6.2",
+      "message": "Economy loop hardening: weight helpers + fireRemote for all shop remotes.",
       "updatedAt": "2026-06-10T00:00:00+00:00",
       "updatedBy": "system"
     },
     "speed_keyboard_escape": {
       "name": "Speed Keyboard Escape",
       "status": "working",
-      "version": "1.2",
+      "version": "1.3",
       "message": "",
       "updatedAt": "2026-06-10T00:00:00+00:00",
       "updatedBy": "system"
@@ -21,7 +21,7 @@
     "slime_rng": {
       "name": "Slime RNG",
       "status": "working",
-      "version": "1.2",
+      "version": "1.3",
       "message": "",
       "updatedAt": "2026-06-10T00:00:00+00:00",
       "updatedBy": "system"

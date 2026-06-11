@@ -90,26 +90,11 @@ local defaults = {
 	GodModeInterval = 0.25,
 }
 
-local savedKeys = {}
-for key in pairs(defaults) do
-	if key ~= "HubRunning" then
-		table.insert(savedKeys, key)
-	end
-end
-table.sort(savedKeys)
+local savedKeys
+local saveSettings
 
-for key, value in pairs(defaults) do
-	if state[key] == nil then
-		state[key] = value
-	end
-end
-
-Core.loadSettings(state, savedKeys, SETTINGS_FILE)
+saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE)
 state.SafeSpot = Core.normalizeDropdownValue(state.SafeSpot, "Classic")
-
-local function saveSettings()
-	Core.saveSettings(state, savedKeys, SETTINGS_FILE)
-end
 
 local function notify(title, text, duration)
 	Core.notify(title, text, duration)
@@ -790,6 +775,14 @@ end)
 
 settingsTab:BuildThemeGroupbox(1)
 Core.buildScriptStatusGroupbox(settingsTab, 1, "survive_a_zombie_arena", VERSION)
+Core.buildHubActionsGroup(settingsTab, 2)
+Core.buildConfigProfileGroup(settingsTab, {
+	state = state,
+	savedKeys = savedKeys,
+	saveFn = saveSettings,
+	version = VERSION,
+	column = 2,
+})
 
 notify("Alleral", "Survive a Zombie Arena v" .. VERSION .. " loaded.", 4)
 

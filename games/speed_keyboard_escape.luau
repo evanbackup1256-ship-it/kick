@@ -6,7 +6,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.2"
+local VERSION = "1.3"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {}
@@ -40,6 +40,16 @@ local TweenService = game:GetService("TweenService")
 local CollectionService = game:GetService("CollectionService")
 local LocalPlayer = Players.LocalPlayer
 
+local SETTINGS_FILE = "speed_keyboard_escape.json"
+local SETTINGS_EXCLUDE = {
+	HubRunning = true,
+	WallState = true,
+	WallDistance = true,
+	LavaState = true,
+	LavaDistance = true,
+	World2WallState = true,
+	World2LavaState = true,
+}
 local defaults = {
 	HubRunning = true,
 	AutoStepFarm = false,
@@ -64,12 +74,9 @@ local defaults = {
 	World2LavaState = "Unknown",
 }
 
-for key, value in pairs(defaults) do
-	if state[key] == nil then
-		state[key] = value
-	end
-end
-
+local saveSettings
+local savedKeys
+saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE, SETTINGS_EXCLUDE)
 _G.TweenSpeed = state.TweenSpeed
 
 local function notify(title, text, duration)
@@ -780,12 +787,14 @@ local shopTab = Core.buildUiTab(section, "Shop", 10734952479, 1, "shop")
 local miscTab = Core.buildUiTab(section, "Misc", 10734950020, 1, "misc")
 local settingsTab = Core.buildUiTab(section, "Settings", 10734950309, 1, "settings")
 
-local farm = Core.buildUiGroup(mainTab, "Farming", 1, nil, nil, "farm")
-local tween = Core.buildUiGroup(mainTab, "Movement", 2, nil, nil, "tween")
-local aura = Core.buildUiGroup(autoTab, "Auras", 1, nil, nil, "aura")
-local equip = Core.buildUiGroup(autoTab, "Gear", 2, nil, nil, "equip")
-local shop = Core.buildUiGroup(shopTab, "Shop", 1, nil, nil, "shop_items")
-local util = Core.buildUiGroup(miscTab, "Extras", 1, nil, nil, "utils")
+local saveWrap = Core.onUiSave(saveSettings)
+
+local farm = Core.buildUiGroup(mainTab, "Farming", 1, saveWrap, nil, "farm")
+local tween = Core.buildUiGroup(mainTab, "Movement", 2, saveWrap, nil, "tween")
+local aura = Core.buildUiGroup(autoTab, "Auras", 1, saveWrap, nil, "aura")
+local equip = Core.buildUiGroup(autoTab, "Gear", 2, saveWrap, nil, "equip")
+local shop = Core.buildUiGroup(shopTab, "Shop", 1, saveWrap, nil, "shop_items")
+local util = Core.buildUiGroup(miscTab, "Extras", 1, saveWrap, nil, "utils")
 
 local winTargetsW1 = { "Win 1", "Win 3", "Win 10", "Win 20", "Win 50", "Win 100", "Win 150", "Win 300", "Win 500", "Win 1000", "Win 2500" }
 local winTargetsW2 = { "Win 250k", "Win 400k", "Win 600k", "Win 1M", "Win 1.5M", "Win 2.5M" }
@@ -872,10 +881,61 @@ util:CreateToggle("Anti AFK", state.AntiAFK ~= false, "So you don't get kicked f
 	end
 end)
 
+local liveStatus = util:CreateStatus("Live stats", {
+	World = state.isWorld2 and "2" or "1",
+	Wins = "?",
+	Steps = "?",
+	Speed = "?",
+	Rebirths = "?",
+})
+
+Core.makeSupervisor(state, loops, loopControllers, "Stats", 1.5, function()
+	liveStatus:Update("World", state.isWorld2 and "2" or "1")
+	if not ClientState or type(ClientState.Get) ~= "function" then
+		return
+	end
+	local data = ClientState:Get()
+	if type(data) ~= "table" then
+		return
+	end
+	liveStatus:Update("Wins", tostring(data.Wins or 0))
+	liveStatus:Update("Steps", tostring(data.Steps or data.Step or "?"))
+	liveStatus:Update("Speed", tostring(data.Speed or data.WalkSpeed or "?"))
+	liveStatus:Update("Rebirths", tostring(data.Rebirths or data.Rebirth or 0))
+end)
+
+local config = Core.buildUiGroup(settingsTab, "Save / reset", 1, nil, nil, "config")
+config:CreateButton("Save now", saveSettings, "Write every toggle and slider to disk.")
+config:CreateButton("Reset settings", function()
+	local env = getgenv and getgenv() or {}
+	if type(env.delfile) == "function" then
+		pcall(env.delfile, "Alleral_Configs/" .. SETTINGS_FILE)
+	end
+	Core.mergeDefaults(state, defaults)
+	for key in pairs(SETTINGS_EXCLUDE) do
+		if key ~= "HubRunning" then
+			state[key] = defaults[key]
+		end
+	end
+	_G.TweenSpeed = state.TweenSpeed
+	saveSettings()
+	notify("Alleral", "Settings reset. Re-open the script to refresh the UI.", 5)
+end, "Clears saved config and restores defaults.")
+
 settingsTab:BuildThemeGroupbox(1)
 Core.buildScriptStatusGroupbox(settingsTab, 1, "speed_keyboard_escape", VERSION)
+Core.buildHubActionsGroup(settingsTab, 2)
+Core.buildConfigProfileGroup(settingsTab, {
+	state = state,
+	savedKeys = savedKeys,
+	saveFn = saveSettings,
+	version = VERSION,
+	column = 2,
+})
 
 notify("Alleral", "Loaded. Tabs on the left.")
+
+saveSettings()
 
 state.Alleral_Unload = function()
 	state.HubRunning = false

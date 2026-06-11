@@ -1,5 +1,5 @@
 local LOADER_VERSION = "7.4.0"
-local MIN_CORE = "2.3"
+local MIN_CORE = "2.5"
 local DEFAULT_UPDATE_POLL_SECONDS = 45
 local CORE_MIN_BYTES = 50000
 local HUB = "hub"
@@ -8,13 +8,14 @@ local UI = "ui"
 
 local RELEASE_FALLBACK = {
 	loader = "7.4.0",
-	core = "2.3",
+	core = "2.5",
 	ui = "WindUI",
 	analytics = "1.0",
 	telemetry = "3.0",
 	helpers = "1.0",
 	weao = "1.0",
 	security = "1.3",
+	access = "1.0",
 	commit = "",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
@@ -1211,6 +1212,31 @@ local function loadSecurityConfig()
 	return cfg
 end
 
+local function loadAccessConfig()
+	local cfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/access.json?t=" .. tick())))
+	if not cfg then
+		local localRaw = readLocal({ CFG .. "/access.json", "config/access.json" }, 20)
+		cfg = localRaw and decodeJson(localRaw) or nil
+	end
+	cfg = type(cfg) == "table" and cfg or { mode = "public", publicKey = "PUBLIC" }
+	ENV.Alleral_OwnerAccess = cfg
+	return cfg
+end
+
+local function grantPublicAccess()
+	local access = ENV.Alleral_Access
+	if type(access) ~= "table" or type(access.ensureAccess) ~= "function" then
+		getgenv().SCRIPT_KEY = "PUBLIC"
+		ENV.SCRIPT_KEY = "PUBLIC"
+		return true
+	end
+	local ok, mode = access.ensureAccess({ stage = "loader" })
+	if ok then
+		log("Access granted (" .. tostring(mode or "public") .. ")")
+	end
+	return ok ~= false
+end
+
 local function enforceSecurityGate(profile, stage)
 	local security = ENV.Alleral_Security
 	if type(security) ~= "table" or type(security.enforce) ~= "function" then
@@ -1261,6 +1287,8 @@ do
 			if bridge.Alleral_OwnerTelemetry then g.Alleral_OwnerTelemetry = bridge.Alleral_OwnerTelemetry end
 			if bridge.Alleral_OwnerSecurity then g.Alleral_OwnerSecurity = bridge.Alleral_OwnerSecurity end
 			if bridge.Alleral_Security then g.Alleral_Security = bridge.Alleral_Security end
+			if bridge.Alleral_Access then g.Alleral_Access = bridge.Alleral_Access end
+			if bridge.SCRIPT_KEY then g.SCRIPT_KEY = bridge.SCRIPT_KEY end
 			if bridge.Alleral_UI then g.Alleral_UI = bridge.Alleral_UI end
 			g.Alleral_State = g.Alleral_State or bridge.Alleral_State or {}
 			bridge.Alleral_State = g.Alleral_State
@@ -1285,6 +1313,10 @@ local function publishBridge()
 		shared.Alleral_OwnerTelemetry = ENV.Alleral_OwnerTelemetry
 		shared.Alleral_OwnerSecurity = ENV.Alleral_OwnerSecurity
 		shared.Alleral_Security = ENV.Alleral_Security
+		shared.Alleral_Access = ENV.Alleral_Access
+		if getgenv().SCRIPT_KEY then
+			shared.SCRIPT_KEY = getgenv().SCRIPT_KEY
+		end
 		shared.Alleral_State = ENV.Alleral_State or {}
 	end)
 end
@@ -1305,7 +1337,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "6.6",
+		version = "6.6.2",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
@@ -1330,7 +1362,7 @@ local GAMES = {
 	{
 		id = "speed_keyboard_escape",
 		name = "Speed Keyboard Escape",
-		version = "1.2",
+		version = "1.3",
 		placeIds = { 95082159892680 },
 		scriptFiles = { "games/speed_keyboard_escape.luau", "speed_keyboard_escape.luau" },
 		scriptUrl = "games/speed_keyboard_escape.luau",
@@ -1347,7 +1379,7 @@ local GAMES = {
 	{
 		id = "slime_rng",
 		name = "Slime RNG",
-		version = "1.2",
+		version = "1.3",
 		placeIds = { 92416421522960 },
 		universeIds = { 9792947201 },
 		scriptFiles = { "games/slime_rng.luau", "slime_rng.luau" },
@@ -1406,6 +1438,7 @@ local VERSION_PATTERNS = {
 	helpers = 'Helpers%.VERSION%s*=%s*"([%d%.]+)"',
 	weao = 'Weao%.VERSION%s*=%s*"([%d%.]+)"',
 	security = 'Security%.VERSION%s*=%s*"([%d%.]+)"',
+	access = 'Access%.VERSION%s*=%s*"([%d%.]+)"',
 	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
 	game = 'local VERSION%s*=%s*"([%d%.]+)"',
 }
@@ -1642,6 +1675,11 @@ local function buildManagedFiles()
 			extract = "security",
 		},
 		{
+			paths = { HUB .. "/access.luau", "core/access.luau" },
+			expectedKey = "access",
+			extract = "access",
+		},
+		{
 			paths = {
 				UI .. "/windui/main.lua",
 				"vendor/windui/main.lua",
@@ -1665,6 +1703,10 @@ local function buildManagedFiles()
 		},
 		{
 			paths = { CFG .. "/security.json", "config/security.json" },
+			purgeOnLoaderChange = true,
+		},
+		{
+			paths = { CFG .. "/access.json", "config/access.json" },
 			purgeOnLoaderChange = true,
 		},
 		{
@@ -1994,6 +2036,109 @@ local function recordInstalledVersions()
 	end
 end
 
+local TELEPORT_RELAUNCH_COOLDOWN = 8
+
+local function scheduleHubRelaunch(reason, delaySeconds)
+	if ENV.Alleral_AutoRelaunch == false then
+		return
+	end
+	delaySeconds = delaySeconds or 2
+	local now = tick()
+	if ENV._Alleral_RelaunchScheduledAt and (now - ENV._Alleral_RelaunchScheduledAt) < 1 then
+		return
+	end
+	if ENV._Alleral_LastLoadAt and (now - ENV._Alleral_LastLoadAt) < TELEPORT_RELAUNCH_COOLDOWN then
+		log(
+			"Skipping relaunch ("
+				.. tostring(reason)
+				.. ") — hub loaded "
+				.. string.format("%.1f", now - ENV._Alleral_LastLoadAt)
+				.. "s ago"
+		)
+		return
+	end
+	ENV._Alleral_RelaunchScheduledAt = now
+	task.delay(delaySeconds, function()
+		ENV._Alleral_RelaunchScheduledAt = nil
+		if type(ENV.Alleral_Reload) ~= "function" then
+			log("Relaunch unavailable after teleport — re-run the loader", true)
+			return
+		end
+		log("Teleport relaunch: " .. tostring(reason))
+		notify("Alleral", "Server changed — reloading hub...", 3)
+		ENV.Alleral_Reload()
+	end)
+end
+
+local function ensureAutoexecLoader()
+	if ENV.Alleral_AutoRelaunch == false then
+		return
+	end
+	if type(writeFileFn) ~= "function" then
+		log("Teleport auto-relaunch works best with writefile (autoexec stub skipped)", true)
+		return
+	end
+	installAutoexecRedirect()
+end
+
+local function wireTeleportRelaunch()
+	if ENV.Alleral_AutoRelaunch == nil then
+		ENV.Alleral_AutoRelaunch = true
+	end
+	if ENV._Alleral_TeleportWatchConnected then
+		return
+	end
+	ENV._Alleral_TeleportWatchConnected = true
+	ENV._Alleral_SessionWasActive = true
+	ENV._Alleral_LastPlaceId = game.PlaceId
+	ENV._Alleral_LastJobId = game.JobId
+
+	pcall(function()
+		local Players = game:GetService("Players")
+		local TeleportService = game:GetService("TeleportService")
+		local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+
+		LocalPlayer.OnTeleport:Connect(function(_teleportState, placeId)
+			ENV._Alleral_PendingRelaunch = true
+			ENV._Alleral_PendingPlaceId = placeId
+			ENV._Alleral_TeleportAt = tick()
+			log("Teleport detected — hub will reload when you arrive")
+		end)
+
+		LocalPlayer.CharacterAdded:Connect(function()
+			local teleAt = ENV._Alleral_TeleportAt
+			if type(teleAt) ~= "number" or (tick() - teleAt) > 45 then
+				return
+			end
+			ENV._Alleral_TeleportAt = nil
+			scheduleHubRelaunch("spawn-after-teleport", 2.5)
+		end)
+
+		pcall(function()
+			TeleportService.LocalPlayerArrivedFromTeleport:Connect(function()
+				ENV._Alleral_PendingRelaunch = nil
+				scheduleHubRelaunch("arrived-from-teleport", 3)
+			end)
+		end)
+	end)
+
+	task.spawn(function()
+		local lastJobId = game.JobId
+		while ENV._Alleral_SessionWasActive and ENV.Alleral_AutoRelaunch ~= false do
+			task.wait(2)
+			local currentJobId = game.JobId
+			if currentJobId ~= lastJobId then
+				lastJobId = currentJobId
+				ENV._Alleral_LastJobId = currentJobId
+				scheduleHubRelaunch("job-id-change", 2)
+			end
+		end
+	end)
+end
+
+ENV._Alleral_EnsureTeleportWatch = wireTeleportRelaunch
+ENV._Alleral_ScheduleRelaunch = scheduleHubRelaunch
+
 local function detectGame()
 	local placeId = game.PlaceId
 	local universeId = nil
@@ -2059,6 +2204,15 @@ local function main()
 
 	if type(PREVIOUS_LOADER_VERSION) == "string" and versionLt(PREVIOUS_LOADER_VERSION, LOADER_VERSION) then
 		log("Upgrading from loader v" .. PREVIOUS_LOADER_VERSION .. " — purging stale workspace cache")
+	end
+
+	if ENV._Alleral_PendingRelaunch then
+		log("Continuing session after teleport")
+		ENV._Alleral_PendingRelaunch = nil
+	end
+
+	if ENV.Alleral_AutoRelaunch == nil then
+		ENV.Alleral_AutoRelaunch = true
 	end
 
 	purgeOutdatedWorkspace()
@@ -2149,12 +2303,38 @@ local function main()
 		return
 	end
 
+	ENV.Alleral_ActiveScriptId = profile.id
+	if ENV.Alleral_Core and type(ENV.Alleral_Core.evaluateScriptStatus) == "function" then
+		if type(ENV.Alleral_Core.fetchScriptManifest) == "function" then
+			pcall(ENV.Alleral_Core.fetchScriptManifest)
+		end
+		local evaluation = ENV.Alleral_Core.evaluateScriptStatus(profile.id, profile.version)
+		if not evaluation.allowed then
+			local status = evaluation.status
+			local msg = status.label
+			if status.message ~= "" then
+				msg = msg .. " — " .. status.message
+			end
+			msg = msg .. ". Set getgenv().Alleral_ForceLoad = true and reload to bypass."
+			notify("Alleral", status.icon .. " " .. msg, 12)
+			log(status.icon .. " " .. msg, true)
+			ENV.Alleral_LoaderRunning = false
+			return
+		end
+		if evaluation.warn and evaluation.status.message ~= "" then
+			notify("Alleral", evaluation.status.icon .. " " .. evaluation.status.message, 6)
+		end
+	end
+
 	loadTelemetryConfig()
 	loadSecurityConfig()
+	loadAccessConfig()
 	loadModule({ HUB .. "/analytics.luau", "core/analytics.luau" }, HUB .. "/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
 	loadModule({ HUB .. "/helpers.luau", "core/game_helpers.luau" }, HUB .. "/helpers.luau", "GameHelpers", "Alleral/helpers")
 	loadModule({ HUB .. "/telemetry.luau", "core/telemetry.luau" }, HUB .. "/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
 	loadModule({ HUB .. "/security.luau", "core/security.luau" }, HUB .. "/security.luau", "Alleral_Security", "Alleral/security")
+	loadModule({ HUB .. "/access.luau", "core/access.luau" }, HUB .. "/access.luau", "Alleral_Access", "Alleral/access")
+	grantPublicAccess()
 
 	if not enforceSecurityGate(profile, "pre_inject") then
 		ENV.Alleral_LoaderRunning = false
@@ -2185,7 +2365,12 @@ local function main()
 
 	log("Loading " .. profile.name .. " v" .. profile.version .. " from " .. label)
 	ENV.Alleral_Boot = LOADER_VERSION
-	ENV.Alleral_LoaderMeta = { version = LOADER_VERSION, profile = profile.id, source = label }
+	ENV.Alleral_LoaderMeta = {
+		version = LOADER_VERSION,
+		profile = profile.id,
+		source = label,
+		scriptVersion = profile.version,
+	}
 	publishBridge()
 	src = ENV_BRIDGE .. "\n" .. src
 
@@ -2216,8 +2401,11 @@ local function main()
 	recordInstalledVersions()
 	checkForRemoteUpdate(profile, true)
 	startAutoUpdater(profile)
+	ENV._Alleral_LastLoadAt = tick()
+	ensureAutoexecLoader()
+	wireTeleportRelaunch()
 	notify("Alleral", profile.name .. " loaded.", 4)
-	log("Ready")
+	log("Ready — auto-relaunch on teleport enabled")
 end
 
 ENV.Alleral_Reload = function()
