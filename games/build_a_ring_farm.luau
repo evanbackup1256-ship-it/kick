@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.2.1"
+local VERSION = "1.3.0"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -1827,9 +1827,10 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoOptimizePets", 10, funct
 	end
 end)
 
-local window = Core.buildUiWindow(ui, {
+local window = Core.buildUiWindow(ui, Core.gameUiSettings({
 	Subtitle = "Build A Ring Farm · v" .. VERSION,
-})
+	Icon = "leaf",
+}))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"
 	Core.logWarn("UI window failed — aborting")
@@ -1953,16 +1954,13 @@ Core.buildConfigProfileGroup(settingsTab, {
 	version = VERSION,
 	column = 2,
 })
-Core.buildStandardSettingsExtras(settingsTab, {
-	state = state,
-	savedKeys = savedKeys,
-	saveFn = saveSettings,
-	settingsFile = SETTINGS_FILE,
-	version = VERSION,
-	window = window,
-})
+Core.buildStandardSettingsExtras(settingsTab, Core.settingsExtrasOptions(window, ui, state, savedKeys, saveSettings, SETTINGS_FILE, VERSION, {
+	gameId = "build_a_ring_farm",
+}))
 
-	notify("Alleral", "loaded", 4, "success")
+Core.finalizeGameUi(window, ui, {
+	Subtitle = "Build A Ring Farm · v" .. VERSION,
+})
 
 state.Alleral_Unload = function()
 	state.HubRunning = false

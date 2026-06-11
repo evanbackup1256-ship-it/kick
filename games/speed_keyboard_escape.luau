@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.3.1"
+local VERSION = "1.4.0"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -765,9 +765,15 @@ Core.makeSupervisor(state, loops, loopControllers, "autoRebirth", 0.5, function(
 	end
 end)
 
-local window = Core.buildUiWindow(ui, {
+local window = Core.buildUiWindow(ui, Core.gameUiSettings({
 	Subtitle = "Speed Keyboard Escape · v" .. VERSION,
-})
+	Icon = "keyboard",
+}))
+if not window or not window._rawWindow then
+	getgenv().Alleral_StartupFailed = "UI window failed"
+	Core.logWarn("UI window failed — aborting")
+	return
+end
 local section = Core.buildUiSection(window)
 local mainTab = Core.buildUiTab(section, "Main", 10723407389, 2, "main")
 local autoTab = Core.buildUiTab(section, "Auto", 10734923214, 2, "auto")
@@ -918,16 +924,13 @@ Core.buildConfigProfileGroup(settingsTab, {
 	version = VERSION,
 	column = 2,
 })
-Core.buildStandardSettingsExtras(settingsTab, {
-	state = state,
-	savedKeys = savedKeys,
-	saveFn = saveSettings,
-	settingsFile = SETTINGS_FILE,
-	version = VERSION,
-	window = window,
-})
+Core.buildStandardSettingsExtras(settingsTab, Core.settingsExtrasOptions(window, ui, state, savedKeys, saveSettings, SETTINGS_FILE, VERSION, {
+	gameId = "speed_keyboard_escape",
+}))
 
-notify("Alleral", "v" .. VERSION .. " ready", 4, "success")
+Core.finalizeGameUi(window, ui, {
+	Subtitle = "Speed Keyboard Escape · v" .. VERSION,
+})
 
 saveSettings()
 

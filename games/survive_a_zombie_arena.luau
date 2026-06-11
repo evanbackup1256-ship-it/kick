@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "2.1"
+local VERSION = "2.2.0"
 local state = getgenv().Alleral_State
 local G = (Core and Core.Game) or getgenv().Alleral_GameHelpers or {}
 local connections = {}
@@ -618,9 +618,15 @@ track(LocalPlayer.CharacterAdded:Connect(function(character)
 	end
 end))
 
-local window = Core.buildUiWindow(ui, {
+local window = Core.buildUiWindow(ui, Core.gameUiSettings({
 	Subtitle = "Survive a Zombie Arena · v" .. VERSION,
-})
+	Icon = "skull",
+}))
+if not window or not window._rawWindow then
+	getgenv().Alleral_StartupFailed = "UI window failed"
+	Core.logWarn("UI window failed — aborting")
+	return
+end
 local section = Core.buildUiSection(window)
 local farmTab = Core.buildUiTab(section, "Farm", 10734923214, 2, "farm")
 local combatTab = Core.buildUiTab(section, "Combat", 10723407389, 2, "combat")
@@ -769,16 +775,13 @@ Core.buildConfigProfileGroup(settingsTab, {
 	version = VERSION,
 	column = 2,
 })
-Core.buildStandardSettingsExtras(settingsTab, {
-	state = state,
-	savedKeys = savedKeys,
-	saveFn = saveSettings,
-	settingsFile = SETTINGS_FILE,
-	version = VERSION,
-	window = window,
-})
+Core.buildStandardSettingsExtras(settingsTab, Core.settingsExtrasOptions(window, ui, state, savedKeys, saveSettings, SETTINGS_FILE, VERSION, {
+	gameId = "survive_a_zombie_arena",
+}))
 
-notify("Alleral", "v" .. VERSION .. " ready", 4, "success")
+Core.finalizeGameUi(window, ui, {
+	Subtitle = "Survive a Zombie Arena · v" .. VERSION,
+})
 
 state.Alleral_Unload = function()
 	state.HubRunning = false

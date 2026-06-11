@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "6.8.0"
+local VERSION = "6.9.0"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -3122,13 +3122,15 @@ local function loggedCallback(label, callback)
 	end
 end
 
-local uiWindow = Core.buildUiWindow(ui, {
+local uiWindow = Core.buildUiWindow(ui, Core.gameUiSettings({
 	Subtitle = "Kick a Lucky Block · v" .. VERSION,
-	FileSettings = {
-		RootFolder = "Alleral_Configs",
-		ConfigFolder = "Interface",
-	},
-})
+	Icon = "zap",
+}))
+if not uiWindow or not uiWindow._rawWindow then
+	getgenv().Alleral_StartupFailed = "UI window failed"
+	Core.logWarn("UI window failed — aborting")
+	return
+end
 local uiSection = Core.buildUiSection(uiWindow)
 
 local function createUiTab(name, icon)
@@ -3204,20 +3206,13 @@ local tuningGroup = createUiGroup(configTab, "Speed tweaks", "rbxassetid://10734
 local diagnosticsGroup = createUiGroup(configTab, "Debug info", "rbxassetid://10734950309", 2)
 local profileGroup = createUiGroup(configTab, "Save slots", "rbxassetid://10734950309", 1)
 configTab:BuildThemeGroupbox(2)
-Core.buildStandardSettingsExtras(configTab, {
-	state = state,
-	savedKeys = savedKeys,
-	saveFn = saveSettings,
-	settingsPath = settingsFile,
-	settingsFile = "KickBlox_v4_" .. tostring(LocalPlayer.UserId) .. ".json",
-	version = VERSION,
-	window = uiWindow,
+Core.buildStandardSettingsExtras(configTab, Core.settingsExtrasOptions(uiWindow, ui, state, savedKeys, saveSettings, settingsFile, VERSION, {
 	scriptId = "kick_a_lucky_block",
 	onApply = function()
 		syncTrackerConfig()
 		rebuildUpgradeBase()
 	end,
-})
+}))
 local protectedDropdown
 local upgradeDropdown
 
@@ -5538,7 +5533,9 @@ if state.AAutoFav then
 	scanTools()
 end
 
-notify("Alleral", "v" .. VERSION .. " loaded", 4, "success")
+Core.finalizeGameUi(uiWindow, ui, {
+	Subtitle = "Kick a Lucky Block · v" .. VERSION,
+})
 end
 
 startRuntime()

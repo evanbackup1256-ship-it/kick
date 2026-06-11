@@ -241,6 +241,8 @@ function Core.installResilience()
 		"buildCloudConfigStudio",
 		"buildCloudConfigTab",
 		"repairUiWindow",
+		"finalizeGameUi",
+		"gameUiSettings",
 		"buildScriptStatusGroupbox",
 		"postWebhook",
 		"writeFile",
@@ -5175,6 +5177,64 @@ function Core.accessMode()
 	return "public"
 end
 
+function Core.gameUiSettings(options)
+	options = type(options) == "table" and options or {}
+	local fileSettings = type(options.FileSettings) == "table" and options.FileSettings or {}
+	return {
+		Name = options.Name or "Alleral",
+		Subtitle = options.Subtitle,
+		Icon = options.Icon or "sparkles",
+		FileSettings = {
+			RootFolder = fileSettings.RootFolder or "Alleral_Configs",
+			ConfigFolder = fileSettings.ConfigFolder or options.configFolder or "Interface",
+		},
+	}
+end
+
+function Core.settingsExtrasOptions(window, ui, state, savedKeys, saveFn, settingsFile, version, extra)
+	extra = type(extra) == "table" and extra or {}
+	return {
+		state = state,
+		savedKeys = savedKeys,
+		saveFn = saveFn,
+		settingsFile = settingsFile,
+		settingsPath = extra.settingsPath,
+		version = version,
+		window = window,
+		uiBundle = ui,
+		gameId = extra.gameId,
+		scriptId = extra.scriptId,
+		onApply = extra.onApply,
+		cloudOnlyTab = extra.cloudOnlyTab,
+		skipCloudConfig = extra.skipCloudConfig,
+		skipHubActions = extra.skipHubActions,
+		skipScriptStatus = extra.skipScriptStatus,
+	}
+end
+
+function Core.finalizeGameUi(window, ui, options)
+	options = type(options) == "table" and options or {}
+	if type(window) == "table" and window._rawWindow then
+		Core.registerUiWindow(window)
+		task.defer(function()
+			Core.repairUiWindow(window)
+			local windUi = ui and (ui.WindUI or ui.Library)
+			if type(ENV.Alleral_UiCustomization) == "table" and windUi and type(windUi.ImportCustomization) == "function" then
+				pcall(function()
+					windUi:ImportCustomization(ENV.Alleral_UiCustomization)
+				end)
+			end
+		end)
+	end
+	if options.notify ~= false then
+		Core.notifyBootReady({
+			Name = options.Name or "Alleral",
+			Subtitle = options.Subtitle,
+		})
+	end
+	return window
+end
+
 function Core.buildUiWindow(ui, settings)
 	settings = settings or {}
 	local lib = ui and (ui.WindUI or ui.Library)
@@ -5188,7 +5248,7 @@ function Core.buildUiWindow(ui, settings)
 		Title = settings.Name or "Alleral",
 		Author = settings.Subtitle or playerLabel,
 		Folder = (settings.FileSettings or {}).RootFolder or (settings.FileSettings or {}).ConfigFolder or "Alleral_Configs",
-		Icon = Core.windUiIcon(settings.Icon or "leaf"),
+		Icon = Core.windUiIcon(settings.Icon or "sparkles"),
 		Theme = "Arrrel",
 		NewElements = true,
 		HideSearchBar = false,
