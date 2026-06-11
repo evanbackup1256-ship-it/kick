@@ -1829,6 +1829,22 @@ function WindowBuilder.create(library, windowSettings)
 	Util.corner(10, main)
 	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, main)
 
+	local window = {
+		Settings = windowSettings,
+		TabSections = {},
+		CurrentTab = nil,
+		Instance = main,
+		Visible = false,
+	}
+
+	local function setVisible(state)
+		window.Visible = state
+		if main then
+			main.Visible = state
+		end
+		setBlur(state)
+	end
+
 	local sidebar = Util.new("Frame", {
 		Name = "Sidebar",
 		BackgroundTransparency = 1,
@@ -1856,12 +1872,6 @@ function WindowBuilder.create(library, windowSettings)
 	}, { windowControls })
 	Util.list(5, true, controls)
 	Util.padding(0, 0, 0, 11, controls)
-
-	local function setVisible(state)
-		window.Visible = state
-		main.Visible = state
-		setBlur(state)
-	end
 
 	trafficLight(controls, theme.Miscellaneous.TrafficClose, true, function()
 		setVisible(false)
@@ -2001,14 +2011,6 @@ function WindowBuilder.create(library, windowSettings)
 		Position = UDim2.new(0, 0, 0, 63),
 		Size = UDim2.new(1, 0, 1, -63),
 	}, { content })
-
-	local window = {
-		Settings = windowSettings,
-		TabSections = {},
-		CurrentTab = nil,
-		Instance = main,
-		Visible = false,
-	}
 
 	local dragging = false
 	local dragStart
@@ -2416,9 +2418,15 @@ function WindowBuilder.create(library, windowSettings)
 		return section
 	end
 
+	local toggleReady = false
+	task.defer(function()
+		task.wait(0.25)
+		toggleReady = true
+	end)
+
 	local keybind = library.WindowKeybind or "K"
 	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed then
+		if not toggleReady or processed then
 			return
 		end
 		if input.KeyCode == Enum.KeyCode[keybind] then

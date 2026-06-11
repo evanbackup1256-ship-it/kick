@@ -1,4 +1,4 @@
-local LOADER_VERSION = "3.5.1"
+local LOADER_VERSION = "3.5.2"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local SCRIPT_MANIFEST_URL = REPO_BASE .. "/config/scripts_manifest.json"
 local FETCH_RETRIES = 3
@@ -158,7 +158,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "6.5",
+		version = "6.6",
 		needsCore = true,
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
@@ -191,7 +191,7 @@ local GAMES = {
 	{
 		id = "speed_keyboard_escape",
 		name = "Speed Keyboard Escape",
-		version = "1.1",
+		version = "1.2",
 		needsCore = true,
 		placeIds = { 95082159892680 },
 		scriptFiles = {
@@ -214,7 +214,7 @@ local GAMES = {
 	{
 		id = "slime_rng",
 		name = "Slime RNG",
-		version = "1.1",
+		version = "1.2",
 		needsCore = true,
 		placeIds = { 92416421522960 },
 		universeIds = { 9792947201 },
@@ -238,7 +238,7 @@ local GAMES = {
 	{
 		id = "build_a_ring_farm",
 		name = "Build A Ring Farm",
-		version = "1.1",
+		version = "1.2",
 		needsCore = true,
 		placeIds = { 107646426076756 },
 		scriptFiles = {
@@ -264,7 +264,7 @@ local GAMES = {
 	{
 		id = "survive_a_zombie_arena",
 		name = "Survive a Zombie Arena",
-		version = "2.0",
+		version = "2.1",
 		needsCore = true,
 		placeIds = { 114204398207377 },
 		scriptFiles = {
