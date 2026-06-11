@@ -6,7 +6,7 @@ One loader — detects your game by PlaceId and runs the matching script.
 
 ## Load
 
-> **Stuck on an old version (e.g. v3.8.3)?** Your executor workspace has a stale `loader.luau`. Use the **remote** snippet below once — it always pulls the latest from GitHub. After v3.8.6+, local copies auto-upgrade on launch.
+> **Stuck on v3.8.6 or core fetch fails?** Re-run the **remote** snippet below (not `readfile`). v3.8.8 uses `Volt.request` directly for core downloads.
 
 **Local workspace** (full repo required — needs `core/` folder):
 
