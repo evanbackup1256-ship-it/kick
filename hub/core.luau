@@ -2258,13 +2258,15 @@ local function applyAlleralWindUiPatch(windUi)
 	for _, base in ipairs(WINDUI_MIRROR_URLS) do
 		local body = Core.httpGet(base .. WINDUI_PATCH_FILE)
 		if patchSourceValid(body) then
-			local chunk = loadStringFn(body, "@Alleral/aller:remote")
+			local chunk, compileErr = loadStringFn(body, "@Alleral/aller:remote")
 			if chunk then
 				local ok, patchFn = pcall(chunk)
 				if ok and type(patchFn) == "function" then
 					pcall(patchFn, windUi)
 					break
 				end
+			else
+				Core.logWarn("UI patch compile: " .. tostring(compileErr))
 			end
 		end
 	end
