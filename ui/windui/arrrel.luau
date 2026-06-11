@@ -1333,6 +1333,15 @@ return function(WindUI)
 				if main and main:IsA("GuiObject") and main.Size.Y.Offset < MAC.rowHeight then
 					main.Size = UDim2.new(main.Size.X.Scale, main.Size.X.Offset, 0, MAC.rowHeight)
 				end
+			elseif desc:IsA("GuiObject") and desc.Name == "SliderFrame" then
+				local main = desc:FindFirstChild("Main")
+				if main and main:IsA("GuiObject") then
+					local minHeight = 58
+					if main.Size.Y.Offset > 0 and main.Size.Y.Offset < minHeight then
+						main.Size = UDim2.new(1, 0, 0, minHeight)
+					end
+					main.AutomaticSize = Enum.AutomaticSize.Y
+				end
 			elseif desc:IsA("GuiObject") and (desc.Name == "Button" or desc.Name == "Slider" or desc.Name == "Dropdown") then
 				if desc.Size.Y.Offset > 0 and desc.Size.Y.Offset < MAC.rowHeight then
 					desc.Size = UDim2.new(desc.Size.X.Scale, desc.Size.X.Offset, 0, MAC.rowHeight)
@@ -2768,21 +2777,59 @@ return function(WindUI)
 		end
 	end
 
+	local function hasAncestorNamed(node, name)
+		while node do
+			if node.Name == name then
+				return true
+			end
+			node = node.Parent
+		end
+		return false
+	end
+
+	local function isSliderMain(gui)
+		return gui and gui:IsA("GuiObject") and gui.Name == "Main" and gui:FindFirstChild("SliderContainer") ~= nil
+	end
+
+	local function isToggleMain(gui)
+		if not gui or not gui:IsA("GuiObject") or gui.Name ~= "Main" then
+			return false
+		end
+		if gui:FindFirstChild("ToggleFrame", true) then
+			return true
+		end
+		return hasAncestorNamed(gui.Parent, "ToggleFrame")
+	end
+
+	local function ensureRowMainLayout(main, minHeight)
+		if not main or not main:IsA("GuiObject") then
+			return
+		end
+		main.Size = UDim2.new(1, 0, 0, 0)
+		main.AutomaticSize = Enum.AutomaticSize.Y
+		if main.AbsoluteSize.Y > 0 and main.AbsoluteSize.Y < minHeight then
+			main.Size = UDim2.new(1, 0, 0, minHeight)
+		elseif main.Size.Y.Offset > 0 and main.Size.Y.Offset < minHeight then
+			main.Size = UDim2.new(1, 0, 0, minHeight)
+		end
+	end
+
 	local function polishToggleRows(root)
 		if not root then
 			return
 		end
 		for _, desc in ipairs(root:GetDescendants()) do
-			if desc:IsA("GuiObject") and desc.Name == "Main" and desc:FindFirstChild("Container") then
-				desc.Size = UDim2.new(1, 0, 0, 0)
-				desc.AutomaticSize = Enum.AutomaticSize.Y
+			if isSliderMain(desc) then
+				ensureRowMainLayout(desc, 58)
+			elseif isToggleMain(desc) then
+				ensureRowMainLayout(desc, 40)
 			end
-			if desc:IsA("TextLabel") then
+			if desc:IsA("TextLabel") and not hasAncestorNamed(desc, "SliderFrame") then
 				local parentName = desc.Parent and desc.Parent.Name or ""
 				if desc.Name == "Title" or desc.Name == "Desc" or parentName == "TitleFrame" then
 					desc.TextWrapped = false
 					desc.TextTruncate = Enum.TextTruncate.None
-					if desc.TextXAlignment == Enum.TextXAlignment.Left then
+					if desc.TextXAlignment == Enum.TextXAlignment.Left and hasAncestorNamed(desc, "ToggleFrame") then
 						if desc.AutomaticSize == Enum.AutomaticSize.XY then
 							desc.AutomaticSize = Enum.AutomaticSize.Y
 						end

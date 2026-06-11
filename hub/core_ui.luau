@@ -1007,7 +1007,62 @@ function Core.createStubUiGroup(label)
 end
 
 local COLUMN_GAP = 12
+local TOGGLE_ROW_MIN_HEIGHT = 40
+local SLIDER_ROW_MIN_HEIGHT = 58
 Core._UiTabRegistry = Core._UiTabRegistry or {}
+
+local function hasAncestorNamed(node, name)
+	while node do
+		if node.Name == name then
+			return true
+		end
+		node = node.Parent
+	end
+	return false
+end
+
+local function isSliderMain(gui)
+	return gui and gui:IsA("GuiObject") and gui.Name == "Main" and gui:FindFirstChild("SliderContainer") ~= nil
+end
+
+local function isToggleMain(gui)
+	if not gui or not gui:IsA("GuiObject") or gui.Name ~= "Main" then
+		return false
+	end
+	if gui:FindFirstChild("ToggleFrame", true) then
+		return true
+	end
+	return hasAncestorNamed(gui.Parent, "ToggleFrame")
+end
+
+local function ensureRowMainLayout(main, minHeight)
+	if not main or not main:IsA("GuiObject") then
+		return
+	end
+	main.Size = UDim2.new(1, 0, 0, 0)
+	main.AutomaticSize = Enum.AutomaticSize.Y
+	if main.AbsoluteSize.Y > 0 and main.AbsoluteSize.Y < minHeight then
+		main.Size = UDim2.new(1, 0, 0, minHeight)
+	elseif main.Size.Y.Offset > 0 and main.Size.Y.Offset < minHeight then
+		main.Size = UDim2.new(1, 0, 0, minHeight)
+	end
+end
+
+local function refreshTabScrollCanvas(rawTab)
+	if not rawTab or not rawTab.UIElements then
+		return
+	end
+	local scroll = rawTab.UIElements.ContainerFrame
+	if not scroll or not scroll:IsA("ScrollingFrame") then
+		return
+	end
+	scroll.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
+	local columns = scroll:FindFirstChild("AlleralColumns")
+	if columns and columns:IsA("GuiObject") then
+		columns.Size = UDim2.new(1, 0, 0, 0)
+		columns.AutomaticSize = Enum.AutomaticSize.Y
+	end
+end
 
 local function measureTabContentWidth(rawTab, window)
 	if rawTab and rawTab.UIElements and rawTab.UIElements.ContainerFrame then
@@ -1049,16 +1104,17 @@ local function fixElementRowLayout(root)
 		return
 	end
 	for _, desc in ipairs(root:GetDescendants()) do
-		if desc:IsA("GuiObject") and desc.Name == "Main" and desc:FindFirstChild("Container") then
-			desc.Size = UDim2.new(1, 0, 0, 0)
-			desc.AutomaticSize = Enum.AutomaticSize.Y
+		if isSliderMain(desc) then
+			ensureRowMainLayout(desc, SLIDER_ROW_MIN_HEIGHT)
+		elseif isToggleMain(desc) then
+			ensureRowMainLayout(desc, TOGGLE_ROW_MIN_HEIGHT)
 		end
-		if desc:IsA("TextLabel") then
+		if desc:IsA("TextLabel") and not hasAncestorNamed(desc, "SliderFrame") then
 			local parentName = desc.Parent and desc.Parent.Name or ""
 			if desc.Name == "Title" or desc.Name == "Desc" or parentName == "TitleFrame" then
 				desc.TextWrapped = false
 				desc.TextTruncate = Enum.TextTruncate.None
-				if desc.TextXAlignment == Enum.TextXAlignment.Left then
+				if desc.TextXAlignment == Enum.TextXAlignment.Left and hasAncestorNamed(desc, "ToggleFrame") then
 					if desc.AutomaticSize == Enum.AutomaticSize.XY then
 						desc.AutomaticSize = Enum.AutomaticSize.Y
 					end
@@ -1118,6 +1174,7 @@ local function relayoutTwoColumnFrames(tab)
 	fixElementRowLayout(layout.left)
 	fixWrappedLabels(layout.right)
 	fixElementRowLayout(layout.right)
+	refreshTabScrollCanvas(tab._rawTab)
 	return true
 end
 
@@ -1147,7 +1204,8 @@ local function ensureTwoColumnLayout(tab, rawTab)
 
 	local rowList = Instance.new("UIListLayout")
 	rowList.FillDirection = Enum.FillDirection.Horizontal
-	rowList.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	rowList.HorizontalAlignment = Enum.HorizontalAlignment.Fill
+	rowList.VerticalAlignment = Enum.VerticalAlignment.Top
 	rowList.SortOrder = Enum.SortOrder.LayoutOrder
 	rowList.Padding = UDim.new(0, COLUMN_GAP)
 	rowList.Parent = row
@@ -1293,9 +1351,10 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 			return Core.createWindUiGroupbox({}, uiBundle)
 		end
 
+		local sectionFrame = rawGroup.ElementFrame
+
 		if tab._columnCount >= 2 then
 			local colFrame = getColumnFrame(tab, column)
-			local sectionFrame = rawGroup.ElementFrame
 			if colFrame and sectionFrame and sectionFrame:IsA("GuiObject") then
 				local layout = tab._layout
 				if column == 2 then
@@ -1316,11 +1375,15 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 
 		task.defer(function()
 			scheduleTwoColumnRelayout(tab)
-			fixElementRowLayout(sectionFrame)
+			if sectionFrame and sectionFrame.Parent then
+				fixWrappedLabels(sectionFrame)
+				fixElementRowLayout(sectionFrame)
+			end
 			if rawGroup.UIElements and rawGroup.UIElements.Main then
 				fixWrappedLabels(rawGroup.UIElements.Main)
 				fixElementRowLayout(rawGroup.UIElements.Main)
 			end
+			refreshTabScrollCanvas(rawTab)
 		end)
 		return Core.createWindUiGroupbox(rawGroup, uiBundle)
 	end
@@ -2294,7 +2357,7 @@ function Core.buildUiWindow(ui, settings)
 		UICorner = 12,
 		UIPadding = 24,
 		SideBarWidth = 260,
-		ElementPadding = 14,
+		ElementPadding = 16,
 		Resizable = true,
 		OpenButton = {
 			Title = "Alleral",
