@@ -1,5 +1,5 @@
-local LOADER_VERSION = "3.5.6"
-local REQUIRED_CORE_VERSION = "1.12"
+local LOADER_VERSION = "3.5.7"
+local REQUIRED_CORE_VERSION = "1.13"
 local REQUIRED_STARLIGHT_BUILD = "Alleral-4"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local SCRIPT_MANIFEST_URL = REPO_BASE .. "/config/scripts_manifest.json"
@@ -609,6 +609,7 @@ local function coreVersionOk(core)
 	return core
 		and type(core.loadStarlight) == "function"
 		and core.VERSION == REQUIRED_CORE_VERSION
+		and core.STARLIGHT_BUILD == REQUIRED_STARLIGHT_BUILD
 end
 
 local function preloadCore(required)
@@ -618,7 +619,12 @@ local function preloadCore(required)
 	end
 	ENV.Alleral_Core = nil
 	ENV.Alleral_Starlight = nil
-	local source, sourceLabel = resolveFromFiles(SHARED_CORE_FILES, "core", SHARED_CORE_URL, "Alleral_Core")
+	local source, sourceLabel = resolveFromFiles(
+		SHARED_CORE_FILES,
+		"core",
+		SHARED_CORE_URL,
+		'Core.STARLIGHT_BUILD = "Alleral-4"'
+	)
 	if not source then
 		if required then
 			return false, sourceLabel

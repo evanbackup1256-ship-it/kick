@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "1.12"
+Core.VERSION = "1.13"
 Core.STARLIGHT_BUILD = "Alleral-4"
 
 local HttpService = game:GetService("HttpService")
@@ -1082,7 +1082,8 @@ local function compileStarlightSource(source, label)
 	if source:find("Alleral Protected") or source:find("Nebula%-Softworks") then
 		return nil, "Refusing cached or third-party Starlight — need Alleral Source.lua"
 	end
-	if not source:find("Alleral%-3") and not source:find('InterfaceBuild%s*=%s*"Alleral%-3"') then
+	local buildMarker = Core.STARLIGHT_BUILD:gsub("-", "%%-")
+	if not source:find(buildMarker) and not source:find('InterfaceBuild%s*=%s*"' .. buildMarker .. '"') then
 		return nil, "Not an Alleral Starlight build (need " .. Core.STARLIGHT_BUILD .. ")"
 	end
 	local compiled, compileErr = loadStringFn(Core.patchStarlightSource(source), label)
@@ -1135,7 +1136,12 @@ function Core.loadStarlight()
 
 	local function fetchRemoteSource(url)
 		local sep = url:find("?") and "&" or "?"
-		local fetchUrl = url .. sep .. "nocache=" .. tostring(math.random(10000, 99999))
+		local fetchUrl = url
+			.. sep
+			.. "build="
+			.. Core.STARLIGHT_BUILD
+			.. "&nocache="
+			.. tostring(math.random(10000, 99999))
 		if type(game.HttpGet) == "function" then
 			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
 			if ok and body and body ~= "" and not body:find("404: Not Found") then
