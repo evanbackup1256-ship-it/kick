@@ -5290,16 +5290,11 @@ function Core.buildUiWindow(ui, settings)
 		Core.repairUiWindow(window)
 	end)
 	function window:AddTab(name, icon)
-		if not self._rawWindow or type(self._rawWindow.Section) ~= "function" then
+		if not self._rawWindow or type(self._rawWindow.Tab) ~= "function" then
 			Core.logWarn("AddTab skipped — window missing")
 			return nil
 		end
-		if not self._windSection then
-			self._windSection = self._rawWindow:Section({
-				Title = "Alleral",
-			})
-		end
-		return self._windSection:Tab({
+		return self._rawWindow:Tab({
 			Title = name,
 			Icon = Core.windUiIcon(icon),
 			Border = true,

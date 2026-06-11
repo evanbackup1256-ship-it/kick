@@ -3468,7 +3468,11 @@ return function(WindUI)
 			return elem
 		end
 
-		local function wrapSection(section)
+		local wrapTab
+		local wrapLayoutStack
+		local wrapSection
+
+		wrapSection = function(section)
 			if type(section) ~= "table" or section._AlleralSectionWrapped then
 				return section
 			end
@@ -3517,7 +3521,11 @@ return function(WindUI)
 			if type(section.Tab) == "function" then
 				local origTab = section.Tab
 				function section:Tab(opts)
-					return wrapTab(origTab(self, opts))
+					local tab = origTab(self, opts)
+					if type(wrapTab) == "function" then
+						return wrapTab(tab)
+					end
+					return tab
 				end
 			end
 
@@ -3531,9 +3539,7 @@ return function(WindUI)
 			return section
 		end
 
-		WindUI._ArrrelWrapSection = wrapSection
-
-		local function wrapLayoutStack(stack)
+		wrapLayoutStack = function(stack)
 			if type(stack) ~= "table" or stack._AlleralLayoutWrapped or type(stack.VStack) ~= "function" then
 				return stack
 			end
@@ -3552,7 +3558,7 @@ return function(WindUI)
 			return stack
 		end
 
-		local function wrapTab(tab)
+		wrapTab = function(tab)
 			if type(tab) ~= "table" or tab._AlleralTabWrapped then
 				return tab
 			end
@@ -3575,6 +3581,8 @@ return function(WindUI)
 			return tab
 		end
 
+		WindUI._ArrrelWrapSection = wrapSection
+
 		if type(window.Tab) == "function" then
 			local origTab = window.Tab
 			function window:Tab(opts)
@@ -3582,7 +3590,10 @@ return function(WindUI)
 				if tab then
 					applyTabGap(tab, resolveElementGap(window))
 				end
-				return wrapTab(tab)
+				if type(wrapTab) == "function" then
+					return wrapTab(tab)
+				end
+				return tab
 			end
 		end
 
@@ -4301,8 +4312,27 @@ return function(WindUI)
 	local function loadV2BoostLayer()
 		local readFn = readfile or (syn and syn.readfile) or (fluxus and fluxus.readfile)
 		local isFileFn = isfile or (syn and syn.isfile)
-		if type(readFn) ~= "function" or type(isFileFn) ~= "function" then
-			return false
+		local boostUrls = {
+			"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/v2/boost.luau",
+			"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/v2/boost.luau",
+		}
+		local function validBoostSource(body)
+			return type(body) == "string"
+				and #body > 400
+				and body:find("ALLERAL_UI_V2", 1, true) ~= nil
+				and body:find("return function", 1, true) ~= nil
+		end
+		local function fetchBoostRemote()
+			for _, url in ipairs(boostUrls) do
+				local bust = url .. (url:find("?", 1, true) and "&" or "?") .. "t=" .. tostring(tick())
+				local ok, body = pcall(function()
+					return game:HttpGet(bust)
+				end)
+				if ok and validBoostSource(body) then
+					return body
+				end
+			end
+			return nil
 		end
 		local roots = {
 			"ui/windui/v2/",
@@ -4312,15 +4342,20 @@ return function(WindUI)
 			"kick/kick/ui/windui/v2/",
 		}
 		local source
-		for _, root in ipairs(roots) do
-			local path = root .. "boost.luau"
-			if isFileFn(path) then
-				local ok, body = pcall(readFn, path)
-				if ok and type(body) == "string" and body:find("ALLERAL_UI_V2", 1, true) then
-					source = body
-					break
+		if type(readFn) == "function" and type(isFileFn) == "function" then
+			for _, root in ipairs(roots) do
+				local path = root .. "boost.luau"
+				if isFileFn(path) then
+					local ok, body = pcall(readFn, path)
+					if ok and validBoostSource(body) then
+						source = body
+						break
+					end
 				end
 			end
+		end
+		if not source then
+			source = fetchBoostRemote()
 		end
 		if not source then
 			uiWarn("v2", "boost.luau missing — V2 layer skipped")
