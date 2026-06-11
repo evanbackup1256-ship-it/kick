@@ -2,7 +2,7 @@
 	Alleral Hub — single entry point.
 	Detects game.PlaceId, loads core + matching games/*.luau script.
 ]]
-local LOADER_VERSION = "3.8.1"
+local LOADER_VERSION = "3.8.3"
 local REQUIRED_CORE_VERSION = "1.17"
 local REQUIRED_UI_LIBRARY = "Rayfield"
 local GITHUB_REPO = "evanbackup1256-ship-it/kick"
@@ -12,9 +12,13 @@ local JSDELIVR_BASE = "https://cdn.jsdelivr.net/gh/" .. GITHUB_REPO .. "@" .. RE
 local GITHUB_WEB_RAW = "https://github.com/" .. GITHUB_REPO .. "/raw/" .. REPO_BRANCH
 local SCRIPT_MANIFEST_PATH = "config/scripts_manifest.json"
 local SCRIPT_MANIFEST_URL = JSDELIVR_BASE .. "/" .. SCRIPT_MANIFEST_PATH
-local FETCH_RETRIES = 4
-local FETCH_BACKOFF = 0.5
+local FETCH_RETRIES = 2
+local FETCH_BACKOFF = 0.35
 local MIN_SCRIPT_BYTES = 1000
+local PINNED_COMMITS = {
+	"55d3f68",
+	"6a1b22c",
+}
 
 local SHARED_CORE_FILES = {
 	"core/alleral_core.luau",
@@ -506,8 +510,20 @@ local function telemetrySourceMarker()
 	return 'Telemetry.Version = "' .. TELEMETRY_MODULE_VERSION .. '"'
 end
 
+local function coreBodyValid(body)
+	if type(body) ~= "string" or #body < MIN_SCRIPT_BYTES then
+		return false
+	end
+	if not body:find("loadRayfield", 1, true) then
+		return false
+	end
+	local version = body:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
+		or body:match("Core%.VERSION%s*=%s*'([%d%.]+)'")
+	return version == REQUIRED_CORE_VERSION
+end
+
 local function coreSourceMarker()
-	return 'Core.VERSION = "' .. REQUIRED_CORE_VERSION .. '"'
+	return coreBodyValid
 end
 
 local function markerMatches(body, marker)
@@ -572,14 +588,30 @@ end
 local function buildMirrorUrls(relativePath)
 	relativePath = repoRelativePath(relativePath)
 	local urls = {}
+	local seen = {}
+	local function add(url)
+		if not seen[url] then
+			seen[url] = true
+			table.insert(urls, url)
+		end
+	end
+
+	add(REPO_BASE .. "/" .. relativePath)
+	add(GITHUB_WEB_RAW .. "/" .. relativePath)
+
 	local commit = ENV._Alleral_ReleaseCommit
 	if type(commit) == "string" and commit ~= "" and commit ~= "HEAD" then
-		table.insert(urls, "https://cdn.jsdelivr.net/gh/" .. GITHUB_REPO .. "@" .. commit .. "/" .. relativePath)
-		table.insert(urls, "https://raw.githubusercontent.com/" .. GITHUB_REPO .. "/" .. commit .. "/" .. relativePath)
+		add("https://raw.githubusercontent.com/" .. GITHUB_REPO .. "/" .. commit .. "/" .. relativePath)
+		add("https://cdn.jsdelivr.net/gh/" .. GITHUB_REPO .. "@" .. commit .. "/" .. relativePath)
 	end
-	table.insert(urls, REPO_BASE .. "/" .. relativePath)
-	table.insert(urls, JSDELIVR_BASE .. "/" .. relativePath)
-	table.insert(urls, GITHUB_WEB_RAW .. "/" .. relativePath)
+
+	for _, pinned in ipairs(PINNED_COMMITS) do
+		if pinned ~= commit then
+			add("https://raw.githubusercontent.com/" .. GITHUB_REPO .. "/" .. pinned .. "/" .. relativePath)
+		end
+	end
+
+	add(JSDELIVR_BASE .. "/" .. relativePath)
 	return urls
 end
 
@@ -705,6 +737,10 @@ local function ensureReleaseManifest(forceRefresh)
 			end
 		end
 	end
+	if not ENV._Alleral_ReleaseCommit and PINNED_COMMITS[1] then
+		ENV._Alleral_ReleaseCommit = PINNED_COMMITS[1]
+	end
+	ENV._Alleral_ReleaseLoaded = true
 end
 
 local function fetchRemoteMirrors(urls, label, marker)
@@ -757,29 +793,45 @@ local function resolveLocalMarked(files, marker)
 end
 
 local function resolveFromFiles(files, label, urlOrPath, marker)
-	local devMode = ENV.Alleral_DevMode == true
-	local preferLocal = devMode or ENV.Alleral_PreferLocal == true
-	if preferLocal then
+	if CAPABILITIES.readfile then
 		local localSource, localLabel = resolveLocalMarked(files, marker)
 		if localSource then
 			return localSource, localLabel
 		end
 	end
 
+	local devMode = ENV.Alleral_DevMode == true
+	local preferLocal = devMode or ENV.Alleral_PreferLocal == true
+	if preferLocal and CAPABILITIES.readfile then
+		for _, hit in ipairs(discoverLocalFiles(files)) do
+			if markerMatches(hit.source, marker) then
+				return hit.source, "discovered:" .. hit.path
+			end
+		end
+	end
+
 	ensureReleaseManifest(false)
 	local mirrors = buildMirrorUrls(urlOrPath)
-	local source, mirrorLabel = fetchRemoteMirrors(mirrors, label, marker)
+	local source, mirrorLabelName = fetchRemoteMirrors(mirrors, label, marker)
 	if source then
-		return source, mirrorLabel
+		return source, mirrorLabelName
 	end
 
-	local localSource, localLabel = resolveLocalMarked(files, marker)
-	if localSource then
-		log("info", label .. " loaded from " .. localLabel .. " (remote mirrors stale)")
-		return localSource, localLabel
+	if CAPABILITIES.readfile then
+		local localSource, localLabel = resolveLocalMarked(files, marker)
+		if localSource then
+			log("info", label .. " loaded from " .. localLabel .. " (remote mirrors stale)")
+			return localSource, localLabel
+		end
+		for _, hit in ipairs(discoverLocalFiles(files)) do
+			if markerMatches(hit.source, marker) then
+				log("info", label .. " loaded from discovered:" .. hit.path .. " (remote mirrors stale)")
+				return hit.source, "discovered:" .. hit.path
+			end
+		end
 	end
 
-	if devMode then
+	if devMode and CAPABILITIES.readfile then
 		for _, hit in ipairs(discoverLocalFiles(files)) do
 			return hit.source, "discovered:" .. hit.path
 		end
@@ -934,6 +986,87 @@ local function coreVersionOk(core)
 		and core.UI_LIBRARY == REQUIRED_UI_LIBRARY
 end
 
+local function tryDirectCoreLoad()
+	if coreVersionOk(ENV.Alleral_Core) then
+		return true
+	end
+	if not CAPABILITIES.http then
+		return false
+	end
+	local nonce = tick()
+	local directUrls = {
+		REPO_BASE .. "/" .. SHARED_CORE_PATH,
+		GITHUB_WEB_RAW .. "/" .. SHARED_CORE_PATH,
+	}
+	for _, url in ipairs(directUrls) do
+		local body = httpFetchBody(url .. "?direct=" .. nonce, nonce)
+		if body and coreBodyValid(body) then
+			local ok, err = compileAndRun(body, "Alleral/core-direct")
+			if ok and coreVersionOk(ENV.Alleral_Core) then
+				log("info", "Core loaded via direct fetch")
+				return true
+			end
+			ENV.Alleral_Core = nil
+			ENV.Alleral_Rayfield = nil
+			ENV.Alleral_UI = nil
+			log("warn", "Direct core fetch rejected: " .. tostring(err or "version mismatch"))
+		end
+	end
+	return false
+end
+
+local function tryRecoveryLoaderBootstrap()
+	if not CAPABILITIES.http then
+		return false
+	end
+	local nonce = tick()
+	local loaderUrls = {
+		REPO_BASE .. "/loader.luau",
+		GITHUB_WEB_RAW .. "/loader.luau",
+	}
+	for _, url in ipairs(loaderUrls) do
+		local body = httpFetchBody(url .. "?recover=" .. nonce, nonce)
+		if type(body) == "string" and #body > 8000 and body:find("Alleral Hub", 1, true) then
+			log("info", "Bootstrapping latest loader from GitHub...")
+			ENV.Alleral_LoaderRunning = false
+			local ok, err = compileAndRun(body, "Alleral/loader-recover")
+			if ok then
+				return true
+			end
+			log("warn", "Recovery loader failed: " .. tostring(err))
+		end
+	end
+	return false
+end
+
+local function runAutoRecovery()
+	if ENV._Alleral_AutoRecoveryAttempted then
+		return false
+	end
+	ENV._Alleral_AutoRecoveryAttempted = true
+	log("info", "Auto-recovering Alleral modules...")
+	ENV.Alleral_LoaderRunning = false
+	ENV._Alleral_ReleaseLoaded = nil
+	ENV.Alleral_Core = nil
+	ENV.Alleral_Rayfield = nil
+	ENV.Alleral_UI = nil
+
+	if tryDirectCoreLoad() then
+		ENV.Alleral_LoaderRunning = false
+		main()
+		return true
+	end
+
+	if tryRecoveryLoaderBootstrap() then
+		return true
+	end
+
+	safeWait(1)
+	ENV.Alleral_LoaderRunning = false
+	main()
+	return true
+end
+
 local function preloadCore(required)
 	local core = ENV.Alleral_Core
 	if coreVersionOk(core) then
@@ -942,6 +1075,10 @@ local function preloadCore(required)
 	ENV.Alleral_Core = nil
 	ENV.Alleral_Rayfield = nil
 	ENV.Alleral_UI = nil
+
+	if tryDirectCoreLoad() then
+		return true
+	end
 
 	for attempt = 1, 2 do
 		if attempt > 1 then
@@ -964,11 +1101,15 @@ local function preloadCore(required)
 				return true
 			end
 			ENV.Alleral_Core = nil
+			log("warn", "Core rejected from " .. tostring(sourceLabel) .. ": " .. tostring(err or "version mismatch"))
 			if required and attempt == 2 then
 				return false, err or "Core failed to initialize"
 			end
-		elseif required and attempt == 2 then
-			return false, sourceLabel
+		elseif required then
+			log("warn", "Core fetch failed: " .. tostring(sourceLabel))
+			if attempt == 2 then
+				return false, sourceLabel
+			end
 		end
 	end
 
@@ -1417,13 +1558,7 @@ local function main()
 
 	local coreOk, coreErr = preloadCore(true)
 	if not coreOk then
-		if not ENV._Alleral_AutoRecoveryAttempted then
-			ENV._Alleral_AutoRecoveryAttempted = true
-			log("info", "Auto-recovering Alleral modules...")
-			ENV.Alleral_LoaderRunning = false
-			ENV._Alleral_ReleaseLoaded = nil
-			safeWait(2.5)
-			main()
+		if runAutoRecovery() then
 			return
 		end
 		notify("Alleral", "Alleral could not start. Please rejoin and try again.", 8)
