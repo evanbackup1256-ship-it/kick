@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "1.19"
+Core.VERSION = "1.20"
 Core.UI_LIBRARY = "Rayfield"
 
 local HttpService = game:GetService("HttpService")
@@ -1059,9 +1059,11 @@ end
 
 local function fetchRayfieldSource()
 	for _, url in ipairs(RAYFIELD_MIRROR_URLS) do
-		local body = fetchRayfieldSourceFromUrl(url)
-		if rayfieldSourceValid(body) then
-			return body, url
+		if not url:find("jsdelivr", 1, true) then
+			local body = fetchRayfieldSourceFromUrl(url)
+			if rayfieldSourceValid(body) then
+				return body, url
+			end
 		end
 	end
 	return nil, nil
@@ -1093,7 +1095,9 @@ function Core.loadRayfield()
 			for _, path in ipairs(RAYFIELD_LOCAL_FILES) do
 				local fullPath = root .. path
 				local source = Core.readFile(fullPath)
-				if source then
+				if source and source:find("jsdelivr", 1, true) then
+					warn("[Alleral] Skipping jsDelivr-cached Rayfield at " .. fullPath)
+				elseif source then
 					local library, err = compileRayfieldSource(source, "@Rayfield/local:" .. fullPath)
 					if library then
 						warn("[Alleral] Rayfield loaded from " .. fullPath)

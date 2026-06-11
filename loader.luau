@@ -3,10 +3,10 @@
 	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "5.4.5"
+local LOADER_VERSION = "5.4.6"
 local MIN_CORE = "1.18"
 local RELEASE_FALLBACK = {
-	core = "1.19",
+	core = "1.20",
 	analytics = "1.0",
 	telemetry = "2.2",
 	helpers = "1.0",
@@ -700,7 +700,10 @@ local function getSource(localPaths, remotePath, opts)
 
 	local src, path = readLocal(localPaths, minBytes)
 	if src then
-		if marker and not src:find(marker, 1, true) then
+		if containsJsdelivr(src) then
+			log("Removing jsDelivr-cached " .. tostring(path), true)
+			deleteWorkspaceFile(path)
+		elseif marker and not src:find(marker, 1, true) then
 			log("Skipping outdated local " .. path, true)
 			deleteWorkspaceFile(path)
 		else
@@ -875,9 +878,6 @@ local function coreValid(src)
 end
 
 local function loadCore()
-	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadRayfield) == "function" and coreVersionOk(ENV.Alleral_Core.VERSION) then
-		return true
-	end
 	ENV.Alleral_Core = nil
 
 	local src, label = readLocal({ "core/alleral_core.luau", "alleral_core.luau" }, 5000)
@@ -1657,7 +1657,18 @@ local function main()
 		return
 	end
 
+	ENV.Alleral_Core = nil
+	ENV.Alleral_Rayfield = nil
+	ENV.Alleral_UI = nil
+	ENV.Alleral_Weao = nil
+	ENV.Alleral_StartupFailed = nil
+
+	if type(PREVIOUS_LOADER_VERSION) == "string" and PREVIOUS_LOADER_VERSION < LOADER_VERSION then
+		log("Upgrading from loader v" .. PREVIOUS_LOADER_VERSION .. " — purging stale workspace cache")
+	end
+
 	purgeJsdelivrCachedFiles()
+	purgeOutdatedWorkspace()
 
 	loadWeaoStack()
 
@@ -1697,12 +1708,6 @@ local function main()
 		notify("Alleral", "v3.x ran earlier. Check Saved Scripts tab and workspace loader.luau.", 15)
 	end
 
-	purgeOutdatedWorkspace()
-
-	ENV.Alleral_Core = nil
-	ENV.Alleral_Rayfield = nil
-	ENV.Alleral_UI = nil
-	ENV.Alleral_StartupFailed = nil
 	ENV.Alleral_ScriptManifestUrl = GITHUB_RAW .. "/config/scripts_manifest.json"
 
 	local profile, err = detectGame()
