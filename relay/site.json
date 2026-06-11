@@ -1,6 +1,6 @@
 {
     "version":  1,
-    "updatedAt":  "2026-06-11T03:57:19Z",
+    "updatedAt":  "2026-06-11T04:02:02Z",
     "brand":  "Alleral",
     "tagline":  "One loadstring. Every supported game. Live status.",
     "loaderVersion":  "7.4.0",
@@ -43,8 +43,8 @@
                           "title":  "HWID gate + public hub site",
                           "items":  [
                                         "Security gate on Railway",
-                                        "Public status page",
-                                        "Bug reports to Discord"
+                                        "Public status page on GitHub Pages",
+                                        "Bug reports to Discord via Railway"
                                     ]
                       },
                       {
@@ -109,7 +109,10 @@
                                              }
               },
     "links":  {
+                  "website":  "https://evanbackup1256-ship-it.github.io/kick/",
                   "github":  "https://github.com/evanbackup1256-ship-it/kick",
-                  "loaderRaw":  "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau"
+                  "loaderRaw":  "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau",
+                  "relay":  "https://alleral-telemetry-production.up.railway.app",
+                  "admin":  "https://alleral-telemetry-production.up.railway.app/admin"
               }
 }

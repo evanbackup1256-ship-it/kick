@@ -1107,6 +1107,21 @@ local function loadTelemetryConfig()
 		cfg,
 		loadReturnTable({ CFG .. "/owner_telemetry.luau", "config/owner_telemetry.luau" }, CFG .. "/owner_telemetry.luau")
 	)
+	if trim(cfg.apiKey or "") == "" and trim(cfg.relayUrl or "") ~= "" then
+		local base = cfg.relayUrl:gsub("/+$", ""):gsub("/ingest$", "")
+		local boot = decodeJson(select(1, httpFetch(base .. "/api/bootstrap?t=" .. tick())))
+		if type(boot) == "table" and boot.ok then
+			if trim(boot.apiKey or "") ~= "" then
+				cfg.apiKey = boot.apiKey
+			end
+			if trim(boot.relayUrl or "") ~= "" then
+				cfg.relayUrl = boot.relayUrl
+			end
+			if trim(boot.gateUrl or "") ~= "" then
+				cfg.gateUrl = boot.gateUrl
+			end
+		end
+	end
 	ENV.Alleral_OwnerTelemetry = cfg
 	return cfg
 end
@@ -1128,6 +1143,12 @@ local function loadSecurityConfig()
 			cfg.gateUrl = base .. "/gate/check"
 		end
 		if owner.gateUrl then
+			cfg.gateUrl = owner.gateUrl
+		end
+		if trim(cfg.apiKey) == "" and trim(owner.apiKey) ~= "" then
+			cfg.apiKey = owner.apiKey
+		end
+		if trim(cfg.gateUrl) == "" and trim(owner.gateUrl) ~= "" then
 			cfg.gateUrl = owner.gateUrl
 		end
 		if owner.security and type(owner.security) == "table" then

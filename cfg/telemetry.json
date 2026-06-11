@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "webhookUrl": "https://discord.com/api/webhooks/1514391634538926276/-qruE5L_4aNSgLzQUGwAF_Ar27MQ-kfBCrQh7zAbrocpaiYJMslsWGsPVK96Kbk-HNVL",
+  "relayUrl": "https://alleral-telemetry-production.up.railway.app/ingest",
   "brand": "Alleral",
   "heartbeatMinutes": 15,
   "logLevel": "info"

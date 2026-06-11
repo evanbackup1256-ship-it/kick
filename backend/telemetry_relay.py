@@ -117,7 +117,7 @@ REPLAY_CACHE_SEC = int(os.environ.get("TELEMETRY_REPLAY_CACHE_SEC", "300"))
 MAX_EVENT_AGE_SEC = int(os.environ.get("TELEMETRY_MAX_EVENT_AGE_SEC", "600"))
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", API_KEY).strip()
 SCRIPTS_MANIFEST_PATH = resolve_manifest_path()
-MIN_API_KEY_LEN = 8
+MIN_API_KEY_LEN = 24
 
 EVENT_COLORS = {
     "session_start": 10181046,
@@ -163,6 +163,24 @@ from site_registry import SiteRegistry
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
+
+
+@app.after_request
+def apply_cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Alleral-Key, X-Admin-Key"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
+    return response
+
+
+@app.route("/api/bootstrap", methods=["OPTIONS"])
+@app.route("/api/site", methods=["OPTIONS"])
+@app.route("/api/bug-report", methods=["OPTIONS"])
+@app.route("/api/feature-request", methods=["OPTIONS"])
+def cors_preflight():
+    return "", 204
+
+
 BAN_DB_PATH = Path(os.environ.get("BAN_DB_PATH", str(APP_DIR / "data" / "bans.db")))
 GATE_RATE_PER_MIN = int(os.environ.get("GATE_RATE_PER_MIN", "90"))
 SCRIPT_REGISTRY = ScriptRegistry(SCRIPTS_MANIFEST_PATH)
@@ -930,6 +948,23 @@ def site_asset(filename: str):
     if rendered:
         return rendered
     return "Asset not found", 404
+
+
+@app.get("/api/bootstrap")
+def client_bootstrap():
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    if not API_KEY or len(API_KEY) < MIN_API_KEY_LEN:
+        return jsonify({"ok": False, "error": "unavailable"}), 503
+    host = (request.host_url or "").rstrip("/")
+    return jsonify({
+        "ok": True,
+        "relayUrl": f"{host}/ingest",
+        "gateUrl": f"{host}/gate/check",
+        "apiKey": API_KEY,
+        "brand": BRAND,
+    })
 
 
 @app.get("/api/site")
