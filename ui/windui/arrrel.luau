@@ -99,7 +99,7 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ARRREL_UI_VERSION = "2.1.2-alleral-v2"
+	WindUI.ARRREL_UI_VERSION = "2.1.3-alleral-v2"
 	WindUI.ARRREL_BRAND = "Alleral"
 	WindUI.ALLERAL_UI_VERSION = WindUI.ARRREL_UI_VERSION
 	WindUI.ALLERAL_BRAND = "Alleral UI V2"
@@ -418,7 +418,7 @@ return function(WindUI)
 	end)()
 
 	if WindUI._AlleralSpringMotion == nil then
-		WindUI._AlleralSpringMotion = false
+		WindUI._AlleralSpringMotion = true
 	end
 
 	local sliderTrackFrames = setmetatable({}, { __mode = "k" })
@@ -448,25 +448,37 @@ return function(WindUI)
 			snapProps(instance, props)
 			return
 		end
-		local useSpring = WindUI._AlleralSpringMotion == true
+		if WindUI._AlleralSpringMotion == false then
+			local info = infoOrPreset
+			if type(info) == "string" then
+				info = TweenInfo.new(0.22, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+			end
+			pcall(function()
+				TweenService:Create(instance, info, props):Play()
+			end)
+			return
+		end
+		if sliderTrackFrames[instance] and props.Size then
+			local presetName = type(infoOrPreset) == "string" and infoOrPreset or nil
+			if presetName == "slider" or presetName == "instant" then
+				snapProps(instance, props)
+				return
+			end
+		end
 		local function run()
 			local ok = pcall(function()
-				if useSpring then
-					local preset = type(infoOrPreset) == "string" and infoOrPreset or Motion.tweenInfoToPreset(infoOrPreset)
-					Motion.target(instance, preset, props)
+				if type(infoOrPreset) == "string" and infoOrPreset == "instant" then
+					snapProps(instance, props)
 					return
 				end
-				local info = infoOrPreset
-				if type(info) == "string" then
-					info = TweenInfo.new(0.22, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-				end
-				TweenService:Create(instance, info, props):Play()
+				local preset = type(infoOrPreset) == "string" and infoOrPreset or Motion.tweenInfoToPreset(infoOrPreset)
+				Motion.target(instance, preset, props)
 			end)
 			if not ok then
 				snapProps(instance, props)
 			end
 		end
-		if useSpring and motionEnabled() and infoOrPreset ~= "instant" then
+		if motionEnabled() and infoOrPreset ~= "instant" then
 			local jitterMin = MOTION_JITTER.min or 0.004
 			local jitterMax = MOTION_JITTER.max or 0.014
 			local jitter = tonumber(instance:GetAttribute("AlleralMotionJitter"))
@@ -481,6 +493,63 @@ return function(WindUI)
 		end
 		run()
 	end
+
+	local function durationToPreset(duration)
+		if type(duration) ~= "number" then
+			return "snappy"
+		end
+		if duration <= 0.08 then
+			return "micro"
+		end
+		if duration <= 0.15 then
+			return "snappy"
+		end
+		if duration >= 0.4 then
+			return "soft"
+		end
+		return "human"
+	end
+
+	local function installCreatorTweenBridge()
+		local creator = WindUI.Creator
+		if type(creator) ~= "table" or creator._AlleralTweenBridged then
+			return false
+		end
+		local original = creator.Tween
+		if type(original) ~= "function" then
+			return false
+		end
+		creator._AlleralTweenBridged = true
+		function creator.Tween(instance, duration, props, ...)
+			if not instance or type(props) ~= "table" then
+				return stubTween(instance)
+			end
+			if WindUI._AlleralReducedMotion == true then
+				snapProps(instance, props)
+				return stubTween(instance)
+			end
+			if WindUI._AlleralSpringMotion == false then
+				local tw = original(instance, duration, props, ...)
+				if type(tw) == "table" then
+					return tw
+				end
+				return stubTween(instance)
+			end
+			if sliderTrackFrames[instance] and props.Size and type(duration) == "number" and duration <= 0.08 then
+				snapProps(instance, props)
+				return stubTween(instance)
+			end
+			if type(duration) == "number" and duration <= 0 then
+				snapProps(instance, props)
+				return stubTween(instance)
+			end
+			Motion.target(instance, durationToPreset(duration), props)
+			return stubTween(instance)
+		end
+		return true
+	end
+
+	installCreatorTweenBridge()
 
 	local AutoScaleLib = (function()
 		if type(WindUI._AlleralScaleApi) == "table" and type(WindUI._AlleralScaleApi.apply) == "function" then
@@ -3451,7 +3520,7 @@ return function(WindUI)
 		end
 
 		local function playElementReveal(root)
-			if WindUI._AlleralReducedMotion == true or WindUI._AlleralSpringMotion == false then
+			if WindUI._AlleralReducedMotion == true then
 				return
 			end
 			if not root or not root:IsA("GuiObject") then
@@ -3988,6 +4057,7 @@ return function(WindUI)
 		end
 
 		if window then
+			installCreatorTweenBridge()
 			WindUI.Window = window
 			window.AutoScale = window.AutoScale ~= false
 			wrapWindowElements(window)

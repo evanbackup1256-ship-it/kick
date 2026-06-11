@@ -33,7 +33,7 @@ return function(ctx)
 	WindUI.ALLERAL_V2_FEATURES = WindUI.ALLERAL_V2_FEATURES or {}
 
 	local V2 = WindUI.ALLERAL_V2_FEATURES
-	V2.version = "2.1.2-alleral-v2"
+	V2.version = "2.1.3-alleral-v2"
 
 	-- -------------------------------------------------------------------------
 	-- V2 customization state
@@ -542,6 +542,7 @@ return function(ctx)
 			WindUI._AlleralSpringMotion = false
 		else
 			WindUI._AlleralReducedMotion = false
+			WindUI._AlleralSpringMotion = true
 		end
 		if preset.startup == false and type(WindUI.SetStartupEffect) == "function" then
 			WindUI:SetStartupEffect(false)
