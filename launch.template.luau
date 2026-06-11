@@ -10,6 +10,7 @@ local GITHUB_WEB_RAW = "https://github.com/" .. GITHUB_REPO .. "/raw/" .. REPO_B
 local DEFAULT_TELEMETRY_RELAY = "https://alleral-telemetry-production.up.railway.app/ingest"
 local MIN_LOADER_PARTS = { 3, 7, 0 }
 local PINNED_COMMITS = {
+	"6a1b22c",
 	"fb2b2ae",
 	"16e04f6",
 	"c77a024",
