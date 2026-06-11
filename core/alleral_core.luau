@@ -1,5 +1,6 @@
 local Core = {}
-Core.VERSION = "1.9"
+Core.VERSION = "1.10"
+Core.STARLIGHT_BUILD = "Alleral-2"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -727,7 +728,7 @@ function Core.patchStarlightSource(source)
 	if not source or source == "" then
 		return source
 	end
-	if source:find("Alleral%-1") or source:find("Alleral Rewrite") then
+	if source:find("Alleral%-[12]") or source:find("Alleral Rewrite") then
 		return source
 	end
 	source = source:gsub(
@@ -763,8 +764,8 @@ local function compileStarlightSource(source, label)
 	if source:find("Alleral Protected") or source:find("Nebula%-Softworks") then
 		return nil, "Refusing cached or third-party Starlight — need Alleral Source.lua"
 	end
-	if not source:find("Alleral%-1") and not source:find('InterfaceBuild%s*=%s*"Alleral%-1"') then
-		return nil, "Not an Alleral Starlight build"
+	if not source:find("Alleral%-2") and not source:find('InterfaceBuild%s*=%s*"Alleral%-2"') then
+		return nil, "Not an Alleral Starlight build (need " .. Core.STARLIGHT_BUILD .. ")"
 	end
 	local compiled, compileErr = loadStringFn(Core.patchStarlightSource(source), label)
 	if not compiled then
@@ -772,7 +773,7 @@ local function compileStarlightSource(source, label)
 	end
 	local ok, result = pcall(compiled)
 	if ok and type(result) == "table" and type(result.CreateWindow) == "function" then
-		if result.InterfaceBuild ~= "Alleral-1" then
+		if result.InterfaceBuild ~= Core.STARLIGHT_BUILD then
 			return nil, "Refusing non-Alleral Starlight (" .. tostring(result.InterfaceBuild) .. ")"
 		end
 		return result
@@ -780,26 +781,38 @@ local function compileStarlightSource(source, label)
 	return nil, ok and "Invalid Starlight library" or tostring(result)
 end
 
+local function starlightBuildOk(library)
+	return type(library) == "table"
+		and type(library.CreateWindow) == "function"
+		and library.InterfaceBuild == Core.STARLIGHT_BUILD
+end
+
 function Core.loadStarlight()
-	if ENV.Alleral_Starlight and type(ENV.Alleral_Starlight.CreateWindow) == "function" then
+	if starlightBuildOk(ENV.Alleral_Starlight) then
 		return ENV.Alleral_Starlight
 	end
+	ENV.Alleral_Starlight = nil
 
 	local loadStringFn = Core.loadStringFn()
 	if not loadStringFn then
 		return nil, "loadstring unavailable"
 	end
 
-	for _, path in ipairs(STARLIGHT_LOCAL_FILES) do
-		local source = Core.readFile(path)
-		if source then
-			local starlight, err = compileStarlightSource(source, "@Starlight/local")
-			if starlight then
-				ENV.Alleral_Starlight = starlight
-				return starlight
+	local preferLocal = ENV.Alleral_DevMode == true or ENV.Alleral_PreferLocal == true
+
+	local function loadLocalStarlight()
+		for _, path in ipairs(STARLIGHT_LOCAL_FILES) do
+			local source = Core.readFile(path)
+			if source then
+				local starlight, err = compileStarlightSource(source, "@Starlight/local")
+				if starlight then
+					ENV.Alleral_Starlight = starlight
+					return starlight
+				end
+				warn("[Alleral] Local Starlight failed (" .. path .. "): " .. tostring(err))
 			end
-			warn("[Alleral] Local Starlight failed (" .. path .. "): " .. tostring(err))
 		end
+		return nil
 	end
 
 	local function fetchRemoteSource(url)
@@ -824,21 +837,46 @@ function Core.loadStarlight()
 		return nil
 	end
 
-	local lastErr = "HTTP unavailable and no local Starlight found"
-	for _, url in ipairs(STARLIGHT_REMOTE_URLS) do
-		local source = fetchRemoteSource(url)
-		if source then
-			local starlight, err = compileStarlightSource(source, "@Starlight/remote")
-			if starlight then
-				ENV.Alleral_Starlight = starlight
-				return starlight
+	local function loadRemoteStarlight()
+		local lastErr = "Starlight download failed"
+		for _, url in ipairs(STARLIGHT_REMOTE_URLS) do
+			local source = fetchRemoteSource(url)
+			if source then
+				local starlight, err = compileStarlightSource(source, "@Starlight/remote")
+				if starlight then
+					ENV.Alleral_Starlight = starlight
+					return starlight
+				end
+				lastErr = err or "Invalid Starlight library"
+			else
+				lastErr = "Starlight download failed: " .. url
 			end
-			lastErr = err or "Invalid Starlight library"
-		else
-			lastErr = "Starlight download failed: " .. url
+		end
+		return nil, lastErr
+	end
+
+	if preferLocal then
+		local localStarlight = loadLocalStarlight()
+		if localStarlight then
+			return localStarlight
 		end
 	end
-	return nil, lastErr
+
+	local remoteStarlight, remoteErr = loadRemoteStarlight()
+	if remoteStarlight then
+		return remoteStarlight
+	end
+
+	if not preferLocal then
+		return nil, remoteErr or "HTTP unavailable and no Alleral-2 Starlight found"
+	end
+
+	local localStarlight = loadLocalStarlight()
+	if localStarlight then
+		return localStarlight
+	end
+
+	return nil, remoteErr or "No Starlight source found"
 end
 
 function Core.ensureCore()

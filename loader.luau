@@ -1,4 +1,4 @@
-local LOADER_VERSION = "3.5.2"
+local LOADER_VERSION = "3.5.3"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local SCRIPT_MANIFEST_URL = REPO_BASE .. "/config/scripts_manifest.json"
 local FETCH_RETRIES = 3
@@ -589,7 +589,7 @@ end
 
 local function preloadCore(required)
 	local core = ENV.Alleral_Core
-	if core and type(core.loadStarlight) == "function" and (core.VERSION == "1.4" or core.VERSION == "1.5" or core.VERSION == "1.6" or core.VERSION == "1.7" or core.VERSION == "1.8" or core.VERSION == "1.9") then
+	if core and type(core.loadStarlight) == "function" and (core.VERSION == "1.4" or core.VERSION == "1.5" or core.VERSION == "1.6" or core.VERSION == "1.7" or core.VERSION == "1.8" or core.VERSION == "1.9" or core.VERSION == "1.10") then
 		return true
 	end
 	ENV.Alleral_Core = nil

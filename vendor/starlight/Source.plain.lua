@@ -2463,7 +2463,7 @@ local WindowBuilder = requireModule('window')
 local Util = requireModule('util')
 
 local Starlight = {
-	InterfaceBuild = "Alleral-1",
+	InterfaceBuild = "Alleral-2",
 	WindowKeybind = "K",
 	Minimized = false,
 	Maximized = false,
