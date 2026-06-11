@@ -20,7 +20,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 
 local RELEASE_FALLBACK = {
 	loader = "7.6.5",
-	core = "2.7.5",
+	core = "2.7.6",
 	ui = "Alleral",
 	analytics = "1.2",
 	telemetry = "3.2",

@@ -1294,14 +1294,14 @@ function Core.buildCustomizationStudioGroup(tab, options)
 		Core.notify("Alleral V2", "Layout: " .. tostring(selected), 2, "success")
 	end, "Device-aware spacing and scale presets.")
 
-	group:CreateDropdown("Motion feel", motionProfiles, windUi:GetMotionProfile and windUi:GetMotionProfile() or "fluid", function(selected)
+	group:CreateDropdown("Motion feel", motionProfiles, (type(windUi.GetMotionProfile) == "function" and windUi:GetMotionProfile()) or "fluid", function(selected)
 		if type(windUi.SetMotionProfile) == "function" then
 			windUi:SetMotionProfile(selected)
 		end
 		Core.notify("Alleral V2", "Motion: " .. tostring(selected), 2, "info")
 	end, "Spring personality for tabs, toggles, and panels.")
 
-	group:CreateSlider("Glass intensity", 0, 100, math.floor((windUi:GetGlassIntensity and windUi:GetGlassIntensity() or 0.55) * 100), function(value)
+	group:CreateSlider("Glass intensity", 0, 100, math.floor(((type(windUi.GetGlassIntensity) == "function" and windUi:GetGlassIntensity()) or 0.55) * 100), function(value)
 		if type(windUi.SetGlassIntensity) == "function" then
 			windUi:SetGlassIntensity(value / 100)
 		end
@@ -1314,13 +1314,13 @@ function Core.buildCustomizationStudioGroup(tab, options)
 		end
 	end, "Glow spread and section elevation.", 1)
 
-	group:CreateDropdown("Tooltip style", { "minimal", "card", "rich" }, windUi:GetTooltipStyle and windUi:GetTooltipStyle() or "rich", function(selected)
+	group:CreateDropdown("Tooltip style", { "minimal", "card", "rich" }, (type(windUi.GetTooltipStyle) == "function" and windUi:GetTooltipStyle()) or "rich", function(selected)
 		if type(windUi.SetTooltipStyle) == "function" then
 			windUi:SetTooltipStyle(selected)
 		end
 	end, "Hover hint presentation.")
 
-	group:CreateDropdown("Toast style", { "glass", "rail", "banner", "pill" }, windUi:GetNotificationStyle and windUi:GetNotificationStyle() or "glass", function(selected)
+	group:CreateDropdown("Toast style", { "glass", "rail", "banner", "pill" }, (type(windUi.GetNotificationStyle) == "function" and windUi:GetNotificationStyle()) or "glass", function(selected)
 		if type(windUi.SetNotificationStyle) == "function" then
 			windUi:SetNotificationStyle(selected)
 		end
