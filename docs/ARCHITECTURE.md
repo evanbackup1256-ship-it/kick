@@ -3,10 +3,10 @@
 ## Boot chain
 
 ```
-loader.luau (remote or readfile)
-    ├── detect executor (identifyexecutor + WEAO when available)
-    ├── detect game by PlaceId
-    ├── download core/alleral_core.luau (HttpGet → request → mirrors)
+loader.luau (CDN HttpGet — only entry point)
+    ├── purge legacy workspace files (v3.x launch/load/bootstrap/run)
+    ├── detect executor + game by PlaceId
+    ├── download core/alleral_core.luau
     ├── load analytics, helpers, telemetry
     ├── preload Rayfield
     └── run games/*.luau
@@ -16,32 +16,26 @@ loader.luau (remote or readfile)
 
 | File | Purpose |
 |------|---------|
-| `loader.luau` | Single entry — v5.2.2+ |
+| `loader.luau` | **Only** player entry — fetch from CDN |
 
-There is no `load.luau` rescue script. Load from GitHub or `readfile("loader.luau")`.
-
-## Core loading
-
-1. Try local `core/alleral_core.luau` if valid (v1.18+, compile check)
-2. Download from jsDelivr → GitHub raw
-3. `coreValid()` rejects broken cores (missing `AlleralGroupShell`, version < 1.18)
-4. Cache successful download to workspace via `writefile`
+There is no `load.luau`, `launch.luau`, `bootstrap.luau`, or `run.luau`. Those were removed in v5.x.
 
 ## Version sources
 
 | Component | Version | File |
 |-----------|---------|------|
-| Loader | 5.2.2 | `loader.luau`, `config/release.json` |
-| Core | 1.18 | `core/alleral_core.luau` |
+| Loader | 5.4.0 | `loader.luau`, `config/release.json` |
+| Core | 1.19 | `core/alleral_core.luau` |
 | Analytics | 1.0 | `core/analytics.luau` |
 | Telemetry | 2.2 | `core/telemetry.luau` |
 | Helpers | 1.0 | `core/game_helpers.luau` |
 | Game scripts | per-game | `games/*.luau`, `config/scripts_manifest.json` |
 
-Run `powershell tools/verify_versions.ps1` to check all versions match.
+Run `powershell tools/verify_versions.ps1` before pushing.
 
 ## Never do
 
-- Embed core in loader with `[=[` long strings (breaks Volt parser)
-- Commit output from `tools/bundle_core.ps1` (embedded core)
-- Keep old loader versions in workspace autoexec (v3.x conflicts with v5.x)
+- Add alternate entry scripts (`launch`, `load`, `bootstrap`, `run`)
+- Embed core or loader with `[=[` long strings (breaks Volt)
+- Commit embedded core/loader bundles (removed `tools/bundle_*.ps1`)
+- Ship v3.x loaders — loader purges them from executor workspace on run

@@ -20,7 +20,7 @@ $body = @{
     player = @{ name = "OfflineTest"; userId = 1; displayName = "Offline"; accountAge = 0 }
     context = @{
         executor = "powershell"
-        loaderVersion = "5.2.2"
+        loaderVersion = "5.4.0"
         gameName = "Offline Relay Test"
         scriptName = "test"
         scriptVersion = "1"

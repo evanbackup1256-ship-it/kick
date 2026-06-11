@@ -1,4 +1,4 @@
-# Verify loader, core, manifest, and game script versions stay in sync.
+# Verify loader, core, manifest, game scripts, and no legacy entry points.
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $failed = @()
@@ -61,16 +61,57 @@ foreach ($id in $gameFiles.Keys) {
     }
 }
 
-if (Test-Path (Join-Path $root "load.luau")) {
-    Fail "load.luau should not exist (removed in v5.x)"
+$forbiddenFiles = @(
+    "load.luau",
+    "launch.luau",
+    "bootstrap.luau",
+    "run.luau",
+    "entry_redirect.luau",
+    "launch.template.luau",
+    "tools/bundle_launch.ps1",
+    "tools/bundle_core.ps1"
+)
+
+foreach ($rel in $forbiddenFiles) {
+    if (Test-Path (Join-Path $root $rel)) {
+        Fail "forbidden legacy file exists: $rel"
+    }
 }
 
-if ($loader -match "EMBEDDED_CORE = \[=") {
-    Fail "loader.luau contains embedded core (breaks Volt)"
+$rootLuau = @(Get-ChildItem -Path $root -Filter "*.luau" -File | ForEach-Object { $_.Name })
+if ($rootLuau.Count -ne 1 -or $rootLuau[0] -ne "loader.luau") {
+    Fail "repo root must contain only loader.luau (found: $($rootLuau -join ', '))"
+} else {
+    Pass "single root entry loader.luau"
 }
+
+$legacyPatterns = @(
+    "EMBEDDED_CORE = \[=",
+    'LOADER_VERSION = "3\.',
+    'LOADER_VERSION = "4\.'
+)
+
+foreach ($pattern in $legacyPatterns) {
+    if ($loader -match $pattern) {
+        Fail "loader.luau contains legacy pattern: $pattern"
+    }
+}
+
+Get-ChildItem -Path $root -Recurse -Include *.luau,*.lua,*.ps1 -File |
+    Where-Object { ($_.FullName -notmatch '\\vendor\\') -and ($_.Name -ne 'loader.luau') -and ($_.Name -ne 'verify_versions.ps1') } |
+    ForEach-Object {
+        $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
+        if (-not $text) { return }
+        if ($text -match '\[Alleral Loader v3\.' -or $text -match 'LOADER_VERSION = "3\.') {
+            Fail "$($_.FullName.Replace($root + '\', '')) contains v3.x loader markers"
+        }
+        if ($text -match 'EMBEDDED_LOADER =') {
+            Fail "$($_.FullName.Replace($root + '\', '')) contains EMBEDDED_LOADER"
+        }
+    }
 
 if ($failed.Count -gt 0) {
-    Write-Host "`n$($failed.Count) version check(s) failed." -ForegroundColor Red
+    Write-Host "`n$($failed.Count) check(s) failed." -ForegroundColor Red
     exit 1
 }
 

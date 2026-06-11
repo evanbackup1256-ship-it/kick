@@ -1,9 +1,9 @@
 --[[
-	Alleral Hub — one script.
-	Detects game, fetches core + game script, runs.
+	Alleral Hub — single entry point (loader.luau only).
+	Fetch from CDN; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "5.3.2"
+local LOADER_VERSION = "5.4.0"
 local MIN_CORE = "1.18"
 local RELEASE_FALLBACK = {
 	core = "1.19",
@@ -276,7 +276,7 @@ local function requestVia(fn, url, headers)
 	return nil
 end
 
-local function bootstrapHttpGet(url, headers)
+local function httpFetch(url, headers)
 	headers = headers or {}
 	local bust = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(tick())
 
@@ -345,7 +345,7 @@ local function fetchWeaoExploits()
 	}
 
 	for _, apiUrl in ipairs(WEAO_API_URLS) do
-		local body, via = bootstrapHttpGet(apiUrl, headers)
+		local body, via = httpFetch(apiUrl, headers)
 		local decoded = decodeJson(body)
 		if decoded then
 			ENV.Alleral_WeaoCache = { fetchedAt = tick(), data = decoded, source = apiUrl }
@@ -688,7 +688,7 @@ local function httpGet(url, minBytes)
 		consider(transport.fetch(url .. "?t=" .. tick()), transport.id)
 	end
 
-	body, via = bootstrapHttpGet(url)
+	body, via = httpFetch(url)
 	consider(body, via)
 
 	if bestBody and #bestBody >= minBytes then
@@ -1089,7 +1089,7 @@ local function fetchExpectedVersions()
 		expected.games[gameProfile.id] = gameProfile.version
 	end
 
-	local release = decodeJson(select(1, bootstrapHttpGet(CDN .. "/config/release.json")))
+	local release = decodeJson(select(1, httpFetch(CDN .. "/config/release.json")))
 	if release then
 		expected.loader = release.loader or expected.loader
 		expected.core = release.core or expected.core
@@ -1098,7 +1098,7 @@ local function fetchExpectedVersions()
 		expected.helpers = release.helpers or expected.helpers
 	end
 
-	local manifest = decodeJson(select(1, bootstrapHttpGet(CDN .. "/config/scripts_manifest.json")))
+	local manifest = decodeJson(select(1, httpFetch(CDN .. "/config/scripts_manifest.json")))
 	if manifest and type(manifest.scripts) == "table" then
 		for id, entry in pairs(manifest.scripts) do
 			if type(entry) == "table" and type(entry.version) == "string" then

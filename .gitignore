@@ -15,3 +15,11 @@ owner_telemetry.luau
 
 # Local editor overrides
 .vscode/settings.json
+
+# Legacy entry points — removed in v5.x (loader.luau only)
+/load.luau
+/launch.luau
+/bootstrap.luau
+/run.luau
+/entry_redirect.luau
+/launch.template.luau
