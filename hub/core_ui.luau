@@ -2106,7 +2106,10 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 	end
 
 	function group:CreateDivider()
-		return groupbox:CreateDivider()
+		if type(groupbox.CreateDivider) == "function" then
+			return groupbox:CreateDivider()
+		end
+		return {}
 	end
 
 	return group
@@ -2381,18 +2384,43 @@ function Core.buildUiWindow(ui, settings)
 	return window
 end
 
+function Core.resolveUiWindow(section)
+	if type(section) ~= "table" then
+		return nil
+	end
+	local window = section._window or section
+	if type(window) == "table" and window._rawWindow then
+		return window
+	end
+	if type(section._rawWindow) == "table" then
+		if type(section._window) == "table" then
+			return section._window
+		end
+		return {
+			_rawWindow = section._rawWindow,
+			_ui = section._ui,
+			AddTab = section.AddTab,
+		}
+	end
+	return nil
+end
+
 function Core.buildUiSection(window)
+	if type(window) ~= "table" then
+		return { _window = window, _ui = nil, _rawWindow = nil }
+	end
 	return {
 		_window = window,
 		_ui = window._ui,
+		_rawWindow = window._rawWindow,
 	}
 end
 
 function Core.buildUiTab(section, name, icon, columns, id)
-	local window = section._window or section
+	local window = Core.resolveUiWindow(section)
 	if not window or not window._rawWindow then
 		Core.logWarn("buildUiTab skipped — window missing")
-		return Core.wrapUiTab(nil, section._ui, window)
+		return Core.wrapUiTab(nil, type(section) == "table" and section._ui or nil, window)
 	end
 	local iconArg = nil
 	if icon then

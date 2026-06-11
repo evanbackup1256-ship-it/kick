@@ -729,17 +729,18 @@ return function(Core)
 	end
 
 	function Core.buildUiTab(section, name, icon, columns, id)
-		local window = (type(section) == "table" and section._window) or section
+		local resolve = Core.resolveUiWindow
+		local window = type(resolve) == "function" and resolve(section) or nil
 		if type(window) ~= "table" or not window._rawWindow then
 			Core.logWarn("buildUiTab skipped — window missing")
-			return Core.wrapUiTab(nil, nil, window)
+			return Core.wrapUiTab(nil, type(section) == "table" and section._ui or nil, window)
 		end
 		local rawPage = window._rawWindow:Page({
 			Name = name,
 			Icon = iconId(icon),
 			Columns = math.max(1, tonumber(columns) or 2),
 		})
-		local wrapped = Core.wrapUiTab(rawPage, window._ui or section._ui, window)
+		local wrapped = Core.wrapUiTab(rawPage, window._ui or (type(section) == "table" and section._ui) or nil, window)
 		wrapped._columnCount = math.max(1, tonumber(columns) or 2)
 		return wrapped
 	end

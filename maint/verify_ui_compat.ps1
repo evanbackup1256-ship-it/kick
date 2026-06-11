@@ -9,16 +9,34 @@ $neverloseUi = Get-Content (Join-Path $root "hub/neverlose_ui.luau") -Raw
 $coreUi = Get-Content (Join-Path $root "hub/core_ui.luau") -Raw
 $library = Get-Content (Join-Path $root "ui/neverlose/library.lua") -Raw
 
-if ($neverloseUi -match 'function Core\.buildUiTab[\s\S]*?local window = \(type\(section\) == "table" and section\._window\) or section') {
-    Pass "neverlose_ui buildUiTab unwraps buildUiSection"
+if ($coreUi -match 'function Core\.resolveUiWindow') {
+    Pass "core_ui exposes resolveUiWindow"
 } else {
-    Fail "neverlose_ui buildUiTab must resolve section._window before checking _rawWindow"
+    Fail "core_ui missing Core.resolveUiWindow"
+}
+
+if ($coreUi -match 'function Core\.buildUiSection[\s\S]*?_rawWindow = window\._rawWindow') {
+    Pass "buildUiSection forwards _rawWindow"
+} else {
+    Fail "buildUiSection must expose _rawWindow for tab boot"
+}
+
+if ($neverloseUi -match 'Core\.resolveUiWindow') {
+    Pass "neverlose_ui buildUiTab uses resolveUiWindow"
+} else {
+    Fail "neverlose_ui buildUiTab must call Core.resolveUiWindow"
 }
 
 if ($coreUi -match 'function Core\.createStubUiGroup[\s\S]*?stub\.CreateDivider\s*=') {
     Pass "createStubUiGroup exposes CreateDivider"
 } else {
     Fail "createStubUiGroup missing CreateDivider noop"
+}
+
+if ($coreUi -match 'function group:CreateDivider\(\)[\s\S]*?groupbox\.CreateDivider') {
+    Pass "wrapUiGroup guards CreateDivider"
+} else {
+    Fail "wrapUiGroup must guard groupbox CreateDivider"
 }
 
 $menuKeybindBlock = [regex]::Match(

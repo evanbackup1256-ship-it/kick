@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.8.4"
+local LOADER_VERSION = "7.8.5"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -23,7 +23,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.8.4",
+	loader = "7.8.5",
 	core = "2.8.8",
 	ui = "Alleral",
 	neverlose = "1.1.0-kick",
@@ -1137,6 +1137,9 @@ local function coreUiValid(src)
 	if not src:find("return function(Core)", 1, true) then
 		return false
 	end
+	if not src:find("function Core.resolveUiWindow", 1, true) then
+		return false
+	end
 	return compileCoreSource(src, "Alleral/core_ui")
 end
 
@@ -1167,6 +1170,9 @@ local function neverloseUiValid(src)
 		return false
 	end
 	if not src:find("Neverlose UI layer", 1, true) then
+		return false
+	end
+	if not src:find("resolveUiWindow", 1, true) then
 		return false
 	end
 	if EXECUTOR.slug == "volt" or EXECUTOR.slug == "awp" then
@@ -1285,6 +1291,9 @@ local function neverloseUiRejectReason(src)
 	end
 	if not src:find("Neverlose UI layer", 1, true) then
 		return "missing Neverlose UI layer marker"
+	end
+	if not src:find("resolveUiWindow", 1, true) then
+		return "missing resolveUiWindow helper"
 	end
 	if EXECUTOR.slug == "volt" or EXECUTOR.slug == "awp" then
 		if not looksLikeLua(src) then
