@@ -58,14 +58,13 @@
     if (!missing.length) return state.thumbs;
 
     try {
-      const url = `https://thumbnails.roblox.com/v1/places/gameicons?placeIds=${missing.join(",")}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false`;
+      const base = window.ALLERAL_API || "";
+      const url = `${base}/api/games/thumbnails?placeIds=${encodeURIComponent(missing.join(","))}`;
       const res = await fetch(url);
       const json = await res.json();
-      (json.data || []).forEach((row) => {
-        if (row.state === "Completed" && row.imageUrl) {
-          state.thumbs[String(row.targetId)] = row.imageUrl;
-        }
-      });
+      if (json.ok && json.thumbnails) {
+        Object.assign(state.thumbs, json.thumbnails);
+      }
     } catch {
       /* keep cached thumbs */
     }
@@ -507,7 +506,7 @@
       btn.addEventListener("click", () => {
         state.gameFilter = btn.dataset.filter || "all";
         $$(".filter-pill").forEach((b) => b.classList.toggle("active", b === btn));
-        if (state.site) renderGames(state.site);
+        if (state.site) void renderGames(state.site);
       });
     });
   }

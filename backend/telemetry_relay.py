@@ -202,6 +202,7 @@ def apply_cors(response):
 @app.route("/api/bug-report", methods=["OPTIONS"])
 @app.route("/api/feature-request", methods=["OPTIONS"])
 @app.route("/api/hub/visit", methods=["OPTIONS"])
+@app.route("/api/games/thumbnails", methods=["OPTIONS"])
 @app.route("/api/ban/check", methods=["OPTIONS"])
 @app.route("/gate/check", methods=["OPTIONS"])
 def cors_preflight():

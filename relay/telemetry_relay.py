@@ -202,6 +202,7 @@ def apply_cors(response):
 @app.route("/api/bug-report", methods=["OPTIONS"])
 @app.route("/api/feature-request", methods=["OPTIONS"])
 @app.route("/api/hub/visit", methods=["OPTIONS"])
+@app.route("/api/games/thumbnails", methods=["OPTIONS"])
 @app.route("/api/ban/check", methods=["OPTIONS"])
 @app.route("/gate/check", methods=["OPTIONS"])
 def cors_preflight():
@@ -234,8 +235,12 @@ if AutoSyncEngine is not None:
 GATE_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 BUG_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 HUB_VISIT_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
+THUMB_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
+THUMB_CACHE: dict[str, tuple[str, float]] = {}
+THUMB_CACHE_SEC = int(os.environ.get("THUMB_CACHE_SEC", "3600"))
 BUG_RATE_PER_MIN = int(os.environ.get("BUG_RATE_PER_MIN", "6"))
 HUB_VISIT_RATE_PER_MIN = int(os.environ.get("HUB_VISIT_RATE_PER_MIN", "30"))
+THUMB_RATE_PER_MIN = int(os.environ.get("THUMB_RATE_PER_MIN", "60"))
 PUBLIC_RATE_PER_MIN = int(os.environ.get("PUBLIC_RATE_PER_MIN", "120"))
 
 
@@ -266,6 +271,15 @@ def public_allow_ip(ip: str, bucket: dict[str, deque[float]], limit: int) -> boo
         return False
     window.append(now)
     return True
+
+
+def parse_place_ids(raw: object) -> list[str]:
+    ids: list[str] = []
+    for part in str(raw or "").split(","):
+        part = part.strip()
+        if part.isdigit() and 1 <= len(part) <= 20:
+            ids.append(part)
+    return ids[:50]
 
 
 def build_public_site_payload() -> dict[str, Any]:
@@ -1227,6 +1241,52 @@ def sync_status():
     if AUTO_SYNC is None:
         return jsonify({"ok": True, "enabled": False, "autoStatus": False})
     return jsonify({"ok": True, **AUTO_SYNC.status()})
+
+
+@app.get("/api/games/thumbnails")
+def game_thumbnails():
+    """Proxy Roblox game icons so the hub avoids browser CORS blocks."""
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, THUMB_IP_HITS, THUMB_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+
+    place_ids = parse_place_ids(request.args.get("placeIds"))
+    if not place_ids:
+        return jsonify({"ok": True, "thumbnails": {}})
+
+    now = time.time()
+    thumbnails: dict[str, str] = {}
+    missing: list[str] = []
+    for pid in place_ids:
+        cached = THUMB_CACHE.get(pid)
+        if cached and now - cached[1] < THUMB_CACHE_SEC:
+            thumbnails[pid] = cached[0]
+        else:
+            missing.append(pid)
+
+    if missing:
+        url = (
+            "https://thumbnails.roblox.com/v1/places/gameicons"
+            f"?placeIds={','.join(missing)}&returnPolicy=PlaceHolder"
+            "&size=512x512&format=Png&isCircular=false"
+        )
+        try:
+            resp = requests.get(url, timeout=12)
+            resp.raise_for_status()
+            payload = resp.json()
+            for row in payload.get("data") or []:
+                if row.get("state") == "Completed" and row.get("imageUrl"):
+                    pid = str(row.get("targetId"))
+                    image_url = str(row["imageUrl"])
+                    thumbnails[pid] = image_url
+                    THUMB_CACHE[pid] = (image_url, now)
+        except requests.RequestException as exc:
+            print(f"[thumbnails] roblox fetch failed: {exc}", file=sys.stderr)
+            if thumbnails:
+                return jsonify({"ok": True, "thumbnails": thumbnails, "partial": True})
+            return jsonify({"ok": False, "error": "upstream_failed"}), 502
+
+    return jsonify({"ok": True, "thumbnails": thumbnails})
 
 
 @app.get("/api/site")
