@@ -1,9 +1,10 @@
 {
-  "loader": "5.4.1",
+  "loader": "5.4.2",
   "core": "1.19",
+  "weao": "1.0",
   "ui": "Rayfield",
   "commit": "da36cf0",
-  "minLoader": "5.4.1",
+  "minLoader": "5.4.2",
   "minCore": "1.18",
   "analytics": "1.0",
   "telemetry": "2.2",

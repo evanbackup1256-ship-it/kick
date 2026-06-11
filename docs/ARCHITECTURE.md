@@ -4,13 +4,28 @@
 
 ```
 loader.luau (CDN HttpGet — only entry point)
-    ├── purge legacy workspace files (v3.x launch/load/bootstrap/run)
-    ├── detect executor + game by PlaceId (WEAO via [goodcurry/weao-proxy-api](https://github.com/goodcurry/weao-proxy-api))
+    ├── load config/weao.json + core/weao.luau (WEAO client)
+    ├── purge legacy workspace files
+    ├── detect executor locally, enrich via WEAO API
+    ├── detect game by PlaceId
     ├── download core/alleral_core.luau
     ├── load analytics, helpers, telemetry
     ├── preload Rayfield
     └── run games/*.luau
 ```
+
+## WEAO integration
+
+Per [WEAO API docs](https://docs.weao.xyz):
+
+- Required header: `User-Agent: WEAO-3PService`
+- Exploits endpoint: `GET /api/status/exploits` (all) or `/api/status/exploits/[name]` (single)
+- Config: `config/weao.json` (CDN + local fallback)
+- Client: `core/weao.luau` (shared by loader + core)
+- Proxy (primary): [goodcurry/weao-proxy-api](https://github.com/goodcurry/weao-proxy-api) → `http://farts.fadedis.xyz:25551`
+- Fallback domains: weao.xyz, whatexpsare.online, whatexploitsaretra.sh, api.weao.xyz
+
+The WEAO client tries every base × transport × cache-busted URL, validates JSON (rejects rate-limit payloads), filters hidden exploits, and caches for 5 minutes in `getgenv().Alleral_WeaoCache`.
 
 ## Entry point
 
@@ -18,14 +33,13 @@ loader.luau (CDN HttpGet — only entry point)
 |------|---------|
 | `loader.luau` | **Only** player entry — fetch from CDN |
 
-There is no `load.luau`, `launch.luau`, `bootstrap.luau`, or `run.luau`. Those were removed in v5.x.
-
 ## Version sources
 
 | Component | Version | File |
 |-----------|---------|------|
-| Loader | 5.4.1 | `loader.luau`, `config/release.json` |
+| Loader | 5.4.2 | `loader.luau`, `config/release.json` |
 | Core | 1.19 | `core/alleral_core.luau` |
+| WEAO | 1.0 | `core/weao.luau`, `config/weao.json` |
 | Analytics | 1.0 | `core/analytics.luau` |
 | Telemetry | 2.2 | `core/telemetry.luau` |
 | Helpers | 1.0 | `core/game_helpers.luau` |
@@ -36,6 +50,6 @@ Run `powershell tools/verify_versions.ps1` before pushing.
 ## Never do
 
 - Add alternate entry scripts (`launch`, `load`, `bootstrap`, `run`)
+- Call WEAO without `WEAO-3PService` user-agent
 - Embed core or loader with `[=[` long strings (breaks Volt)
-- Commit embedded core/loader bundles (removed `tools/bundle_*.ps1`)
 - Ship v3.x loaders — loader purges them from executor workspace on run

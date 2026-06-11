@@ -3,13 +3,14 @@
 	Fetch from CDN; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "5.4.1"
+local LOADER_VERSION = "5.4.2"
 local MIN_CORE = "1.18"
 local RELEASE_FALLBACK = {
 	core = "1.19",
 	analytics = "1.0",
 	telemetry = "2.2",
 	helpers = "1.0",
+	weao = "1.0",
 }
 local WORKSPACE_ROOTS = {
 	"",
@@ -225,17 +226,6 @@ local function inferSlugFromText(text)
 	return nil
 end
 
--- WEAO proxy: https://github.com/goodcurry/weao-proxy-api
-local WEAO_API_URLS = {
-	"http://farts.fadedis.xyz:25551/api/status/exploits",
-	"https://whatexpsare.online/api/status/exploits",
-	"https://api.whatexpsare.online/api/status/exploits",
-	"https://weao.xyz/api/status/exploits",
-	"https://api.weao.xyz/api/status/exploits",
-	"https://api.whatexploitsaretra.sh/api/status/exploits",
-	"http://api.weao.xyz/api/status/exploits",
-}
-
 local function extractResponseBody(response)
 	if type(response) == "string" then
 		return response
@@ -334,91 +324,10 @@ local function decodeJson(body)
 	return nil
 end
 
-local function fetchWeaoExploits()
-	local cache = ENV.Alleral_WeaoCache
-	if type(cache) == "table" and cache.fetchedAt and (tick() - cache.fetchedAt) < 300 and type(cache.data) == "table" then
-		return cache.data, cache.source
-	end
-
-	local headers = {
-		["User-Agent"] = "WEAO-3PService",
-		["Accept"] = "application/json",
-		["Cache-Control"] = "no-cache",
-	}
-
-	for _, apiUrl in ipairs(WEAO_API_URLS) do
-		local body, via = httpFetch(apiUrl, headers)
-		local decoded = decodeJson(body)
-		if decoded then
-			ENV.Alleral_WeaoCache = { fetchedAt = tick(), data = decoded, source = apiUrl }
-			return decoded, apiUrl .. (via and (" (" .. via .. ")") or "")
-		end
-	end
-
-	if type(cache) == "table" and cache.data then
-		return cache.data, cache.source
-	end
-	return nil
-end
-
-local function formatWeaoEntry(entry)
-	if type(entry) ~= "table" then
-		return nil
-	end
-	return {
-		title = entry.title,
-		version = entry.version,
-		detected = entry.detected == true,
-		updateStatus = entry.updateStatus ~= false,
-		uncStatus = entry.uncStatus == true,
-		platform = entry.platform,
-		extype = entry.extype,
-		free = entry.free == true,
-		suncPercentage = tonumber(entry.suncPercentage),
-		uncPercentage = tonumber(entry.uncPercentage),
-	}
-end
-
-local function matchWeaoExploit(hints, exploits)
-	if type(exploits) ~= "table" then
-		return nil, 0
-	end
-
-	local keys = {}
-	local function addKey(key, weight)
-		key = normalizeSlug(key)
-		if key ~= "" then
-			keys[key] = math.max(keys[key] or 0, weight)
-		end
-	end
-
-	addKey(hints.rawName, 90)
-	addKey(hints.slug, 85)
-	addKey(inferSlugFromText(hints.rawName), 88)
-	for _, envSlug in ipairs(hints.envSlugs or {}) do
-		addKey(envSlug, 75)
-	end
-
-	local best, bestScore = nil, 0
-	for _, entry in ipairs(exploits) do
-		if type(entry) == "table" and type(entry.title) == "string" then
-			local titleKey = normalizeSlug(entry.title)
-			local score = 0
-			for key, weight in pairs(keys) do
-				if titleKey == key then
-					score = math.max(score, weight + 10)
-				elseif titleKey:find(key, 1, true) or key:find(titleKey, 1, true) then
-					score = math.max(score, weight - 10)
-				end
-			end
-			if score > bestScore then
-				bestScore = score
-				best = entry
-			end
-		end
-	end
-
-	return bestScore >= 70 and best or nil, bestScore
+local function weaoHttpFetch(url)
+	local Weao = ENV.Alleral_Weao
+	local headers = Weao and Weao.requestHeaders and Weao.requestHeaders() or { ["User-Agent"] = "WEAO-3PService" }
+	return httpFetch(url, headers)
 end
 
 local function detectEnvSlugs()
@@ -492,12 +401,23 @@ local function resolveExecutorProfile()
 end
 
 local function refreshWeaoProfile(profile)
-	local exploits, weaoSource = fetchWeaoExploits()
+	local Weao = ENV.Alleral_Weao
+	if not Weao then
+		return profile
+	end
+
+	local exploits, weaoSource = Weao.fetchExploits({
+		httpFetch = weaoHttpFetch,
+		requestFn = getHttpRequestFn(),
+		config = ENV.Alleral_WeaoConfig,
+		executorSlug = profile.slug,
+	})
 	if not exploits then
 		return profile
 	end
-	local weaoEntry, weaoScore = matchWeaoExploit(profile, exploits)
-	local weao = formatWeaoEntry(weaoEntry)
+
+	local weaoEntry, weaoScore = Weao.matchExploit(profile, exploits)
+	local weao = Weao.formatEntry(weaoEntry)
 	if weao and weao.title then
 		profile.slug = normalizeSlug(weao.title)
 		if profile.slug == "synapse" and profile.rawName:lower():find("z", 1, true) then
@@ -900,6 +820,25 @@ local function loadModule(localPaths, remotePath, marker, chunkName)
 	return ok
 end
 
+local function loadWeaoStack()
+	local cfgBody = httpFetch(CDN .. "/config/weao.json", { ["Accept"] = "application/json" })
+	local cfg = decodeJson(cfgBody)
+	if cfg then
+		ENV.Alleral_WeaoConfig = cfg
+	end
+
+	if ENV.Alleral_Weao and type(ENV.Alleral_Weao.fetchExploits) == "function" then
+		return true
+	end
+
+	if loadModule({ "core/weao.luau" }, "core/weao.luau", "Alleral_Weao", "Alleral/weao") then
+		return ENV.Alleral_Weao ~= nil
+	end
+
+	log("WEAO module unavailable", true)
+	return false
+end
+
 local ENV_BRIDGE = [=[
 do
 	local bridge = shared
@@ -910,6 +849,8 @@ do
 			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
 			if bridge.Alleral_Analytics then g.Alleral_Analytics = bridge.Alleral_Analytics end
 			if bridge.Alleral_Telemetry then g.Alleral_Telemetry = bridge.Alleral_Telemetry end
+			if bridge.Alleral_Weao then g.Alleral_Weao = bridge.Alleral_Weao end
+			if bridge.Alleral_WeaoConfig then g.Alleral_WeaoConfig = bridge.Alleral_WeaoConfig end
 			g.Alleral_State = g.Alleral_State or bridge.Alleral_State or {}
 			bridge.Alleral_State = g.Alleral_State
 		end
@@ -924,6 +865,8 @@ local function publishBridge()
 		shared.Alleral_Core = ENV.Alleral_Core
 		shared.Alleral_Analytics = ENV.Alleral_Analytics
 		shared.Alleral_Telemetry = ENV.Alleral_Telemetry
+		shared.Alleral_Weao = ENV.Alleral_Weao
+		shared.Alleral_WeaoConfig = ENV.Alleral_WeaoConfig
 		shared.Alleral_State = ENV.Alleral_State or {}
 	end)
 end
@@ -1038,6 +981,7 @@ local VERSION_PATTERNS = {
 	analytics = 'Analytics%.Version%s*=%s*"([%d%.]+)"',
 	telemetry = 'Telemetry%.Version%s*=%s*"([%d%.]+)"',
 	helpers = 'Helpers%.VERSION%s*=%s*"([%d%.]+)"',
+	weao = 'Weao%.VERSION%s*=%s*"([%d%.]+)"',
 	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
 	game = 'local VERSION%s*=%s*"([%d%.]+)"',
 }
@@ -1085,6 +1029,7 @@ local function fetchExpectedVersions()
 		analytics = RELEASE_FALLBACK.analytics,
 		telemetry = RELEASE_FALLBACK.telemetry,
 		helpers = RELEASE_FALLBACK.helpers,
+		weao = RELEASE_FALLBACK.weao,
 		games = {},
 	}
 	for _, gameProfile in ipairs(GAMES) do
@@ -1098,6 +1043,12 @@ local function fetchExpectedVersions()
 		expected.analytics = release.analytics or expected.analytics
 		expected.telemetry = release.telemetry or expected.telemetry
 		expected.helpers = release.helpers or expected.helpers
+		expected.weao = release.weao or expected.weao
+	end
+
+	local weaoCfg = decodeJson(select(1, httpFetch(CDN .. "/config/weao.json")))
+	if weaoCfg then
+		ENV._Alleral_WeaoConfigRemote = weaoCfg
 	end
 
 	local manifest = decodeJson(select(1, httpFetch(CDN .. "/config/scripts_manifest.json")))
@@ -1139,6 +1090,15 @@ local function buildManagedFiles()
 			paths = { "core/game_helpers.luau" },
 			expectedKey = "helpers",
 			extract = "helpers",
+		},
+		{
+			paths = { "core/weao.luau" },
+			expectedKey = "weao",
+			extract = "weao",
+		},
+		{
+			paths = { "config/weao.json" },
+			purgeOnLoaderChange = true,
 		},
 		{
 			paths = { "config/owner_telemetry.luau" },
@@ -1514,16 +1474,18 @@ local function main()
 	ENV.Alleral_LoaderRunning = true
 	ENV._Alleral_LoaderVersion = LOADER_VERSION
 
-	if typeof(task) == "table" and type(task.spawn) == "function" then
-		task.spawn(function()
-			refreshWeaoProfile(EXECUTOR)
-		end)
-	end
-
 	if not loadStringFn then
 		notify("Alleral", "This executor needs loadstring.", 8)
 		ENV.Alleral_LoaderRunning = false
 		return
+	end
+
+	loadWeaoStack()
+
+	if typeof(task) == "table" and type(task.spawn) == "function" then
+		task.spawn(function()
+			refreshWeaoProfile(EXECUTOR)
+		end)
 	end
 
 	clearLegacySession()

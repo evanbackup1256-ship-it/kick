@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "docs": "https://docs.weao.xyz",
+  "exploitsDocs": "https://docs.weao.xyz/weao-api-reference/exploits.md",
+  "userAgent": "WEAO-3PService",
+  "cacheSeconds": 300,
+  "proxy": {
+    "repo": "https://github.com/goodcurry/weao-proxy-api",
+    "base": "http://farts.fadedis.xyz:25551"
+  },
+  "paths": {
+    "allExploits": "/api/status/exploits",
+    "singleExploit": "/api/status/exploits/"
+  },
+  "bases": [
+    "http://farts.fadedis.xyz:25551",
+    "https://weao.xyz",
+    "https://api.weao.xyz",
+    "https://whatexpsare.online",
+    "https://api.whatexpsare.online",
+    "https://whatexploitsaretra.sh",
+    "https://api.whatexploitsaretra.sh",
+    "http://api.weao.xyz"
+  ]
+}

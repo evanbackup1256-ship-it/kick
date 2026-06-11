@@ -401,14 +401,89 @@ function Core.detectExecutor()
 	}
 end
 
--- WEAO proxy: https://github.com/goodcurry/weao-proxy-api
-Core.WEAO_API_URLS = {
-	"http://farts.fadedis.xyz:25551/api/status/exploits",
-	"https://api.weao.xyz/api/status/exploits",
-	"https://whatexpsare.online/api/status/exploits",
-	"https://api.whatexpsare.online/api/status/exploits",
-	"http://api.weao.xyz/api/status/exploits",
-}
+function Core.weaoClient()
+	local client = ENV.Alleral_Weao
+	if client and type(client.fetchExploits) == "function" then
+		return client
+	end
+	return nil
+end
+
+function Core.weaoRequestHeaders()
+	local client = Core.weaoClient()
+	if client and client.requestHeaders then
+		return client.requestHeaders()
+	end
+	return {
+		["User-Agent"] = "WEAO-3PService",
+		["Accept"] = "application/json",
+		["Cache-Control"] = "no-cache",
+	}
+end
+
+function Core.fetchWeaoExploits(forceRefresh)
+	local Weao = Core.weaoClient()
+	if not Weao then
+		return nil, "WEAO module missing — run loader.luau first"
+	end
+	local profile = Core.detectExecutor()
+	return Weao.fetchExploits({
+		forceRefresh = forceRefresh == true,
+		httpFetch = function(url)
+			return Core.httpGet(url)
+		end,
+		requestFn = Core.requestFunction(),
+		config = ENV.Alleral_WeaoConfig or ENV._Alleral_WeaoConfigRemote,
+		executorSlug = profile and profile.slug,
+	})
+end
+
+function Core.formatWeaoEntry(entry)
+	local Weao = Core.weaoClient()
+	if Weao and Weao.formatEntry then
+		return Weao.formatEntry(entry)
+	end
+	return nil
+end
+
+function Core.matchWeaoExploit(profile, exploits)
+	local Weao = Core.weaoClient()
+	if Weao and Weao.matchExploit then
+		return Weao.matchExploit(profile, exploits)
+	end
+	return nil
+end
+
+function Core.fetchWeaoExecutorStatus(profile)
+	profile = profile or Core.executorProfile()
+	local Weao = Core.weaoClient()
+	if not Weao then
+		return nil, "WEAO module missing"
+	end
+	local weao, err = Weao.executorStatus(profile, {
+		forceRefresh = false,
+		httpFetch = function(url)
+			return Core.httpGet(url)
+		end,
+		requestFn = Core.requestFunction(),
+		config = ENV.Alleral_WeaoConfig or ENV._Alleral_WeaoConfigRemote,
+	})
+	if weao then
+		return weao, nil
+	end
+	return nil, err
+end
+
+function Core.weaoStatusLabel(weao)
+	local Weao = Core.weaoClient()
+	if Weao and Weao.statusLabel then
+		return Weao.statusLabel(weao)
+	end
+	if type(weao) ~= "table" then
+		return "Unknown (see docs.weao.xyz)"
+	end
+	return "Unknown"
+end
 
 function Core.normalizeExecutorKey(text)
 	local key = tostring(text or ""):lower()
@@ -418,166 +493,6 @@ function Core.normalizeExecutorKey(text)
 	key = key:gsub("vega%s*x", "vegax")
 	key = key:gsub("[^a-z0-9]", "")
 	return key
-end
-
-function Core.formatWeaoEntry(entry)
-	if type(entry) ~= "table" then
-		return nil
-	end
-	return {
-		title = entry.title,
-		version = entry.version,
-		detected = entry.detected == true,
-		updateStatus = entry.updateStatus ~= false,
-		uncStatus = entry.uncStatus == true,
-		platform = entry.platform,
-		extype = entry.extype,
-		free = entry.free == true,
-		suncPercentage = tonumber(entry.suncPercentage),
-		uncPercentage = tonumber(entry.uncPercentage),
-		updatedDate = entry.updatedDate,
-		websitelink = entry.websitelink,
-	}
-end
-
-function Core.matchWeaoExploit(profile, exploits)
-	if type(exploits) ~= "table" then
-		return nil
-	end
-	local slugKey = Core.normalizeExecutorKey(profile and (profile.name or profile.slug))
-	local rawKey = Core.normalizeExecutorKey(profile and profile.rawName)
-	if slugKey == "" and rawKey == "" then
-		return nil
-	end
-	local best
-	local bestScore = 0
-	for _, entry in ipairs(exploits) do
-		if type(entry) == "table" and type(entry.title) == "string" then
-			local titleKey = Core.normalizeExecutorKey(entry.title)
-			local score = 0
-			if titleKey ~= "" then
-				if titleKey == slugKey or titleKey == rawKey then
-					score = 100
-				elseif slugKey ~= "" and (titleKey:find(slugKey, 1, true) or slugKey:find(titleKey, 1, true)) then
-					score = 80
-				elseif rawKey ~= "" and (titleKey:find(rawKey, 1, true) or rawKey:find(titleKey, 1, true)) then
-					score = 70
-				end
-			end
-			if score > bestScore then
-				bestScore = score
-				best = entry
-			end
-		end
-	end
-	return bestScore >= 70 and best or nil
-end
-
-function Core.fetchWeaoExploits(forceRefresh)
-	local cache = ENV.Alleral_WeaoCache
-	if not forceRefresh and type(cache) == "table" and cache.fetchedAt and (tick() - cache.fetchedAt) < 300 then
-		return cache.data, cache.source
-	end
-
-	local function decodeBody(body)
-		if type(body) ~= "string" or body == "" then
-			return nil
-		end
-		local ok, decoded = pcall(function()
-			return HttpService:JSONDecode(body)
-		end)
-		if ok and type(decoded) == "table" then
-			return decoded
-		end
-		return nil
-	end
-
-	local function fetchUrl(url)
-		local fetchUrl = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(math.random(10000, 99999))
-		local decoded = decodeBody(Core.httpGet(fetchUrl))
-		if decoded then
-			return decoded, url
-		end
-
-		local headers = {
-			["User-Agent"] = "WEAO-3PService",
-			["Accept"] = "application/json",
-			["Cache-Control"] = "no-cache",
-		}
-		local requestFn = Core.requestFunction()
-		if requestFn then
-			local ok, response = pcall(function()
-				return requestFn({
-					Url = fetchUrl,
-					Method = "GET",
-					Headers = headers,
-				})
-			end)
-			if ok then
-				local body = type(response) == "table" and (response.Body or response.body) or (type(response) == "string" and response)
-				local decoded = decodeBody(body)
-				if decoded then
-					return decoded, url
-				end
-			end
-		end
-		if type(game.HttpGet) == "function" then
-			local ok, body = pcall(game.HttpGet, game, url, true)
-			local decoded = decodeBody(ok and body or nil)
-			if decoded then
-				return decoded, url
-			end
-		end
-		return nil
-	end
-
-	for _, url in ipairs(Core.WEAO_API_URLS) do
-		local data, source = fetchUrl(url)
-		if data then
-			ENV.Alleral_WeaoCache = {
-				fetchedAt = tick(),
-				data = data,
-				source = source,
-			}
-			return data, source
-		end
-	end
-
-	if type(cache) == "table" and cache.data then
-		return cache.data, cache.source
-	end
-	return nil, "WEAO exploit list unavailable"
-end
-
-function Core.fetchWeaoExecutorStatus(profile)
-	profile = profile or Core.executorProfile()
-	local exploits, err = Core.fetchWeaoExploits(false)
-	local entry = Core.matchWeaoExploit(profile, exploits)
-	if entry then
-		return Core.formatWeaoEntry(entry)
-	end
-	return nil, err
-end
-
-function Core.weaoStatusLabel(weao)
-	if type(weao) ~= "table" then
-		return "Unknown (see whatexpsare.online)"
-	end
-	local parts = {}
-	if weao.updateStatus then
-		table.insert(parts, "Updated")
-	else
-		table.insert(parts, "Outdated")
-	end
-	if weao.detected then
-		table.insert(parts, "Detected")
-	else
-		table.insert(parts, "Undetected")
-	end
-	if weao.suncPercentage then
-		table.insert(parts, tostring(weao.suncPercentage) .. "% sUNC")
-	end
-	return table.concat(parts, " · ")
 end
 
 Core.EXECUTOR_FS_BROKEN = {

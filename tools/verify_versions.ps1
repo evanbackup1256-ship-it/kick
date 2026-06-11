@@ -1,4 +1,4 @@
-# Verify loader, core, manifest, game scripts, and no legacy entry points.
+# Verify loader, core, manifest, game scripts, WEAO, and no legacy entry points.
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $failed = @()
@@ -32,6 +32,33 @@ if ($core -match 'Core\.VERSION = "([^"]+)"') {
     }
 } else {
     Fail "core missing Core.VERSION"
+}
+
+$weaoPath = Join-Path $root "core/weao.luau"
+$weao = Get-Content $weaoPath -Raw
+if ($weao -match 'Weao\.VERSION = "([^"]+)"') {
+    $weaoVer = $Matches[1]
+    if ($release.weao -and $weaoVer -ne $release.weao) {
+        Fail "weao ($weaoVer) != release.json ($($release.weao))"
+    } else {
+        Pass "weao $weaoVer"
+    }
+} else {
+    Fail "core/weao.luau missing Weao.VERSION"
+}
+
+$weaoCfgPath = Join-Path $root "config/weao.json"
+if (-not (Test-Path $weaoCfgPath)) {
+    Fail "config/weao.json missing"
+} else {
+    $weaoCfg = Get-Content $weaoCfgPath -Raw | ConvertFrom-Json
+    if ($weaoCfg.userAgent -ne "WEAO-3PService") {
+        Fail "config/weao.json userAgent must be WEAO-3PService per docs.weao.xyz"
+    } elseif ($weaoCfg.bases.Count -lt 1) {
+        Fail "config/weao.json must list WEAO bases"
+    } else {
+        Pass "config/weao.json"
+    }
 }
 
 $gameFiles = @{
