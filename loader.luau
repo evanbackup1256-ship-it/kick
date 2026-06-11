@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.7.8"
+local LOADER_VERSION = "7.7.9"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -20,7 +20,7 @@ local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.7.8",
+	loader = "7.7.9",
 	core = "2.8.6",
 	ui = "Alleral",
 	windui = "2.1.4-alleral-v2",
@@ -188,6 +188,19 @@ local function log(msg, isWarn)
 		print(line)
 	end
 end
+
+local function safeSpawn(fn)
+	if type(fn) ~= "function" then
+		return
+	end
+	if typeof(task) == "table" and type(task.spawn) == "function" then
+		task.spawn(fn)
+	else
+		coroutine.wrap(fn)()
+	end
+end
+
+local fetchExpectedVersions
 
 local function notify(title, text, duration)
 	pcall(function()
@@ -2007,14 +2020,7 @@ local function fetchExpectedVersionsFast()
 	return expected
 end
 
-local function refreshExpectedVersionsAsync()
-	task.spawn(function()
-		local expected = fetchExpectedVersions(true)
-		ENV._Alleral_ExpectedVersions = expected
-	end)
-end
-
-local function fetchExpectedVersions(forceRefresh)
+fetchExpectedVersions = function(forceRefresh)
 	local cached = ENV._Alleral_ExpectedVersions
 	local cachedAt = ENV._Alleral_ExpectedVersionsAt
 	if
@@ -2084,6 +2090,18 @@ local function fetchExpectedVersions(forceRefresh)
 	ENV._Alleral_ExpectedVersions = expected
 	ENV._Alleral_ExpectedVersionsAt = tick()
 	return expected
+end
+
+local function refreshExpectedVersionsAsync()
+	safeSpawn(function()
+		if type(fetchExpectedVersions) ~= "function" then
+			return
+		end
+		local expected = fetchExpectedVersions(true)
+		if type(expected) == "table" then
+			ENV._Alleral_ExpectedVersions = expected
+		end
+	end)
 end
 
 local function buildUpdateFingerprint(expected, profile)
