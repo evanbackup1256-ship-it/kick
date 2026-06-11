@@ -1,7 +1,7 @@
 --[[
-	Arrrel UI — WindUI engine layer (Footagesus 1.6.64-fix base)
-	Premium dark chrome, profiles, motion, search, tooltips, notifications.
-	Tokens: ui/design/tokens.json
+	Alleral UI V2 — WindUI engine layer (Footagesus 1.6.64-fix base)
+	Premium chrome, V2 boost, profiles, motion, search, tooltips, notifications.
+	Tokens: ui/design/tokens.json · V2: ui/windui/v2/boost.luau
 ]]
 
 return function(WindUI)
@@ -99,10 +99,10 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ARRREL_UI_VERSION = "1.0.0-arrrel3"
-	WindUI.ARRREL_BRAND = "Arrrel"
+	WindUI.ARRREL_UI_VERSION = "2.0.0-alleral-v2"
+	WindUI.ARRREL_BRAND = "Alleral"
 	WindUI.ALLERAL_UI_VERSION = WindUI.ARRREL_UI_VERSION
-	WindUI.ALLERAL_BRAND = "Arrrel UI"
+	WindUI.ALLERAL_BRAND = "Alleral UI V2"
 	WindUI._AlleralNotifyCount = 0
 	WindUI._AlleralMaxNotify = 8
 	WindUI._AlleralWatchdogToken = 0
@@ -4297,6 +4297,77 @@ return function(WindUI)
 	if not passed then
 		uiWarn("selftest", "theme bootstrap incomplete")
 	end
+
+	local function loadV2BoostLayer()
+		local readFn = readfile or (syn and syn.readfile) or (fluxus and fluxus.readfile)
+		local isFileFn = isfile or (syn and syn.isfile)
+		if type(readFn) ~= "function" or type(isFileFn) ~= "function" then
+			return false
+		end
+		local roots = {
+			"ui/windui/v2/",
+			"vendor/windui/v2/",
+			"windui/v2/",
+			"kick/ui/windui/v2/",
+			"kick/kick/ui/windui/v2/",
+		}
+		local source
+		for _, root in ipairs(roots) do
+			local path = root .. "boost.luau"
+			if isFileFn(path) then
+				local ok, body = pcall(readFn, path)
+				if ok and type(body) == "string" and body:find("ALLERAL_UI_V2", 1, true) then
+					source = body
+					break
+				end
+			end
+		end
+		if not source then
+			uiWarn("v2", "boost.luau missing — V2 layer skipped")
+			return false
+		end
+		local compile = loadstring or load
+		if type(compile) ~= "function" then
+			return false
+		end
+		local chunk, err = compile(source, "@Alleral/v2/boost")
+		if not chunk then
+			uiWarn("v2", err)
+			return false
+		end
+		local ok, boostFn = pcall(chunk)
+		if not ok or type(boostFn) ~= "function" then
+			uiWarn("v2", boostFn)
+			return false
+		end
+		local applied, applyErr = pcall(boostFn, {
+			WindUI = WindUI,
+			MAC = MAC,
+			palette = palette,
+			accent = accent,
+			accentSoft = accentSoft,
+			accentHot = accentHot,
+			mergeTokens = mergeTokens,
+			installThemes = installThemes,
+			fullTheme = fullTheme,
+			Motion = Motion,
+			tween = tween,
+			ANIM = ANIM,
+			ensureStroke = ensureStroke,
+			ensureCorner = ensureCorner,
+			ensureGradient = ensureGradient,
+			PROFILE_PRESETS = PROFILE_PRESETS,
+			ACCENT_PRESETS = ACCENT_PRESETS,
+			uiWarn = uiWarn,
+		})
+		if not applied then
+			uiWarn("v2", applyErr)
+			return false
+		end
+		return true
+	end
+
+	loadV2BoostLayer()
 
 	WindUI._AlleralPatchComplete = true
 

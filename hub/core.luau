@@ -1,7 +1,7 @@
 local Core = {}
 Core.VERSION = "2.7.0"
 Core.UI_LIBRARY = "Alleral"
-Core.ALLERAL_UI_VERSION = "1.0.0-arrrel3"
+Core.ALLERAL_UI_VERSION = "2.0.0-alleral-v2"
 Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")
@@ -231,6 +231,7 @@ function Core.installResilience()
 		"fetchWeaoExecutorStatus",
 		"buildHubActionsGroup",
 		"buildThemeStudioGroup",
+		"buildCustomizationStudioGroup",
 		"buildSystemPanelGroup",
 		"buildAdvancedHubGroup",
 		"buildStandardSettingsExtras",
@@ -2348,6 +2349,171 @@ function Core.buildThemeStudioGroup(tab, options)
 	return group
 end
 
+function Core.buildCustomizationStudioGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local column = options.customizationColumn or options.column or 2
+	local uiBundle = options.uiBundle
+	if not uiBundle and type(options.window) == "table" then
+		uiBundle = options.window._ui
+	end
+	local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
+	local group = Core.buildUiGroup(tab, "Customization V2", column, nil, nil, "CustomizationV2")
+
+	if not windUi or windUi.ALLERAL_UI_V2 ~= true then
+		group:CreateLabel("Alleral UI V2 layer not loaded — sync ui/windui/v2/boost.luau")
+		return group
+	end
+
+	local motionProfiles = { "fluid", "snappy", "bouncy", "cinematic", "reduced" }
+	if type(windUi.ListMotionProfiles) == "function" then
+		local ok, listed = pcall(function()
+			return windUi:ListMotionProfiles()
+		end)
+		if ok and type(listed) == "table" and #listed > 0 then
+			motionProfiles = listed
+		end
+	end
+
+	local layoutProfiles = { "auto", "desktop", "mobile", "compact", "cinema", "ultrawide", "minimal", "accessibility", "performance" }
+	if type(windUi.ListProfiles) == "function" then
+		local ok, listed = pcall(function()
+			return windUi:ListProfiles()
+		end)
+		if ok and type(listed) == "table" and #listed > 0 then
+			layoutProfiles = { "auto" }
+			for _, entry in ipairs(listed) do
+				if type(entry) == "table" and entry.id then
+					table.insert(layoutProfiles, entry.id)
+				elseif type(entry) == "string" then
+					table.insert(layoutProfiles, entry)
+				end
+			end
+		end
+	end
+
+	local v2Themes = {
+		"Arrrel",
+		"ArrrelNeon",
+		"ArrrelMidnight",
+		"ArrrelAurora",
+		"ArrrelObsidian",
+		"ArrrelSynth",
+		"ArrrelOcean",
+		"ArrrelEmber",
+		"ArrrelStealth",
+		"ArrrelPaper",
+		"ArrrelVoid",
+	}
+	if type(windUi.ListThemeNames) == "function" then
+		local ok, listed = pcall(function()
+			return windUi:ListThemeNames()
+		end)
+		if ok and type(listed) == "table" and #listed > 0 then
+			v2Themes = listed
+		end
+	end
+
+	group:CreateDropdown("Layout profile", layoutProfiles, ENV.Alleral_UiProfile or "auto", function(selected)
+		ENV.Alleral_UiProfile = tostring(selected or "auto")
+		if type(windUi.ApplyProfile) == "function" then
+			pcall(function()
+				windUi:ApplyProfile(ENV.Alleral_UiProfile)
+			end)
+		end
+		Core.notify("Alleral V2", "Layout: " .. tostring(selected), 2, "success")
+	end, "Device-aware spacing and scale presets.")
+
+	group:CreateDropdown("Motion feel", motionProfiles, windUi:GetMotionProfile and windUi:GetMotionProfile() or "fluid", function(selected)
+		if type(windUi.SetMotionProfile) == "function" then
+			windUi:SetMotionProfile(selected)
+		end
+		Core.notify("Alleral V2", "Motion: " .. tostring(selected), 2, "info")
+	end, "Spring personality for tabs, toggles, and panels.")
+
+	group:CreateSlider("Glass intensity", 0, 100, math.floor((windUi:GetGlassIntensity and windUi:GetGlassIntensity() or 0.55) * 100), function(value)
+		if type(windUi.SetGlassIntensity) == "function" then
+			windUi:SetGlassIntensity(value / 100)
+		end
+	end, "Sidebar veil and ambient glass strength.", 1)
+
+	group:CreateSlider("Chrome depth", 0, 100, math.floor((tonumber(ENV.Alleral_ChromeDepth) or 0.65) * 100), function(value)
+		ENV.Alleral_ChromeDepth = value / 100
+		if type(windUi.SetChromeDepth) == "function" then
+			windUi:SetChromeDepth(value / 100)
+		end
+	end, "Glow spread and section elevation.", 1)
+
+	group:CreateDropdown("Tooltip style", { "minimal", "card", "rich" }, windUi:GetTooltipStyle and windUi:GetTooltipStyle() or "rich", function(selected)
+		if type(windUi.SetTooltipStyle) == "function" then
+			windUi:SetTooltipStyle(selected)
+		end
+	end, "Hover hint presentation.")
+
+	group:CreateDropdown("Toast style", { "glass", "rail", "banner", "pill" }, windUi:GetNotificationStyle and windUi:GetNotificationStyle() or "glass", function(selected)
+		if type(windUi.SetNotificationStyle) == "function" then
+			windUi:SetNotificationStyle(selected)
+		end
+	end, "Notification chrome variant.")
+
+	group:CreateToggle("Ambient window glow", ENV.Alleral_AmbientGlow ~= false, "Soft accent halo behind the window.", function(value)
+		ENV.Alleral_AmbientGlow = value ~= false
+		if type(windUi.SetAmbientGlow) == "function" then
+			windUi:SetAmbientGlow(value)
+		end
+	end)
+
+	group:CreateToggle("Tab aurora rail", ENV.Alleral_TabAurora ~= false, "Accent pulse on sidebar tabs.", function(value)
+		ENV.Alleral_TabAurora = value ~= false
+		if type(windUi.SetTabAurora) == "function" then
+			windUi:SetTabAurora(value)
+		end
+	end)
+
+	group:CreateToggle("Section lift", ENV.Alleral_SectionLift ~= false, "Elevated cards with accent edge glow.", function(value)
+		ENV.Alleral_SectionLift = value ~= false
+		if type(windUi.SetSectionLift) == "function" then
+			windUi:SetSectionLift(value)
+		end
+	end)
+
+	group:CreateDropdown("V2 theme", v2Themes, "Arrrel", function(selected)
+		if type(windUi.SetTheme) == "function" then
+			pcall(function()
+				windUi:SetTheme(selected)
+				if type(windUi.FlashAccent) == "function" then
+					windUi:FlashAccent()
+				end
+			end)
+		end
+	end, "Full V2 theme presets including Synth, Ocean, and Void.")
+
+	group:CreateButton("Cycle V2 themes", function()
+		if type(windUi.CycleV2Theme) == "function" then
+			local ok, nextTheme = pcall(function()
+				return windUi:CycleV2Theme(1)
+			end)
+			if ok and nextTheme then
+				Core.notify("Alleral V2", "Theme: " .. tostring(nextTheme), 2, "success")
+			end
+		end
+	end, "Step through the expanded V2 palette.")
+
+	group:CreateButton("Export look", function()
+		if type(windUi.ExportCustomization) == "function" then
+			local ok, payload = pcall(function()
+				return windUi:ExportCustomization()
+			end)
+			if ok and type(payload) == "table" and Core.setClipboard then
+				local encoded = game:GetService("HttpService"):JSONEncode(payload)
+				pcall(Core.setClipboard, encoded)
+				Core.notify("Alleral V2", "Customization copied to clipboard.", 3, "success")
+			end
+		end
+	end, "Copy your current UI settings as JSON.")
+
+	return group
+end
+
 function Core.buildSystemPanelGroup(tab, options)
 	options = type(options) == "table" and options or {}
 	local column = options.column or 2
@@ -2428,6 +2594,7 @@ function Core.buildStandardSettingsExtras(tab, options)
 	Core.buildSessionStatsGroup(tab, options.sessionColumn or 1)
 	Core.buildServerToolsGroup(tab, options.serverColumn or 1)
 	Core.buildThemeStudioGroup(tab, options)
+	Core.buildCustomizationStudioGroup(tab, options)
 	Core.buildSystemPanelGroup(tab, options)
 	Core.buildAdvancedHubGroup(tab, options)
 	Core.buildQuickTogglesGroup(tab, options)
@@ -3412,7 +3579,21 @@ local function listUiThemes(windUi)
 		end
 	end
 	if #names == 0 then
-		return { "Arrrel", "ArrrelNeon", "ArrrelMidnight", "ArrrelAurora", "Dark", "Light" }
+		return {
+			"Arrrel",
+			"ArrrelNeon",
+			"ArrrelMidnight",
+			"ArrrelAurora",
+			"ArrrelObsidian",
+			"ArrrelSynth",
+			"ArrrelOcean",
+			"ArrrelEmber",
+			"ArrrelStealth",
+			"ArrrelPaper",
+			"ArrrelVoid",
+			"Dark",
+			"Light",
+		}
 	end
 	return names
 end
@@ -4117,7 +4298,21 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 	function tab:BuildThemeGroupbox(column)
 		local group = Core.buildUiGroup(tab, "Appearance", column or 1)
 		local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
-		local themes = (uiBundle and uiBundle.ThemeNames) or { "Arrrel", "ArrrelNeon", "ArrrelAurora", "Dark", "Light" }
+		local themes = (uiBundle and uiBundle.ThemeNames) or {
+			"Arrrel",
+			"ArrrelNeon",
+			"ArrrelMidnight",
+			"ArrrelAurora",
+			"ArrrelObsidian",
+			"ArrrelSynth",
+			"ArrrelOcean",
+			"ArrrelEmber",
+			"ArrrelStealth",
+			"ArrrelPaper",
+			"ArrrelVoid",
+			"Dark",
+			"Light",
+		}
 		if windUi and type(windUi.ListThemeNames) == "function" then
 			local ok, listed = pcall(function()
 				return windUi:ListThemeNames()
@@ -4157,7 +4352,7 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 			end
 		end, "Cycles through available presets.")
 
-		local accentPresets = { "Mint", "Cyan", "Violet", "Rose", "Amber", "Ice", "Aurora" }
+		local accentPresets = { "Mint", "Cyan", "Violet", "Rose", "Amber", "Ice", "Aurora", "Crimson", "Lime", "Sky", "Gold", "Plum", "Teal", "Blaze", "Mono" }
 		group:CreateDropdown("Accent color", accentPresets, "Mint", function(selected)
 			if windUi and type(windUi.ApplyAccentPreset) == "function" then
 				pcall(function()

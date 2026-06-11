@@ -1,6 +1,7 @@
-1.0.0-arrrel3
+2.0.0-alleral-v2
 Base: https://github.com/Footagesus/WindUI/releases/tag/1.6.64-fix
 Patch: ui/windui/arrrel.luau
+V2: ui/windui/v2/boost.luau
 Legacy: ui/windui/aller.luau
 Loader: ui/windui/bootstrap.lua
 Layout: sidebar + section spacing from ui/design/tokens.json
