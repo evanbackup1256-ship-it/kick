@@ -3,11 +3,11 @@
 	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "5.4.10"
+local LOADER_VERSION = "5.4.11"
 local MIN_CORE = "1.18"
 local CORE_MIN_BYTES = 50000
 local RELEASE_FALLBACK = {
-	core = "1.22",
+	core = "1.23",
 	analytics = "1.0",
 	telemetry = "2.2",
 	helpers = "1.0",
@@ -1775,8 +1775,9 @@ local function main()
 	end
 
 	log("Loading " .. profile.name .. " v" .. profile.version .. " from " .. label)
-	publishBridge()
+	ENV.Alleral_Boot = LOADER_VERSION
 	ENV.Alleral_LoaderMeta = { version = LOADER_VERSION, profile = profile.id, source = label }
+	publishBridge()
 	src = ENV_BRIDGE .. "\n" .. src
 
 	local ok, runErr = compileAndRun(src, "Alleral/" .. profile.id, ENV)

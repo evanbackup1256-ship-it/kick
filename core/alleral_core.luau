@@ -1884,6 +1884,13 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 		return output
 	end
 
+	local function instanceHasChild(parent, childName)
+		if type(parent) ~= "table" or type(parent.FindFirstChild) ~= "function" then
+			return false
+		end
+		return parent:FindFirstChild(childName) ~= nil
+	end
+
 	local function waitForElement(element, timeout)
 		local started = tick()
 		repeat
@@ -2011,7 +2018,7 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 				})
 			end
 		end
-		if not waitForElement(label, 3) or not (label.Instance and label.Instance:FindFirstChild("DropdownHolder")) then
+		if not waitForElement(label, 3) or not instanceHasChild(label.Instance, "DropdownHolder") then
 			local renderedValues = config.Searchable and compactOptions(values, current) or values
 			local dropdown = groupbox:CreateDropdown({
 				Name = config.Text or config.Name or id,
