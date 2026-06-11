@@ -1092,6 +1092,13 @@ local function mergeTables(base, extra)
 	return base
 end
 
+local function trim(value)
+	if value == nil then
+		return ""
+	end
+	return tostring(value):match("^%s*(.-)%s*$") or ""
+end
+
 local function normalizeHttps(url)
 	if type(url) ~= "string" or url == "" then
 		return url
@@ -1186,13 +1193,6 @@ local function loadSecurityConfig()
 	end
 	ENV.Alleral_OwnerSecurity = cfg
 	return cfg
-end
-
-local function trim(value)
-	if value == nil then
-		return ""
-	end
-	return tostring(value):match("^%s*(.-)%s*$") or ""
 end
 
 local function enforceSecurityGate(profile, stage)
