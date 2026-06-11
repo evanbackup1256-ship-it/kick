@@ -702,11 +702,14 @@ local Library do
  return getcustomasset(`{Library.Folders.Assets}/{Name}.font`)
  end
 
- local SemiBold = Font.new("rbxassetid://12187365364", Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
-
- local Regular = Font.new("rbxassetid://12187365364", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-
- local Light = Font.new("rbxassetid://12187365364", Enum.FontWeight.Light, Enum.FontStyle.Normal)
+ local SemiBold = Enum.Font.GothamMedium
+ local Regular = Enum.Font.Gotham
+ local Light = Enum.Font.Gotham
+ pcall(function()
+ SemiBold = Font.new("rbxassetid://12187365364", Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+ Regular = Font.new("rbxassetid://12187365364", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+ Light = Font.new("rbxassetid://12187365364", Enum.FontWeight.Light, Enum.FontStyle.Normal)
+ end)
 
  Library.Fonts = {
  ["SemiBold"] = SemiBold,
@@ -717,7 +720,22 @@ local Library do
  Library.Font = SemiBold
  end
 
- Library.Holder = Instances:Create("ScreenGui", {
+ Library.EnsureGuiRoot = function(self)
+ if type(self) ~= "table" then
+  return nil
+ end
+
+ local holder = self.Holder
+ if holder and holder.Instance and holder.Instance.Parent then
+  return self
+ end
+
+ if holder and type(holder.Clean) == "function" then
+  pcall(holder.Clean, holder)
+ end
+ self.Holder = nil
+
+ self.Holder = Instances:Create("ScreenGui", {
  Parent = gethui(),
  Name = "\0",
  ZIndexBehavior = Enum.ZIndexBehavior.Global,
@@ -725,40 +743,49 @@ local Library do
  ResetOnSpawn = false
  })
 
- Library.UnusedHolder = Instances:Create("ScreenGui", {
- Parent = gethui(),
- Name = "\0",
- ZIndexBehavior = Enum.ZIndexBehavior.Global,
- Enabled = false,
- ResetOnSpawn = false
- })
+ if not self.UnusedHolder or not self.UnusedHolder.Instance then
+  self.UnusedHolder = Instances:Create("ScreenGui", {
+  Parent = gethui(),
+  Name = "\0",
+  ZIndexBehavior = Enum.ZIndexBehavior.Global,
+  Enabled = false,
+  ResetOnSpawn = false
+  })
+ end
 
- Library.NotifHolder = Instances:Create("Frame", {
- Parent = Library.Holder.Instance,
- Name = "\0",
- BackgroundTransparency = 1,
- Size = UDim2New(0, 0, 1, 0),
- BorderColor3 = FromRGB(0, 0, 0),
- BorderSizePixel = 0,
- AutomaticSize = Enum.AutomaticSize.X,
- BackgroundColor3 = FromRGB(255, 255, 255)
- })
- 
- Instances:Create("UIListLayout", {
- Parent = Library.NotifHolder.Instance,
- Name = "\0",
- Padding = UDimNew(0, 12),
- SortOrder = Enum.SortOrder.LayoutOrder
- })
- 
- Instances:Create("UIPadding", {
- Parent = Library.NotifHolder.Instance,
- Name = "\0",
- PaddingTop = UDimNew(0, 12),
- PaddingBottom = UDimNew(0, 12),
- PaddingRight = UDimNew(0, 12),
- PaddingLeft = UDimNew(0, 12)
- }) 
+ if not self.NotifHolder or not self.NotifHolder.Instance then
+  self.NotifHolder = Instances:Create("Frame", {
+  Parent = self.Holder.Instance,
+  Name = "\0",
+  BackgroundTransparency = 1,
+  Size = UDim2New(0, 0, 1, 0),
+  BorderColor3 = FromRGB(0, 0, 0),
+  BorderSizePixel = 0,
+  AutomaticSize = Enum.AutomaticSize.X,
+  BackgroundColor3 = FromRGB(255, 255, 255)
+  })
+
+  Instances:Create("UIListLayout", {
+  Parent = self.NotifHolder.Instance,
+  Name = "\0",
+  Padding = UDimNew(0, 12),
+  SortOrder = Enum.SortOrder.LayoutOrder
+  })
+
+  Instances:Create("UIPadding", {
+  Parent = self.NotifHolder.Instance,
+  Name = "\0",
+  PaddingTop = UDimNew(0, 12),
+  PaddingBottom = UDimNew(0, 12),
+  PaddingRight = UDimNew(0, 12),
+  PaddingLeft = UDimNew(0, 12)
+  })
+ end
+
+ return self
+ end
+
+ Library:EnsureGuiRoot()
 
  Library.Unload = function(self)
  for Index, Value in self.Connections do 
@@ -771,10 +798,19 @@ local Library do
 
  if self.Holder then 
  self.Holder:Clean()
+ self.Holder = nil
  end
 
  if self.UnusedHolder then 
  self.UnusedHolder:Clean()
+ self.UnusedHolder = nil
+ end
+
+ if self.NotifHolder and self.NotifHolder.Instance then
+ pcall(function()
+ self.NotifHolder.Instance:Destroy()
+ end)
+ self.NotifHolder = nil
  end
 
  if self.WatermarkFrame then
@@ -788,7 +824,6 @@ local Library do
  end
  end
 
- Library = nil 
  getgenv().Library = nil
  end
 
@@ -2438,6 +2473,7 @@ local Library do
 
  Library.Window = function(self, Data)
  Data = Data or { }
+ self:EnsureGuiRoot()
 
  local Window = {
  Name = Data.Name or Data.name or "Window",

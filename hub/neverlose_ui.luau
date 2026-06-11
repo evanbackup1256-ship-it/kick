@@ -68,9 +68,26 @@ return function(Core)
 		return result
 	end
 
+	local function neverloseLibraryLive(lib)
+		if type(lib) ~= "table" or type(lib.Window) ~= "function" then
+			return false
+		end
+		if type(lib.EnsureGuiRoot) == "function" then
+			local ok = pcall(lib.EnsureGuiRoot, lib)
+			if not ok then
+				return false
+			end
+		end
+		return lib.Holder and lib.Holder.Instance
+	end
+
 	local function loadNeverloseLibrary()
-		if ENV._NeverloseLibrary and type(ENV._NeverloseLibrary.Window) == "function" then
+		if neverloseLibraryLive(ENV._NeverloseLibrary) then
 			return ENV._NeverloseLibrary
+		end
+		ENV._NeverloseLibrary = nil
+		if getgenv().Library then
+			getgenv().Library = nil
 		end
 
 		local springFactory = compileModule(readLocal(SPRING_FILE) or fetchRemote(SPRING_FILE, MIN_SPRING_BYTES), "@Neverlose/spring")
@@ -353,6 +370,7 @@ return function(Core)
 		end
 
 		ENV._NeverloseLibrary = Library
+		pcall(Library.EnsureGuiRoot, Library)
 		return Library
 	end
 

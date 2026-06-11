@@ -57,10 +57,22 @@ if ($library -match 'function Window:SetOpen[\s\S]*?Name = "Menu Keybind"') {
     Fail "Window:SetOpen must be defined before Settings Menu Keybind is created"
 }
 
-if ($library -match 'Library\.MenuKeybind = bind\.Key') {
-    Pass "Menu Keybind syncs Library.MenuKeybind"
+if ($library -match 'Library\.EnsureGuiRoot = function') {
+    Pass "library.lua exposes EnsureGuiRoot"
 } else {
-    Fail "Menu Keybind callback must sync Library.MenuKeybind from MenuBind flag"
+    Fail "library.lua missing EnsureGuiRoot for ScreenGui bootstrap"
+}
+
+if ($library -match 'Library\.Window = function\(self, Data\)[\s\S]*?self:EnsureGuiRoot\(\)') {
+    Pass "Window bootstraps GUI root before building"
+} else {
+    Fail "Library.Window must call EnsureGuiRoot before creating frames"
+}
+
+if ($neverloseUi -match 'neverloseLibraryLive') {
+    Pass "neverlose_ui validates cached library Holder"
+} else {
+    Fail "neverlose_ui must reject stale cached libraries missing Holder"
 }
 
 if ($failed.Count -gt 0) {
