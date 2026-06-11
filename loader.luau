@@ -3,7 +3,7 @@
 	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "5.4.3"
+local LOADER_VERSION = "5.4.4"
 local MIN_CORE = "1.18"
 local RELEASE_FALLBACK = {
 	core = "1.19",
@@ -582,18 +582,15 @@ local CAPABILITIES = {
 local function httpGet(url, minBytes)
 	minBytes = minBytes or 0
 
-	if ENV.Alleral_Core and type(ENV.Alleral_Core.httpGet) == "function" then
-		local body = ENV.Alleral_Core.httpGet(url)
-		if type(body) == "string" and #body >= minBytes then
-			return body, "core"
-		end
-	end
-
 	local bestBody, bestVia, bestLen = nil, nil, 0
 	local function consider(body, via)
 		if type(body) == "string" and #body > bestLen then
 			bestBody, bestVia, bestLen = body, via, #body
 		end
+	end
+
+	if ENV.Alleral_Core and type(ENV.Alleral_Core.httpGet) == "function" then
+		consider(ENV.Alleral_Core.httpGet(url), "core")
 	end
 
 	local body, via = tryGameHttpGet(url)
@@ -661,7 +658,11 @@ local function fetchRemote(relativePath, minBytes)
 			local label = base .. (via and (" via " .. via) or "")
 			return body, label
 		end
-		lastErr = via or "invalid response"
+		if body then
+			lastErr = (via or "http") .. " (" .. tostring(#body) .. "b, invalid lua)"
+		else
+			lastErr = via or "invalid response"
+		end
 	end
 	return nil, lastErr or ("fetch failed for " .. relativePath)
 end
@@ -719,6 +720,114 @@ local function getSource(localPaths, remotePath, opts)
 	return nil, path or ("Could not load " .. remotePath)
 end
 
+local function gameScriptValid(body, profile)
+	if type(body) ~= "string" then
+		return false
+	end
+	local minBytes = profile.minBytes or 40000
+	if #body < minBytes then
+		return false
+	end
+	if body:find("404: Not Found", 1, true) then
+		return false
+	end
+	if not looksLikeLua(body) then
+		return false
+	end
+	if profile.sourceMarker and not body:find(profile.sourceMarker, 1, true) then
+		return false
+	end
+	if profile.version and not body:find('local VERSION = "' .. profile.version .. '"', 1, true) then
+		return false
+	end
+	return true
+end
+
+local function collectHttpBodies(url)
+	local results = {}
+	local seen = {}
+	local function add(body, via)
+		if type(body) ~= "string" or #body == 0 or seen[via] then
+			return
+		end
+		seen[via] = true
+		table.insert(results, { body = body, via = via, len = #body })
+	end
+
+	if ENV.Alleral_Core and type(ENV.Alleral_Core.httpGet) == "function" then
+		add(ENV.Alleral_Core.httpGet(url), "core")
+	end
+
+	add(select(1, tryGameHttpGet(url)), "httpget")
+
+	local req = getHttpRequestFn()
+	if req then
+		add(requestVia(req, url .. "?t=" .. tick()), "request")
+	end
+
+	for _, transport in ipairs(HTTP_TRANSPORTS) do
+		add(transport.fetch(url), transport.id)
+		add(transport.fetch(url .. "?t=" .. tick()), transport.id)
+	end
+
+	add(select(1, httpFetch(url)), "httpfetch")
+	return results
+end
+
+local function fetchGameScript(profile)
+	local minBytes = profile.minBytes or 40000
+
+	local src, path = readLocal(profile.scriptFiles, minBytes)
+	if src and gameScriptValid(src, profile) then
+		return src, "local:" .. path
+	end
+	if src and path then
+		log("Removing invalid local game script at " .. path, true)
+		deleteWorkspaceFile(path)
+	end
+
+	local best, bestInvalid, lastErr = nil, nil, nil
+	for _, base in ipairs(REMOTE_BASES) do
+		for _, suffix in ipairs({ "", "?t=" .. tick() }) do
+			local url = base .. "/" .. profile.scriptUrl .. suffix
+			for _, item in ipairs(collectHttpBodies(url)) do
+				if gameScriptValid(item.body, profile) then
+					if not best or item.len > best.len then
+						best = { body = item.body, via = item.via, base = base, len = item.len }
+					end
+				elseif item.len > (bestInvalid and bestInvalid.len or 0) then
+					bestInvalid = item
+				end
+			end
+		end
+		if best then
+			break
+		end
+	end
+
+	if best then
+		cacheRemote(profile.scriptUrl, best.body)
+		return best.body, best.base .. " via " .. best.via .. " (" .. tostring(best.len) .. "b)"
+	end
+
+	if bestInvalid then
+		if gameScriptValid(bestInvalid.body, { minBytes = minBytes }) then
+			lastErr = bestInvalid.via .. " (missing marker or version)"
+		else
+			lastErr = bestInvalid.via
+				.. " ("
+				.. tostring(bestInvalid.len)
+				.. "b, need "
+				.. tostring(minBytes)
+				.. "b+)"
+		end
+	elseif lastErr == nil then
+		lastErr = "all transports failed"
+	end
+
+	return nil, lastErr
+end
+
 local function compileAndRun(source, chunkName, runEnv)
 	if not loadStringFn then
 		return false, "loadstring unavailable"
@@ -753,6 +862,9 @@ local function coreValid(src)
 		return false
 	end
 	if src:find("fakeUiInstance", 1, true) and not src:find("AlleralGroupShell", 1, true) then
+		return false
+	end
+	if src:find("jsdelivr", 1, true) then
 		return false
 	end
 	if not loadStringFn then
@@ -892,6 +1004,7 @@ local GAMES = {
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
 		scriptUrl = "games/kick_a_lucky_block.luau",
 		sourceMarker = "Alleral_Rayfield",
+		minBytes = 100000,
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Shared" }, 20)
 			local areas = Workspace:WaitForChild("Areas", 20)
@@ -914,6 +1027,7 @@ local GAMES = {
 		placeIds = { 95082159892680 },
 		scriptFiles = { "games/speed_keyboard_escape.luau", "speed_keyboard_escape.luau" },
 		scriptUrl = "games/speed_keyboard_escape.luau",
+		minBytes = 22000,
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Remotes" }, 20)
 			return true
@@ -931,6 +1045,7 @@ local GAMES = {
 		universeIds = { 9792947201 },
 		scriptFiles = { "games/slime_rng.luau", "slime_rng.luau" },
 		scriptUrl = "games/slime_rng.luau",
+		minBytes = 40000,
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Packages", "DataService" }, 25)
 			return true
@@ -947,6 +1062,7 @@ local GAMES = {
 		placeIds = { 107646426076756 },
 		scriptFiles = { "games/build_a_ring_farm.luau", "build_a_ring_farm.luau" },
 		scriptUrl = "games/build_a_ring_farm.luau",
+		minBytes = 55000,
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Shared" }, 20)
 			waitForPath(ReplicatedStorage, { "Remotes", "PlantSeed" }, 15)
@@ -964,6 +1080,7 @@ local GAMES = {
 		placeIds = { 114204398207377 },
 		scriptFiles = { "games/survive_a_zombie_arena.luau", "survive_a_zombie_arena.luau" },
 		scriptUrl = "games/survive_a_zombie_arena.luau",
+		minBytes = 18000,
 		preload = function()
 			waitForPath(ReplicatedStorage, { "ZombieRemotes", "ZombieDamage" }, 20)
 			return true
@@ -1574,10 +1691,7 @@ local function main()
 		end
 	end
 
-	local src, label = getSource(profile.scriptFiles, profile.scriptUrl, {
-		marker = profile.sourceMarker,
-		minBytes = 40000,
-	})
+	local src, label = fetchGameScript(profile)
 	if not src then
 		notify("Alleral", "Game script failed: " .. tostring(label), 8)
 		log("Game script failed: " .. tostring(label), true)
