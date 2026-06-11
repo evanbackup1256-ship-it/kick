@@ -108,9 +108,15 @@ function WindowBuilder.create(library, windowSettings)
 		blur.Parent = lighting
 	end
 	blur.Size = 0
+	local destroyed = false
 
 	local function setBlur(active)
-		blur.Size = (active and Theme.Visual.BlurEnabled) and Theme.Visual.BlurSize or 0
+		local target = (active and Theme.Visual.BlurEnabled) and Theme.Visual.BlurSize or 0
+		Tween.number(blur.Size, target, function(value)
+			if not destroyed then
+				blur.Size = value
+			end
+		end, Theme.motion(active and 0.32 or 0.22))
 	end
 
 	local main = Util.new("Frame", {
@@ -133,7 +139,6 @@ function WindowBuilder.create(library, windowSettings)
 		Instance = main,
 		Visible = false,
 	}
-	local destroyed = false
 	local keybindConnection
 
 	local windowScale = Instance.new("UIScale")
@@ -146,12 +151,24 @@ function WindowBuilder.create(library, windowSettings)
 		end
 		local visible = state == true
 		window.Visible = visible
-		main.Visible = visible
 		if visible then
-			windowScale.Scale = 0.94
-			Tween.play(windowScale, { Scale = 1 }, nil, Theme.tweenInfo(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
+			main.Visible = true
+			windowScale.Scale = 0.9
+			main.BackgroundTransparency = 1
+			Tween.play(windowScale, { Scale = 1 }, nil, Theme.motionSpring(0.34))
+			Tween.play(main, {
+				BackgroundTransparency = Theme.Visual.BlurEnabled and transp.Window or 0,
+			}, nil, Theme.motion(0.28))
+			setBlur(true)
+		else
+			Tween.play(windowScale, { Scale = 0.94 }, nil, Theme.motionSnap(0.16))
+			Tween.play(main, { BackgroundTransparency = 1 }, function()
+				if not destroyed and main and main.Parent then
+					main.Visible = false
+				end
+			end, Theme.motionSnap(0.14))
+			setBlur(false)
 		end
-		setBlur(visible)
 	end
 
 	local sidebar = Util.new("Frame", {
@@ -489,11 +506,11 @@ function WindowBuilder.create(library, windowSettings)
 				local targetBg = active and transp.Section or 1
 				local targetStroke = active and transp.SectionStroke or 1
 				local targetText = active and transp.TabActive or transp.Tab
-				Tween.play(navButton, { BackgroundTransparency = targetBg }, nil, Theme.tweenInfo(0.18))
-				Tween.play(navStroke, { Transparency = targetStroke }, nil, Theme.tweenInfo(0.18))
-				Tween.play(navLabel, { TextTransparency = targetText }, nil, Theme.tweenInfo(0.18))
+				Tween.play(navButton, { BackgroundTransparency = targetBg }, nil, Theme.motion(0.2))
+				Tween.play(navStroke, { Transparency = targetStroke }, nil, Theme.motion(0.2))
+				Tween.play(navLabel, { TextTransparency = targetText }, nil, Theme.motion(0.2))
 				if navIcon then
-					Tween.play(navIcon, { ImageTransparency = targetText }, nil, Theme.tweenInfo(0.18))
+					Tween.play(navIcon, { ImageTransparency = targetText }, nil, Theme.motion(0.2))
 				end
 			end
 
@@ -501,7 +518,7 @@ function WindowBuilder.create(library, windowSettings)
 				local previousPage = window.CurrentTab and window.CurrentTab.Page
 				for _, other in pairs(self.Tabs) do
 					other.Active = false
-					if other.Page then
+					if other.Page and other.Page ~= tab.Page then
 						other.Page.Visible = false
 					end
 					if other.StyleNav then
@@ -510,16 +527,21 @@ function WindowBuilder.create(library, windowSettings)
 				end
 				tab.Active = true
 				tab.Page.Visible = true
-				if previousPage ~= tab.Page then
-					tab.Page.Position = UDim2.new(0, 0, 0, 10)
+				if previousPage and previousPage ~= tab.Page then
+					tab.Page.Position = UDim2.new(0, 0, 0, 14)
 					Tween.play(
 						tab.Page,
 						{ Position = UDim2.new(0, 0, 0, 0) },
 						nil,
-						Theme.tweenInfo(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+						Theme.motionSpring(0.28)
 					)
+					Tween.play(titleLabel, { TextTransparency = 0.8 }, function()
+						titleLabel.Text = tabSettings.Name or tabIndex
+						Tween.play(titleLabel, { TextTransparency = 0.5 }, nil, Theme.motion(0.2))
+					end, Theme.motionSnap(0.1))
+				else
+					titleLabel.Text = tabSettings.Name or tabIndex
 				end
-				titleLabel.Text = tabSettings.Name or tabIndex
 				styleNav(true)
 				window.CurrentTab = tab
 			end
@@ -533,15 +555,15 @@ function WindowBuilder.create(library, windowSettings)
 				if tab.Active then
 					return
 				end
-				Tween.play(navButton, { BackgroundTransparency = transp.Section + 0.02 }, nil, Theme.tweenInfo(0.15))
-				Tween.play(navLabel, { TextTransparency = transp.TabActive }, nil, Theme.tweenInfo(0.15))
+				Tween.play(navButton, { BackgroundTransparency = transp.Section + 0.02 }, nil, Theme.motionSnap(0.14))
+				Tween.play(navLabel, { TextTransparency = transp.TabActive }, nil, Theme.motionSnap(0.14))
 			end)
 			navButton.MouseLeave:Connect(function()
 				if tab.Active then
 					return
 				end
-				Tween.play(navButton, { BackgroundTransparency = 1 }, nil, Theme.tweenInfo(0.15))
-				Tween.play(navLabel, { TextTransparency = transp.Tab }, nil, Theme.tweenInfo(0.15))
+				Tween.play(navButton, { BackgroundTransparency = 1 }, nil, Theme.motionSnap(0.14))
+				Tween.play(navLabel, { TextTransparency = transp.Tab }, nil, Theme.motionSnap(0.14))
 			end)
 			self.Tabs[tabIndex] = tab
 

@@ -63,7 +63,7 @@ local WindowBuilder = requireModule('window')
 local Util = requireModule('util')
 
 local Starlight = {
-\tInterfaceBuild = "Alleral-5",
+\tInterfaceBuild = "Alleral-6",
 \tWindowKeybind = "K",
 \tMinimized = false,
 \tMaximized = false,

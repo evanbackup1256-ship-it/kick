@@ -263,6 +263,7 @@ Theme.Visual = {
 	BlurEnabled = true,
 	BlurSize = 16,
 	AnimationSpeed = 1,
+	MotionScale = 1,
 	FontScale = 1,
 	CompactMode = false,
 	ShowShadows = true,
@@ -294,8 +295,20 @@ function Theme.setTheme(name)
 end
 
 function Theme.tweenInfo(time, style, direction)
-	local speed = Theme.Visual.AnimationSpeed
-	return TweenInfo.new((time or 0.2) / speed, style or Enum.EasingStyle.Sine, direction or Enum.EasingDirection.Out)
+	local speed = Theme.Visual.AnimationSpeed * (Theme.Visual.MotionScale or 1)
+	return TweenInfo.new((time or 0.2) / speed, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out)
+end
+
+function Theme.motion(time)
+	return Theme.tweenInfo(time or 0.2)
+end
+
+function Theme.motionSpring(time)
+	return Theme.tweenInfo(time or 0.26, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+end
+
+function Theme.motionSnap(time)
+	return Theme.tweenInfo(time or 0.12, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 end
 
 return Theme

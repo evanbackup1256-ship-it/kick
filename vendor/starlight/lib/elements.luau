@@ -79,6 +79,12 @@ function Elements.createRow(parent, settings, theme)
 	return row, label, slot, dropdownHolder
 end
 
+function Elements.animateRowEntrance(label, index)
+	if label then
+		Tween.entrance(label, (index or 0) * 0.028)
+	end
+end
+
 function Elements.glassBox(parent, theme, size)
 	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 	local box = Util.new("Frame", {
@@ -100,6 +106,7 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
+	Elements.animateRowEntrance(label, index)
 
 	local toggleBtn = Util.new("ImageButton", {
 		AutoButtonColor = false,
@@ -111,29 +118,51 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 		ImageColor3 = theme.Miscellaneous.ToggleOff,
 	}, { slot })
 
+	local toggleScale = Instance.new("UIScale")
+	toggleScale.Scale = 1
+	toggleScale.Parent = toggleBtn
+
 	local head = Util.new("ImageLabel", {
 		Name = "TogglerHead",
 		BackgroundTransparency = 1,
 		Image = Theme.Assets.ToggleHead,
 		ImageColor3 = theme.Miscellaneous.ToggleHeadOff,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0, 10, 0.5, 0),
 		Size = UDim2.fromOffset(15, 15),
 		ZIndex = 2,
 	}, { toggleBtn })
 
-	local function paint(on)
-		toggleBtn.ImageColor3 = on and theme.Miscellaneous.ToggleOn or theme.Miscellaneous.ToggleOff
-		head.ImageColor3 = on and theme.Miscellaneous.ToggleHeadOn or theme.Miscellaneous.ToggleHeadOff
-		head.Position = on and UDim2.new(1, 0, 0.5, 0) or UDim2.new(0.5, 0, 0.5, 0)
-		Tween.play(toggleBtn, { ImageColor3 = toggleBtn.ImageColor3 }, nil, Theme.tweenInfo(0.2))
-		Tween.play(head, { ImageColor3 = head.ImageColor3, Position = head.Position }, nil, Theme.tweenInfo(0.2))
+	local function paint(on, instant)
+		local trackColor = on and theme.Miscellaneous.ToggleOn or theme.Miscellaneous.ToggleOff
+		local headColor = on and theme.Miscellaneous.ToggleHeadOn or theme.Miscellaneous.ToggleHeadOff
+		local headPos = on and UDim2.new(1, -10, 0.5, 0) or UDim2.new(0, 10, 0.5, 0)
+		if instant then
+			toggleBtn.ImageColor3 = trackColor
+			head.ImageColor3 = headColor
+			head.Position = headPos
+			return
+		end
+		Tween.play(toggleBtn, { ImageColor3 = trackColor }, nil, Theme.motion(0.22))
+		Tween.play(head, {
+			ImageColor3 = headColor,
+			Position = headPos,
+		}, nil, Theme.motionSpring(0.28))
+		Tween.play(toggleScale, { Scale = 1.06 }, function()
+			Tween.play(toggleScale, { Scale = 1 }, nil, Theme.motionSnap(0.14))
+		end, Theme.motionSnap(0.1))
 	end
-	paint(settings.CurrentValue)
+	paint(settings.CurrentValue, true)
 
+	toggleBtn.MouseEnter:Connect(function()
+		Tween.play(toggleScale, { Scale = 1.04 }, nil, Theme.motionSnap(0.12))
+	end)
+	toggleBtn.MouseLeave:Connect(function()
+		Tween.play(toggleScale, { Scale = 1 }, nil, Theme.motionSnap(0.12))
+	end)
 	toggleBtn.MouseButton1Click:Connect(function()
 		settings.CurrentValue = not settings.CurrentValue
-		paint(settings.CurrentValue)
+		paint(settings.CurrentValue, false)
 		Elements.runCallback(windowSettings, settings.Name or "Toggle", function()
 			settings.Callback(settings.CurrentValue)
 		end, library)
@@ -146,7 +175,7 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 		element.Values = newSettings
 		settings = newSettings
 		label.Text = settings.Name or label.Text
-		paint(settings.CurrentValue == true)
+		paint(settings.CurrentValue == true, false)
 	end
 	function element:Destroy()
 		row:Destroy()
@@ -174,6 +203,10 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
 	slot.Size = UDim2.fromOffset(150, 26)
+	Elements.animateRowEntrance(label, index)
+
+	local valueScale = Instance.new("UIScale")
+	valueScale.Scale = 1
 
 	local valueBox = Util.new("TextBox", {
 		AnchorPoint = Vector2.new(1, 0.5),
@@ -189,6 +222,7 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		TextSize = 12 * Theme.Visual.FontScale,
 		ClearTextOnFocus = false,
 	}, { slot })
+	valueScale.Parent = valueBox
 	Util.corner(4, valueBox)
 	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, valueBox)
 
@@ -200,44 +234,97 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 	Util.corner(999, bar)
 
 	local fill = Util.new("Frame", {
-		BackgroundColor3 = theme.Foregrounds.Light,
-		BackgroundTransparency = 0.5,
+		BackgroundColor3 = theme.Miscellaneous.ToggleOn,
+		BackgroundTransparency = 0.15,
 		Size = UDim2.new(0, 0, 1, 0),
 	}, { bar })
 	Util.corner(999, fill)
 
+	local thumb = Util.new("Frame", {
+		Name = "Thumb",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = theme.Foregrounds.Light,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, 0.5, 0),
+		Size = UDim2.fromOffset(10, 10),
+		ZIndex = 4,
+	}, { bar })
+	Util.corner(999, thumb)
+	Util.stroke(Color3.fromRGB(255, 255, 255), 1, 0.35, thumb)
+
+	local thumbScale = Instance.new("UIScale")
+	thumbScale.Scale = 1
+	thumbScale.Parent = thumb
+
 	local dragging = false
-	local function setValue(raw, fire)
+	local function applyVisuals(alpha, animate)
+		local fillGoal = UDim2.new(alpha, 0, 1, 0)
+		local thumbGoal = UDim2.new(alpha, 0, 0.5, 0)
+		if dragging or not animate then
+			fill.Size = fillGoal
+			thumb.Position = thumbGoal
+		else
+			Tween.play(fill, { Size = fillGoal }, nil, Theme.motion(0.2))
+			Tween.play(thumb, { Position = thumbGoal }, nil, Theme.motionSpring(0.24))
+		end
+	end
+
+	local function pulseValue()
+		Tween.play(valueScale, { Scale = 1.08 }, function()
+			Tween.play(valueScale, { Scale = 1 }, nil, Theme.motionSnap(0.12))
+		end, Theme.motionSnap(0.08))
+	end
+
+	local function setValue(raw, fire, animate)
+		local previous = settings.CurrentValue
 		settings.CurrentValue = snapValue(raw)
 		local alpha = (settings.CurrentValue - minValue) / math.max(maxValue - minValue, increment)
-		fill.Size = UDim2.new(alpha, 0, 1, 0)
+		applyVisuals(alpha, animate ~= false and not dragging)
 		valueBox.Text = tostring(settings.CurrentValue)
+		if previous ~= settings.CurrentValue then
+			pulseValue()
+		end
 		if fire and settings.Callback then
 			Elements.runCallback(windowSettings, settings.Name or "Slider", function()
 				settings.Callback(settings.CurrentValue)
 			end, library)
 		end
 	end
-	setValue(settings.CurrentValue, false)
+	setValue(settings.CurrentValue, false, false)
 
 	local hit = Util.button({
 		Parent = bar,
-		Size = UDim2.new(1, 0, 4, 0),
-		Position = UDim2.new(0, 0, 0.5, -2),
+		Size = UDim2.new(1, 0, 12, 0),
+		Position = UDim2.new(0, 0, 0.5, -6),
 		BackgroundTransparency = 1,
 		Radius = 999,
 	})
 	hit.ZIndex = 3
+	hit.MouseEnter:Connect(function()
+		if not dragging then
+			Tween.play(bar, { Size = UDim2.new(1, -48, 0, 5) }, nil, Theme.motionSnap(0.12))
+		end
+	end)
+	hit.MouseLeave:Connect(function()
+		if not dragging then
+			Tween.play(bar, { Size = UDim2.new(1, -48, 0, 4) }, nil, Theme.motionSnap(0.12))
+			Tween.play(thumbScale, { Scale = 1 }, nil, Theme.motionSnap(0.12))
+		end
+	end)
 	hit.MouseButton1Down:Connect(function()
 		dragging = true
+		Tween.play(thumbScale, { Scale = 1.35 }, nil, Theme.motionSnap(0.1))
+		Tween.play(fill, { BackgroundTransparency = 0 }, nil, Theme.motionSnap(0.12))
 		local mouse = UserInputService:GetMouseLocation()
 		local rel = Util.clamp((mouse.X - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X, 1), 0, 1)
-		setValue(minValue + (maxValue - minValue) * rel, true)
+		setValue(minValue + (maxValue - minValue) * rel, true, false)
 	end)
 	UserInputService.InputEnded:Connect(function(input)
 		if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-			setValue(settings.CurrentValue, true)
+			setValue(settings.CurrentValue, true, true)
 			dragging = false
+			Tween.play(thumbScale, { Scale = 1 }, nil, Theme.motionSpring(0.18))
+			Tween.play(fill, { BackgroundTransparency = 0.15 }, nil, Theme.motion(0.16))
 		end
 	end)
 	UserInputService.InputChanged:Connect(function(input)
@@ -246,7 +333,7 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		end
 		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 			local rel = Util.clamp((input.Position.X - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X, 1), 0, 1)
-			setValue(minValue + (maxValue - minValue) * rel, dragging)
+			setValue(minValue + (maxValue - minValue) * rel, false, false)
 		end
 	end)
 
@@ -264,7 +351,7 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 			increment = newSettings.Increment
 		end
 		label.Text = settings.Name or label.Text
-		setValue(settings.CurrentValue, false)
+		setValue(settings.CurrentValue, false, true)
 	end
 	function element:Destroy()
 		row:Destroy()
@@ -315,20 +402,21 @@ function Elements.createButton(groupbox, settings, index, windowSettings, librar
 		Position = UDim2.fromScale(1, 0.5),
 		Size = UDim2.fromOffset(15, 15),
 	}, { btn })
+	Elements.animateRowEntrance(label, index)
 
 	btn.MouseEnter:Connect(function()
-		Tween.play(btn, { BackgroundTransparency = transp.Input }, nil, Theme.tweenInfo(0.15))
-		label.TextTransparency = transp.LabelHover
+		Tween.play(btn, { BackgroundTransparency = transp.Input }, nil, Theme.motionSnap(0.14))
+		Tween.play(label, { TextTransparency = transp.LabelHover }, nil, Theme.motionSnap(0.14))
 	end)
 	btn.MouseLeave:Connect(function()
-		Tween.play(btn, { BackgroundTransparency = 1 }, nil, Theme.tweenInfo(0.15))
-		label.TextTransparency = transp.Label
+		Tween.play(btn, { BackgroundTransparency = 1 }, nil, Theme.motionSnap(0.14))
+		Tween.play(label, { TextTransparency = transp.Label }, nil, Theme.motionSnap(0.14))
 	end)
 	btn.MouseButton1Down:Connect(function()
-		Tween.play(btn, { Size = UDim2.new(1, -4, 1, -2) }, nil, Theme.tweenInfo(0.08))
+		Tween.play(btn, { Size = UDim2.new(1, -4, 1, -2) }, nil, Theme.motionSnap(0.08))
 	end)
 	btn.MouseButton1Up:Connect(function()
-		Tween.play(btn, { Size = UDim2.fromScale(1, 1) }, nil, Theme.tweenInfo(0.12))
+		Tween.play(btn, { Size = UDim2.fromScale(1, 1) }, nil, Theme.motionSpring(0.14))
 	end)
 	btn.MouseButton1Click:Connect(function()
 		Elements.runCallback(windowSettings, settings.Name or "Button", settings.Callback or function() end, library)
@@ -355,6 +443,7 @@ function Elements.createInput(groupbox, settings, index, windowSettings, library
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
 	slot.Size = UDim2.fromOffset(160, 26)
+	Elements.animateRowEntrance(label, index)
 
 	local box = Util.inputBox({
 		Parent = slot,
@@ -370,8 +459,19 @@ function Elements.createInput(groupbox, settings, index, windowSettings, library
 	})
 	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, box)
 	Util.padding(0, 8, 0, 8, box)
+	local inputStroke = box:FindFirstChildOfClass("UIStroke")
 
+	box.Focused:Connect(function()
+		Tween.play(box, { BackgroundTransparency = math.max(0, transp.Input - 0.06) }, nil, Theme.motionSnap(0.14))
+		if inputStroke then
+			Tween.play(inputStroke, { Transparency = math.max(0, transp.Stroke - 0.25) }, nil, Theme.motionSnap(0.14))
+		end
+	end)
 	box.FocusLost:Connect(function()
+		Tween.play(box, { BackgroundTransparency = transp.Input }, nil, Theme.motion(0.16))
+		if inputStroke then
+			Tween.play(inputStroke, { Transparency = transp.Stroke }, nil, Theme.motion(0.16))
+		end
 		settings.CurrentValue = box.Text
 		Elements.runCallback(windowSettings, settings.Name or "Input", function()
 			settings.Callback(settings.CurrentValue)
@@ -536,6 +636,16 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 	})
 	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, closed)
 
+	local chevron = Util.new("ImageLabel", {
+		BackgroundTransparency = 1,
+		Image = Theme.Assets.ButtonArrow,
+		ImageTransparency = 0.45,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -8, 0.5, 0),
+		Rotation = 90,
+		Size = UDim2.fromOffset(12, 12),
+	}, { closed })
+
 	local valueText = Util.text({
 		Parent = closed,
 		Text = "",
@@ -567,6 +677,10 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, popup)
 	Util.padding(4, 4, 4, 4, popup)
 
+	local popupScale = Instance.new("UIScale")
+	popupScale.Scale = 0.94
+	popupScale.Parent = popup
+
 	local openDropdowns = library and library._openDropdowns
 	if not openDropdowns and library then
 		openDropdowns = {}
@@ -580,8 +694,18 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		popup.Position = UDim2.fromOffset(anchor.X, anchor.Y + size.Y + 4)
 	end
 
-	local function closePopup()
-		popup.Visible = false
+	local function closePopup(instant)
+		if instant then
+			popup.Visible = false
+			popupScale.Scale = 0.94
+			chevron.Rotation = 90
+		else
+			Tween.play(popupScale, { Scale = 0.94 }, nil, Theme.motionSnap(0.1))
+			Tween.play(chevron, { Rotation = 90 }, nil, Theme.motionSnap(0.14))
+			Tween.play(popup, { BackgroundTransparency = 1 }, function()
+				popup.Visible = false
+			end, Theme.motionSnap(0.12))
+		end
 		if openDropdowns then
 			openDropdowns[popup] = nil
 		end
@@ -600,7 +724,12 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 			openDropdowns[popup] = true
 		end
 		positionPopup()
+		popup.BackgroundTransparency = 1
 		popup.Visible = true
+		popupScale.Scale = 0.92
+		Tween.play(popupScale, { Scale = 1 }, nil, Theme.motionSpring(0.22))
+		Tween.play(popup, { BackgroundTransparency = 0 }, nil, Theme.motion(0.18))
+		Tween.play(chevron, { Rotation = -90 }, nil, Theme.motionSpring(0.2))
 	end
 
 	local function displayValue()
@@ -642,6 +771,12 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 				TextTransparency = selected and 0.2 or 0.5,
 				Size = UDim2.fromScale(1, 1),
 			})
+			opt.MouseEnter:Connect(function()
+				Tween.play(opt, { BackgroundTransparency = selected and 0.82 or 0.9 }, nil, Theme.motionSnap(0.1))
+			end)
+			opt.MouseLeave:Connect(function()
+				Tween.play(opt, { BackgroundTransparency = selected and 0.9 or 0.98 }, nil, Theme.motionSnap(0.1))
+			end)
 			opt.MouseButton1Click:Connect(function()
 				if settings.Multi then
 					local found = table.find(settings.CurrentOptions, option)
@@ -672,7 +807,18 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 
 	displayValue()
 	rebuildOptions()
+	if rowLabel then
+		Elements.animateRowEntrance(rowLabel, index)
+	end
 
+	closed.MouseEnter:Connect(function()
+		Tween.play(closed, { BackgroundTransparency = math.max(0, transp.Input - 0.04) }, nil, Theme.motionSnap(0.12))
+	end)
+	closed.MouseLeave:Connect(function()
+		if not popup.Visible then
+			Tween.play(closed, { BackgroundTransparency = transp.Input }, nil, Theme.motionSnap(0.12))
+		end
+	end)
 	closed.MouseButton1Click:Connect(function()
 		if popup.Visible then
 			closePopup()
