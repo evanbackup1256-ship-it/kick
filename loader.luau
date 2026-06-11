@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.6.4"
+local LOADER_VERSION = "7.6.5"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 60
@@ -19,7 +19,7 @@ local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.6.4",
+	loader = "7.6.5",
 	core = "2.7.5",
 	ui = "Alleral",
 	analytics = "1.2",
@@ -1073,7 +1073,7 @@ local function coreMonolithValid(src)
 	if not src:find("buildUiGroup", 1, true) or not src:find("buildUiWindow", 1, true) then
 		return false
 	end
-	if not src:find("ENV%.Alleral_Core = Core", 1, true) then
+	if not src:find("ENV.Alleral_Core = Core", 1, true) then
 		return false
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
@@ -1096,10 +1096,10 @@ local function coreBaseValid(src)
 	if not src:find("applyUiLayer", 1, true) then
 		return false
 	end
-	if not src:find('Core%._CORE_ARTIFACT%s*=%s*"base"', 1, true) then
+	if not src:find('Core._CORE_ARTIFACT = "base"', 1, true) then
 		return false
 	end
-	if src:find("function Core%.loadUi", 1, true) then
+	if src:find("function Core.loadUi", 1, true) then
 		return false
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
@@ -1113,13 +1113,13 @@ local function coreUiValid(src)
 	if type(src) ~= "string" or #src < CORE_UI_MIN_BYTES then
 		return false
 	end
-	if not src:find("function Core%.loadUi", 1, true) then
+	if not src:find("function Core.loadUi", 1, true) then
 		return false
 	end
 	if not src:find("buildUiGroup", 1, true) or not src:find("buildUiWindow", 1, true) then
 		return false
 	end
-	if not src:find("return function%(Core%)", 1, true) then
+	if not src:find("return function(Core)", 1, true) then
 		return false
 	end
 	return compileCoreSource(src, "Alleral/core_ui")
@@ -1129,7 +1129,7 @@ local function coreHubUiValid(src)
 	if type(src) ~= "string" or #src < CORE_HUB_UI_MIN_BYTES then
 		return false
 	end
-	if not src:find("return function%(Core%)", 1, true) then
+	if not src:find("return function(Core)", 1, true) then
 		return false
 	end
 	if not src:find("buildStandardSettingsExtras", 1, true) then
@@ -1158,7 +1158,7 @@ local function coreRejectReason(src)
 	if not src:find("applyUiLayer", 1, true) and not src:find("loadUi", 1, true) then
 		return "missing core bootstrap"
 	end
-	if not src:find('Core%._CORE_ARTIFACT%s*=%s*"base"', 1, true) and not src:find("ENV%.Alleral_Core = Core", 1, true) then
+	if not src:find('Core._CORE_ARTIFACT = "base"', 1, true) and not src:find("ENV.Alleral_Core = Core", 1, true) then
 		return "truncated core (" .. tostring(#src) .. "b)"
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
@@ -1187,13 +1187,13 @@ local function coreUiRejectReason(src)
 	if #src < CORE_UI_MIN_BYTES then
 		return tostring(#src) .. "b, need " .. tostring(CORE_UI_MIN_BYTES) .. "b+"
 	end
-	if not src:find("function Core%.loadUi", 1, true) then
+	if not src:find("function Core.loadUi", 1, true) then
 		return "missing loadUi"
 	end
 	if not src:find("buildUiGroup", 1, true) or not src:find("buildUiWindow", 1, true) then
 		return "missing UI helpers"
 	end
-	if not src:find("return function%(Core%)", 1, true) then
+	if not src:find("return function(Core)", 1, true) then
 		return "missing ui layer wrapper"
 	end
 	if loadStringFn then
@@ -1324,7 +1324,7 @@ local function purgeStaleCorePaths()
 				local okRead, src = pcall(readFile, path)
 				if okRead and type(src) == "string" and src ~= "" then
 					local stale = #src > CORE_BASE_MAX_BYTES
-					if path:find("core%.luau", 1, true) and not path:find("core_base", 1, true) then
+					if path:find("core.luau", 1, true) and not path:find("core_base", 1, true) then
 						stale = true
 					end
 					if stale and not coreValid(src) then
