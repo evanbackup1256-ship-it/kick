@@ -99,7 +99,7 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ARRREL_UI_VERSION = "2.0.8-alleral-v2"
+	WindUI.ARRREL_UI_VERSION = "2.1.0-alleral-v2"
 	WindUI.ARRREL_BRAND = "Alleral"
 	WindUI.ALLERAL_UI_VERSION = WindUI.ARRREL_UI_VERSION
 	WindUI.ALLERAL_BRAND = "Alleral UI V2"
@@ -511,6 +511,10 @@ return function(WindUI)
 	installTweenCreateHook()
 
 	local AutoScaleLib = (function()
+		if type(WindUI._AlleralScaleApi) == "table" and type(WindUI._AlleralScaleApi.apply) == "function" then
+			return WindUI._AlleralScaleApi
+		end
+
 		local roots = {
 			"ui/windui/autoscale.luau",
 			"kick/ui/windui/autoscale.luau",
@@ -520,7 +524,6 @@ return function(WindUI)
 		local urls = {
 			"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/autoscale.luau",
 			"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/autoscale.luau",
-			"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua",
 		}
 		local readFn = readfile or (syn and syn.readfile) or (fluxus and fluxus.readfile)
 		local isFileFn = isfile or (syn and syn.isfile)
@@ -541,9 +544,9 @@ return function(WindUI)
 			if not ok or type(factory) ~= "function" then
 				return nil
 			end
-			local applied, api = pcall(factory, WindUI)
-			if applied and type(api) == "table" and type(api.apply) == "function" then
-				return api
+			local applied = pcall(factory, WindUI)
+			if applied and type(WindUI._AlleralScaleApi) == "table" then
+				return WindUI._AlleralScaleApi
 			end
 			return nil
 		end
@@ -561,91 +564,17 @@ return function(WindUI)
 		end
 
 		for _, url in ipairs(urls) do
-			if url:find("autoscale", 1, true) then
-				local bust = url .. (url:find("?", 1, true) and "&" or "?") .. "t=" .. tostring(tick())
-				local ok, body = pcall(function()
-					return game:HttpGet(bust)
-				end)
-				local api = ok and activate(body, url)
-				if api then
-					return api
-				end
+			local bust = url .. (url:find("?", 1, true) and "&" or "?") .. "t=" .. tostring(tick())
+			local ok, body = pcall(function()
+				return game:HttpGet(bust)
+			end)
+			local api = ok and activate(body, url)
+			if api then
+				return api
 			end
 		end
 
-		local margin, minScale, maxScale, threshold = 40, 0.3, 1.0, 0.05
-		local function computeScale(window)
-			if type(window) ~= "table" or window.IsFullscreen or window.AutoScale == false then
-				return nil
-			end
-			local camera = Workspace.CurrentCamera
-			local main = window.UIElements and window.UIElements.Main
-			if not camera or not main or not main:IsA("GuiObject") then
-				return nil
-			end
-			local abs = main.AbsoluteSize
-			if abs.X <= 1 or abs.Y <= 1 then
-				return nil
-			end
-			local vp = camera.ViewportSize
-			local availX, availY = vp.X - margin * 2, vp.Y - margin * 2
-			if availX <= 0 or availY <= 0 then
-				return nil
-			end
-			return math.clamp(math.min(availX / abs.X, availY / abs.Y), minScale, maxScale)
-		end
-		local function applyScale(window)
-			if type(window) ~= "table" or type(window.SetUIScale) ~= "function" then
-				return nil
-			end
-			local profileMul = math.clamp(tonumber(WindUI._AlleralUiScale) or 1, 0.75, 1.25)
-			local base = computeScale(window)
-			local scale = base
-			if not scale then
-				if window.AutoScale == false then
-					scale = profileMul
-				else
-					return nil
-				end
-			else
-				scale = math.clamp(base * profileMul, minScale, maxScale)
-			end
-			local current = (type(window.GetUIScale) == "function" and window:GetUIScale()) or 1
-			if math.abs(scale - current) > threshold then
-				pcall(function()
-					window:SetUIScale(scale)
-				end)
-			end
-			WindUI._AlleralAutoScale = scale
-			return scale
-		end
-		return {
-			apply = applyScale,
-			compute = computeScale,
-			bind = function(window, _, onRefresh)
-				local function refresh()
-					applyScale(window)
-					if type(onRefresh) == "function" then
-						pcall(onRefresh, window)
-					end
-				end
-				local function hook(camera)
-					if not camera then
-						return
-					end
-					pcall(function()
-						camera:GetPropertyChangedSignal("ViewportSize"):Connect(refresh)
-					end)
-					task.defer(refresh)
-					task.delay(0.08, refresh)
-					task.delay(0.25, refresh)
-				end
-				hook(Workspace.CurrentCamera)
-				Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-					hook(Workspace.CurrentCamera)
-				end)
-			end,
-		}
+		return WindUI._AlleralScaleApi
 	end)()
 
 	-- Spring motion presets (fraktality/spr-style: frequency Hz + damping ratio).
@@ -3108,6 +3037,26 @@ return function(WindUI)
 		end
 	end
 
+	local function refreshUiLayoutAfterScale(window)
+		if type(window) ~= "table" then
+			return
+		end
+		relayoutAllHStacks(window)
+		local mainBar = window.UIElements and window.UIElements.MainBar
+		if mainBar then
+			polishRowLabels(mainBar)
+			polishLabelTone(mainBar)
+			polishElementRowHeights(mainBar)
+			if AutoScaleLib and type(AutoScaleLib.fixTextLayout) == "function" then
+				pcall(AutoScaleLib.fixTextLayout, mainBar)
+			end
+		end
+	end
+
+	if AutoScaleLib and type(AutoScaleLib.registerLayoutRefresh) == "function" then
+		AutoScaleLib.registerLayoutRefresh("arrrel", refreshUiLayoutAfterScale)
+	end
+
 	local function applyWindowScale(window)
 		if AutoScaleLib and type(AutoScaleLib.apply) == "function" then
 			return AutoScaleLib.apply(window)
@@ -3121,17 +3070,14 @@ return function(WindUI)
 		WindUI._AlleralAutoScaleBound = window
 		if AutoScaleLib and type(AutoScaleLib.bind) == "function" then
 			AutoScaleLib.bind(window, nil, function()
-				if WindUI.Window then
-					task.defer(function()
-						relayoutAllHStacks(WindUI.Window)
-						polishRowLabels(WindUI.Window.UIElements and WindUI.Window.UIElements.MainBar)
-					end)
-				end
+				task.defer(function()
+					refreshUiLayoutAfterScale(window)
+				end)
 			end)
 		end
 		task.defer(function()
 			applyWindowScale(window)
-			relayoutAllHStacks(window)
+			refreshUiLayoutAfterScale(window)
 		end)
 	end
 
@@ -3142,8 +3088,7 @@ return function(WindUI)
 		end
 		local scale = applyWindowScale(window)
 		task.defer(function()
-			relayoutAllHStacks(window)
-			polishRowLabels(window.UIElements and window.UIElements.MainBar)
+			refreshUiLayoutAfterScale(window)
 		end)
 		return scale
 	end
@@ -4547,7 +4492,7 @@ return function(WindUI)
 			applyWindowScale(WindUI.Window)
 			WindUI:RepairWindow(WindUI.Window)
 			task.defer(function()
-				relayoutAllHStacks(WindUI.Window)
+				refreshUiLayoutAfterScale(WindUI.Window)
 			end)
 		end
 		return resolved, preset
@@ -4560,7 +4505,7 @@ return function(WindUI)
 		if WindUI.Window then
 			applyWindowScale(WindUI.Window)
 			task.defer(function()
-				relayoutAllHStacks(WindUI.Window)
+				refreshUiLayoutAfterScale(WindUI.Window)
 			end)
 		end
 		return scale

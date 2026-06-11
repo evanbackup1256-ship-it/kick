@@ -33,7 +33,7 @@ return function(ctx)
 	WindUI.ALLERAL_V2_FEATURES = WindUI.ALLERAL_V2_FEATURES or {}
 
 	local V2 = WindUI.ALLERAL_V2_FEATURES
-	V2.version = "2.0.0-alleral-v2"
+	V2.version = "2.1.0-alleral-v2"
 
 	-- -------------------------------------------------------------------------
 	-- V2 customization state
@@ -386,6 +386,46 @@ return function(ctx)
 		end
 	end
 
+	local function fixV2TextLayout(window)
+		if type(window) ~= "table" then
+			return
+		end
+		local scaleApi = WindUI._AlleralScaleApi
+		local roots = {
+			window.UIElements and window.UIElements.MainBar,
+			window.UIElements and window.UIElements.Main,
+			WindUI.DropdownGui,
+		}
+		for _, root in ipairs(roots) do
+			if scaleApi and type(scaleApi.fixTextLayout) == "function" then
+				pcall(scaleApi.fixTextLayout, root)
+			elseif root then
+				for _, desc in ipairs(root:GetDescendants()) do
+					if desc:IsA("TextLabel") and desc.TextWrapped then
+						desc.TextWrapped = false
+						desc.TextTruncate = Enum.TextTruncate.AtEnd
+					end
+				end
+			end
+		end
+	end
+
+	local function refreshV2Layout(window, includeScaleRefresh)
+		window = window or WindUI.Window
+		if not window then
+			return false
+		end
+		if includeScaleRefresh ~= false and type(WindUI.RefreshViewportScale) == "function" then
+			pcall(function()
+				WindUI:RefreshViewportScale(window)
+			end)
+		else
+			fixV2TextLayout(window)
+			polishV2Window(window)
+		end
+		return true
+	end
+
 	local function polishV2Window(window)
 		if type(window) ~= "table" then
 			return
@@ -413,6 +453,7 @@ return function(ctx)
 				applyRowShimmer(main)
 			end
 			applyTabAurora(window)
+			fixV2TextLayout(window)
 		end)
 	end
 
@@ -430,6 +471,8 @@ return function(ctx)
 	function WindUI.GetV2Features(_self)
 		return {
 			version = V2.version,
+			scale = WindUI._AlleralAutoScale or WindUI._AlleralUiScale or 1,
+			scaleApi = WindUI._AlleralScaleApi and WindUI._AlleralScaleApi.VERSION or nil,
 			themes = {
 				"ArrrelObsidian",
 				"ArrrelSynth",
@@ -605,13 +648,20 @@ return function(ctx)
 			pcall(function()
 				WindUI:SetUiScale(payload.uiScale)
 			end)
-		end
-		if WindUI.Window and type(WindUI.RepairWindow) == "function" then
+		elseif WindUI.Window and type(WindUI.RefreshViewportScale) == "function" then
 			pcall(function()
-				WindUI:RepairWindow(WindUI.Window)
+				WindUI:RefreshViewportScale(WindUI.Window)
 			end)
 		end
+		if WindUI.Window then
+			fixV2TextLayout(WindUI.Window)
+			polishV2Window(WindUI.Window)
+		end
 		return true
+	end
+
+	function WindUI.RefreshV2Layout(_self, window)
+		return refreshV2Layout(window, true)
 	end
 
 	function WindUI.CycleV2Theme(_self, delta)
@@ -676,9 +726,22 @@ return function(ctx)
 
 	local originalRepair = WindUI.RepairWindow
 	function WindUI.RepairWindow(self, window)
+		local target = window or WindUI.Window
 		local ok = originalRepair(self, window)
-		polishV2Window(window or WindUI.Window)
+		fixV2TextLayout(target)
+		polishV2Window(target)
 		return ok
+	end
+
+	local originalRefreshScale = WindUI.RefreshViewportScale
+	if type(originalRefreshScale) == "function" then
+		function WindUI.RefreshViewportScale(self, window)
+			local target = window or WindUI.Window
+			local scale = originalRefreshScale(self, window)
+			fixV2TextLayout(target)
+			polishV2Window(target)
+			return scale
+		end
 	end
 
 	WindUI:SetMotionProfile(WindUI._AlleralMotionProfile or "fluid")

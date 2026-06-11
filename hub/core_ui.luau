@@ -440,6 +440,7 @@ function Core.loadUi()
 			WindUI:ApplyProfile(ENV.Alleral_UiProfile or "auto")
 		end)
 	end
+	registerUiScaleHooks(WindUI)
 	if ENV.Alleral_UiScale and type(WindUI.SetUiScale) == "function" then
 		pcall(function()
 			WindUI:SetUiScale(ENV.Alleral_UiScale)
@@ -1045,6 +1046,7 @@ local function fixWrappedLabels(root)
 end
 
 local COLUMN_GAP = 8
+Core._UiTabRegistry = Core._UiTabRegistry or {}
 
 local function relayoutTwoColumnFrames(tab)
 	local layout = tab._layout
@@ -1175,6 +1177,35 @@ local function scheduleTwoColumnRelayout(tab)
 	task.delay(0.15, tryRelayout)
 end
 
+function Core.refreshAllTabColumns()
+	for _, tab in ipairs(Core._UiTabRegistry) do
+		if type(tab) == "table" then
+			relayoutTwoColumnFrames(tab)
+		end
+	end
+	return true
+end
+
+local function registerUiScaleHooks(windUi)
+	if type(windUi) ~= "table" or Core._UiScaleHooksRegistered then
+		return
+	end
+	Core._UiScaleHooksRegistered = true
+	if type(windUi.RegisterLayoutRefresh) == "function" then
+		pcall(function()
+			windUi:RegisterLayoutRefresh("core_columns", function()
+				Core.refreshAllTabColumns()
+			end)
+		end)
+	elseif windUi._AlleralScaleApi and type(windUi._AlleralScaleApi.registerLayoutRefresh) == "function" then
+		pcall(function()
+			windUi._AlleralScaleApi.registerLayoutRefresh("core_columns", function()
+				Core.refreshAllTabColumns()
+			end)
+		end)
+	end
+end
+
 function Core.wrapUiTab(rawTab, uiBundle, window)
 	local tab = {
 		_rawTab = rawTab,
@@ -1182,6 +1213,7 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 		_window = window,
 		_columnCount = 1,
 	}
+	table.insert(Core._UiTabRegistry, tab)
 
 	local function resolveColumn(column)
 		column = math.clamp(tonumber(column) or 1, 1, 2)
@@ -2244,8 +2276,14 @@ function Core.buildUiWindow(ui, settings)
 	}
 	Core.registerUiWindow(window)
 	Core.flushPendingNotifications()
+	registerUiScaleHooks(lib)
 	task.defer(function()
 		Core.repairUiWindow(window)
+		if type(lib.RefreshViewportScale) == "function" then
+			pcall(function()
+				lib:RefreshViewportScale(window._rawWindow)
+			end)
+		end
 	end)
 	function window:AddTab(name, icon)
 		if not self._rawWindow or type(self._rawWindow.Tab) ~= "function" then

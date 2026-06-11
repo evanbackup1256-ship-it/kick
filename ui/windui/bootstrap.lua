@@ -119,7 +119,7 @@ return function(WindUI)
 		return nil
 	end
 
-	local autoscaleSource = loadModule(AUTOSCALE_FILE, "WindUI AutoScale")
+	local autoscaleSource = loadModule(AUTOSCALE_FILE, "registerLayoutRefresh")
 	if autoscaleSource then
 		local compile = loadstring or load
 		if type(compile) == "function" then
