@@ -76,7 +76,7 @@ return function(Core)
 		local springFactory = compileModule(readLocal(SPRING_FILE) or fetchRemote(SPRING_FILE, MIN_SPRING_BYTES), "@Neverlose/spring")
 		local Spring = type(springFactory) == "function" and springFactory() or nil
 
-		local libSource = readLocal(LIBRARY_FILE) or fetchRemote(LIBRARY_FILE)
+		local libSource = readLocal(LIBRARY_FILE) or fetchRemote(LIBRARY_FILE, MIN_LIBRARY_BYTES)
 		if not libSource then
 			return nil, "library.lua missing"
 		end
@@ -86,8 +86,13 @@ return function(Core)
 			return nil, "invalid Neverlose library"
 		end
 
-		if Spring and Library then
-			local origNotification = Library.Notification
+		if not Spring then
+			Core.logWarn("Neverlose spring unavailable — UI loads with TweenService animation fallback")
+		end
+
+		do
+			local springModule = Spring
+			local origNotification = type(Library.Notification) == "function" and Library.Notification or nil
 			local motionProfiles = {
 				fluid = { frequency = 7, damping = 0.78 },
 				snappy = { frequency = 11, damping = 0.9 },
@@ -116,7 +121,8 @@ return function(Core)
 			end
 			table.sort(themeNames)
 
-			Library._Spring = Spring
+			Library._SpringModule = springModule
+			Library._Spring = springModule
 			Library._SpringMotion = motionProfiles.fluid
 			Library.ALLERAL_UI_V2 = true
 			Library.WindUI = Library
@@ -137,11 +143,14 @@ return function(Core)
 
 			Library.Notification = function(self, data)
 				data = type(data) == "table" and data or { Title = "Notice", Description = tostring(data) }
-				return origNotification(self, {
+				local payload = {
 					Title = data.Title or data.title or "Notice",
 					Description = data.Description or data.Content or data.Text or data.description or "",
 					Duration = data.Duration or data.Time or 4,
-				})
+				}
+				if type(origNotification) == "function" then
+					return origNotification(self, payload)
+				end
 			end
 			Library.Notify = Library.Notification
 			Library.CreateWindow = function(_, settings)
@@ -249,7 +258,7 @@ return function(Core)
 			end
 			Library.SetReducedMotion = function(_, enabled)
 				ENV.Alleral_UiReducedMotion = enabled == true
-				Library._Spring = enabled and nil or Spring
+				Library._Spring = enabled and nil or Library._SpringModule
 				if enabled then
 					Library._SpringMotion = motionProfiles.reduced
 				else
