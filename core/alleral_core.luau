@@ -1,10 +1,17 @@
 local Core = {}
-Core.VERSION = "1.17"
+Core.VERSION = "1.18"
 Core.UI_LIBRARY = "Rayfield"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
 local RAYFIELD_SOURCE_URL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua"
+local RAYFIELD_MIRROR_URLS = {
+	"https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
+	"https://cdn.jsdelivr.net/gh/SiriusSoftwareLtd/Rayfield@main/source.lua",
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/vendor/rayfield/source.lua",
+	"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/vendor/rayfield/source.lua",
+}
+local RAYFIELD_MIN_BYTES = 50000
 local RAYFIELD_LOCAL_FILES = {
 	"vendor/rayfield/source.lua",
 	"rayfield/source.lua",
@@ -1027,7 +1034,20 @@ function Core.postWebhook(url, payload)
 end
 
 function Core.loadStringFn()
-	return ENV.loadstring or loadstring
+	local candidates = {
+		ENV.loadstring,
+		ENV.LoadString,
+		ENV.load,
+		ENV.Load,
+		loadstring,
+		load,
+	}
+	for _, candidate in ipairs(candidates) do
+		if type(candidate) == "function" then
+			return candidate
+		end
+	end
+	return Core.firstExecFunc("loadstring", "LoadString", "load", "Load")
 end
 
 function Core.readFile(path)
@@ -1069,15 +1089,24 @@ local function stampRayfield(library)
 	return library
 end
 
+local function rayfieldSourceValid(body)
+	return type(body) == "string"
+		and #body >= RAYFIELD_MIN_BYTES
+		and (body:find("RayfieldLibrary", 1, true) or body:find("CreateWindow", 1, true))
+end
+
 local function compileRayfieldSource(source, label)
 	local loadStringFn = Core.loadStringFn()
 	if not loadStringFn or not source or source == "" then
 		return nil, "Empty Rayfield source"
 	end
-	if not source:find("RayfieldLibrary") and not source:find("CreateWindow") then
-		return nil, "Not a Rayfield source file"
+	if not rayfieldSourceValid(source) then
+		return nil, "Rayfield source too small or invalid (" .. tostring(#source) .. " bytes)"
 	end
 	local compiled, compileErr = loadStringFn(source, label)
+	if not compiled and type(load) == "function" and load ~= loadStringFn then
+		compiled, compileErr = load(source, label)
+	end
 	if not compiled then
 		return nil, tostring(compileErr)
 	end
@@ -1085,36 +1114,27 @@ local function compileRayfieldSource(source, label)
 	if ok and rayfieldOk(result) then
 		return stampRayfield(result)
 	end
+	if not ok then
+		warn("[Alleral] Rayfield runtime error: " .. tostring(result))
+	end
 	return nil, ok and "Invalid Rayfield library" or tostring(result)
 end
 
-local function fetchRayfieldSource(url)
+local function fetchRayfieldSourceFromUrl(url)
 	local sep = url:find("?") and "&" or "?"
-	local fetchUrl = url .. sep .. "nocache=" .. tostring(math.random(10000, 99999))
-	if type(game.HttpGet) == "function" then
-		local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
-		if ok and body and body ~= "" and not body:find("404: Not Found") then
-			return body
+	local nonce = tick()
+	local fetchUrl = url .. sep .. "nocache=" .. tostring(nonce)
+	return Core.httpGet(fetchUrl)
+end
+
+local function fetchRayfieldSource()
+	for _, url in ipairs(RAYFIELD_MIRROR_URLS) do
+		local body = fetchRayfieldSourceFromUrl(url)
+		if rayfieldSourceValid(body) then
+			return body, url
 		end
 	end
-	local httpGet = Core.requestFunction()
-	if httpGet then
-		local ok, response = pcall(httpGet, {
-			Url = fetchUrl,
-			Method = "GET",
-			Headers = {
-				["Cache-Control"] = "no-cache, no-store, must-revalidate",
-				["Pragma"] = "no-cache",
-			},
-		})
-		if ok and response then
-			local body = response.Body or response.body or (type(response) == "string" and response)
-			if body and body ~= "" and not body:find("404: Not Found") then
-				return body
-			end
-		end
-	end
-	return nil
+	return nil, nil
 end
 
 local function cacheRayfield(library)
@@ -1137,43 +1157,23 @@ function Core.loadRayfield()
 		return nil, "loadstring unavailable"
 	end
 
-	local preferLocal = ENV.Alleral_DevMode == true or ENV.Alleral_PreferLocal == true
-
 	local function loadLocalRayfield()
-		for _, path in ipairs(RAYFIELD_LOCAL_FILES) do
-			local source = Core.readFile(path)
-			if source then
-				local library, err = compileRayfieldSource(source, "@Rayfield/local")
-				if library then
-					return cacheRayfield(library)
+		local roots = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
+		for _, root in ipairs(roots) do
+			for _, path in ipairs(RAYFIELD_LOCAL_FILES) do
+				local fullPath = root .. path
+				local source = Core.readFile(fullPath)
+				if source then
+					local library, err = compileRayfieldSource(source, "@Rayfield/local:" .. fullPath)
+					if library then
+						warn("[Alleral] Rayfield loaded from " .. fullPath)
+						return cacheRayfield(library)
+					end
+					warn("[Alleral] Local Rayfield failed (" .. fullPath .. "): " .. tostring(err))
 				end
-				warn("[Alleral] Local Rayfield failed (" .. path .. "): " .. tostring(err))
 			end
 		end
 		return nil
-	end
-
-	if preferLocal then
-		local localLibrary = loadLocalRayfield()
-		if localLibrary then
-			return localLibrary
-		end
-	end
-
-	local source = fetchRayfieldSource(RAYFIELD_SOURCE_URL)
-	if source then
-		local library, err = compileRayfieldSource(source, "@Rayfield/remote")
-		if library then
-			warn("[Alleral] Rayfield loaded from Sirius GitHub")
-			return cacheRayfield(library)
-		end
-		if not preferLocal then
-			return nil, err or "Invalid Rayfield library"
-		end
-	else
-		if not preferLocal then
-			return nil, "Rayfield download failed — check HTTP / docs.sirius.menu/rayfield"
-		end
 	end
 
 	local localLibrary = loadLocalRayfield()
@@ -1181,32 +1181,116 @@ function Core.loadRayfield()
 		return localLibrary
 	end
 
-	return nil, "No Rayfield source found"
+	local source, sourceUrl = fetchRayfieldSource()
+	if source then
+		local library, err = compileRayfieldSource(source, "@Rayfield/remote")
+		if library then
+			warn("[Alleral] Rayfield loaded from " .. tostring(sourceUrl or RAYFIELD_SOURCE_URL))
+			return cacheRayfield(library)
+		end
+		warn("[Alleral] Rayfield compile failed: " .. tostring(err))
+		return nil, err or "Invalid Rayfield library"
+	end
+
+	localLibrary = loadLocalRayfield()
+	if localLibrary then
+		return localLibrary
+	end
+
+	return nil, "Rayfield download failed — check HTTP or docs.sirius.menu/rayfield"
 end
 
 function Core.httpGet(url)
+	if type(url) ~= "string" or url == "" then
+		return nil
+	end
+	local function accept(body)
+		if type(body) ~= "string" or body == "" then
+			return false
+		end
+		if body:find("404: Not Found", 1, true) then
+			return false
+		end
+		if body:find("<!DOCTYPE html>", 1, true) or body:find("<html", 1, true) then
+			return body:find("function ", 1, true) ~= nil
+		end
+		return true
+	end
+	local function extractBody(response)
+		if type(response) == "string" then
+			return response
+		end
+		if type(response) == "table" then
+			return response.Body or response.body or response.Data or response.data
+		end
+		return nil
+	end
+
 	if type(game.HttpGet) == "function" then
 		local ok, body = pcall(game.HttpGet, game, url, true)
-		if ok and type(body) == "string" and body ~= "" and not body:find("404: Not Found") then
+		if ok and accept(body) then
+			return body
+		end
+		ok, body = pcall(game.HttpGet, game, url)
+		if ok and accept(body) then
 			return body
 		end
 	end
+
+	local ok, body = pcall(function()
+		return game:HttpGet(url, true)
+	end)
+	if ok and accept(body) then
+		return body
+	end
+
+	ok, body = pcall(function()
+		return game:HttpGet(url)
+	end)
+	if ok and accept(body) then
+		return body
+	end
+
+	if type(HttpService.GetAsync) == "function" then
+		ok, body = pcall(function()
+			return HttpService:GetAsync(url, true)
+		end)
+		if ok and accept(body) then
+			return body
+		end
+	end
+
 	local httpGet = Core.requestFunction()
 	if httpGet then
-		local ok, response = pcall(httpGet, {
-			Url = url,
-			Method = "GET",
-			Headers = {
-				["Cache-Control"] = "no-cache, no-store, must-revalidate",
+		for _, spec in ipairs({
+			{
+				Url = url,
+				Method = "GET",
+				Headers = {
+					["Cache-Control"] = "no-cache, no-store, must-revalidate",
+					["Pragma"] = "no-cache",
+				},
 			},
-		})
-		if ok and response then
-			local body = response.Body or response.body or (type(response) == "string" and response)
-			if body and body ~= "" and not body:find("404: Not Found") then
-				return body
+			{
+				url = url,
+				method = "GET",
+				headers = {
+					["Cache-Control"] = "no-cache, no-store, must-revalidate",
+					["Pragma"] = "no-cache",
+				},
+			},
+		}) do
+			local reqOk, response = pcall(httpGet, spec)
+			if reqOk then
+				body = extractBody(response)
+				local status = type(response) == "table" and (response.StatusCode or response.status or response.Status or 200) or 200
+				if accept(body) and (status == 0 or (status >= 200 and status < 300)) then
+					return body
+				end
 			end
 		end
 	end
+
 	return nil
 end
 
@@ -1459,6 +1543,11 @@ function Core.buildRoScriptsSearch(tab, column, rayfield)
 end
 
 local function fakeUiInstance(visible)
+	return {
+		Visible = visible ~= false,
+		Name = "AlleralGroupShell",
+	}
+end
 
 function Core.createRayfieldGroupbox(tab, sectionName)
 	if sectionName and sectionName ~= "" then

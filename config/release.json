@@ -1,7 +1,7 @@
 {
-  "loader": "3.8.3",
-  "core": "1.17",
+  "loader": "3.8.4",
+  "core": "1.18",
   "ui": "Rayfield",
-  "commit": "df472aa",
+  "commit": "d40bcd3",
   "minLoader": "3.8.0"
 }

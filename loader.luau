@@ -2,8 +2,8 @@
 	Alleral Hub — single entry point.
 	Detects game.PlaceId, loads core + matching games/*.luau script.
 ]]
-local LOADER_VERSION = "3.8.3"
-local REQUIRED_CORE_VERSION = "1.17"
+local LOADER_VERSION = "3.8.4"
+local REQUIRED_CORE_VERSION = "1.18"
 local REQUIRED_UI_LIBRARY = "Rayfield"
 local GITHUB_REPO = "evanbackup1256-ship-it/kick"
 local REPO_BRANCH = "main"
@@ -1625,10 +1625,7 @@ local function main()
 			ENV.Alleral_UI = nil
 			local detail = uiErr
 				or ("UI library mismatch: " .. tostring(uiLibrary and uiLibrary.InterfaceBuild or "nil"))
-			log("warn", "Rayfield preload failed: " .. detail)
-			notify("Alleral", "Rayfield failed: " .. detail, 8)
-			ENV.Alleral_LoaderRunning = false
-			return
+			log("warn", "Rayfield preload skipped: " .. detail .. " (game script will retry)")
 		end
 	end
 
