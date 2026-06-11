@@ -1,0 +1,81 @@
+{
+  "collections": [
+    {
+      "name": "Primitives",
+      "modes": ["Value"],
+      "variables": {
+        "white": "#ffffff",
+        "gray/900": "#0f0f0f",
+        "gray/850": "#141414",
+        "gray/800": "#161616",
+        "gray/750": "#1c1c1c",
+        "gray/500": "#a1a1aa",
+        "mint/500": "#53fc18",
+        "mint/400": "#7dff35",
+        "mint/600": "#30ff6a",
+        "track/off": "#2a2a34",
+        "track/on": "#1a3a12"
+      }
+    },
+    {
+      "name": "Color",
+      "modes": ["Dark"],
+      "variables": {
+        "color/bg/canvas": { "alias": "Primitives/gray/900" },
+        "color/bg/surface": { "alias": "Primitives/gray/850" },
+        "color/bg/card": { "alias": "Primitives/gray/800" },
+        "color/bg/card-hover": { "alias": "Primitives/gray/750" },
+        "color/text/primary": { "alias": "Primitives/white" },
+        "color/text/muted": { "alias": "Primitives/gray/500" },
+        "color/border/divider": { "alias": "Primitives/white", "opacity": 0.1 },
+        "color/accent/primary": { "alias": "Primitives/mint/500" },
+        "color/accent/soft": { "alias": "Primitives/mint/400" },
+        "color/accent/hot": { "alias": "Primitives/mint/600" }
+      }
+    },
+    {
+      "name": "Spacing",
+      "modes": ["Value"],
+      "variables": {
+        "spacing/window/padding": 24,
+        "spacing/element/gap": 16,
+        "spacing/section/gap": 15,
+        "spacing/section/inner": 10,
+        "spacing/section/pad-top": 22,
+        "spacing/section/pad-bottom": 20,
+        "spacing/section/pad-left": 20,
+        "spacing/section/pad-right": 18,
+        "spacing/sidebar/top": 31,
+        "spacing/sidebar/x": 10,
+        "spacing/tab/left": 24,
+        "spacing/tab/right": 12,
+        "spacing/tab/group-gap": 17,
+        "spacing/scroll/top": 10,
+        "spacing/scroll/bottom": 15,
+        "spacing/scroll/left": 11,
+        "spacing/scroll/right": 3
+      }
+    },
+    {
+      "name": "Radius",
+      "modes": ["Value"],
+      "variables": {
+        "radius/window": 10,
+        "radius/tab": 8,
+        "radius/section": 10,
+        "radius/control": 8
+      }
+    },
+    {
+      "name": "Size",
+      "modes": ["Value"],
+      "variables": {
+        "size/sidebar/width": 276,
+        "size/tab/height": 40,
+        "size/row/height": 38,
+        "size/window/width": 860,
+        "size/window/height": 560
+      }
+    }
+  ]
+}

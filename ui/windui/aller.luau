@@ -1,8 +1,7 @@
 --[[
-	Alleral UI — opinionated WindUI layer (Footagesus 1.6.64-fix base)
-	Profiles (desktop/mobile/compact/performance), fluid motion, touch feedback,
-	tab rails, deduped notifications, accessibility toggles, mobile open button.
-	Loaded by ui/windui/main.lua after upstream WindUI initializes.
+	Alleral UI — WindUI layer (Footagesus 1.6.64-fix base)
+	Profiles, motion, tooltips, search, notifications.
+	Tokens: ui/design/tokens.json
 ]]
 
 return function(WindUI)
@@ -15,21 +14,73 @@ return function(WindUI)
 	-- -------------------------------------------------------------------------
 
 	local TweenService = game:GetService("TweenService")
+	local RunService = game:GetService("RunService")
 	local UserInputService = game:GetService("UserInputService")
 	local Workspace = game:GetService("Workspace")
 
-	-- Alleral signature palette — charcoal base, mint accent used as signal not wallpaper.
+	-- Layout tokens — sidebar width, section padding, tab height, hairline dividers.
+	local MAC = {
+		corner = 10,
+		windowPad = 24,
+		sidebarWidth = 276,
+		elementGap = 16,
+		sectionGap = 15,
+		sectionInner = 10,
+		sectionPadTop = 22,
+		sectionPadBottom = 20,
+		sectionPadLeft = 20,
+		sectionPadRight = 18,
+		contentPadX = 20,
+		scrollPadTop = 10,
+		scrollPadBottom = 15,
+		scrollPadLeft = 11,
+		scrollPadRight = 3,
+		sidebarPadTop = 31,
+		sidebarPadX = 10,
+		tabHeight = 40,
+		tabPadLeft = 24,
+		tabPadRight = 12,
+		tabGroupGap = 17,
+		rowHeight = 38,
+		dividerTransparency = 0.9,
+		sectionFillTransparency = 0.98,
+		sectionStrokeTransparency = 0.95,
+		tabInactiveText = 0.42,
+		tabInactiveIcon = 0.45,
+		topbarHeight = 63,
+		rowLabelTransparency = 0.5,
+		notifyCorner = 10,
+		cardStrokeTransparency = 0.95,
+		windowStrokeTransparency = 0.9,
+		sliderTrackTransparency = 0.88,
+		sliderFillTransparency = 0.22,
+		sliderThumbSize = 15,
+	}
+
+	local ACCENT_PRESETS = {
+		Mint = "#53fc18",
+		Cyan = "#22d3ee",
+		Violet = "#a78bfa",
+		Rose = "#fb7185",
+		Amber = "#fbbf24",
+		Ice = "#93c5fd",
+		Emerald = "#34d399",
+		Fuchsia = "#e879f9",
+	}
+
+	-- Alleral palette — Mac-dark base with mint accent as signal color.
 	local palette = {
 		accent = Color3.fromHex("#53fc18"),
 		accentSoft = Color3.fromHex("#7dff35"),
 		accentHot = Color3.fromHex("#30ff6a"),
-		canvas = Color3.fromHex("#09090b"),
-		surface = Color3.fromHex("#121216"),
-		card = Color3.fromHex("#18181f"),
-		cardHover = Color3.fromHex("#1f1f28"),
-		line = Color3.fromHex("#2e2e38"),
-		text = Color3.fromHex("#f4f4f8"),
-		muted = Color3.fromHex("#9393a0"),
+		canvas = Color3.fromHex("#0f0f0f"),
+		surface = Color3.fromHex("#141414"),
+		card = Color3.fromHex("#161616"),
+		cardHover = Color3.fromHex("#1c1c1c"),
+		line = Color3.fromHex("#ffffff"),
+		divider = Color3.fromHex("#ffffff"),
+		text = Color3.fromHex("#ffffff"),
+		muted = Color3.fromHex("#a1a1aa"),
 		trackOff = Color3.fromHex("#2a2a34"),
 		trackOn = Color3.fromHex("#1a3a12"),
 		knob = Color3.fromHex("#f8f8fc"),
@@ -45,7 +96,7 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ALLERAL_UI_VERSION = "1.6.64-fix-aller10"
+	WindUI.ALLERAL_UI_VERSION = "1.6.64-fix-aller17"
 	WindUI.ALLERAL_BRAND = "Alleral UI"
 	WindUI._AlleralNotifyCount = 0
 	WindUI._AlleralMaxNotify = 8
@@ -107,31 +158,349 @@ return function(WindUI)
 		warn(string.format("[Alleral UI/%s] %s", tostring(scope), tostring(err)))
 	end
 
-	local function tween(instance, info, props)
-		if WindUI._AlleralReducedMotion or not instance or not instance.Parent then
+	local function snapProps(instance, props)
+		if not instance or not props then
 			return
 		end
 		pcall(function()
-			TweenService:Create(instance, info, props):Play()
+			for key, value in pairs(props) do
+				instance[key] = value
+			end
 		end)
 	end
 
-	-- Snappy motion — shorter durations + Sine/Quint so UI feels instant, not sluggish.
+	local Motion = (function()
+		local springStates = setmetatable({}, { __mode = "k" })
+		local heartbeatConn = nil
+		local EPSILON = 0.0008
+		local MAX_DT = 1 / 30
+
+		local PRESETS = {
+			instant = { f = math.huge, d = 1 },
+			human = { f = 5.2, d = 1.02 },
+			snappy = { f = 6.4, d = 1.04 },
+			soft = { f = 4.2, d = 1.1 },
+			bouncy = { f = 5.2, d = 0.82 },
+			pop = { f = 5.8, d = 0.88 },
+			micro = { f = 7.8, d = 1.06 },
+			open = { f = 4.6, d = 0.96 },
+			close = { f = 6.4, d = 1.08 },
+			notify = { f = 5.4, d = 0.94 },
+			dropdown = { f = 7.2, d = 1.02 },
+			sweep = { f = 3.8, d = 1.02 },
+			tab = { f = 5.2, d = 0.92 },
+			toggle = { f = 6.4, d = 0.84 },
+			press = { f = 9.5, d = 0.78 },
+			slider = { f = 10, d = 1.02 },
+			tooltip = { f = 6, d = 1 },
+		}
+
+		local function resolvePreset(name)
+			if type(name) == "table" and name.f then
+				return name
+			end
+			return PRESETS[name] or PRESETS.snappy
+		end
+
+		local function stepScalar(pos, vel, goal, dt, freq, damp)
+			if freq == math.huge then
+				return goal, 0
+			end
+			local omega = math.pi * 2 * freq
+			local zeta = damp
+			local offset = pos - goal
+			if zeta >= 1 then
+				local expTerm = math.exp(-omega * dt)
+				local newPos = goal + (offset + (vel + omega * offset) * dt) * expTerm
+				local newVel = (vel - omega * (vel + omega * offset) * dt) * expTerm
+				return newPos, newVel
+			end
+			local omegaD = omega * math.sqrt(1 - zeta * zeta)
+			if omegaD < 1e-4 then
+				omegaD = 1e-4
+			end
+			local expTerm = math.exp(-zeta * omega * dt)
+			local cosTerm = math.cos(omegaD * dt)
+			local sinTerm = math.sin(omegaD * dt)
+			local newPos = goal
+				+ expTerm
+					* (offset * (cosTerm + (zeta * omega / omegaD) * sinTerm) + (vel / omegaD) * sinTerm)
+			local newVel = expTerm
+				* (vel * cosTerm - ((offset * omega * omega + vel * zeta * omega) / omegaD) * sinTerm)
+			return newPos, newVel
+		end
+
+		local function packValue(value)
+			local t = typeof(value)
+			if t == "number" then
+				return "number", { value }, function(ch)
+					return ch[1]
+				end
+			elseif t == "UDim2" then
+				return "udim2", { value.X.Scale, value.X.Offset, value.Y.Scale, value.Y.Offset }, function(ch)
+					return UDim2.new(ch[1], ch[2], ch[3], ch[4])
+				end
+			elseif t == "UDim" then
+				return "udim", { value.Scale, value.Offset }, function(ch)
+					return UDim.new(ch[1], ch[2])
+				end
+			elseif t == "Color3" then
+				return "color3", { value.R, value.G, value.B }, function(ch)
+					return Color3.new(ch[1], ch[2], ch[3])
+				end
+			elseif t == "Vector2" then
+				return "vector2", { value.X, value.Y }, function(ch)
+					return Vector2.new(ch[1], ch[2])
+				end
+			end
+			return nil
+		end
+
+		local function readProperty(instance, propName)
+			local ok, value = pcall(function()
+				return instance[propName]
+			end)
+			if ok then
+				return value
+			end
+			return nil
+		end
+
+		local function writeProperty(instance, propName, value)
+			pcall(function()
+				instance[propName] = value
+			end)
+		end
+
+		local function stepHeartbeat(dt)
+			dt = math.min(dt, MAX_DT)
+			for instance, props in pairs(springStates) do
+				if not instance or not instance.Parent then
+					springStates[instance] = nil
+					continue
+				end
+				for propName, state in pairs(props) do
+					local allSettled = true
+					for i = 1, #state.pos do
+						state.pos[i], state.vel[i] =
+							stepScalar(state.pos[i], state.vel[i], state.goal[i], dt, state.f, state.d)
+						if math.abs(state.pos[i] - state.goal[i]) > EPSILON or math.abs(state.vel[i]) > EPSILON then
+							allSettled = false
+						end
+					end
+					if allSettled then
+						writeProperty(instance, propName, state.pack(state.goal))
+						props[propName] = nil
+					else
+						writeProperty(instance, propName, state.pack(state.pos))
+					end
+				end
+				if not next(props) then
+					springStates[instance] = nil
+				end
+			end
+			if not next(springStates) and heartbeatConn then
+				heartbeatConn:Disconnect()
+				heartbeatConn = nil
+			end
+		end
+
+		local function ensureHeartbeat()
+			if heartbeatConn then
+				return
+			end
+			heartbeatConn = RunService.RenderStepped:Connect(stepHeartbeat)
+		end
+
+		local function target(instance, presetName, props)
+			if not instance or type(props) ~= "table" then
+				return
+			end
+			local preset = resolvePreset(presetName)
+			if preset.f == math.huge then
+				for propName, goal in pairs(props) do
+					writeProperty(instance, propName, goal)
+				end
+				return
+			end
+
+			local bag = springStates[instance]
+			if not bag then
+				bag = {}
+				springStates[instance] = bag
+			end
+
+			for propName, goal in pairs(props) do
+				local kind, goalChannels, pack = packValue(goal)
+				if not kind then
+					writeProperty(instance, propName, goal)
+					continue
+				end
+				local current = readProperty(instance, propName)
+				local _, startChannels = packValue(current)
+				if not startChannels then
+					writeProperty(instance, propName, goal)
+					continue
+				end
+				local pos, vel = {}, {}
+				for i = 1, #goalChannels do
+					pos[i] = startChannels[i]
+					vel[i] = 0
+				end
+				bag[propName] = {
+					pos = pos,
+					vel = vel,
+					goal = goalChannels,
+					pack = pack,
+					f = preset.f,
+					d = preset.d,
+				}
+			end
+			ensureHeartbeat()
+		end
+
+		local function stop(instance, propName)
+			local bag = springStates[instance]
+			if not bag then
+				return
+			end
+			if propName then
+				bag[propName] = nil
+				if not next(bag) then
+					springStates[instance] = nil
+				end
+			else
+				springStates[instance] = nil
+			end
+		end
+
+		local function tweenInfoToPreset(info)
+			if not info or not info.Time then
+				return "snappy"
+			end
+			local style = info.EasingStyle
+			local t = info.Time
+			if style == Enum.EasingStyle.Back then
+				return "bouncy"
+			end
+			if style == Enum.EasingStyle.Exponential or style == Enum.EasingStyle.Elastic then
+				return "pop"
+			end
+			if t <= 0.12 then
+				return "micro"
+			end
+			if t >= 0.38 then
+				return "soft"
+			end
+			if style == Enum.EasingStyle.Quint or style == Enum.EasingStyle.Quart then
+				return "open"
+			end
+			return "snappy"
+		end
+
+		return {
+			Presets = PRESETS,
+			target = target,
+			stop = stop,
+			tweenInfoToPreset = tweenInfoToPreset,
+		}
+	end)()
+
+	if WindUI._AlleralSpringMotion == nil then
+		WindUI._AlleralSpringMotion = true
+	end
+
+	local sliderTrackFrames = setmetatable({}, { __mode = "k" })
+
+	local function stubTween(instance)
+		return {
+			Play = function() end,
+			Cancel = function()
+				if instance then
+					Motion.stop(instance)
+				end
+			end,
+			Pause = function() end,
+			Destroy = function()
+				if instance then
+					Motion.stop(instance)
+				end
+			end,
+		}
+	end
+
+	local function tween(instance, infoOrPreset, props)
+		if not instance or not props then
+			return
+		end
+		if not instance.Parent or WindUI._AlleralReducedMotion == true then
+			snapProps(instance, props)
+			return
+		end
+		local function run()
+			if WindUI._AlleralSpringMotion ~= false then
+				local preset = type(infoOrPreset) == "string" and infoOrPreset or Motion.tweenInfoToPreset(infoOrPreset)
+				Motion.target(instance, preset, props)
+				return
+			end
+			pcall(function()
+				local info = infoOrPreset
+				if type(info) == "string" then
+					info = TweenInfo.new(0.22, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+				end
+				TweenService:Create(instance, info, props):Play()
+			end)
+		end
+		if motionEnabled() and infoOrPreset ~= "instant" then
+			local jitterMin = RESOURCES.motion.jitterMin or 0.004
+			local jitterMax = RESOURCES.motion.jitterMax or 0.014
+			local jitter = tonumber(instance:GetAttribute("AlleralMotionJitter"))
+			if not jitter then
+				jitter = jitterMin + math.random() * (jitterMax - jitterMin)
+				instance:SetAttribute("AlleralMotionJitter", jitter)
+			end
+			if jitter > jitterMin then
+				task.delay(jitter, run)
+				return
+			end
+		end
+		run()
+	end
+
+	local _TweenCreate = TweenService.Create
+	TweenService.Create = function(self, instance, tweenInfo, props)
+		if sliderTrackFrames[instance] and props and props.Size and tweenInfo and tweenInfo.Time <= 0.08 then
+			snapProps(instance, props)
+			return stubTween(instance)
+		end
+		if WindUI._AlleralSpringMotion ~= false and WindUI._AlleralReducedMotion ~= true and props and instance then
+			Motion.target(instance, Motion.tweenInfoToPreset(tweenInfo), props)
+			return stubTween(instance)
+		end
+		return _TweenCreate(self, instance, tweenInfo, props)
+	end
+
+	-- Spring motion presets (fraktality/spr-style: frequency Hz + damping ratio).
 	local ANIM = {
-		open = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-		close = TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
-		page = TweenInfo.new(0.22, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-		pageOut = TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
-		micro = TweenInfo.new(0.14, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-		notify = TweenInfo.new(0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-		dropdown = TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-		sweep = TweenInfo.new(0.44, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-		toggle = TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-		tab = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-		press = TweenInfo.new(0.08, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		open = "open",
+		close = "close",
+		page = "soft",
+		pageOut = "micro",
+		micro = "micro",
+		notify = "notify",
+		dropdown = "dropdown",
+		sweep = "sweep",
+		toggle = "toggle",
+		tab = "tab",
+		press = "press",
+		slider = "slider",
 	}
 
-	WindUI._AlleralStartupEffect = WindUI._AlleralStartupEffect ~= false
+	local ALLERAL_TAB_GAP = MAC.elementGap
+
+	if WindUI._AlleralStartupEffect == nil then
+		WindUI._AlleralStartupEffect = true
+	end
 
 	local POLISH_SKIP = {
 		AlleralPageFade = true,
@@ -142,8 +511,13 @@ return function(WindUI)
 		AlleralTopbarLine = true,
 		AlleralCardShell = true,
 		AlleralTabPill = true,
+		AlleralTabActiveBg = true,
+		AlleralTabHoverBg = true,
 		AlleralSearchHook = true,
 		AlleralBtnScale = true,
+		AlleralRowHover = true,
+		AlleralRevealScale = true,
+		AlleralTabHoverScale = true,
 		MenuCanvas = true,
 		Menu = true,
 	}
@@ -203,7 +577,7 @@ return function(WindUI)
 	end
 
 	local function playStartupEffect(window)
-		if not motionEnabled() or WindUI._AlleralStartupEffect == false then
+		if not motionEnabled() or WindUI._AlleralStartupEffect ~= true then
 			return
 		end
 		local main = window.UIElements and window.UIElements.Main
@@ -215,7 +589,7 @@ return function(WindUI)
 
 		local scale = ensureUiScale(main, "AlleralStartupScale")
 		if scale then
-			scale.Scale = 0.975
+			scale.Scale = 0.962
 			tween(scale, ANIM.open, { Scale = 1 })
 		end
 
@@ -248,20 +622,27 @@ return function(WindUI)
 			return
 		end
 		cleanupLegacyPolish(card)
+
+		local nScale = ensureUiScale(card, "AlleralNotifyScale")
+		if nScale then
+			nScale.Scale = 0.96
+			tween(nScale, ANIM.notify, { Scale = 1 })
+		end
+
 		if card:IsA("ImageLabel") or card:IsA("ImageButton") then
 			local target = card.ImageTransparency
-			card.ImageTransparency = math.clamp(target + 0.18, 0, 1)
+			card.ImageTransparency = math.clamp(target + 0.14, 0, 1)
 			tween(card, ANIM.notify, { ImageTransparency = target })
 		end
-		local stroke = card:FindFirstChild("AlleralNotifyStroke")
+		local stroke = card:FindFirstChild("AlleralNotifyStroke", true)
 		if stroke then
-			stroke.Transparency = 0.88
-			tween(stroke, ANIM.micro, { Transparency = 0.62 })
+			stroke.Transparency = 0.94
+			tween(stroke, ANIM.micro, { Transparency = 0.88 })
 		end
 		if rail then
 			local full = rail.Size
 			rail.Size = UDim2.new(0, 0, full.Y.Scale, full.Y.Offset)
-			tween(rail, ANIM.micro, { Size = full })
+			tween(rail, ANIM.notify, { Size = full })
 		end
 	end
 
@@ -278,8 +659,13 @@ return function(WindUI)
 
 		if menu:IsA("ImageLabel") then
 			local target = menu.ImageTransparency
-			menu.ImageTransparency = math.clamp(target + 0.22, 0, 1)
+			menu.ImageTransparency = math.clamp(target + 0.16, 0, 1)
 			tween(menu, ANIM.dropdown, { ImageTransparency = target })
+		end
+		local menuScale = ensureUiScale(menu, "AlleralMenuScale")
+		if menuScale then
+			menuScale.Scale = 0.97
+			tween(menuScale, ANIM.dropdown, { Scale = 1 })
 		end
 
 		local stroke = menu:FindFirstChild("AlleralMenuStroke")
@@ -362,7 +748,7 @@ return function(WindUI)
 			local origOpen = window.Open
 			function window:Open(...)
 				local result = origOpen(self, ...)
-				if WindUI._AlleralStartupEffect ~= false then
+				if WindUI._AlleralStartupEffect == true then
 					task.defer(function()
 						task.wait(0.06)
 						playStartupEffect(self)
@@ -422,10 +808,10 @@ return function(WindUI)
 	local WINDOW_DEFAULTS = {
 		Theme = "Alleral",
 		NewElements = true,
-		UICorner = 20,
-		UIPadding = 20,
-		SideBarWidth = 256,
-		ElementPadding = 14,
+		UICorner = MAC.corner,
+		UIPadding = MAC.windowPad,
+		SideBarWidth = MAC.sidebarWidth,
+		ElementPadding = MAC.elementGap,
 		Resizable = true,
 		HideSearchBar = false,
 	}
@@ -434,10 +820,10 @@ return function(WindUI)
 		desktop = {
 			label = "Desktop",
 			uiScale = 1,
-			corner = 20,
-			padding = 20,
-			sidebar = 256,
-			elementPad = 14,
+			corner = MAC.corner,
+			padding = MAC.windowPad,
+			sidebar = MAC.sidebarWidth,
+			elementPad = MAC.elementGap,
 			startup = true,
 			touchFeedback = true,
 			haptics = false,
@@ -447,10 +833,10 @@ return function(WindUI)
 		mobile = {
 			label = "Mobile",
 			uiScale = 0.9,
-			corner = 16,
-			padding = 14,
-			sidebar = 208,
-			elementPad = 12,
+			corner = 12,
+			padding = 18,
+			sidebar = 228,
+			elementPad = 14,
 			startup = false,
 			touchFeedback = true,
 			haptics = true,
@@ -465,10 +851,10 @@ return function(WindUI)
 		compact = {
 			label = "Compact",
 			uiScale = 0.94,
-			corner = 18,
-			padding = 16,
-			sidebar = 232,
-			elementPad = 12,
+			corner = 12,
+			padding = 20,
+			sidebar = 248,
+			elementPad = 14,
 			notifyCompact = true,
 			touchFeedback = true,
 			startup = true,
@@ -478,10 +864,10 @@ return function(WindUI)
 		performance = {
 			label = "Performance",
 			uiScale = 1,
-			corner = 16,
-			padding = 14,
-			sidebar = 240,
-			elementPad = 10,
+			corner = 10,
+			padding = 18,
+			sidebar = 248,
+			elementPad = 12,
 			startup = false,
 			reducedMotion = true,
 			notifyCompact = false,
@@ -551,7 +937,121 @@ return function(WindUI)
 			WindUI._AlleralNotifyCompact = preset.notifyCompact == true
 		end
 		if preset.startup ~= nil then
-			WindUI._AlleralStartupEffect = preset.startup ~= false
+			WindUI._AlleralStartupEffect = preset.startup == true
+		end
+	end
+
+	local function syncProfileEnv(preset)
+		if not preset then
+			return
+		end
+		local env
+		pcall(function()
+			if type(_G) == "table" and type(_G.ENV) == "table" then
+				env = _G.ENV
+			elseif type(shared) == "table" and type(shared.ENV) == "table" then
+				env = shared.ENV
+			end
+		end)
+		if not env then
+			return
+		end
+		if preset.reducedMotion ~= nil then
+			env.Alleral_UiReducedMotion = preset.reducedMotion == true
+		end
+		if preset.notifyCompact ~= nil then
+			env.Alleral_NotifyCompact = preset.notifyCompact == true
+		end
+		if preset.startup ~= nil then
+			env.Alleral_UiStartup = preset.startup == true
+		end
+		if preset.touchFeedback ~= nil then
+			env.Alleral_UiTouchFeedback = preset.touchFeedback ~= false
+		end
+		if preset.haptics ~= nil then
+			env.Alleral_UiHaptics = preset.haptics == true
+		end
+		if preset.uiScale ~= nil then
+			env.Alleral_UiScale = preset.uiScale
+		end
+	end
+
+	local function resolveElementGap(window)
+		local gap = tonumber(WindUI._AlleralElementGap)
+			or (window and tonumber(window.ElementPadding))
+			or WINDOW_DEFAULTS.ElementPadding
+			or ALLERAL_TAB_GAP
+		return math.clamp(math.floor(gap + 0.5), MAC.elementGap, 24)
+	end
+
+	local function polishScrollPadding(scroll)
+		if not scroll or not scroll:IsA("ScrollingFrame") then
+			return
+		end
+		scroll.ScrollBarThickness = 1
+		scroll.ScrollBarImageTransparency = 0.5
+		local pad = scroll:FindFirstChildOfClass("UIPadding")
+		if not pad then
+			pad = Instance.new("UIPadding")
+			pad.Parent = scroll
+		end
+		pad.PaddingTop = UDim.new(0, MAC.scrollPadTop)
+		pad.PaddingBottom = UDim.new(0, MAC.scrollPadBottom)
+		pad.PaddingLeft = UDim.new(0, MAC.scrollPadLeft)
+		pad.PaddingRight = UDim.new(0, MAC.scrollPadRight)
+		local layout = scroll:FindFirstChildOfClass("UIListLayout")
+		if layout then
+			layout.Padding = UDim.new(0, MAC.sectionGap)
+		end
+	end
+
+	local function polishElementRowHeights(root)
+		if not root then
+			return
+		end
+		for _, desc in ipairs(root:GetDescendants()) do
+			if desc:IsA("GuiObject") and desc.Name == "ToggleFrame" then
+				local main = desc:FindFirstChild("Main")
+				if main and main:IsA("GuiObject") and main.Size.Y.Offset < MAC.rowHeight then
+					main.Size = UDim2.new(main.Size.X.Scale, main.Size.X.Offset, 0, MAC.rowHeight)
+				end
+			elseif desc:IsA("GuiObject") and (desc.Name == "Button" or desc.Name == "Slider" or desc.Name == "Dropdown") then
+				if desc.Size.Y.Offset > 0 and desc.Size.Y.Offset < MAC.rowHeight then
+					desc.Size = UDim2.new(desc.Size.X.Scale, desc.Size.X.Offset, 0, MAC.rowHeight)
+				end
+			end
+		end
+	end
+
+	local function applyTabGap(tab, gap)
+		if type(tab) ~= "table" then
+			return
+		end
+		tab.Gap = gap
+		local scroll = tab.UIElements and tab.UIElements.ContainerFrame
+		if scroll then
+			local layout = scroll:FindFirstChildOfClass("UIListLayout")
+			if layout then
+				layout.Padding = UDim.new(0, gap)
+			end
+			polishScrollPadding(scroll)
+		end
+	end
+
+	local function polishTabScrolling(window)
+		if type(window) ~= "table" then
+			return
+		end
+		local gap = resolveElementGap(window)
+		window.Gap = gap
+		window.ElementPadding = gap
+		WindUI._AlleralElementGap = gap
+
+		local tabMod = window.TabModule
+		if tabMod and tabMod.Tabs then
+			for _, tab in pairs(tabMod.Tabs) do
+				applyTabGap(tab, gap)
+			end
 		end
 	end
 
@@ -568,6 +1068,694 @@ return function(WindUI)
 					HapticService:SetMotor(inputType, Enum.VibrationMotor.Small, 0)
 				end)
 			end)
+		end)
+	end
+
+	local RESOURCES = {
+		fonts = {
+			ui = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium),
+			uiSemibold = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+			uiTitle = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+		},
+		preload = {
+			"rbxasset://fonts/families/GothamSSm.json",
+		},
+		tooltips = {
+			showDelay = 0.32,
+			showJitter = 0.07,
+			hideDelay = 0.05,
+			maxWidth = 248,
+		},
+		search = {
+			placeholder = "Find a setting…",
+			placeholderHint = "  ·  / or Ctrl+F",
+			minChars = 1,
+			maxResults = 8,
+			debounce = 0.08,
+			emptyHint = "No matches",
+			footer = "↑↓   Enter   Esc",
+		},
+		motion = {
+			jitterMin = 0.004,
+			jitterMax = 0.014,
+		},
+	}
+
+	local function preloadAssets()
+		if WindUI._AlleralResourcesReady then
+			return true
+		end
+		local list = RESOURCES.preload
+		if not list or #list == 0 then
+			return false
+		end
+		pcall(function()
+			local ContentProvider = game:GetService("ContentProvider")
+			ContentProvider:PreloadAsync(list)
+		end)
+		WindUI._AlleralResourcesReady = true
+		return true
+	end
+
+	local tooltipState = {
+		frame = nil,
+		label = nil,
+		token = 0,
+	}
+
+	local function ensureTooltipGui()
+		if tooltipState.frame and tooltipState.frame.Parent then
+			return tooltipState.frame, tooltipState.label
+		end
+		local parent = WindUI.TooltipGui
+		if not parent then
+			parent = Instance.new("ScreenGui")
+			parent.Name = "AlleralTooltips"
+			parent.ResetOnSpawn = false
+			parent.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+			parent.DisplayOrder = 950
+			pcall(function()
+				parent.Parent = game:GetService("CoreGui")
+			end)
+			if not parent.Parent then
+				parent.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+			end
+			WindUI.TooltipGui = parent
+		end
+		local card = Instance.new("Frame")
+		card.Name = "AlleralTipCard"
+		card.BackgroundColor3 = palette.card
+		card.BackgroundTransparency = 0.06
+		card.BorderSizePixel = 0
+		card.AutomaticSize = Enum.AutomaticSize.XY
+		card.Visible = false
+		card.ZIndex = 20
+		card.Parent = parent
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 8)
+		corner.Parent = card
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = palette.divider
+		stroke.Transparency = 0.88
+		stroke.Thickness = 1
+		stroke.Parent = card
+		local pad = Instance.new("UIPadding")
+		pad.PaddingTop = UDim.new(0, 8)
+		pad.PaddingBottom = UDim.new(0, 8)
+		pad.PaddingLeft = UDim.new(0, 10)
+		pad.PaddingRight = UDim.new(0, 10)
+		pad.Parent = card
+		local scale = Instance.new("UIScale")
+		scale.Name = "TipScale"
+		scale.Scale = 0.96
+		scale.Parent = card
+		local label = Instance.new("TextLabel")
+		label.Name = "Body"
+		label.BackgroundTransparency = 1
+		label.FontFace = RESOURCES.fonts.ui
+		label.TextSize = 13
+		label.TextColor3 = palette.text
+		label.TextTransparency = 0.12
+		label.TextWrapped = true
+		label.AutomaticSize = Enum.AutomaticSize.XY
+		label.Size = UDim2.fromOffset(220, 0)
+		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.Parent = card
+		tooltipState.frame = card
+		tooltipState.label = label
+		return card, label
+	end
+
+	local function hideTooltip()
+		tooltipState.token += 1
+		local card = tooltipState.frame
+		if not card then
+			return
+		end
+		local hideDelay = RESOURCES.tooltips.hideDelay or 0.05
+		task.delay(hideDelay, function()
+			if card.Parent and card.Visible then
+				local scale = card:FindFirstChild("TipScale")
+				if scale and motionEnabled() then
+					tween(scale, ANIM.micro, { Scale = 0.97 })
+					tween(card, ANIM.micro, { BackgroundTransparency = 1 })
+					task.delay(0.1, function()
+						if card.Parent then
+							card.Visible = false
+						end
+					end)
+				else
+					card.Visible = false
+				end
+			end
+		end)
+	end
+
+	local function clampTooltipOffset(x, y, card)
+		local camera = workspace.CurrentCamera
+		if not camera or not card then
+			return x, y
+		end
+		local viewport = camera.ViewportSize
+		local width = math.max(card.AbsoluteSize.X, RESOURCES.tooltips.maxWidth or 220)
+		local height = math.max(card.AbsoluteSize.Y, 40)
+		x = math.clamp(x, width * 0.5 + 10, viewport.X - width * 0.5 - 10)
+		y = math.clamp(y, height + 14, viewport.Y - 10)
+		return x, y
+	end
+
+	local function showTooltip(text, anchor)
+		text = tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+		if text == "" or not anchor or not anchor:IsA("GuiObject") then
+			return
+		end
+		local card, label = ensureTooltipGui()
+		if not card or not label then
+			return
+		end
+		tooltipState.token += 1
+		local title, body = text:match("^([^\n]+)\n(.+)$")
+		if body then
+			label.Text = title .. "\n" .. body
+			label.TextSize = 13
+		else
+			label.Text = text
+		end
+		label.Size = UDim2.fromOffset(RESOURCES.tooltips.maxWidth or 248, 0)
+		card.Visible = true
+		card.BackgroundTransparency = 0.1
+		local scale = card:FindFirstChild("TipScale")
+		local pos = anchor.AbsolutePosition
+		local size = anchor.AbsoluteSize
+		local x = pos.X + size.X * 0.5
+		local y = pos.Y - 6
+		x, y = clampTooltipOffset(x, y, card)
+		card.AnchorPoint = Vector2.new(0.5, 1)
+		card.Position = UDim2.fromOffset(x, y)
+		if scale then
+			scale.Scale = 0.97
+			tween(scale, ANIM.tooltip, { Scale = 1 })
+		end
+		tween(card, ANIM.tooltip, { BackgroundTransparency = 0.06 })
+	end
+
+	local function attachRowTooltip(row, text)
+		if not row or not row:IsA("GuiObject") or row:FindFirstChild("AlleralTipHook") then
+			return
+		end
+		text = tostring(text or "")
+		if text == "" then
+			return
+		end
+		local hook = Instance.new("BoolValue")
+		hook.Name = "AlleralTipHook"
+		hook.Parent = row
+		local hoverToken = 0
+		local showDelay = RESOURCES.tooltips.showDelay or 0.32
+		local showJitter = RESOURCES.tooltips.showJitter or 0.07
+		row.MouseEnter:Connect(function()
+			hoverToken += 1
+			local token = hoverToken
+			local waitFor = showDelay + (math.random() * showJitter)
+			task.delay(waitFor, function()
+				if token == hoverToken and row.Parent then
+					showTooltip(text, row)
+				end
+			end)
+		end)
+		row.MouseLeave:Connect(function()
+			hoverToken += 1
+			hideTooltip()
+		end)
+	end
+
+	local function hookElementTooltip(elem)
+		if type(elem) ~= "table" then
+			return
+		end
+		local text = elem.Desc or elem.Description or elem.Tooltip
+		if not text or text == "" then
+			return
+		end
+		local row = elem.UIElements and elem.UIElements.Main
+		if elem.ToggleFrame and elem.ToggleFrame.UIElements then
+			row = row or elem.ToggleFrame.UIElements.Main
+		end
+		if elem.SliderFrame and elem.SliderFrame.UIElements then
+			row = row or elem.SliderFrame.UIElements.Main
+		end
+		if row then
+			attachRowTooltip(row, text)
+		end
+	end
+
+	local function normalizeSearchText(value)
+		return string.lower(tostring(value or "")):gsub("[%s%p]+", " ")
+	end
+
+	local function searchTokens(query)
+		local tokens = {}
+		for token in normalizeSearchText(query):gmatch("%S+") do
+			if #token >= 1 then
+				table.insert(tokens, token)
+			end
+		end
+		return tokens
+	end
+
+	local function searchMatches(haystack, query)
+		local tokens = searchTokens(query)
+		if #tokens == 0 then
+			return normalizeSearchText(haystack):find(normalizeSearchText(query), 1, true) ~= nil
+		end
+		for _, token in ipairs(tokens) do
+			if not normalizeSearchText(haystack):find(token, 1, true) then
+				return false
+			end
+		end
+		return true
+	end
+
+	local function rankMatch(haystack, query, title)
+		haystack = normalizeSearchText(haystack)
+		title = normalizeSearchText(title)
+		query = normalizeSearchText(query)
+		if query == "" then
+			return 0
+		end
+		if title == query then
+			return 1200
+		end
+		if title:find("^" .. query, 1, true) then
+			return 900 + math.min(80, #query * 8)
+		end
+		if haystack:find(query, 1, true) then
+			return 650 + math.min(60, #query * 6)
+		end
+		local tokens = searchTokens(query)
+		if #tokens == 0 then
+			return haystack:find(query, 1, true) and 400 or 0
+		end
+		local score = 120
+		for _, token in ipairs(tokens) do
+			if title:find("^" .. token, 1, true) then
+				score += 180
+			elseif haystack:find(token, 1, true) then
+				score += 100
+			else
+				return 0
+			end
+		end
+		return score
+	end
+
+	local function walkSearchElements(container, tabIndex, tab, sectionPath, bucket)
+		if type(container) ~= "table" then
+			return
+		end
+		for elemIndex, elem in pairs(container.Elements or {}) do
+			if type(elem) == "table" then
+				local title = elem.Title or elem.Name
+				local desc = elem.Desc or elem.Description
+				local kind = elem.__type or "Item"
+				local path = sectionPath
+				if kind == "Section" and title then
+					path = path == "" and tostring(title) or (path .. " / " .. tostring(title))
+				end
+				if title or desc then
+					table.insert(bucket, {
+						tabIndex = tabIndex,
+						elemIndex = elemIndex,
+						tabTitle = tab and tab.Title,
+						title = title,
+						desc = desc,
+						kind = kind,
+						path = path,
+						element = elem,
+						haystack = normalizeSearchText(
+							(tab and tab.Title or "")
+								.. " "
+								.. path
+								.. " "
+								.. tostring(title or "")
+								.. " "
+								.. tostring(desc or "")
+						),
+					})
+				end
+				if kind == "Section" and elem.Elements then
+					walkSearchElements(elem, tabIndex, tab, path, bucket)
+				end
+			end
+		end
+	end
+
+	local function buildSearchIndex(window)
+		local index = {}
+		local tabMod = window and window.TabModule
+		if not tabMod or not tabMod.Tabs then
+			return index
+		end
+		for tabIndex, tab in pairs(tabMod.Tabs) do
+			walkSearchElements(tab, tabIndex, tab, "", index)
+		end
+		window._AlleralSearchIndex = index
+		return index
+	end
+
+	local function jumpToSearchHit(window, hit)
+		if not window or not hit then
+			return
+		end
+		local tabMod = window.TabModule
+		if tabMod and type(tabMod.SelectTab) == "function" then
+			pcall(function()
+				tabMod:SelectTab(hit.tabIndex)
+			end)
+		elseif type(window.SelectTab) == "function" then
+			pcall(function()
+				window:SelectTab(hit.tabIndex)
+			end)
+		end
+		task.defer(function()
+			local tab = tabMod and tabMod.Tabs and tabMod.Tabs[hit.tabIndex]
+			if tab and type(tab.ScrollToTheElement) == "function" and hit.elemIndex then
+				pcall(function()
+					tab:ScrollToTheElement(hit.elemIndex)
+				end)
+			elseif hit.element and type(hit.element.Highlight) == "function" then
+				pcall(function()
+					hit.element:Highlight()
+				end)
+			end
+		end)
+	end
+
+	local function filterSettings(window, query)
+		query = tostring(query or "")
+		local index = window._AlleralSearchIndex or buildSearchIndex(window)
+		local hits = {}
+		local minChars = RESOURCES.search.minChars or 1
+		if #normalizeSearchText(query) < minChars then
+			window._AlleralSearchHits = hits
+			window._AlleralSearchSelected = 0
+			return hits
+		end
+		for _, entry in ipairs(index) do
+			local score = rankMatch(entry.haystack, query, tostring(entry.title or ""))
+			if score > 0 then
+				entry._score = score
+				table.insert(hits, entry)
+			end
+		end
+		table.sort(hits, function(a, b)
+			if a._score ~= b._score then
+				return a._score > b._score
+			end
+			return tostring(a.title or "") < tostring(b.title or "")
+		end)
+		local maxResults = RESOURCES.search.maxResults or 8
+		while #hits > maxResults do
+			table.remove(hits)
+		end
+		window._AlleralSearchHits = hits
+		window._AlleralSearchSelected = math.clamp(window._AlleralSearchSelected or 1, 1, math.max(1, #hits))
+		return hits
+	end
+
+	local function getSearchPanel(window, anchor)
+		if window._AlleralSearchPanel and window._AlleralSearchPanel.Parent then
+			return window._AlleralSearchPanel
+		end
+		if not anchor or not anchor:IsA("GuiObject") then
+			return nil
+		end
+		local host = anchor:FindFirstAncestorWhichIsA("Frame") or anchor.Parent
+		if not host then
+			return nil
+		end
+
+		local panel = Instance.new("Frame")
+		panel.Name = "AlleralSearchPanel"
+		panel.BackgroundColor3 = palette.card
+		panel.BackgroundTransparency = 0.04
+		panel.BorderSizePixel = 0
+		panel.Visible = false
+		panel.ClipsDescendants = true
+		panel.ZIndex = anchor.ZIndex + 12
+		panel.Parent = host
+		safeEnsureCorner(panel, UDim.new(0, MAC.corner))
+		ensureStroke(panel, "AlleralSearchPanelStroke", palette.divider, 0.9, 1, { inner = true })
+
+		local pad = Instance.new("UIPadding")
+		pad.PaddingTop = UDim.new(0, 6)
+		pad.PaddingBottom = UDim.new(0, 6)
+		pad.PaddingLeft = UDim.new(0, 6)
+		pad.PaddingRight = UDim.new(0, 6)
+		pad.Parent = panel
+
+		local layout = Instance.new("UIListLayout")
+		layout.Padding = UDim.new(0, 4)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Parent = panel
+
+		local footer = Instance.new("TextLabel")
+		footer.Name = "Footer"
+		footer.BackgroundTransparency = 1
+		footer.FontFace = RESOURCES.fonts.ui
+		footer.TextSize = 11
+		footer.TextColor3 = palette.muted
+		footer.TextTransparency = 0.35
+		footer.TextXAlignment = Enum.TextXAlignment.Left
+		footer.Text = RESOURCES.search.footer or ""
+		footer.Size = UDim2.new(1, 0, 0, 14)
+		footer.LayoutOrder = 999
+		footer.Parent = panel
+
+		window._AlleralSearchPanel = panel
+		window._AlleralSearchPanelRows = {}
+		return panel
+	end
+
+	local function clearSearchPanelRows(window)
+		local rows = window._AlleralSearchPanelRows
+		if type(rows) == "table" then
+			for _, row in ipairs(rows) do
+				if row and row.Parent then
+					row:Destroy()
+				end
+			end
+		end
+		window._AlleralSearchPanelRows = {}
+	end
+
+	local function drawSearchList(window, hits, query, anchor)
+		local panel = getSearchPanel(window, anchor)
+		if not panel then
+			return
+		end
+		clearSearchPanelRows(window)
+		local selected = window._AlleralSearchSelected or 1
+
+		if #hits == 0 then
+			local empty = Instance.new("TextLabel")
+			empty.BackgroundTransparency = 1
+			empty.FontFace = RESOURCES.fonts.ui
+			empty.TextSize = 12
+			empty.TextColor3 = palette.muted
+			empty.TextTransparency = 0.25
+			empty.TextXAlignment = Enum.TextXAlignment.Left
+			empty.Text = RESOURCES.search.emptyHint or "No matches"
+			empty.Size = UDim2.new(1, 0, 0, 28)
+			empty.Parent = panel
+			table.insert(window._AlleralSearchPanelRows, empty)
+			panel.Size = UDim2.new(1, -8, 0, 52)
+			panel.Position = UDim2.new(0, 4, 1, 6)
+			panel.Visible = query ~= ""
+			return
+		end
+
+		for index, hit in ipairs(hits) do
+			local row = Instance.new("TextButton")
+			row.Name = "Hit" .. tostring(index)
+			row.AutoButtonColor = false
+			row.BackgroundColor3 = palette.text
+			row.BackgroundTransparency = index == selected and 0.9 or 1
+			row.BorderSizePixel = 0
+			row.FontFace = RESOURCES.fonts.uiSemibold
+			row.TextSize = 12
+			row.TextColor3 = palette.text
+			row.TextTransparency = index == selected and 0.08 or 0.38
+			row.TextXAlignment = Enum.TextXAlignment.Left
+			row.Text = tostring(hit.title or "Setting")
+			row.Size = UDim2.new(1, 0, 0, 28)
+			row.LayoutOrder = index
+			row.Parent = panel
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 6)
+			corner.Parent = row
+			local sub = Instance.new("TextLabel")
+			sub.BackgroundTransparency = 1
+			sub.FontFace = RESOURCES.fonts.ui
+			sub.TextSize = 11
+			sub.TextColor3 = palette.muted
+			sub.TextTransparency = 0.4
+			sub.TextXAlignment = Enum.TextXAlignment.Left
+			sub.Text = tostring(hit.path or hit.tabTitle or "")
+			sub.Size = UDim2.new(1, -8, 0, 14)
+			sub.Position = UDim2.new(0, 8, 0, 14)
+			sub.Parent = row
+			row.Size = UDim2.new(1, 0, 0, 34)
+			row.MouseButton1Click:Connect(function()
+				window._AlleralSearchSelected = index
+				jumpToSearchHit(window, hit)
+				panel.Visible = false
+			end)
+			table.insert(window._AlleralSearchPanelRows, row)
+		end
+
+		local rowH = 38
+		panel.Size = UDim2.new(1, -8, 0, math.min(240, #hits * rowH + 26))
+		panel.Position = UDim2.new(0, 4, 1, 6)
+		panel.Visible = true
+	end
+
+	local function hideSearchPanel(window)
+		local panel = window and window._AlleralSearchPanel
+		if panel then
+			panel.Visible = false
+		end
+	end
+
+	local function setupSearch(window)
+		if not window or window._AlleralSearchOn then
+			return
+		end
+		window._AlleralSearchOn = true
+		window._AlleralSearchSelected = 1
+		buildSearchIndex(window)
+
+		local function bindSearchBox(box)
+			if not box or box:FindFirstChild("AlleralSearchBind") then
+				return
+			end
+			local mark = Instance.new("BoolValue")
+			mark.Name = "AlleralSearchBind"
+			mark.Parent = box
+			local placeholder = RESOURCES.search.placeholder or "Find a setting…"
+			local hint = RESOURCES.search.placeholderHint or ""
+			if box.PlaceholderText == "" or box.PlaceholderText == "Search" then
+				box.PlaceholderText = placeholder .. hint
+			end
+			box.ClearTextOnFocus = false
+			local debounceToken = 0
+			local function refreshResults()
+				local hits = filterSettings(window, box.Text)
+				window._AlleralLastSearchQuery = box.Text
+				window._AlleralLastSearchCount = #hits
+				drawSearchList(window, hits, box.Text, box)
+			end
+			box:GetPropertyChangedSignal("Text"):Connect(function()
+				debounceToken += 1
+				local token = debounceToken
+				task.delay(RESOURCES.search.debounce or 0.08, function()
+					if token == debounceToken and box.Parent then
+						refreshResults()
+					end
+				end)
+			end)
+			box.Focused:Connect(function()
+				if box.Text ~= "" then
+					refreshResults()
+				end
+			end)
+			box.FocusLost:Connect(function()
+				task.delay(0.12, function()
+					if not box:IsFocused() then
+						hideSearchPanel(window)
+					end
+				end)
+			end)
+			window._AlleralSearchBox = box
+		end
+
+		local sidebar = window.UIElements and window.UIElements.SideBarContainer
+		if sidebar then
+			for _, desc in ipairs(sidebar:GetDescendants()) do
+				if desc:IsA("TextBox") then
+					bindSearchBox(desc)
+				end
+			end
+			sidebar.DescendantAdded:Connect(function(desc)
+				if desc:IsA("TextBox") then
+					task.defer(function()
+						bindSearchBox(desc)
+					end)
+				end
+			end)
+		end
+
+		if window.SearchBar and window.SearchBar.Frame then
+			local box = window.SearchBar.Frame:FindFirstChildWhichIsA("TextBox", true)
+			bindSearchBox(box)
+		end
+
+		pcall(function()
+			if not WindUI._AlleralSearchKeys then
+				WindUI._AlleralSearchKeys = true
+				UserInputService.InputBegan:Connect(function(input, processed)
+					local active = WindUI.Window
+					if not active or not active._AlleralSearchOn then
+						return
+					end
+					local sidebarActive = active.UIElements and active.UIElements.SideBarContainer
+					local hits = active._AlleralSearchHits or {}
+					local selected = active._AlleralSearchSelected or 1
+
+					if input.KeyCode == Enum.KeyCode.Escape then
+						hideSearchPanel(active)
+						return
+					end
+
+					if input.KeyCode == Enum.KeyCode.Up then
+						if #hits > 0 then
+							active._AlleralSearchSelected = math.clamp(selected - 1, 1, #hits)
+							drawSearchList(active, hits, active._AlleralLastSearchQuery or "", active._AlleralSearchBox)
+						end
+						return
+					end
+
+					if input.KeyCode == Enum.KeyCode.Down then
+						if #hits > 0 then
+							active._AlleralSearchSelected = math.clamp(selected + 1, 1, #hits)
+							drawSearchList(active, hits, active._AlleralLastSearchQuery or "", active._AlleralSearchBox)
+						end
+						return
+					end
+
+					if processed then
+						return
+					end
+
+					if input.KeyCode == Enum.KeyCode.F and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+						local searchBtn = sidebarActive and sidebarActive:FindFirstChild("Search", true)
+						if searchBtn and searchBtn:IsA("GuiButton") then
+							searchBtn:Activate()
+						end
+					elseif input.KeyCode == Enum.KeyCode.Slash and not UserInputService:GetFocusedTextBox() then
+						local searchBtn = sidebarActive and sidebarActive:FindFirstChild("Search", true)
+						if searchBtn and searchBtn:IsA("GuiButton") then
+							searchBtn:Activate()
+						end
+					elseif input.KeyCode == Enum.KeyCode.Return and #hits > 0 then
+						local hit = hits[selected] or hits[1]
+						if hit then
+							jumpToSearchHit(active, hit)
+							hideSearchPanel(active)
+						end
+					end
+				end)
+			end
 		end)
 	end
 
@@ -590,7 +1778,7 @@ return function(WindUI)
 			Name = name,
 			Accent = accentCol,
 			Primary = accentCol,
-			Outline = palette.line,
+			Outline = palette.divider,
 			Icon = accentCol,
 			Toggle = accentCol,
 			Slider = button,
@@ -604,46 +1792,46 @@ return function(WindUI)
 			PanelBackground = panel,
 			PanelBackgroundTransparency = 0.04,
 			LabelBackground = palette.surface,
-			LabelBackgroundTransparency = 0.08,
+			LabelBackgroundTransparency = 0.06,
 			ElementBackground = palette.card,
-			ElementBackgroundTransparency = 0.02,
+			ElementBackgroundTransparency = 1,
 			ElementTitle = text,
 			ElementDesc = muted,
 			ElementIcon = accentCol,
 			TabBackground = bg,
 			TabBackgroundHover = palette.cardHover,
-			TabBackgroundHoverTransparency = 0.12,
-			TabBackgroundActive = tabActive,
-			TabBackgroundActiveTransparency = 0.06,
+			TabBackgroundHoverTransparency = 0.96,
+			TabBackgroundActive = palette.text,
+			TabBackgroundActiveTransparency = 0.92,
 			TabText = text,
-			TabTextTransparency = 0.22,
-			TabTextTransparencyActive = 0,
+			TabTextTransparency = MAC.tabInactiveText,
+			TabTextTransparencyActive = 0.08,
 			TabIcon = muted,
-			TabIconTransparency = 0.18,
-			TabIconTransparencyActive = 0,
-			TabBorder = palette.line,
-			TabBorderTransparency = 0.72,
-			TabBorderTransparencyActive = 0.42,
+			TabIconTransparency = MAC.tabInactiveIcon,
+			TabIconTransparencyActive = 0.12,
+			TabBorder = palette.divider,
+			TabBorderTransparency = 0.94,
+			TabBorderTransparencyActive = 0.9,
 			WindowBackground = bg,
 			WindowTopbarTitle = text,
 			WindowTopbarAuthor = muted,
 			WindowTopbarIcon = accentCol,
 			WindowSearchBarBackground = palette.surface,
-			SearchBarBorderTransparency = 0.55,
-			SectionBoxBackground = palette.card,
-			SectionBoxBackgroundTransparency = 0.04,
-			SectionBoxBorder = palette.line,
-			SectionBoxBorderTransparency = 0.58,
-			SectionExpandIconTransparency = 0.12,
+			SearchBarBorderTransparency = 0.92,
+			SectionBoxBackground = palette.text,
+			SectionBoxBackgroundTransparency = MAC.sectionFillTransparency,
+			SectionBoxBorder = palette.divider,
+			SectionBoxBorderTransparency = MAC.sectionStrokeTransparency,
+			SectionExpandIconTransparency = 0.35,
 			Notification = palette.card,
 			NotificationTitle = text,
 			NotificationContent = muted,
-			NotificationBorder = palette.line,
-			NotificationBorderTransparency = 1,
+			NotificationBorder = palette.divider,
+			NotificationBorderTransparency = 0.92,
 			PopupBackground = palette.card,
 			DialogBackground = palette.card,
 			ToggleBar = accentCol,
-			CheckboxBorderTransparency = 0.55,
+			CheckboxBorderTransparency = 0.92,
 			Tooltip = palette.card,
 			TooltipText = text,
 		})
@@ -846,11 +2034,35 @@ return function(WindUI)
 					shell.Active = false
 					shell.ClipsDescendants = false
 					shell.Parent = box
-					ensureStroke(shell, "AlleralCardStroke", palette.line, 0.72, 1, {
+					ensureStroke(shell, "AlleralCardStroke", palette.divider, MAC.sectionStrokeTransparency, 1, {
 						inner = true,
 						reuseExisting = false,
 					})
 				end
+			end
+		end
+	end
+
+	local function polishSectionSpacing(root, gap)
+		if not root then
+			return
+		end
+		local innerGap = math.max(MAC.sectionInner, gap - 4)
+		for _, desc in ipairs(root:GetDescendants()) do
+			if desc.Name == "Content" and desc:IsA("Frame") then
+				local layout = desc:FindFirstChildOfClass("UIListLayout")
+				if layout then
+					layout.Padding = UDim.new(0, innerGap)
+				end
+				local pad = desc:FindFirstChildOfClass("UIPadding")
+				if not pad then
+					pad = Instance.new("UIPadding")
+					pad.Parent = desc
+				end
+				pad.PaddingTop = UDim.new(0, MAC.sectionPadTop)
+				pad.PaddingBottom = UDim.new(0, MAC.sectionPadBottom)
+				pad.PaddingLeft = UDim.new(0, MAC.sectionPadLeft)
+				pad.PaddingRight = UDim.new(0, MAC.sectionPadRight)
 			end
 		end
 	end
@@ -880,12 +2092,17 @@ return function(WindUI)
 		local frame = sidebar:FindFirstChild("Frame") or sidebar
 		local layout = frame:FindFirstChildWhichIsA("UIListLayout", true)
 		if layout then
-			layout.Padding = UDim.new(0, 7)
+			layout.Padding = UDim.new(0, 6)
 		end
 		for _, pad in ipairs(frame:GetDescendants()) do
-			if pad:IsA("UIPadding") and pad.Parent and pad.Parent.Name == "Frame" then
-				pad.PaddingTop = UDim.new(0, 10)
-				pad.PaddingBottom = UDim.new(0, 10)
+			if pad:IsA("UIPadding") then
+				local parent = pad.Parent
+				if parent and (parent.Name == "Frame" or parent:IsA("ScrollingFrame")) then
+					pad.PaddingLeft = UDim.new(0, MAC.sidebarPadX)
+					pad.PaddingRight = UDim.new(0, MAC.sidebarPadX)
+					pad.PaddingTop = UDim.new(0, MAC.sidebarPadTop)
+					pad.PaddingBottom = UDim.new(0, 12)
+				end
 			end
 		end
 	end
@@ -899,21 +2116,94 @@ return function(WindUI)
 		end
 		local line = Instance.new("Frame")
 		line.Name = "AlleralTopbarLine"
-		line.BackgroundColor3 = palette.line
-		line.BackgroundTransparency = 0.55
+		line.BackgroundColor3 = palette.divider
+		line.BackgroundTransparency = MAC.dividerTransparency
 		line.BorderSizePixel = 0
-		line.Size = UDim2.new(1, -24, 0, 1)
-		line.Position = UDim2.new(0, 12, 1, -1)
+		line.Size = UDim2.new(1, 0, 0, 1)
+		line.Position = UDim2.new(0, 0, 1, -1)
 		line.ZIndex = topbar.ZIndex + 2
 		line.Parent = topbar
+	end
+
+	local function polishTopbarBrand(window)
+		local topbar = window.UIElements and window.UIElements.Topbar
+		local main = topbar and topbar.Main
+		if not main or not main:IsA("GuiObject") then
+			return
+		end
+		if main.Size.Y.Offset > 0 and main.Size.Y.Offset ~= MAC.topbarHeight then
+			main.Size = UDim2.new(main.Size.X.Scale, main.Size.X.Offset, 0, MAC.topbarHeight)
+		end
+		for _, desc in ipairs(main:GetDescendants()) do
+			if desc:IsA("TextLabel") then
+				if desc.TextSize >= 17 then
+					desc.TextTransparency = math.min(desc.TextTransparency, 0.06)
+				elseif desc.TextSize <= 14 and desc.TextTransparency < 0.35 then
+					desc.TextTransparency = 0.42
+				end
+			end
+		end
+	end
+
+	local function polishLabelTone(root)
+		if not root then
+			return
+		end
+		for _, desc in ipairs(root:GetDescendants()) do
+			if desc:IsA("TextLabel") then
+				local name = desc.Name:lower()
+				if name:find("desc") or name:find("description") or name:find("subtitle") then
+					if desc.TextTransparency < 0.4 then
+						desc.TextTransparency = MAC.rowLabelTransparency
+					end
+				elseif name == "title" and desc.TextSize >= 13 and desc.TextSize <= 15 then
+					if desc.TextTransparency > 0.35 and desc.TextTransparency < 0.85 then
+						desc.TextTransparency = MAC.rowLabelTransparency
+					end
+				elseif name == "title" and desc.TextSize >= 14 and desc.TextSize <= 16 then
+					local parent = desc.Parent
+					if parent and parent.Name == "Title" then
+						desc.TextTransparency = math.min(desc.TextTransparency, 0.08)
+					end
+				end
+			end
+		end
+	end
+
+	local function polishContentChrome(window)
+		local tabMod = window.TabModule
+		if tabMod and tabMod.Tabs then
+			for _, tab in pairs(tabMod.Tabs) do
+				local canvas = tab.UIElements and tab.UIElements.ContainerFrameCanvas
+				if canvas then
+					local pad = canvas:FindFirstChildOfClass("UIPadding")
+					if not pad then
+						pad = Instance.new("UIPadding")
+						pad.Parent = canvas
+					end
+					pad.PaddingLeft = UDim.new(0, MAC.contentPadX)
+					pad.PaddingRight = UDim.new(0, MAC.contentPadX)
+				end
+				local scroll = tab.UIElements and tab.UIElements.ContainerFrame
+				if scroll then
+					polishScrollPadding(scroll)
+				end
+			end
+		end
+		if window.UIElements and window.UIElements.MainBar then
+			polishLabelTone(window.UIElements.MainBar)
+		end
+		if window.UIElements and window.UIElements.Main then
+			polishLabelTone(window.UIElements.Main)
+		end
 	end
 
 	local function syncWindowStroke(main)
 		if not main then
 			return nil
 		end
-		safeEnsureCorner(main, UDim.new(0, WINDOW_DEFAULTS.UICorner))
-		return ensureStroke(main, "AlleralWindowStroke", palette.line, 0.58, 1, { inner = true })
+		safeEnsureCorner(main, UDim.new(0, MAC.corner))
+		return ensureStroke(main, "AlleralWindowStroke", palette.divider, MAC.windowStrokeTransparency, 1, { inner = true })
 	end
 
 	local function addSidebarDivider(sidebar)
@@ -926,11 +2216,11 @@ return function(WindUI)
 
 		local divider = Instance.new("Frame")
 		divider.Name = "AlleralSidebarDivider"
-		divider.BackgroundColor3 = palette.line
-		divider.BackgroundTransparency = 0.35
+		divider.BackgroundColor3 = palette.divider
+		divider.BackgroundTransparency = MAC.dividerTransparency
 		divider.BorderSizePixel = 0
-		divider.Size = UDim2.new(0, 1, 1, -16)
-		divider.Position = UDim2.new(1, -1, 0, 8)
+		divider.Size = UDim2.new(0, 1, 1, 0)
+		divider.Position = UDim2.new(1, -1, 0, 0)
 		divider.ZIndex = sidebar.ZIndex + 2
 		divider.Parent = sidebar
 	end
@@ -940,8 +2230,8 @@ return function(WindUI)
 			return
 		end
 		local search = searchBar.Frame
-		safeEnsureCorner(search, UDim.new(0, 10))
-		local stroke = ensureStroke(search, "AlleralSearchStroke", palette.line, 0.64, 1, { inner = true })
+		safeEnsureCorner(search, UDim.new(0, 8))
+		local stroke = ensureStroke(search, "AlleralSearchStroke", palette.divider, 0.92, 1, { inner = true })
 		local box = search:FindFirstChildWhichIsA("TextBox", true)
 		if not box or box:FindFirstChild("AlleralSearchHook") then
 			return
@@ -953,18 +2243,22 @@ return function(WindUI)
 			if stroke then
 				tween(stroke, ANIM.micro, {
 					Color = accent(),
-					Transparency = 0.36,
+					Transparency = 0.78,
 				})
 			end
 		end)
 		box.FocusLost:Connect(function()
 			if stroke then
 				tween(stroke, ANIM.micro, {
-					Color = palette.line,
-					Transparency = 0.64,
+					Color = palette.divider,
+					Transparency = 0.92,
 				})
 			end
 		end)
+		if box.PlaceholderText == "" or box.PlaceholderText == "Search" then
+			box.PlaceholderText = (RESOURCES.search.placeholder or "Find a setting…")
+				.. (RESOURCES.search.placeholderHint or "")
+		end
 	end
 
 	local function installTabRail(window)
@@ -977,38 +2271,127 @@ return function(WindUI)
 		end
 		window._AlleralTabRail = true
 
-		local function syncPill(index)
+		local function ensureTabChrome(main)
+			if not main or not main:IsA("GuiObject") then
+				return nil, nil
+			end
+			local pad = main:FindFirstChild("AlleralTabPad")
+			if not pad then
+				pad = Instance.new("UIPadding")
+				pad.Name = "AlleralTabPad"
+				pad.PaddingLeft = UDim.new(0, MAC.tabPadLeft)
+				pad.PaddingRight = UDim.new(0, MAC.tabPadRight)
+				pad.Parent = main
+			end
+			if main.Size.Y.Offset > 0 and main.Size.Y.Offset < MAC.tabHeight then
+				main.Size = UDim2.new(main.Size.X.Scale, main.Size.X.Offset, 0, MAC.tabHeight)
+			end
+			local activeBg = main:FindFirstChild("AlleralTabActiveBg")
+			if not activeBg then
+				activeBg = Instance.new("Frame")
+				activeBg.Name = "AlleralTabActiveBg"
+				activeBg.BackgroundColor3 = palette.text
+				activeBg.BackgroundTransparency = 1
+				activeBg.BorderSizePixel = 0
+				activeBg.Size = UDim2.new(1, -(MAC.tabPadRight + 4), 1, -8)
+				activeBg.Position = UDim2.new(0, 2, 0, 4)
+				activeBg.ZIndex = math.max(1, main.ZIndex - 1)
+				activeBg.Parent = main
+				local corner = Instance.new("UICorner")
+				corner.CornerRadius = UDim.new(0, 8)
+				corner.Parent = activeBg
+				ensureStroke(activeBg, "AlleralTabActiveStroke", palette.divider, 1, 1, {
+					reuseExisting = false,
+				})
+			end
+			local hoverBg = main:FindFirstChild("AlleralTabHoverBg")
+			if not hoverBg then
+				hoverBg = Instance.new("Frame")
+				hoverBg.Name = "AlleralTabHoverBg"
+				hoverBg.BackgroundColor3 = palette.text
+				hoverBg.BackgroundTransparency = 1
+				hoverBg.BorderSizePixel = 0
+				hoverBg.Size = activeBg.Size
+				hoverBg.Position = activeBg.Position
+				hoverBg.ZIndex = activeBg.ZIndex
+				hoverBg.Parent = main
+				local corner = Instance.new("UICorner")
+				corner.CornerRadius = UDim.new(0, 8)
+				corner.Parent = hoverBg
+			end
+			local legacyPill = main:FindFirstChild("AlleralTabPill")
+			if legacyPill then
+				legacyPill:Destroy()
+			end
+			return activeBg, hoverBg
+		end
+
+		local function syncTabLabels(main, isActive)
+			for _, label in ipairs(main:GetDescendants()) do
+				if label:IsA("TextLabel") then
+					tween(label, ANIM.micro, {
+						TextTransparency = isActive and 0.08 or MAC.tabInactiveText,
+					})
+				elseif label:IsA("ImageLabel") and label.Name:lower():find("icon") then
+					tween(label, ANIM.micro, {
+						ImageTransparency = isActive and 0.12 or MAC.tabInactiveIcon,
+					})
+				end
+			end
+		end
+
+		local function hookTabHover(main, hoverBg, tabIndex)
+			if not main or main:FindFirstChild("AlleralTabHover") then
+				return
+			end
+			local hook = Instance.new("BoolValue")
+			hook.Name = "AlleralTabHover"
+			hook.Parent = main
+			main.MouseEnter:Connect(function()
+				local current = tabMod.SelectedTab or window.CurrentTab
+				if tabIndex == current or not hoverBg then
+					return
+				end
+				tween(hoverBg, ANIM.micro, { BackgroundTransparency = 0.96 })
+			end)
+			main.MouseLeave:Connect(function()
+				if hoverBg then
+					tween(hoverBg, ANIM.micro, { BackgroundTransparency = 1 })
+				end
+			end)
+		end
+
+		local function syncMacTabs(index)
 			if not tabMod.Tabs then
 				return
 			end
 			for tabIndex, tab in pairs(tabMod.Tabs) do
 				local main = tab.UIElements and tab.UIElements.Main
 				if main and main:IsA("GuiObject") then
-					local pill = main:FindFirstChild("AlleralTabPill")
-					if tabIndex == index then
-						if not pill then
-							pill = Instance.new("Frame")
-							pill.Name = "AlleralTabPill"
-							pill.BackgroundColor3 = accent()
-							pill.BackgroundTransparency = 0.1
-							pill.BorderSizePixel = 0
-							pill.Size = UDim2.new(0, 3, 0.64, 0)
-							pill.Position = UDim2.new(0, 5, 0.18, 0)
-							pill.ZIndex = main.ZIndex + 3
-							pill.Parent = main
-							local corner = Instance.new("UICorner")
-							corner.CornerRadius = UDim.new(1, 0)
-							corner.Parent = pill
-						end
-						tween(pill, ANIM.tab, {
-							BackgroundTransparency = 0.06,
-							Size = UDim2.new(0, 3, 0.7, 0),
+					local activeBg, hoverBg = ensureTabChrome(main)
+					local isActive = tabIndex == index
+					if activeBg then
+						tween(activeBg, ANIM.tab, {
+							BackgroundTransparency = isActive and 0.9 or 1,
 						})
-					elseif pill then
-						tween(pill, ANIM.micro, { BackgroundTransparency = 1 })
+						local stroke = activeBg:FindFirstChild("AlleralTabActiveStroke")
+						if stroke then
+							tween(stroke, ANIM.micro, {
+								Transparency = isActive and 0.92 or 1,
+							})
+						end
 					end
+					if hoverBg and isActive then
+						hoverBg.BackgroundTransparency = 1
+					end
+					syncTabLabels(main, isActive)
+					hookTabHover(main, hoverBg, tabIndex)
 				end
 			end
+		end
+
+		local function syncPill(index)
+			syncMacTabs(index)
 		end
 
 		tabMod:OnChange(function(index)
@@ -1050,6 +2433,7 @@ return function(WindUI)
 			local topbar = window.UIElements.Topbar
 			if topbar and topbar.Main then
 				addTopbarLine(topbar.Main)
+				polishTopbarBrand(window)
 			end
 
 			local sidebar = window.UIElements.SideBar
@@ -1065,18 +2449,38 @@ return function(WindUI)
 			if window.UIElements.MainBar then
 				polishSectionOutlines(window.UIElements.MainBar)
 				polishRowChrome(window.UIElements.MainBar)
+				polishSectionSpacing(window.UIElements.MainBar, resolveElementGap(window))
+				polishElementRowHeights(window.UIElements.MainBar)
+				polishLabelTone(window.UIElements.MainBar)
 			end
+			polishContentChrome(window)
 			if main then
 				task.defer(function()
 					if window.UIElements and window.UIElements.Main == main and main.Parent then
+						local gap = resolveElementGap(window)
 						polishSectionOutlines(main)
 						polishRowChrome(main)
+						polishSectionSpacing(main, gap)
+						polishElementRowHeights(main)
+						polishTabScrolling(window)
+						local tabMod = window.TabModule
+						if tabMod and tabMod.Tabs then
+							for _, tab in pairs(tabMod.Tabs) do
+								local scroll = tab.UIElements and tab.UIElements.ContainerFrame
+								if scroll then
+									polishScrollPadding(scroll)
+								end
+							end
+						end
 					end
 				end)
 			end
 
 			window.CanDropdown = true
 			installTabRail(window)
+			polishTabScrolling(window)
+			setupSearch(window)
+			buildSearchIndex(window)
 		end)
 
 		return window
@@ -1138,6 +2542,8 @@ return function(WindUI)
 			settings.OpenButton.OnlyMobile = false
 		end
 
+		WindUI._AlleralElementGap = settings.ElementPadding or WindUI._AlleralElementGap or ALLERAL_TAB_GAP
+
 		return settings
 	end
 
@@ -1170,7 +2576,7 @@ return function(WindUI)
 
 		local bg = card:FindFirstChild("Background", true)
 		if bg then
-			safeEnsureCorner(bg, UDim.new(0, 13))
+			safeEnsureCorner(bg, UDim.new(0, MAC.notifyCorner))
 		end
 
 		local oldStroke = card:FindFirstChild("AlleralNotifyStroke", true)
@@ -1181,12 +2587,12 @@ return function(WindUI)
 		local strokeTarget = bg
 		if not strokeTarget and card:IsA("Frame") then
 			strokeTarget = card
-			safeEnsureCorner(strokeTarget, UDim.new(0, 13))
+			safeEnsureCorner(strokeTarget, UDim.new(0, MAC.notifyCorner))
 		end
 		if not strokeTarget then
 			return nil
 		end
-		return ensureStroke(strokeTarget, "AlleralNotifyStroke", palette.line, 0.48, 1, {
+		return ensureStroke(strokeTarget, "AlleralNotifyStroke", palette.divider, 0.92, 1, {
 			inner = true,
 			reuseExisting = false,
 		})
@@ -1207,10 +2613,10 @@ return function(WindUI)
 		local rail = Instance.new("Frame")
 		rail.Name = "AlleralNotifyRail"
 		rail.BackgroundColor3 = style.accent
-		rail.BackgroundTransparency = 0.08
+		rail.BackgroundTransparency = 0.06
 		rail.BorderSizePixel = 0
-		rail.Size = UDim2.new(0, 3, 1, -12)
-		rail.Position = UDim2.new(0, 8, 0, 6)
+		rail.Size = UDim2.new(0, 3, 1, 0)
+		rail.Position = UDim2.new(0, 0, 0, 0)
 		rail.ZIndex = card.ZIndex + 4
 		rail.Parent = card
 		local railCorner = Instance.new("UICorner")
@@ -1219,10 +2625,9 @@ return function(WindUI)
 
 		local stroke = card:FindFirstChild("AlleralNotifyStroke", true)
 		if stroke then
-			tween(stroke, ANIM.micro, {
-				Color = style.accent,
-				Transparency = 0.52,
-			})
+			stroke.Color = palette.divider
+			stroke.Transparency = 0.94
+			tween(stroke, ANIM.micro, { Transparency = 0.92 })
 		end
 
 		animateNotificationIn(card, rail)
@@ -1306,6 +2711,64 @@ return function(WindUI)
 			}
 		end
 
+		local function playElementReveal(root)
+			if WindUI._AlleralReducedMotion == true or WindUI._AlleralSpringMotion == false then
+				return
+			end
+			if not root or not root:IsA("GuiObject") then
+				return
+			end
+			local scale = ensureUiScale(root, "AlleralRevealScale")
+			if not scale then
+				return
+			end
+			scale.Scale = 0.985
+			task.defer(function()
+				if root.Parent then
+					tween(scale, ANIM.notify, { Scale = 1 })
+				end
+			end)
+		end
+
+		local function hookRowHover(row)
+			if not row or not row:IsA("GuiObject") or row:FindFirstChild("AlleralRowHover") then
+				return
+			end
+			local hook = Instance.new("BoolValue")
+			hook.Name = "AlleralRowHover"
+			hook.Parent = row
+			local labels = {}
+			for _, desc in ipairs(row:GetDescendants()) do
+				if desc:IsA("TextLabel") and desc.TextTransparency < 1 then
+					table.insert(labels, {
+						label = desc,
+						idle = desc.TextTransparency,
+					})
+				end
+			end
+			row.MouseEnter:Connect(function()
+				if WindUI._AlleralTouchFeedback == false then
+					return
+				end
+				for _, entry in ipairs(labels) do
+					local label = entry.label
+					if label.Parent then
+						tween(label, ANIM.micro, {
+							TextTransparency = math.max(0.22, entry.idle - 0.18),
+						})
+					end
+				end
+			end)
+			row.MouseLeave:Connect(function()
+				for _, entry in ipairs(labels) do
+					local label = entry.label
+					if label.Parent then
+						tween(label, ANIM.micro, { TextTransparency = entry.idle })
+					end
+				end
+			end)
+		end
+
 		local function polishElementChrome(elem)
 			if type(elem) ~= "table" then
 				return
@@ -1327,6 +2790,8 @@ return function(WindUI)
 				if root.Parent and root.Parent:IsA("GuiObject") then
 					stripSliceChrome(root.Parent)
 				end
+				playElementReveal(root)
+				hookRowHover(root)
 			end
 		end
 
@@ -1467,13 +2932,96 @@ return function(WindUI)
 			return elem
 		end
 
+		local function polishSliderElement(elem)
+			if type(elem) ~= "table" or elem._AlleralSliderDone then
+				return elem
+			end
+			elem._AlleralSliderDone = true
+			task.defer(function()
+				local icon = elem.UIElements and elem.UIElements.SliderIcon
+				local track = icon and icon:FindFirstChild("Frame")
+				local fill = track and track:FindFirstChild("Frame")
+				local thumb = fill and fill:FindFirstChild("Thumb")
+
+				if track then
+					sliderTrackFrames[track] = true
+				end
+				if fill then
+					sliderTrackFrames[fill] = true
+				end
+
+				if icon and icon:IsA("GuiObject") then
+					safeEnsureCorner(icon, UDim.new(1, 0))
+					ensureStroke(icon, "AlleralSliderTrackStroke", palette.divider, MAC.sliderTrackTransparency, 1, {
+						inner = true,
+						reuseExisting = false,
+					})
+				end
+
+				if fill and fill:IsA("GuiObject") then
+					fill.ImageColor3 = accent()
+					fill.ImageTransparency = MAC.sliderFillTransparency
+				end
+
+				if thumb and thumb:IsA("GuiObject") then
+					ensureCorner(thumb, UDim.new(1, 0))
+					ensureStroke(thumb, "AlleralSliderThumbStroke", palette.line, 0.42, 1, {
+						inner = true,
+						reuseExisting = false,
+					})
+					local highlight = thumb:FindFirstChild("Highlight")
+					if highlight and highlight:IsA("GuiObject") then
+						highlight.ImageTransparency = 0.72
+					end
+					if motionEnabled() then
+						local thumbScale = ensureUiScale(thumb, "AlleralThumbScale")
+						if thumbScale then
+							thumbScale.Scale = 1
+							thumb.MouseEnter:Connect(function()
+								tween(thumbScale, ANIM.micro, { Scale = 1.08 })
+							end)
+							thumb.MouseLeave:Connect(function()
+								tween(thumbScale, ANIM.micro, { Scale = 1 })
+							end)
+						end
+					end
+				end
+
+				if type(elem.Set) == "function" and not elem._AlleralSliderHook then
+					elem._AlleralSliderHook = true
+					local originalSet = elem.Set
+					elem.Set = function(self, val, input, ...)
+						local result = originalSet(self, val, input, ...)
+						if fill and motionEnabled() then
+							tween(fill, ANIM.slider, { ImageTransparency = 0.12, ImageColor3 = accentHot() })
+							task.delay(0.18, function()
+								if fill.Parent then
+									tween(fill, ANIM.micro, {
+										ImageTransparency = MAC.sliderFillTransparency,
+										ImageColor3 = accent(),
+									})
+								end
+							end)
+						end
+						if input and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+							hapticPulse()
+						end
+						return result
+					end
+				end
+
+				polishElementChrome(elem)
+			end)
+			return elem
+		end
+
 		local function wrapSection(section)
 			if type(section) ~= "table" or section._AlleralSectionWrapped then
 				return section
 			end
 			section._AlleralSectionWrapped = true
 
-			local methods = { "Toggle", "Checkbox", "Slider", "Button", "Dropdown", "Input", "Keybind" }
+			local methods = { "Toggle", "Checkbox", "Slider", "Button", "Dropdown", "Input", "Keybind", "Paragraph" }
 			for _, methodName in ipairs(methods) do
 				local original = section[methodName]
 				if type(original) == "function" then
@@ -1481,8 +3029,32 @@ return function(WindUI)
 						local elem = original(self, opts, ...)
 						if methodName == "Toggle" or methodName == "Checkbox" then
 							polishToggleElement(elem)
+							task.defer(function()
+								hookElementTooltip(elem)
+							end)
 						elseif methodName == "Button" then
 							polishButtonElement(elem)
+						elseif methodName == "Slider" then
+							polishSliderElement(elem)
+							task.defer(function()
+								hookElementTooltip(elem)
+							end)
+						elseif methodName == "Paragraph" then
+							task.defer(function()
+								pcall(function()
+									polishElementChrome(elem)
+								end)
+							end)
+						elseif methodName == "Dropdown" or methodName == "Input" or methodName == "Keybind" then
+							task.defer(function()
+								polishElementChrome(elem)
+								hookElementTooltip(elem)
+							end)
+						end
+						if WindUI.Window and WindUI.Window._AlleralSearchOn then
+							task.defer(function()
+								buildSearchIndex(WindUI.Window)
+							end)
 						end
 						return elem
 					end
@@ -1511,7 +3083,11 @@ return function(WindUI)
 		if type(window.Tab) == "function" then
 			local origTab = window.Tab
 			function window:Tab(opts)
-				return wrapTab(origTab(self, opts))
+				local tab = origTab(self, opts)
+				if tab then
+					applyTabGap(tab, resolveElementGap(window))
+				end
+				return wrapTab(tab)
 			end
 		end
 
@@ -1531,7 +3107,7 @@ return function(WindUI)
 
 		task.spawn(function()
 			while WindUI._AlleralWatchdogToken == token and WindUI.Window == window do
-				task.wait(18)
+				task.wait(24)
 				if WindUI._AlleralWatchdogToken ~= token or WindUI.Window ~= window then
 					break
 				end
@@ -1547,7 +3123,7 @@ return function(WindUI)
 	end
 
 	-- -------------------------------------------------------------------------
-	-- Safe API wrappers
+	-- Window API
 	-- -------------------------------------------------------------------------
 
 	local _CreateWindow = WindUI.CreateWindow
@@ -1574,7 +3150,6 @@ return function(WindUI)
 
 		if WindUI.Window then
 			WindUI:ReleaseWindow(WindUI.Window)
-			task.wait(0.05)
 		end
 
 		local window
@@ -1589,16 +3164,16 @@ return function(WindUI)
 			uiWarn("window", result)
 			if WindUI.Window then
 				WindUI:ReleaseWindow(WindUI.Window)
-				task.wait(0.05)
 			end
 			settings.Theme = resolveThemeName(attempt == 1 and "Alleral" or "Dark")
-			task.wait(0.05)
 		end
 
 		if window then
+			WindUI.Window = window
 			wrapWindowElements(window)
 			installWindowAnimations(window)
 			applyWindowScale(window)
+			task.spawn(preloadAssets)
 			task.defer(function()
 				installDropdownAnimations()
 				WindUI:PolishWindow(window)
@@ -1793,8 +3368,7 @@ return function(WindUI)
 		return result
 	end
 
-	-- -------------------------------------------------------------------------
-	-- Public helpers
+	-- Exports
 	-- -------------------------------------------------------------------------
 
 	function WindUI.GetAlleralVersion(_self)
@@ -1814,6 +3388,50 @@ return function(WindUI)
 			WindUI:RepairWindow(WindUI.Window)
 		end
 		return true
+	end
+
+	function WindUI.ListAccentPresets(_self)
+		local names = {}
+		for name in pairs(ACCENT_PRESETS) do
+			table.insert(names, name)
+		end
+		table.sort(names)
+		return names
+	end
+
+	function WindUI.ApplyAccentPreset(_self, presetName)
+		local hex = ACCENT_PRESETS[tostring(presetName or "")]
+		if not hex then
+			return false
+		end
+		return WindUI:SetAccentColor(Color3.fromHex(hex))
+	end
+
+	function WindUI.FlashRow(_self, elementTable, duration)
+		if type(elementTable) ~= "table" or type(elementTable.Highlight) ~= "function" then
+			return false
+		end
+		pcall(function()
+			elementTable:Highlight()
+		end)
+		if duration and duration > 0 then
+			task.delay(duration, function()
+				pcall(function()
+					if elementTable.Unhighlight then
+						elementTable:Unhighlight()
+					end
+				end)
+			end)
+		end
+		return true
+	end
+
+	function WindUI.SetCompactSidebar(_self, enabled)
+		WindUI._AlleralSidebarCompact = enabled == true
+		if WindUI.Window then
+			WindUI:PolishWindow(WindUI.Window)
+		end
+		return WindUI._AlleralSidebarCompact
 	end
 
 	function WindUI.SafeNotify(self, title, content, duration, notifyType)
@@ -1922,7 +3540,7 @@ return function(WindUI)
 				Thickness = 1.5,
 			})
 			task.delay(0.2, function()
-				tween(stroke, TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+				tween(stroke, ANIM.open, {
 					Color = palette.line,
 					Transparency = 0.62,
 					Thickness = 1,
@@ -1935,8 +3553,32 @@ return function(WindUI)
 		WindUI._AlleralReducedMotion = enabled == true
 	end
 
+	function WindUI.SetSpringMotion(_self, enabled)
+		WindUI._AlleralSpringMotion = enabled == true
+	end
+
+	function WindUI.Spring(_self, instance, preset, props)
+		if not instance or type(props) ~= "table" then
+			return
+		end
+		if WindUI._AlleralReducedMotion == true then
+			snapProps(instance, props)
+			return
+		end
+		Motion.target(instance, preset or "snappy", props)
+	end
+
+	function WindUI.GetMotionPresets(_self)
+		local names = {}
+		for name in pairs(Motion.Presets) do
+			table.insert(names, name)
+		end
+		table.sort(names)
+		return names
+	end
+
 	function WindUI.SetStartupEffect(_self, enabled)
-		WindUI._AlleralStartupEffect = enabled ~= false
+		WindUI._AlleralStartupEffect = enabled == true
 	end
 
 	function WindUI.GetDeviceProfile(_self)
@@ -1967,6 +3609,7 @@ return function(WindUI)
 		WindUI._AlleralProfile = profileName or resolved
 		if preset then
 			applyPresetToDefaults(preset)
+			syncProfileEnv(preset)
 		end
 		if preset and preset.reducedMotion ~= nil and type(WindUI.SetReducedMotion) == "function" then
 			pcall(function()
@@ -1975,7 +3618,7 @@ return function(WindUI)
 		end
 		if preset and preset.startup ~= nil and type(WindUI.SetStartupEffect) == "function" then
 			pcall(function()
-				WindUI:SetStartupEffect(WindUI._AlleralStartupEffect ~= false)
+				WindUI:SetStartupEffect(WindUI._AlleralStartupEffect == true)
 			end)
 		end
 		if preset and preset.notifyCompact ~= nil and type(WindUI.SetNotificationCompact) == "function" then
@@ -2015,17 +3658,43 @@ return function(WindUI)
 		return WindUI._AlleralNotifyDedupe
 	end
 
+	function WindUI.Preload(_self)
+		return preloadAssets()
+	end
+
+	function WindUI.GetResources(_self)
+		return RESOURCES
+	end
+
+	function WindUI.RebuildSearchIndex(_self, window)
+		window = window or WindUI.Window
+		if not window then
+			return 0
+		end
+		return #buildSearchIndex(window)
+	end
+
+	function WindUI.FindSettings(_self, query, window)
+		window = window or WindUI.Window
+		if not window then
+			return {}
+		end
+		return filterSettings(window, query)
+	end
+
+	function WindUI.GoToSetting(_self, hit, window)
+		window = window or WindUI.Window
+		jumpToSearchHit(window, hit)
+		return true
+	end
+
 	function WindUI.GetFeatures(_self)
 		return {
 			brand = WindUI.ALLERAL_BRAND,
 			version = WindUI.ALLERAL_UI_VERSION,
 			profiles = true,
-			mobile = true,
-			tabRail = true,
-			touchFeedback = true,
-			haptics = true,
-			notifyDedupe = true,
-			reducedMotion = true,
+			search = true,
+			tooltips = true,
 			themes = WindUI.Themes ~= nil,
 		}
 	end
@@ -2059,6 +3728,8 @@ return function(WindUI)
 			clear = type(WindUI.ClearNotifications) == "function",
 			profiles = type(WindUI.ApplyProfile) == "function",
 			mobile = type(WindUI.GetDeviceProfile) == "function",
+			spring = type(WindUI.Spring) == "function",
+			motion = Motion and type(Motion.target) == "function",
 		}
 		local ok = checks.create and checks.theme and checks.patch and checks.notify and checks.profiles
 		return ok, checks

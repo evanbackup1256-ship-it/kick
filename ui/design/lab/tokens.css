@@ -1,0 +1,56 @@
+/* Generated from ui/design/tokens.json — edit tokens.json first, then mirror here */
+:root {
+  --accent: #53fc18;
+  --accent-soft: #7dff35;
+  --accent-hot: #30ff6a;
+  --canvas: #0f0f0f;
+  --surface: #141414;
+  --card: #161616;
+  --card-hover: #1c1c1c;
+  --text: #ffffff;
+  --muted: #a1a1aa;
+  --divider: rgba(255, 255, 255, 0.1);
+  --divider-strong: rgba(255, 255, 255, 0.9);
+  --track-off: #2a2a34;
+  --track-on: #1a3a12;
+  --knob: #f8f8fc;
+  --warn: #ffd166;
+  --error: #ff5c5c;
+
+  --radius-window: 10px;
+  --radius-tab: 8px;
+  --radius-section: 10px;
+
+  --pad-window: 24px;
+  --sidebar-width: 276px;
+  --gap-element: 16px;
+  --gap-section: 15px;
+  --pad-section-top: 22px;
+  --pad-section-bottom: 20px;
+  --pad-section-x: 20px;
+  --pad-section-right: 18px;
+  --pad-content-x: 20px;
+  --sidebar-pad-top: 31px;
+  --sidebar-pad-x: 10px;
+  --tab-height: 40px;
+  --tab-pad-left: 24px;
+  --row-height: 38px;
+  --window-width: 860px;
+  --window-height: 560px;
+  --topbar-height: 63px;
+
+  --tab-text-idle: 0.42;
+  --tab-text-active: 0.92;
+  --section-fill: rgba(255, 255, 255, 0.02);
+  --section-stroke: rgba(255, 255, 255, 0.05);
+  --tab-active-fill: rgba(255, 255, 255, 0.1);
+  --tab-active-stroke: rgba(255, 255, 255, 0.08);
+  --tab-hover-fill: rgba(255, 255, 255, 0.04);
+
+  --font: "Segoe UI", "Inter", system-ui, -apple-system, sans-serif;
+  --spring-snappy: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring-bouncy: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spring-open: cubic-bezier(0.34, 1.25, 0.64, 1);
+  --spring-toggle: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring-press: cubic-bezier(0.34, 1.56, 0.64, 1);
+}

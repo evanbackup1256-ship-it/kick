@@ -1,0 +1,14 @@
+{
+  "codeConnect": {
+    "include": ["ui/design/code-connect/**/*.figma.ts"],
+    "exclude": ["**/node_modules/**"],
+    "parser": "typescript",
+    "label": "Luau",
+    "language": "lua",
+    "importPaths": {
+      "aller": ["ui/windui/aller.luau"],
+      "windui": ["ui/windui/main.lua"],
+      "core": ["hub/core.luau"]
+    }
+  }
+}

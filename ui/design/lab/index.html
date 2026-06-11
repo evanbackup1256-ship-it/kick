@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Alleral UI — Design Lab</title>
+    <link rel="stylesheet" href="lab.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="top">
+        <div>
+          <h1>Alleral Design Lab</h1>
+          <p>Local design system — unlimited pages, no API limits, synced to <code>tokens.json</code></p>
+        </div>
+        <span class="badge">aller17</span>
+      </header>
+
+      <nav class="nav" aria-label="Lab sections">
+        <button class="nav-tab active" data-panel="panel-foundations" type="button">Foundations</button>
+        <button class="nav-tab" data-panel="panel-components" type="button">Components</button>
+        <button class="nav-tab" data-panel="panel-hub" type="button">Hub Screen</button>
+      </nav>
+
+      <section id="panel-foundations" class="panel active">
+        <div class="grid-2">
+          <article class="card">
+            <h2>Color</h2>
+            <div class="swatch-grid">
+              <div class="swatch"><div class="swatch-chip" style="background:#0f0f0f"></div><span>Canvas</span></div>
+              <div class="swatch"><div class="swatch-chip" style="background:#141414"></div><span>Surface</span></div>
+              <div class="swatch"><div class="swatch-chip" style="background:#161616"></div><span>Card</span></div>
+              <div class="swatch"><div class="swatch-chip" style="background:#53fc18"></div><span>Accent</span></div>
+              <div class="swatch"><div class="swatch-chip" style="background:#ffffff"></div><span>Text</span></div>
+              <div class="swatch"><div class="swatch-chip" style="background:#a1a1aa"></div><span>Muted</span></div>
+            </div>
+          </article>
+          <article class="card">
+            <h2>Spacing &amp; layout</h2>
+            <div class="spacing-list">
+              <div class="spacing-row"><div class="spacing-bar" style="width:24px"></div>Window pad 24px</div>
+              <div class="spacing-row"><div class="spacing-bar" style="width:276px;max-width:100%"></div>Sidebar 276px</div>
+              <div class="spacing-row"><div class="spacing-bar" style="width:40px"></div>Tab height 40px</div>
+              <div class="spacing-row"><div class="spacing-bar" style="width:38px"></div>Row height 38px</div>
+              <div class="spacing-row"><div class="spacing-bar" style="width:15px"></div>Section gap 15px</div>
+              <div class="spacing-row"><div class="spacing-bar" style="width:10px"></div>Corner radius 10px</div>
+            </div>
+          </article>
+          <article class="card">
+            <h2>Motion presets</h2>
+            <p style="margin:0 0 12px;font-size:13px;color:var(--muted);line-height:1.5">
+              Springs mirror <code>aller.luau</code> — open, tab, toggle, press, notify. Toggle
+              <strong>Reduced motion</strong> on the Hub tab to snap instantly (Performance profile).
+            </p>
+            <div class="controls-bar">
+              <button class="btn-row btn-accent" id="notify-demo" type="button">Preview notification</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="panel-components" class="panel">
+        <div class="grid-2">
+          <article class="card">
+            <h2>Navigation / Tab</h2>
+            <button class="sidebar-tab" type="button">Automation</button>
+            <button class="sidebar-tab active" type="button" style="margin-top:6px">Settings</button>
+            <button class="sidebar-tab" type="button" style="margin-top:6px">Appearance</button>
+          </article>
+          <article class="card">
+            <h2>Control / Toggle</h2>
+            <div class="row">
+              <span class="row-label">Spring motion</span>
+              <div class="toggle on" role="switch" aria-checked="true" tabindex="0"><div class="toggle-knob"></div></div>
+            </div>
+            <div class="row">
+              <span class="row-label">Startup animation</span>
+              <div class="toggle" role="switch" aria-checked="false" tabindex="0"><div class="toggle-knob"></div></div>
+            </div>
+          </article>
+          <article class="card">
+            <h2>Control / Button</h2>
+            <div class="row">
+              <span class="row-label">Reload script</span>
+              <button class="btn-row" type="button">Run</button>
+            </div>
+            <div class="row">
+              <span class="row-label">Join server</span>
+              <button class="btn-row btn-accent" type="button">Connect</button>
+            </div>
+          </article>
+          <article class="card">
+            <h2>Layout / Section</h2>
+            <div class="section" style="margin:0">
+              <h3 class="section-title">Appearance</h3>
+              <div class="row"><span class="row-label">Layout profile</span><span style="color:var(--muted);font-size:13px">Desktop</span></div>
+              <div class="row"><span class="row-label">UI scale</span><span style="color:var(--muted);font-size:13px">100%</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="panel-hub" class="panel">
+        <div class="controls-bar">
+          <label><input type="checkbox" id="reduced-motion" /> Reduced motion</label>
+          <button class="btn-row btn-accent" id="notify-demo-hub" type="button">Fire notification</button>
+        </div>
+        <div class="hub-wrap">
+          <div class="hub-window" role="application" aria-label="Alleral Hub preview">
+            <aside class="hub-sidebar">
+              <div class="hub-brand">
+                <h3>Alleral Hub</h3>
+                <p>Kick · v2.7.0</p>
+              </div>
+              <button class="sidebar-tab active" type="button">Main</button>
+              <button class="sidebar-tab" type="button">Automation</button>
+              <button class="sidebar-tab" type="button">Settings</button>
+            </aside>
+            <div class="hub-content">
+              <div class="hub-topbar"></div>
+              <div class="hub-scroll">
+                <div class="section">
+                  <h3 class="section-title">Appearance</h3>
+                  <div class="row">
+                    <span class="row-label">Spring motion</span>
+                    <div class="toggle on" tabindex="0"><div class="toggle-knob"></div></div>
+                  </div>
+                  <div class="row">
+                    <span class="row-label">Startup animation</span>
+                    <div class="toggle" tabindex="0"><div class="toggle-knob"></div></div>
+                  </div>
+                  <div class="row">
+                    <span class="row-label">Compact notifications</span>
+                    <div class="toggle" tabindex="0"><div class="toggle-knob"></div></div>
+                  </div>
+                </div>
+                <div class="section">
+                  <h3 class="section-title">Session</h3>
+                  <div class="row">
+                    <span class="row-label">Auto rejoin</span>
+                    <div class="toggle on" tabindex="0"><div class="toggle-knob"></div></div>
+                  </div>
+                  <div class="row">
+                    <span class="row-label">Copy join link</span>
+                    <button class="btn-row" type="button">Copy</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="notify-stack" id="notify-stack" aria-live="polite"></div>
+
+    <script src="lab.js"></script>
+    <script>
+      document.getElementById("notify-demo-hub")?.addEventListener("click", () =>
+        document.getElementById("notify-demo")?.click()
+      );
+    </script>
+  </body>
+</html>

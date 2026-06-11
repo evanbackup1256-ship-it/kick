@@ -3103,6 +3103,28 @@ local function createUiGroup(tab, name, icon, column)
 	end, icon)
 end
 
+Core.clearUiStateBindings()
+
+local function uiToggle(group, key, name, tooltip, callback)
+	return group:CreateToggle(name, state[key], tooltip, function(value)
+		state[key] = value
+		saveSettings()
+		if callback then
+			callback(value)
+		end
+	end, key)
+end
+
+local function uiSlider(group, key, name, min, max, tooltip, increment, callback)
+	return group:CreateSlider(name, min, max, state[key], function(value)
+		state[key] = value
+		saveSettings()
+		if callback then
+			callback(value)
+		end
+	end, tooltip, increment, key)
+end
+
 local mainTab = createUiTab("Kick", "rbxassetid://10723407389")
 local autoTab = createUiTab("Plot", "rbxassetid://10734923214")
 local eventsTab = createUiTab("Events", "rbxassetid://10709789407")
@@ -3125,6 +3147,21 @@ local serverGroup = createUiGroup(miscTab, "Server", "rbxassetid://10734950020",
 local webhookGroup = createUiGroup(miscTab, "Webhooks", "rbxassetid://10734950020", 2)
 local configGroup = createUiGroup(configTab, "Alerts", "rbxassetid://10734950309", 1)
 local recoveryGroup = createUiGroup(configTab, "Stuck?", "rbxassetid://10734950309", 2)
+Core.buildAutomationStatusGroup(configTab, {
+	state = state,
+	loops = loops,
+	column = 2,
+	flags = {
+		{ key = "AFarm", label = "Kick" },
+		{ key = "APlaceBest", label = "Place" },
+		{ key = "AAutoUpgrade", label = "Upgrade" },
+		{ key = "AAutoFav", label = "Favorite" },
+		{ key = "ATrain", label = "Train" },
+		{ key = "ACollect", label = "Collect" },
+		{ key = "AAutoBattle", label = "Battle" },
+		{ key = "AAutoMastery", label = "Mastery" },
+	},
+})
 local tuningGroup = createUiGroup(configTab, "Speed tweaks", "rbxassetid://10734950309", 1)
 local diagnosticsGroup = createUiGroup(configTab, "Debug info", "rbxassetid://10734950309", 2)
 local profileGroup = createUiGroup(configTab, "Save slots", "rbxassetid://10734950309", 1)
@@ -3228,6 +3265,9 @@ local function applyConfigSnapshot(snapshot)
 	end
 	rebuildUpgradeBase()
 	saveSettings()
+	if Core.syncUiState then
+		pcall(Core.syncUiState, state)
+	end
 	return true, nil
 end
 
@@ -3456,7 +3496,8 @@ configGroup:CreateToggle(
 	function(value)
 		state.UIQuietMode = value
 		saveSettings()
-	end
+	end,
+	"UIQuietMode"
 )
 configGroup:CreateToggle(
 	"Error popups",
@@ -3465,7 +3506,8 @@ configGroup:CreateToggle(
 	function(value)
 		state.NotifyOnError = value
 		saveSettings()
-	end
+	end,
+	"NotifyOnError"
 )
 
 recoveryGroup:CreateButton(
@@ -3552,7 +3594,9 @@ tuningGroup:CreateSlider(
 		state.AutoKickInterval = math.max(0.3, value)
 		saveSettings()
 	end,
-	"Time between kick attempts. Lower is faster; raise it if you're lagging."
+	"Time between kick attempts. Lower is faster; raise it if you're lagging.",
+	nil,
+	"AutoKickInterval"
 )
 tuningGroup:CreateSlider(
 	"Place speed (sec)",
@@ -3563,7 +3607,9 @@ tuningGroup:CreateSlider(
 		state.AutoPlaceInterval = math.max(1.5, value)
 		saveSettings()
 	end,
-	"How often it tries to place a brainrot on your plot."
+	"How often it tries to place a brainrot on your plot.",
+	nil,
+	"AutoPlaceInterval"
 )
 tuningGroup:CreateSlider(
 	"Mastery speed (sec)",
@@ -3574,7 +3620,9 @@ tuningGroup:CreateSlider(
 		state.MasteryInterval = math.max(1, value)
 		saveSettings()
 	end,
-	"Delay between mastery kick cycles."
+	"Delay between mastery kick cycles.",
+	nil,
+	"MasteryInterval"
 )
 tuningGroup:CreateSlider(
 	"Plot list refresh (sec)",
@@ -3585,7 +3633,9 @@ tuningGroup:CreateSlider(
 		state.PlotRefreshInterval = math.max(8, value)
 		saveSettings()
 	end,
-	"How often the protected / upgrade lists pull from your live plot."
+	"How often the protected / upgrade lists pull from your live plot.",
+	nil,
+	"PlotRefreshInterval"
 )
 tuningGroup:CreateSlider(
 	"Favorite scan (sec)",
@@ -3596,18 +3646,19 @@ tuningGroup:CreateSlider(
 		state.FavoriteScanInterval = math.max(4, value)
 		saveSettings()
 	end,
-	"How often it checks your backpack for stuff to favorite."
+	"How often it checks your backpack for stuff to favorite.",
+	nil,
+	"FavoriteScanInterval"
 )
 
-kickGroup:CreateToggle(
+uiToggle(
+	kickGroup,
+	"AFarm",
 	"Auto kick",
-	state.AFarm,
 	"Runs to the pad, kicks, and resets when the roll doesn't match your filters.",
 	function(value)
-		state.AFarm = value
 		runtime.nextAutoKickReset = 0
 		restoreCamera(select(2, characterParts()))
-		saveSettings()
 	end
 )
 kickGroup:CreateSlider(
@@ -3619,7 +3670,9 @@ kickGroup:CreateSlider(
 		state.VolcanoTweenSpeed = value
 		saveSettings()
 	end,
-	"How fast you slide over to the kick spot. Crank it up if you want snappier runs."
+	"How fast you slide over to the kick spot. Crank it up if you want snappier runs.",
+	nil,
+	"VolcanoTweenSpeed"
 )
 kickGroup:CreateDivider()
 kickGroup:CreateDropdown(
@@ -3664,7 +3717,8 @@ kickGroup:CreateToggle(
 		if predictionStatus and predictionStatus.SetVisible then
 			predictionStatus:SetVisible(value)
 		end
-	end
+	end,
+	"APredict"
 )
 predictionStatus = kickGroup:CreateStatus("Live roll", {
 	Roll       = "--",
@@ -3741,7 +3795,8 @@ filterGroup:CreateToggle(
 		state.ANotifyRare = value
 		runtime.lastRareNotify = ""
 		saveSettings()
-	end
+	end,
+	"ANotifyRare"
 )
 filterGroup:CreateDropdown(
 	"Notify at rarity",
@@ -3760,7 +3815,8 @@ filterGroup:CreateToggle(
 	function(value)
 		state.AKickVariance = value
 		saveSettings()
-	end
+	end,
+	"AKickVariance"
 )
 filterGroup:CreateSlider(
 	"Max random wait (ms)",
@@ -3771,7 +3827,9 @@ filterGroup:CreateSlider(
 		state.KickVarianceMs = value
 		saveSettings()
 	end,
-	"Cap on the humanize pause."
+	"Cap on the humanize pause.",
+	nil,
+	"KickVarianceMs"
 )
 
 trainGroup:CreateToggle(
@@ -3781,7 +3839,8 @@ trainGroup:CreateToggle(
 	function(value)
 		state.ATrain = value
 		saveSettings()
-	end
+	end,
+	"ATrain"
 )
 trainGroup:CreateDivider()
 trainGroup:CreateToggle(
@@ -3798,7 +3857,8 @@ trainGroup:CreateToggle(
 			state.TrainAnchorCFrame = nil
 		end
 		saveSettings()
-	end
+	end,
+	"ATrainCollect"
 )
 trainGroup:CreateSlider(
 	"Collect every (min)",
@@ -3810,7 +3870,9 @@ trainGroup:CreateSlider(
 		state.NextFlashCollect = tick() + (value * 60)
 		saveSettings()
 	end,
-	"How often the train+collect combo grabs plot money."
+	"How often the train+collect combo grabs plot money.",
+	nil,
+	"TrainCollectDelay"
 )
 trainGroup:CreateDivider()
 trainGroup:CreateToggle(
@@ -3820,7 +3882,8 @@ trainGroup:CreateToggle(
 	function(value)
 		state.ACollect = value
 		saveSettings()
-	end
+	end,
+	"ACollect"
 )
 trainGroup:CreateSlider(
 	"Collect every (sec)",
@@ -3831,7 +3894,9 @@ trainGroup:CreateSlider(
 		state.CollectDelay = value
 		saveSettings()
 	end,
-	"Wait time between collect runs."
+	"Wait time between collect runs.",
+	nil,
+	"CollectDelay"
 )
 
 placeGroup:CreateToggle(
@@ -3841,7 +3906,8 @@ placeGroup:CreateToggle(
 	function(value)
 		state.APlaceBest = value
 		saveSettings()
-	end
+	end,
+	"APlaceBest"
 )
 placeGroup:CreateDivider()
 placeGroup:CreateToggle(
@@ -3851,7 +3917,8 @@ placeGroup:CreateToggle(
 	function(value)
 		state.AProtectFilter = value
 		saveSettings()
-	end
+	end,
+	"AProtectFilter"
 )
 protectedDropdown = placeGroup:AddDropdown("ProtectedBrainrots", {
 	Text = "Don't replace",
@@ -3873,7 +3940,8 @@ upgradeGroup:CreateToggle(
 	function(value)
 		state.AAutoUpgrade = value
 		saveSettings()
-	end
+	end,
+	"AAutoUpgrade"
 )
 upgradeGroup:CreateToggle(
 	"Auto upgrade plot",
@@ -3882,7 +3950,8 @@ upgradeGroup:CreateToggle(
 	function(value)
 		state.APlotUpgrade = value
 		saveSettings()
-	end
+	end,
+	"APlotUpgrade"
 )
 upgradeGroup:CreateDivider()
 upgradeDropdown = upgradeGroup:AddDropdown("UpgradeBrainrots", {
@@ -3907,7 +3976,9 @@ upgradeGroup:CreateSlider(
 		state.MaxUpLevel = value
 		saveSettings()
 	end,
-	"Won't push a pet past this level."
+	"Won't push a pet past this level.",
+	nil,
+	"MaxUpLevel"
 )
 upgradeGroup:CreateSlider(
 	"Wait between upgrades",
@@ -3918,7 +3989,9 @@ upgradeGroup:CreateSlider(
 		state.AutoUpgradeDelay = value
 		saveSettings()
 	end,
-	"Pause between upgrade clicks so you don't spam."
+	"Pause between upgrade clicks so you don't spam.",
+	nil,
+	"AutoUpgradeDelay"
 )
 
 economyGroup:CreateToggle(
@@ -3928,7 +4001,8 @@ economyGroup:CreateToggle(
 	function(value)
 		state.ABuyBest = value
 		saveSettings()
-	end
+	end,
+	"ABuyBest"
 )
 economyGroup:CreateToggle(
 	"Buy picked weight",
@@ -3937,7 +4011,8 @@ economyGroup:CreateToggle(
 	function(value)
 		state.ABuyWeights = value
 		saveSettings()
-	end
+	end,
+	"ABuyWeights"
 )
 state.WeightList = { "None" }
 for _, weight in ipairs(getSortedWeights()) do
@@ -3960,7 +4035,8 @@ economyGroup:CreateToggle(
 	function(value)
 		state.ABuySpeed = value
 		saveSettings()
-	end
+	end,
+	"ABuySpeed"
 )
 economyGroup:CreateDivider()
 economyGroup:CreateToggle(
@@ -3970,7 +4046,8 @@ economyGroup:CreateToggle(
 	function(value)
 		state.ARebirth = value
 		saveSettings()
-	end
+	end,
+	"ARebirth"
 )
 economyGroup:CreateToggle(
 	"Sell when full",
@@ -3979,7 +4056,8 @@ economyGroup:CreateToggle(
 	function(value)
 		state.AAutoSell = value
 		saveSettings()
-	end
+	end,
+	"AAutoSell"
 )
 economyGroup:CreateSlider(
 	"Sell at count",
@@ -3990,7 +4068,9 @@ economyGroup:CreateSlider(
 		state.AutoSellMaxBackpack = math.max(5, value)
 		saveSettings()
 	end,
-	"How many brainrots in bag before it sells."
+	"How many brainrots in bag before it sells.",
+	nil,
+	"AutoSellMaxBackpack"
 )
 economyGroup:CreateToggle(
 	"Claim 2x train",
@@ -3999,7 +4079,8 @@ economyGroup:CreateToggle(
 	function(value)
 		state.A2xTrain = value
 		saveSettings()
-	end
+	end,
+	"A2xTrain"
 )
 
 local kickStyleOptions = getKickStyleOptions()
@@ -4019,7 +4100,8 @@ styleGroup:CreateToggle(
 	function(value)
 		state.AAutoKickStyle = value
 		saveSettings()
-	end
+	end,
+	"AAutoKickStyle"
 )
 
 favoriteGroup:CreateToggle(
@@ -4032,7 +4114,8 @@ favoriteGroup:CreateToggle(
 			scanTools()
 		end
 		saveSettings()
-	end
+	end,
+	"AAutoFav"
 )
 favoriteGroup:CreateDivider()
 favoriteGroup:AddDropdown("FavoriteBrainrot", {
@@ -4108,7 +4191,8 @@ battleGroup:CreateToggle(
 	function(value)
 		state.AAutoBattle = value
 		saveSettings()
-	end
+	end,
+	"AAutoBattle"
 )
 battleGroup:CreateToggle(
 	"Auto-accept battles",
@@ -4117,7 +4201,8 @@ battleGroup:CreateToggle(
 	function(value)
 		state.AAutoAcceptBattle = value
 		saveSettings()
-	end
+	end,
+	"AAutoAcceptBattle"
 )
 battleGroup:CreateDivider()
 battleGroup:CreateDropdown(
@@ -4136,7 +4221,8 @@ battleGroup:CreateToggle(
 	function(value)
 		state.BattleGamepass = value
 		saveSettings()
-	end
+	end,
+	"BattleGamepass"
 )
 battleGroup:CreateSlider(
 	"Start with players",
@@ -4147,7 +4233,9 @@ battleGroup:CreateSlider(
 		state.BattleMinPlayers = value
 		saveSettings()
 	end,
-	"Won't start until at least this many other players show up."
+	"Won't start until at least this many other players show up.",
+	nil,
+	"BattleMinPlayers"
 )
 
 local masteryStatus
@@ -4163,7 +4251,8 @@ masteryGroup:CreateToggle(
 			updateMasteryStatus("Off")
 		end
 		saveSettings()
-	end
+	end,
+	"AAutoMastery"
 )
 masteryGroup:CreateDivider()
 masteryGroup:CreateSlider(
@@ -4175,7 +4264,9 @@ masteryGroup:CreateSlider(
 		state.MasteryKickPower = value
 		saveSettings()
 	end,
-	"Dial down if you're overshooting the tier."
+	"Dial down if you're overshooting the tier.",
+	nil,
+	"MasteryKickPower"
 )
 masteryGroup:CreateDropdown(
 	"Reset method",
@@ -4218,7 +4309,8 @@ weatherGroup:CreateToggle(
 	function(value)
 		state.AAutoSummonWeather = value
 		saveSettings()
-	end
+	end,
+	"AAutoSummonWeather"
 )
 weatherGroup:CreateDropdown(
 	"Weather",
@@ -4237,7 +4329,8 @@ serverGroup:CreateToggle(
 	function(value)
 		state.AntiAFK = value
 		saveSettings()
-	end
+	end,
+	"AntiAFK"
 )
 serverGroup:CreateDivider()
 Core.buildJoinServerControls(serverGroup, {
@@ -4254,7 +4347,8 @@ webhookGroup:CreateToggle(
 		state.AWebhook = value
 		syncTrackerConfig()
 		saveSettings()
-	end
+	end,
+	"AWebhook"
 )
 webhookGroup:CreateInput(
 	"Webhook link",
@@ -4338,7 +4432,8 @@ webhookGroup:CreateToggle(
 		state.AutoStatusWebhook = value
 		runtime.nextStatusWebhook = tick() + (state.AutoStatusInterval * 60)
 		saveSettings()
-	end
+	end,
+	"AutoStatusWebhook"
 )
 webhookGroup:CreateSlider(
 	"How often (min)",
@@ -4350,7 +4445,9 @@ webhookGroup:CreateSlider(
 		runtime.nextStatusWebhook = tick() + (value * 60)
 		saveSettings()
 	end,
-	"Minutes between bag check-in messages."
+	"Minutes between bag check-in messages.",
+	nil,
+	"AutoStatusInterval"
 )
 webhookGroup:CreateButton(
 	"Post bag count now",

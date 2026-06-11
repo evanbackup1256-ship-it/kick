@@ -1068,6 +1068,24 @@ local function fetchCoreRemote()
 	return nil, "all transports failed"
 end
 
+local function runParallel(tasks)
+	local remaining = #tasks
+	local results = table.create(#tasks)
+	if remaining == 0 then
+		return results
+	end
+	for index, fn in ipairs(tasks) do
+		task.spawn(function()
+			results[index] = table.pack(pcall(fn))
+			remaining -= 1
+		end)
+	end
+	while remaining > 0 do
+		task.wait()
+	end
+	return results
+end
+
 local function loadCore()
 	ENV.Alleral_Core = nil
 
@@ -2585,11 +2603,35 @@ local function main()
 	loadTelemetryConfig()
 	loadSecurityConfig()
 	loadAccessConfig()
-	loadModule({ HUB .. "/analytics.luau", "core/analytics.luau" }, HUB .. "/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
-	loadModule({ HUB .. "/helpers.luau", "core/game_helpers.luau" }, HUB .. "/helpers.luau", "GameHelpers", "Alleral/helpers")
-	loadModule({ HUB .. "/telemetry.luau", "core/telemetry.luau" }, HUB .. "/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
-	loadModule({ HUB .. "/security.luau", "core/security.luau" }, HUB .. "/security.luau", "Alleral_Security", "Alleral/security")
-	loadModule({ HUB .. "/access.luau", "core/access.luau" }, HUB .. "/access.luau", "Alleral_Access", "Alleral/access")
+
+	local uiBundle, uiErr, gameSrc, gameLabel
+	local _ = runParallel({
+		function()
+			if ENV.Alleral_Core and type(ENV.Alleral_Core.preloadUi) == "function" then
+				uiBundle, uiErr = ENV.Alleral_Core.preloadUi()
+			elseif ENV.Alleral_Core and type(ENV.Alleral_Core.loadUi) == "function" then
+				uiBundle, uiErr = ENV.Alleral_Core.loadUi()
+			end
+		end,
+		function()
+			gameSrc, gameLabel = fetchGameScript(profile)
+		end,
+		function()
+			loadModule({ HUB .. "/analytics.luau", "core/analytics.luau" }, HUB .. "/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
+		end,
+		function()
+			loadModule({ HUB .. "/helpers.luau", "core/game_helpers.luau" }, HUB .. "/helpers.luau", "GameHelpers", "Alleral/helpers")
+		end,
+		function()
+			loadModule({ HUB .. "/telemetry.luau", "core/telemetry.luau" }, HUB .. "/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
+		end,
+		function()
+			loadModule({ HUB .. "/security.luau", "core/security.luau" }, HUB .. "/security.luau", "Alleral_Security", "Alleral/security")
+		end,
+		function()
+			loadModule({ HUB .. "/access.luau", "core/access.luau" }, HUB .. "/access.luau", "Alleral_Access", "Alleral/access")
+		end,
+	})
 	grantPublicAccess()
 
 	if not enforceSecurityGate(profile, "pre_inject") then
@@ -2597,15 +2639,12 @@ local function main()
 		return
 	end
 
-	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadUi) == "function" then
-		local ui, uiErr = ENV.Alleral_Core.loadUi()
-		if ui then
-			ENV.Alleral_Rayfield = ui
-			ENV.Alleral_UI = ui
-			log("WindUI ready")
-		else
-			log("UI skipped: " .. tostring(uiErr), true)
-		end
+	if uiBundle then
+		ENV.Alleral_Rayfield = uiBundle
+		ENV.Alleral_UI = uiBundle
+		log("WindUI ready")
+	elseif uiErr then
+		log("UI skipped: " .. tostring(uiErr), true)
 	end
 
 	if ENV.Alleral_Telemetry and ENV.Alleral_Telemetry.ReportInject then
@@ -2615,7 +2654,7 @@ local function main()
 		})
 	end
 
-	local src, label = fetchGameScript(profile)
+	local src, label = gameSrc, gameLabel
 	if not src then
 		notify("Alleral", "Game script failed: " .. tostring(label), 8)
 		log("Game script failed: " .. tostring(label), true)

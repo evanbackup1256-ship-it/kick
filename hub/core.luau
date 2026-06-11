@@ -1,7 +1,7 @@
 local Core = {}
 Core.VERSION = "2.7.0"
 Core.UI_LIBRARY = "WindUI"
-Core.WINDUI_VERSION = "1.6.64-fix-aller10"
+Core.WINDUI_VERSION = "1.6.64-fix-aller17"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -13,6 +13,8 @@ local WINDUI_MIRROR_URLS = {
 }
 local WINDUI_LOCAL_ROOTS = {
 	"ui/windui/",
+	"kick/ui/windui/",
+	"kick/kick/ui/windui/",
 	"vendor/windui/",
 	"windui/",
 }
@@ -155,6 +157,7 @@ function Core.installResilience()
 	local guarded = {
 		"prepareGame",
 		"loadUi",
+		"preloadUi",
 		"buildUiWindow",
 		"buildUiTab",
 		"buildUiGroup",
@@ -1267,6 +1270,112 @@ function Core.registerUiWindow(window)
 	return window
 end
 
+Core._UiStateBindings = Core._UiStateBindings or {}
+
+function Core.clearUiStateBindings()
+	Core._UiStateBindings = {}
+end
+
+function Core.bindUiState(stateKey, widget, kind, rawHandle)
+	if type(stateKey) ~= "string" or stateKey == "" then
+		return widget
+	end
+	Core._UiStateBindings[stateKey] = {
+		widget = widget,
+		kind = kind or "toggle",
+		raw = rawHandle,
+	}
+	return widget
+end
+
+function Core.sliderIncrement(minValue, maxValue, explicit)
+	if explicit ~= nil then
+		return explicit
+	end
+	minValue = tonumber(minValue) or 0
+	maxValue = tonumber(maxValue) or 100
+	local range = maxValue - minValue
+	if range <= 0 then
+		return 1
+	end
+	if range <= 1 then
+		return 0.01
+	end
+	if range <= 5 then
+		return 0.05
+	end
+	if range <= 10 then
+		return 0.1
+	end
+	if range <= 50 then
+		return 0.5
+	end
+	if range <= 200 then
+		return 1
+	end
+	return math.max(1, math.floor(range / 80))
+end
+
+function Core.syncUiState(state, options)
+	if type(state) ~= "table" then
+		return 0
+	end
+	options = type(options) == "table" and options or {}
+	local synced = 0
+	for key, entry in pairs(Core._UiStateBindings or {}) do
+		local value = state[key]
+		if value ~= nil then
+			local raw = entry.raw
+			if not raw and type(entry.widget) == "table" then
+				raw = entry.widget._raw
+			end
+			if entry.kind == "toggle" and raw and type(raw.Set) == "function" then
+				pcall(function()
+					local prev = raw.Callback
+					raw.Callback = function() end
+					raw:Set(value == true, nil, false)
+					raw.Callback = prev
+				end)
+				synced += 1
+			elseif entry.kind == "slider" and raw and type(raw.Set) == "function" then
+				pcall(function()
+					local prev = raw.Callback
+					raw.Callback = function() end
+					raw:Set(tonumber(value) or 0)
+					raw.Callback = prev
+				end)
+				synced += 1
+			elseif entry.kind == "dropdown" and raw then
+				pcall(function()
+					if raw.Select then
+						raw:Select(value)
+					elseif raw.Set then
+						raw:Set(value)
+					elseif entry.widget and entry.widget.Set then
+						entry.widget:Set({ CurrentOption = value })
+					end
+				end)
+				synced += 1
+			elseif entry.widget and type(entry.widget.Set) == "function" then
+				pcall(function()
+					if entry.kind == "toggle" then
+						entry.widget:Set({ CurrentValue = value == true })
+					elseif entry.kind == "slider" then
+						entry.widget:Set({ CurrentValue = tonumber(value) or 0 })
+					else
+						entry.widget:Set({ CurrentOption = value })
+					end
+				end)
+				synced += 1
+			end
+		end
+	end
+	if options.notify == true and synced > 0 then
+		Core.notify("UI", "Synced " .. tostring(synced) .. " controls.", 2, "info")
+	end
+	return synced
+end
+
 function Core.releaseUiWindow()
 	local ui = ENV.Alleral_UI or ENV.Alleral_Rayfield
 	local wind = ui and (ui.WindUI or ui.Library)
@@ -1834,45 +1943,7 @@ function Core.buildUiPreferencesGroup(tab, options)
 		uiBundle = options.window._ui
 	end
 	local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
-	local group = Core.buildUiGroup(tab, "UI & notifications", column, nil, nil, "UiPreferences")
-
-	group:CreateToggle(
-		"Reduced motion",
-		ENV.Alleral_UiReducedMotion == true,
-		"Less UI animation.",
-		function(value)
-			ENV.Alleral_UiReducedMotion = value == true
-			if windUi and type(windUi.SetReducedMotion) == "function" then
-				windUi:SetReducedMotion(value)
-			end
-		end
-	)
-
-	group:CreateToggle(
-		"Bottom notifications",
-		ENV.Alleral_NotifyLower == true,
-		"Move toasts to the bottom-right.",
-		function(value)
-			ENV.Alleral_NotifyLower = value == true
-			if windUi and type(windUi.SetNotificationLower) == "function" then
-				pcall(function()
-					windUi:SetNotificationLower(value)
-				end)
-			end
-		end
-	)
-
-	group:CreateToggle(
-		"Compact toasts",
-		ENV.Alleral_NotifyCompact == true,
-		"Smaller notification cards with tighter spacing.",
-		function(value)
-			ENV.Alleral_NotifyCompact = value == true
-			if windUi and type(windUi.SetNotificationCompact) == "function" then
-				windUi:SetNotificationCompact(value)
-			end
-		end
-	)
+	local group = Core.buildUiGroup(tab, "UI tools", column, nil, nil, "UiPreferences")
 
 	group:CreateButton("Test success toast", function()
 		Core.notify("Alleral", "Success toast.", 4, "success")
@@ -1900,7 +1971,74 @@ function Core.buildUiPreferencesGroup(tab, options)
 		end
 	end, "Re-apply theme rails and polish.")
 
+	group:CreateToggle(
+		"Bottom notifications",
+		ENV.Alleral_NotifyLower == true,
+		"Move toasts to the bottom-right.",
+		function(value)
+			ENV.Alleral_NotifyLower = value == true
+			if windUi and type(windUi.SetNotificationLower) == "function" then
+				pcall(function()
+					windUi:SetNotificationLower(value)
+				end)
+			end
+		end
+	)
+
 	return group
+end
+
+function Core.buildAutomationStatusGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local state = options.state or ENV.Alleral_State or {}
+	local loops = options.loops or {}
+	local column = options.column or 1
+	local flags = options.flags or {
+		{ key = "AFarm", label = "Auto kick" },
+		{ key = "APlaceBest", label = "Auto place" },
+		{ key = "AAutoUpgrade", label = "Auto upgrade" },
+		{ key = "AAutoFav", label = "Auto favorite" },
+		{ key = "ATrain", label = "Auto train" },
+		{ key = "ACollect", label = "Auto collect" },
+		{ key = "AAutoBattle", label = "Auto battle" },
+		{ key = "AAutoMastery", label = "Auto mastery" },
+	}
+
+	local group = Core.buildUiGroup(tab, "Automation", column, nil, nil, "AutomationStatus")
+	local status = group:CreateStatus("Live loops", {
+		Active = "0",
+		Total = tostring(#flags),
+		Hub = state.HubRunning ~= false and "running" or "stopped",
+	})
+
+	local function refresh()
+		local active = 0
+		local lines = {}
+		for _, entry in ipairs(flags) do
+			local on = state[entry.key] == true
+			if on then
+				active += 1
+			end
+			local loopState = loops[entry.key] or loops[entry.label]
+			local pulse = on and (loopState and loopState.enabled ~= false and "●" or "○") or "·"
+			table.insert(lines, pulse .. " " .. entry.label)
+		end
+		status:Update("Active", tostring(active))
+		status:Update("Hub", state.HubRunning ~= false and "running" or "stopped")
+		if status.SetSummary and type(status.SetSummary) == "function" then
+			status:SetSummary(table.concat(lines, "  "))
+		end
+	end
+
+	group:CreateButton("Refresh status", refresh, "Update loop indicators.")
+	task.spawn(function()
+		while state.HubRunning ~= false do
+			refresh()
+			task.wait(2)
+		end
+	end)
+
+	return group, status, refresh
 end
 
 function Core.buildStandardSettingsExtras(tab, options)
@@ -2320,6 +2458,11 @@ local function compileWindUiModule(source, label)
 	if not loadStringFn or not source or source == "" then
 		return nil, "Empty WindUI source"
 	end
+	local cacheKey = tostring(#source) .. ":" .. tostring(label)
+	local cache = ENV._AlleralWindUiCompileCache
+	if cache and cache.key == cacheKey and type(cache.module) == "table" then
+		return cache.module
+	end
 	if not windUiSourceValid(source) then
 		return nil, "WindUI source invalid (" .. tostring(#source) .. " bytes)"
 	end
@@ -2333,6 +2476,10 @@ local function compileWindUiModule(source, label)
 	local ok, result = pcall(compiled)
 	if ok and type(result) == "table" and type(result.CreateWindow) == "function" then
 		ENV.Alleral_WindUiLastGood = result
+		ENV._AlleralWindUiCompileCache = {
+			key = tostring(#source) .. ":" .. tostring(label),
+			module = result,
+		}
 		return result
 	end
 	if not ok then
@@ -2346,12 +2493,22 @@ local function compileWindUiModule(source, label)
 end
 
 local function readWindUiLocal(relativePath)
+	local cacheKey = "_AlleralWindPath_" .. tostring(relativePath):gsub("[^%w]", "_")
+	local cachedPath = ENV[cacheKey]
+	if type(cachedPath) == "string" then
+		local cachedSource = Core.readFile(cachedPath)
+		if cachedSource then
+			return cachedSource, cachedPath
+		end
+	end
+
 	local roots = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
-	for _, root in ipairs(roots) do
-		for _, vendorRoot in ipairs(WINDUI_LOCAL_ROOTS) do
+	for _, vendorRoot in ipairs(WINDUI_LOCAL_ROOTS) do
+		for _, root in ipairs(roots) do
 			local fullPath = root .. vendorRoot .. relativePath
 			local source = Core.readFile(fullPath)
 			if source then
+				ENV[cacheKey] = fullPath
 				return source, fullPath
 			end
 		end
@@ -2460,6 +2617,13 @@ local function applyAlleralWindUiPatch(windUi)
 end
 
 local function loadWindUiModule()
+	if ENV.Alleral_WindUiLastGood and type(ENV.Alleral_WindUiLastGood.CreateWindow) == "function" then
+		local cache = ENV._AlleralWindUiCompileCache
+		if cache and type(cache.module) == "table" then
+			return applyAlleralWindUiPatch(cache.module)
+		end
+	end
+
 	local localSource, localPath = readWindUiLocal(WINDUI_FILE)
 	if localSource then
 		local module, err = compileWindUiModule(localSource, "@WindUI/local:" .. localPath)
@@ -2548,6 +2712,8 @@ function Core.loadUi()
 
 	ENV.Alleral_WindUiLastGood = WindUI
 
+	Core.clearUiStateBindings()
+
 	local bundle = {
 		WindUI = WindUI,
 		Library = WindUI,
@@ -2582,9 +2748,18 @@ function Core.loadUi()
 	if ENV.Alleral_UiReducedMotion == true and type(WindUI.SetReducedMotion) == "function" then
 		WindUI:SetReducedMotion(true)
 	end
+	if ENV.Alleral_UiSpringMotion == false and type(WindUI.SetSpringMotion) == "function" then
+		pcall(function()
+			WindUI:SetSpringMotion(false)
+		end)
+	end
 	if ENV.Alleral_UiStartup == false and type(WindUI.SetStartupEffect) == "function" then
 		pcall(function()
 			WindUI:SetStartupEffect(false)
+		end)
+	elseif ENV.Alleral_UiStartup == true and type(WindUI.SetStartupEffect) == "function" then
+		pcall(function()
+			WindUI:SetStartupEffect(true)
 		end)
 	end
 	if ENV.Alleral_UiTouchFeedback == false and type(WindUI.SetTouchFeedback) == "function" then
@@ -2623,10 +2798,38 @@ function Core.loadUi()
 		end)
 	end
 	Core.say("WindUI " .. tostring(WindUI.GetAlleralVersion and WindUI:GetAlleralVersion() or Core.WINDUI_VERSION) .. " loaded")
+	task.defer(function()
+		if type(WindUI.Preload) == "function" then
+			pcall(function()
+				WindUI:Preload()
+			end)
+		end
+	end)
 	return cacheUi(bundle)
 end
 
 Core.loadRayfield = Core.loadUi
+
+function Core.preloadUi()
+	local cached = ENV.Alleral_UI or ENV.Alleral_Rayfield
+	if uiOk(cached) then
+		return cacheUi(cached)
+	end
+	if ENV._AlleralUiPreloadRunning == true then
+		local started = tick()
+		while ENV._AlleralUiPreloadRunning == true and tick() - started < 15 do
+			task.wait()
+		end
+		cached = ENV.Alleral_UI or ENV.Alleral_Rayfield
+		if uiOk(cached) then
+			return cacheUi(cached)
+		end
+	end
+	ENV._AlleralUiPreloadRunning = true
+	local bundle, err = Core.loadUi()
+	ENV._AlleralUiPreloadRunning = false
+	return bundle, err
+end
 
 function Core.httpGet(url)
 	if type(url) ~= "string" or url == "" then
@@ -2802,8 +3005,10 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 		return explicit or Core.uiElementId(name) .. "_" .. serial
 	end
 
-	local function wrapElement(applySet)
-		return {
+	local function wrapElement(applySet, meta)
+		meta = type(meta) == "table" and meta or {}
+		local wrapper = {
+			_raw = meta.raw,
 			Set = function(_, settings)
 				if type(settings) == "table" then
 					applySet(settings)
@@ -2812,6 +3017,10 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 				end
 			end,
 		}
+		if meta.bindKey then
+			Core.bindUiState(meta.bindKey, wrapper, meta.kind or "toggle", meta.raw)
+		end
+		return wrapper
 	end
 
 	local function dropdownDefault(values, current, multi)
@@ -2863,7 +3072,11 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 			if nextSettings.CurrentValue ~= nil then
 				setElementValue(handle, nextSettings.CurrentValue == true)
 			end
-		end)
+		end, {
+			raw = handle,
+			bindKey = settings.BindKey or settings.StateKey,
+			kind = "toggle",
+		})
 	end
 
 	function groupbox:CreateSlider(settings, id)
@@ -2873,7 +3086,7 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 		local handle = rawGroup:Slider({
 			Title = settings.Name,
 			Desc = settings.Tooltip,
-			Step = settings.Increment or (maxValue <= 5 and 0.05 or 1),
+			Step = Core.sliderIncrement(minValue, maxValue, settings.Increment),
 			Value = {
 				Min = minValue,
 				Max = maxValue,
@@ -2885,7 +3098,11 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 			if nextSettings.CurrentValue ~= nil then
 				setElementValue(handle, tonumber(nextSettings.CurrentValue) or minValue)
 			end
-		end)
+		end, {
+			raw = handle,
+			bindKey = settings.BindKey or settings.StateKey,
+			kind = "slider",
+		})
 	end
 
 	function groupbox:CreateButton(settings, id)
@@ -2968,7 +3185,11 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 			else
 				setElementValue(handle, type(pick) == "table" and pick[1] or pick)
 			end
-		end)
+		end, {
+			raw = handle,
+			bindKey = settings.BindKey or settings.StateKey,
+			kind = "dropdown",
+		})
 	end
 
 	function groupbox:CreateLabel(settings, id)
@@ -3010,12 +3231,40 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 		_rawTab = rawTab,
 		_ui = uiBundle,
 		_window = window,
+		_columnCount = 1,
 	}
+
+	local function resolveSectionParent(column)
+		column = math.clamp(tonumber(column) or 1, 1, 2)
+		if not rawTab or tab._columnCount < 2 or type(rawTab.HStack) ~= "function" then
+			return rawTab, column
+		end
+		tab._layout = tab._layout or {}
+		local layout = tab._layout
+		if not layout.ready then
+			layout.hstack = rawTab:HStack({})
+			if layout.hstack and type(layout.hstack.VStack) == "function" then
+				layout.cols = {
+					layout.hstack:VStack({}),
+					layout.hstack:VStack({}),
+				}
+				layout.ready = layout.cols[1] ~= nil and layout.cols[2] ~= nil
+			end
+		end
+		if layout.ready and layout.cols and layout.cols[column] and type(layout.cols[column].Section) == "function" then
+			return layout.cols[column], column
+		end
+		return rawTab, column
+	end
 
 	function tab:CreateGroupbox(settings)
 		settings = settings or {}
 		local name = settings.Name or "Group"
-		local rawGroup = rawTab:Section({
+		local parent = select(1, resolveSectionParent(settings.Column or 1))
+		if not parent or type(parent.Section) ~= "function" then
+			parent = rawTab
+		end
+		local rawGroup = parent:Section({
 			Title = name,
 			Box = true,
 			BoxBorder = true,
@@ -3067,6 +3316,33 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 			end
 		end, "Cycles through available presets.")
 
+		local accentPresets = { "Mint", "Cyan", "Violet", "Rose", "Amber", "Ice" }
+		group:CreateDropdown("Accent color", accentPresets, "Mint", function(selected)
+			if windUi and type(windUi.ApplyAccentPreset) == "function" then
+				pcall(function()
+					windUi:ApplyAccentPreset(selected)
+					if type(windUi.FlashAccent) == "function" then
+						windUi:FlashAccent()
+					end
+				end)
+			elseif windUi and type(windUi.SetAccentColor) == "function" then
+				local hex = ({
+					Mint = "#53fc18",
+					Cyan = "#22d3ee",
+					Violet = "#a78bfa",
+					Rose = "#fb7185",
+					Amber = "#fbbf24",
+					Ice = "#93c5fd",
+				})[selected] or "#53fc18"
+				pcall(function()
+					windUi:SetAccentColor(Color3.fromHex(hex))
+					if type(windUi.FlashAccent) == "function" then
+						windUi:FlashAccent()
+					end
+				end)
+			end
+		end, "Accent for toggles and highlights.")
+
 		local profileNames = { "auto", "desktop", "mobile", "compact", "performance" }
 		local profileLabels = {
 			auto = "Auto",
@@ -3104,11 +3380,20 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 			end
 		end)
 
+		group:CreateToggle("Spring motion", ENV.Alleral_UiSpringMotion ~= false, "Springs on menus and controls.", function(value)
+			ENV.Alleral_UiSpringMotion = value ~= false
+			if windUi and type(windUi.SetSpringMotion) == "function" then
+				pcall(function()
+					windUi:SetSpringMotion(value ~= false)
+				end)
+			end
+		end)
+
 		group:CreateToggle("Startup animation", ENV.Alleral_UiStartup ~= false, "Opening sweep when the menu loads.", function(value)
-			ENV.Alleral_UiStartup = value ~= false
+			ENV.Alleral_UiStartup = value == true
 			if windUi and type(windUi.SetStartupEffect) == "function" then
 				pcall(function()
-					windUi:SetStartupEffect(value ~= false)
+					windUi:SetStartupEffect(value == true)
 				end)
 			end
 		end)
@@ -3523,23 +3808,25 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 		end
 	end
 
-	function group:CreateToggle(name, default, tooltip, callback)
+	function group:CreateToggle(name, default, tooltip, callback, bindKey)
 		return groupbox:CreateToggle({
 			Name = name,
 			CurrentValue = default == true,
 			Tooltip = tooltip,
 			Callback = wrap(name, callback),
+			BindKey = bindKey,
 		}, nextId(name))
 	end
 
-	function group:CreateSlider(name, min, max, default, callback, tooltip)
+	function group:CreateSlider(name, min, max, default, callback, tooltip, increment, bindKey)
 		return groupbox:CreateSlider({
 			Name = name,
 			Range = { min, max },
-			Increment = max <= 5 and 0.05 or 1,
+			Increment = increment,
 			CurrentValue = tonumber(default) or min,
 			Tooltip = tooltip,
 			Callback = wrap(name, callback),
+			BindKey = bindKey,
 		}, nextId(name))
 	end
 
@@ -3585,13 +3872,14 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 		}, nextId(name))
 	end
 
-	function group:CreateDropdown(name, options, default, callback, tooltip)
+	function group:CreateDropdown(name, options, default, callback, tooltip, bindKey)
 		return groupbox:CreateDropdown({
 			Name = name,
 			Options = normalizeOptions(options),
 			CurrentOption = default,
 			Tooltip = tooltip,
 			Callback = wrap(name, callback),
+			BindKey = bindKey,
 		}, nextId(name))
 	end
 
@@ -3685,6 +3973,9 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 				Name = tostring(key) .. ": " .. rendered,
 			}, nextId(label .. "_" .. tostring(key)))
 		end
+		status.Labels.Summary = groupbox:CreateLabel({
+			Name = "",
+		}, nextId(label .. "_summary"))
 		function status:Update(key, value)
 			local rendered = tostring(value)
 			if self.LastValues[key] == rendered then
@@ -3694,6 +3985,12 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 			local row = self.Labels[key]
 			if row and row.Set then
 				row:Set({ Name = tostring(key) .. ": " .. rendered })
+			end
+		end
+		function status:SetSummary(text)
+			local row = self.Labels.Summary
+			if row and row.Set then
+				row:Set({ Name = tostring(text or "") })
 			end
 		end
 		function status:SetVisible(visible)
@@ -3935,7 +4232,9 @@ function Core.buildUiTab(section, name, icon, columns, id)
 		end
 	end
 	local rawTab = iconArg and window:AddTab(name, iconArg) or window:AddTab(name)
-	return Core.wrapUiTab(rawTab, window._ui or section._ui, window)
+	local wrapped = Core.wrapUiTab(rawTab, window._ui or section._ui, window)
+	wrapped._columnCount = math.max(1, tonumber(columns) or 1)
+	return wrapped
 end
 
 Core.buildRayfieldWindow = Core.buildUiWindow
