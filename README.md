@@ -6,7 +6,9 @@ One loader — detects your game by PlaceId and runs the matching script.
 
 ## Load
 
-**Local workspace:**
+> **Stuck on an old version (e.g. v3.8.3)?** Your executor workspace has a stale `loader.luau`. Use the **remote** snippet below once — it always pulls the latest from GitHub. After v3.8.6+, local copies auto-upgrade on launch.
+
+**Local workspace** (full repo required — needs `core/` folder):
 
 ```lua
 loadstring(readfile("loader.luau"))()

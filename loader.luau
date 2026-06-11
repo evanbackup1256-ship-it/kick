@@ -2,7 +2,7 @@
 	Alleral Hub — single entry point.
 	Detects game.PlaceId, loads core + matching games/*.luau script.
 ]]
-local LOADER_VERSION = "3.8.5"
+local LOADER_VERSION = "3.8.6"
 local REQUIRED_CORE_VERSION = "1.18"
 local MIN_CORE_VERSION = "1.17"
 local REQUIRED_UI_LIBRARY = "Rayfield"
@@ -17,6 +17,7 @@ local FETCH_RETRIES = 2
 local FETCH_BACKOFF = 0.35
 local MIN_SCRIPT_BYTES = 1000
 local PINNED_COMMITS = {
+	"c6191aa",
 	"d9441a1",
 	"df472aa",
 	"55d3f68",
@@ -185,6 +186,7 @@ end
 local httpRequest = resolveHttpRequest()
 local readFile = firstExecFunc("readfile", "read_file", "ReadFile")
 local isFile = firstExecFunc("isfile", "is_file", "IsFile")
+local listFiles = firstExecFunc("listfiles", "list_files", "ListFiles")
 local loadStringFn = resolveLoadString()
 
 local function hasHttp()
@@ -253,7 +255,7 @@ local CAPABILITIES = {
 	loadstring = loadStringFn ~= nil,
 	readfile = readFile ~= nil,
 	isfile = isFile ~= nil,
-	listfiles = firstExecFunc("listfiles", "list_files", "ListFiles") ~= nil,
+	listfiles = listFiles ~= nil,
 }
 
 local function waitForPath(root, path, timeout)
@@ -506,7 +508,78 @@ local function discoverLocalFiles(fileNames)
 			end
 		end
 	end
+	if listFiles then
+		local searchDirs = { "", "kick", "kick/kick", "workspace", "scripts", "autoexec" }
+		for _, dir in ipairs(searchDirs) do
+			local ok, entries = pcall(listFiles, dir)
+			if ok and type(entries) == "table" then
+				for _, entry in ipairs(entries) do
+					for _, name in ipairs(fileNames) do
+						local baseName = name:match("([^/]+)$") or name
+						if entry == baseName or entry == name then
+							local path = (dir ~= "" and (dir .. "/") or "") .. name
+							local source = readLocalFile(path)
+							if not source and entry == baseName then
+								path = (dir ~= "" and (dir .. "/") or "") .. entry
+								source = readLocalFile(path)
+							end
+							if source then
+								local duplicate = false
+								for _, hit in ipairs(found) do
+									if hit.path == path then
+										duplicate = true
+										break
+									end
+								end
+								if not duplicate then
+									table.insert(found, { path = path, source = source })
+								end
+							end
+						elseif entry == "core" and name:find("core/", 1, true) then
+							local path = (dir ~= "" and (dir .. "/") or "") .. name
+							local source = readLocalFile(path)
+							if source then
+								table.insert(found, { path = path, source = source })
+							end
+						end
+					end
+				end
+			end
+		end
+	end
 	return found
+end
+
+local function logLocalCoreHints()
+	if not CAPABILITIES.readfile then
+		return
+	end
+	local hints = {}
+	for _, hit in ipairs(discoverLocalFiles(SHARED_CORE_FILES)) do
+		table.insert(hints, hit.path)
+	end
+	if #hints > 0 then
+		log("info", "Local core candidates: " .. table.concat(hints, ", "))
+		return
+	end
+	local tried = {}
+	for _, root in ipairs({ "", "kick/", "kick/kick/" }) do
+		for _, name in ipairs(SHARED_CORE_FILES) do
+			table.insert(tried, root .. name)
+		end
+	end
+	log("warn", "No local core on disk. Checked: " .. table.concat(tried, ", "))
+	if listFiles then
+		local ok, entries = pcall(listFiles, "")
+		if ok and type(entries) == "table" and #entries > 0 then
+			local names = {}
+			for i = 1, math.min(#entries, 12) do
+				table.insert(names, tostring(entries[i]))
+			end
+			log("info", "Workspace root: " .. table.concat(names, ", "))
+		end
+	end
+	log("warn", "Sync the full repo (core/ folder) or use the remote load snippet in README once.")
 end
 
 local function telemetrySourceMarker()
@@ -1024,6 +1097,44 @@ local function coreVersionOk(core)
 		and core.UI_LIBRARY == REQUIRED_UI_LIBRARY
 end
 
+local function loaderVersionNewer(remote, localVersion)
+	return type(remote) == "string"
+		and type(localVersion) == "string"
+		and remote ~= localVersion
+		and coreVersionAtLeast(remote, localVersion)
+end
+
+local function trySelfUpgrade()
+	if ENV.Alleral_DevMode == true or ENV._Alleral_UpgradeRan == true then
+		return false
+	end
+	ENV._Alleral_UpgradeRan = true
+	if not CAPABILITIES.http or not loadStringFn then
+		return false
+	end
+	local nonce = tick()
+	for _, base in ipairs({
+		REPO_BASE .. "/loader.luau",
+		GITHUB_WEB_RAW .. "/loader.luau",
+		JSDELIVR_BASE .. "/loader.luau",
+	}) do
+		local body = httpFetchBody(base .. "?upgrade=" .. nonce, nonce)
+		if type(body) == "string" and #body > 8000 and body:find("Alleral Hub", 1, true) then
+			local remoteVersion = body:match('LOADER_VERSION%s*=%s*"([%d%.]+)"')
+			if loaderVersionNewer(remoteVersion, LOADER_VERSION) then
+				print("[Alleral] Upgrading loader " .. LOADER_VERSION .. " -> " .. tostring(remoteVersion))
+				ENV.Alleral_LoaderRunning = false
+				local ok, err = compileAndRun(body, "Alleral/loader-upgrade")
+				if not ok then
+					warn("[Alleral] Self-upgrade failed: " .. tostring(err))
+				end
+				return ok
+			end
+		end
+	end
+	return false
+end
+
 local main
 
 local function tryLocalCoreLoad()
@@ -1187,6 +1298,9 @@ local function preloadCore(required)
 			end
 		elseif required then
 			log("warn", "Core fetch failed: " .. tostring(sourceLabel))
+			if attempt == 1 then
+				logLocalCoreHints()
+			end
 			if attempt == 2 then
 				return false, sourceLabel
 			end
@@ -1755,6 +1869,10 @@ ENV.Alleral_LoaderInfo = function()
 end
 
 print("[Alleral] v" .. LOADER_VERSION .. " | PlaceId " .. tostring(game.PlaceId) .. " | executor=" .. tostring(CAPABILITIES.executor))
+
+if trySelfUpgrade() then
+	return
+end
 
 local okBoot, bootErr = pcall(main)
 if not okBoot then
