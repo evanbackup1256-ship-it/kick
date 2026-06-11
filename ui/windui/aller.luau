@@ -441,6 +441,8 @@ return function(WindUI)
 			startup = true,
 			touchFeedback = true,
 			haptics = false,
+			reducedMotion = false,
+			notifyCompact = false,
 		},
 		mobile = {
 			label = "Mobile",
@@ -453,6 +455,7 @@ return function(WindUI)
 			touchFeedback = true,
 			haptics = true,
 			notifyCompact = true,
+			reducedMotion = false,
 			openButton = {
 				Enabled = true,
 				OnlyMobile = false,
@@ -468,6 +471,9 @@ return function(WindUI)
 			elementPad = 12,
 			notifyCompact = true,
 			touchFeedback = true,
+			startup = true,
+			haptics = false,
+			reducedMotion = false,
 		},
 		performance = {
 			label = "Performance",
@@ -478,6 +484,7 @@ return function(WindUI)
 			elementPad = 10,
 			startup = false,
 			reducedMotion = true,
+			notifyCompact = false,
 			touchFeedback = false,
 			haptics = false,
 		},
@@ -528,17 +535,23 @@ return function(WindUI)
 		WINDOW_DEFAULTS.UIPadding = preset.padding or WINDOW_DEFAULTS.UIPadding
 		WINDOW_DEFAULTS.SideBarWidth = preset.sidebar or WINDOW_DEFAULTS.SideBarWidth
 		WINDOW_DEFAULTS.ElementPadding = preset.elementPad or WINDOW_DEFAULTS.ElementPadding
-		WindUI._AlleralUiScale = preset.uiScale or WindUI._AlleralUiScale or 1
-		WindUI._AlleralTouchFeedback = preset.touchFeedback ~= false
-		WindUI._AlleralHaptics = preset.haptics == true
-		if preset.reducedMotion then
-			WindUI._AlleralReducedMotion = true
+		if preset.uiScale ~= nil then
+			WindUI._AlleralUiScale = preset.uiScale
 		end
-		if preset.notifyCompact then
-			WindUI._AlleralNotifyCompact = true
+		if preset.touchFeedback ~= nil then
+			WindUI._AlleralTouchFeedback = preset.touchFeedback ~= false
 		end
-		if preset.startup == false then
-			WindUI._AlleralStartupEffect = false
+		if preset.haptics ~= nil then
+			WindUI._AlleralHaptics = preset.haptics == true
+		end
+		if preset.reducedMotion ~= nil then
+			WindUI._AlleralReducedMotion = preset.reducedMotion == true
+		end
+		if preset.notifyCompact ~= nil then
+			WindUI._AlleralNotifyCompact = preset.notifyCompact == true
+		end
+		if preset.startup ~= nil then
+			WindUI._AlleralStartupEffect = preset.startup ~= false
 		end
 	end
 
@@ -762,27 +775,99 @@ return function(WindUI)
 		return corner
 	end
 
+	local SLICE_GLASS_IMAGES = {
+		["rbxassetid://79047752995006"] = true,
+		["rbxassetid://97324581055162"] = true,
+		["rbxassetid://95071123641270"] = true,
+	}
+
+	local function isSliceChrome(gui)
+		return gui:IsA("ImageLabel") and gui.ScaleType == Enum.ScaleType.Slice
+	end
+
+	local function isGlassOrOutlineOverlay(gui)
+		if not isSliceChrome(gui) then
+			return false
+		end
+		if gui.Name == "Outline" or gui.Name == "Shadow" then
+			return true
+		end
+		return SLICE_GLASS_IMAGES[gui.Image] == true
+	end
+
+	local function hideSliceOverlay(gui)
+		if not gui or not gui:IsA("ImageLabel") then
+			return
+		end
+		gui.Visible = false
+		gui.ImageTransparency = 1
+	end
+
+	local function stripSliceChrome(root)
+		if not root then
+			return
+		end
+		for _, desc in ipairs(root:GetDescendants()) do
+			if isGlassOrOutlineOverlay(desc) then
+				hideSliceOverlay(desc)
+			end
+		end
+		if root:IsA("GuiObject") then
+			for _, child in ipairs(root:GetChildren()) do
+				if isGlassOrOutlineOverlay(child) then
+					hideSliceOverlay(child)
+				end
+			end
+		end
+	end
+
+	local function safeEnsureCorner(gui, radius)
+		if not gui or not gui:IsA("GuiObject") or isSliceChrome(gui) then
+			return nil
+		end
+		return ensureCorner(gui, radius)
+	end
+
 	local function polishSectionOutlines(root)
 		if not root then
 			return
 		end
 		for _, desc in ipairs(root:GetDescendants()) do
 			if desc.Name == "Outline" and desc:IsA("ImageLabel") and not isDropdownDescendant(desc) then
-				desc.Visible = false
+				hideSliceOverlay(desc)
 				local box = desc.Parent
 				if box and box:IsA("GuiObject") and not box:FindFirstChild("AlleralCardShell") then
-					ensureCorner(box, UDim.new(0, 14))
+					stripSliceChrome(box)
 					local shell = Instance.new("Frame")
 					shell.Name = "AlleralCardShell"
 					shell.BackgroundTransparency = 1
 					shell.Size = UDim2.fromScale(1, 1)
 					shell.ZIndex = box.ZIndex + 1
 					shell.Active = false
+					shell.ClipsDescendants = false
 					shell.Parent = box
 					ensureStroke(shell, "AlleralCardStroke", palette.line, 0.72, 1, {
 						inner = true,
 						reuseExisting = false,
 					})
+				end
+			end
+		end
+	end
+
+	local function polishRowChrome(root)
+		if not root then
+			return
+		end
+		for _, desc in ipairs(root:GetDescendants()) do
+			if desc.Name == "Outline" and desc:IsA("ImageLabel") and not isDropdownDescendant(desc) then
+				local box = desc.Parent
+				if box and box:FindFirstChild("AlleralCardShell") then
+					continue
+				end
+				hideSliceOverlay(desc)
+				if box then
+					stripSliceChrome(box)
 				end
 			end
 		end
@@ -827,7 +912,7 @@ return function(WindUI)
 		if not main then
 			return nil
 		end
-		ensureCorner(main, UDim.new(0, WINDOW_DEFAULTS.UICorner))
+		safeEnsureCorner(main, UDim.new(0, WINDOW_DEFAULTS.UICorner))
 		return ensureStroke(main, "AlleralWindowStroke", palette.line, 0.58, 1, { inner = true })
 	end
 
@@ -855,7 +940,7 @@ return function(WindUI)
 			return
 		end
 		local search = searchBar.Frame
-		ensureCorner(search, UDim.new(0, 10))
+		safeEnsureCorner(search, UDim.new(0, 10))
 		local stroke = ensureStroke(search, "AlleralSearchStroke", palette.line, 0.64, 1, { inner = true })
 		local box = search:FindFirstChildWhichIsA("TextBox", true)
 		if not box or box:FindFirstChild("AlleralSearchHook") then
@@ -979,11 +1064,13 @@ return function(WindUI)
 
 			if window.UIElements.MainBar then
 				polishSectionOutlines(window.UIElements.MainBar)
+				polishRowChrome(window.UIElements.MainBar)
 			end
 			if main then
 				task.defer(function()
 					if window.UIElements and window.UIElements.Main == main and main.Parent then
 						polishSectionOutlines(main)
+						polishRowChrome(main)
 					end
 				end)
 			end
@@ -997,6 +1084,36 @@ return function(WindUI)
 
 	local function normalizeWindowSettings(settings)
 		settings = type(settings) == "table" and settings or {}
+		local userKeys = {}
+		for key in pairs(settings) do
+			userKeys[key] = true
+		end
+
+		local presetName = resolveProfileName(WindUI._AlleralProfile)
+		local preset = PROFILE_PRESETS[presetName]
+		if preset then
+			if not userKeys.UICorner and preset.corner then
+				settings.UICorner = preset.corner
+			end
+			if not userKeys.UIPadding and preset.padding then
+				settings.UIPadding = preset.padding
+			end
+			if not userKeys.SideBarWidth and preset.sidebar then
+				settings.SideBarWidth = preset.sidebar
+			end
+			if not userKeys.ElementPadding and preset.elementPad then
+				settings.ElementPadding = preset.elementPad
+			end
+			if preset.openButton then
+				settings.OpenButton = type(settings.OpenButton) == "table" and settings.OpenButton or {}
+				for key, value in pairs(preset.openButton) do
+					if settings.OpenButton[key] == nil then
+						settings.OpenButton[key] = value
+					end
+				end
+			end
+		end
+
 		for key, value in pairs(WINDOW_DEFAULTS) do
 			if settings[key] == nil then
 				settings[key] = value
@@ -1019,22 +1136,6 @@ return function(WindUI)
 		end
 		if settings.OpenButton.OnlyMobile == nil then
 			settings.OpenButton.OnlyMobile = false
-		end
-
-		local presetName = resolveProfileName(WindUI._AlleralProfile)
-		local preset = PROFILE_PRESETS[presetName]
-		if preset then
-			settings.UICorner = preset.corner or settings.UICorner
-			settings.UIPadding = preset.padding or settings.UIPadding
-			settings.SideBarWidth = preset.sidebar or settings.SideBarWidth
-			settings.ElementPadding = preset.elementPad or settings.ElementPadding
-			if preset.openButton then
-				for key, value in pairs(preset.openButton) do
-					if settings.OpenButton[key] == nil then
-						settings.OpenButton[key] = value
-					end
-				end
-			end
 		end
 
 		return settings
@@ -1060,21 +1161,31 @@ return function(WindUI)
 		if not card then
 			return nil
 		end
-		for _, child in ipairs(card:GetChildren()) do
-			if child:IsA("ImageLabel") and child.Name ~= "Background" and child.Size == UDim2.new(1, 0, 1, 0) then
-				child.Visible = false
-			end
+
+		if card:IsA("GuiObject") then
+			card.ClipsDescendants = true
 		end
-		local bg = card:FindFirstChild("Background")
+
+		stripSliceChrome(card)
+
+		local bg = card:FindFirstChild("Background", true)
 		if bg then
-			ensureCorner(bg, UDim.new(0, 13))
+			safeEnsureCorner(bg, UDim.new(0, 13))
 		end
-		ensureCorner(card, UDim.new(0, 13))
-		local oldStroke = card:FindFirstChild("AlleralNotifyStroke")
+
+		local oldStroke = card:FindFirstChild("AlleralNotifyStroke", true)
 		if oldStroke then
 			oldStroke:Destroy()
 		end
-		local strokeTarget = bg or card
+
+		local strokeTarget = bg
+		if not strokeTarget and card:IsA("Frame") then
+			strokeTarget = card
+			safeEnsureCorner(strokeTarget, UDim.new(0, 13))
+		end
+		if not strokeTarget then
+			return nil
+		end
 		return ensureStroke(strokeTarget, "AlleralNotifyStroke", palette.line, 0.48, 1, {
 			inner = true,
 			reuseExisting = false,
@@ -1195,6 +1306,30 @@ return function(WindUI)
 			}
 		end
 
+		local function polishElementChrome(elem)
+			if type(elem) ~= "table" then
+				return
+			end
+			local roots = {}
+			if elem.UIElements then
+				if elem.UIElements.Main then
+					table.insert(roots, elem.UIElements.Main)
+				end
+				if elem.UIElements.Container then
+					table.insert(roots, elem.UIElements.Container)
+				end
+			end
+			if elem.ToggleFrame and elem.ToggleFrame.UIElements and elem.ToggleFrame.UIElements.Main then
+				table.insert(roots, elem.ToggleFrame.UIElements.Main)
+			end
+			for _, root in ipairs(roots) do
+				stripSliceChrome(root)
+				if root.Parent and root.Parent:IsA("GuiObject") then
+					stripSliceChrome(root.Parent)
+				end
+			end
+		end
+
 		local function polishToggleElement(elem)
 			if type(elem) ~= "table" or elem._AlleralToggleDone then
 				return elem
@@ -1206,6 +1341,8 @@ return function(WindUI)
 				if not row then
 					return
 				end
+
+				polishElementChrome(elem)
 
 				local parts = findToggleParts(findToggleSwitch(row))
 				if not parts then
@@ -1297,6 +1434,7 @@ return function(WindUI)
 			end
 			elem._AlleralButtonDone = true
 			task.defer(function()
+				polishElementChrome(elem)
 				local row = elem.UIElements and (elem.UIElements.Main or elem.UIElements.Container)
 				if not row then
 					return
@@ -1638,7 +1776,7 @@ return function(WindUI)
 			task.defer(function()
 				local main = type(result) == "table" and result.UIElements and result.UIElements.Main
 				if main and main:IsA("GuiObject") then
-					ensureCorner(main, UDim.new(0, 14))
+					safeEnsureCorner(main, UDim.new(0, 14))
 					local stroke = ensureStroke(main, "AlleralPopupStroke", palette.line, 0.72, 1, { inner = true })
 					if main:IsA("ImageLabel") then
 						local target = main.ImageTransparency
@@ -1830,8 +1968,20 @@ return function(WindUI)
 		if preset then
 			applyPresetToDefaults(preset)
 		end
-		if type(WindUI.SetNotificationCompact) == "function" and WindUI._AlleralNotifyCompact then
-			WindUI:SetNotificationCompact(true)
+		if preset and preset.reducedMotion ~= nil and type(WindUI.SetReducedMotion) == "function" then
+			pcall(function()
+				WindUI:SetReducedMotion(WindUI._AlleralReducedMotion == true)
+			end)
+		end
+		if preset and preset.startup ~= nil and type(WindUI.SetStartupEffect) == "function" then
+			pcall(function()
+				WindUI:SetStartupEffect(WindUI._AlleralStartupEffect ~= false)
+			end)
+		end
+		if preset and preset.notifyCompact ~= nil and type(WindUI.SetNotificationCompact) == "function" then
+			pcall(function()
+				WindUI:SetNotificationCompact(WindUI._AlleralNotifyCompact == true)
+			end)
 		end
 		if WindUI.Window then
 			applyWindowScale(WindUI.Window)
