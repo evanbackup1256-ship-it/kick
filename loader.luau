@@ -16,6 +16,7 @@ local FETCH_RETRIES = 2
 local FETCH_BACKOFF = 0.35
 local MIN_SCRIPT_BYTES = 1000
 local PINNED_COMMITS = {
+	"df472aa",
 	"55d3f68",
 	"6a1b22c",
 }
