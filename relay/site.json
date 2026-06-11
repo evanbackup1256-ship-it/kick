@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-11T21:39:04Z",
+  "updatedAt": "2026-06-11T21:42:05Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
-  "loaderVersion": "7.6.2",
-  "coreVersion": "2.7.3",
+  "loaderVersion": "7.6.3",
+  "coreVersion": "2.7.4",
   "uiLibrary": "WindUI",
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick()))()",

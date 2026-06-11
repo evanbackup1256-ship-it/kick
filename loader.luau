@@ -1,19 +1,22 @@
-local LOADER_VERSION = "7.6.2"
+local LOADER_VERSION = "7.6.3"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 60
 local CORE_MIN_BYTES = 50000
-local CORE_BASE_MIN_BYTES = 90000
+local CORE_BASE_MIN_BYTES = 30000
+local CORE_BASE_MAX_BYTES = 80000
 local CORE_UI_MIN_BYTES = 50000
+local CORE_HUB_UI_MIN_BYTES = 60000
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
 local CORE_UI_PATH = HUB .. "/core_ui.luau"
+local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.6.2",
-	core = "2.7.3",
+	loader = "7.6.3",
+	core = "2.7.4",
 	ui = "Alleral",
 	analytics = "1.2",
 	telemetry = "3.2",
@@ -1082,6 +1085,9 @@ local function coreBaseValid(src)
 	if type(src) ~= "string" or #src < CORE_BASE_MIN_BYTES then
 		return false
 	end
+	if #src > CORE_BASE_MAX_BYTES then
+		return false
+	end
 	if not src:find("applyUiLayer", 1, true) then
 		return false
 	end
@@ -1112,6 +1118,19 @@ local function coreUiValid(src)
 		return false
 	end
 	return compileCoreSource(src, "Alleral/core_ui")
+end
+
+local function coreHubUiValid(src)
+	if type(src) ~= "string" or #src < CORE_HUB_UI_MIN_BYTES then
+		return false
+	end
+	if not src:find("return function%(Core%)", 1, true) then
+		return false
+	end
+	if not src:find("buildStandardSettingsExtras", 1, true) then
+		return false
+	end
+	return compileCoreSource(src, "Alleral/core_hub_ui")
 end
 
 local function coreValid(src)
@@ -1171,6 +1190,28 @@ local function coreUiRejectReason(src)
 	end
 	if loadStringFn then
 		local ok, err = compileCoreSource(src, "Alleral/core_ui-check")
+		if not ok then
+			return "compile failed: " .. tostring(err)
+		end
+	end
+	return "unknown"
+end
+
+local function coreHubUiRejectReason(src)
+	if type(src) ~= "string" or src == "" then
+		return "empty response"
+	end
+	if coreHubUiValid(src) then
+		return "valid"
+	end
+	if #src < CORE_HUB_UI_MIN_BYTES then
+		return tostring(#src) .. "b, need " .. tostring(CORE_HUB_UI_MIN_BYTES) .. "b+"
+	end
+	if not src:find("buildStandardSettingsExtras", 1, true) then
+		return "missing hub UI builders"
+	end
+	if loadStringFn then
+		local ok, err = compileCoreSource(src, "Alleral/core_hub_ui-check")
 		if not ok then
 			return "compile failed: " .. tostring(err)
 		end
@@ -1317,21 +1358,52 @@ local function loadCore()
 		return false, uiLabel or "Core UI download failed"
 	end
 
+	local hubUiSrc, hubUiLabel = resolveCoreSource(
+		{ CORE_HUB_UI_PATH, HUB .. "/core_hub_ui.luau" },
+		{ ".alleral/cache/" .. CORE_HUB_UI_PATH },
+		CORE_HUB_UI_PATH,
+		coreHubUiValid,
+		coreHubUiRejectReason,
+		CORE_HUB_UI_MIN_BYTES
+	)
+	if not hubUiSrc then
+		ENV.Alleral_Core = nil
+		return false, hubUiLabel or "Core hub UI download failed"
+	end
+
 	local applied, applyErr = ENV.Alleral_Core.applyUiLayer(uiSrc, uiLabel or "@Alleral/core_ui")
 	if not applied then
 		ENV.Alleral_Core = nil
 		return false, applyErr or "Core UI layer failed"
 	end
-	if type(ENV.Alleral_Core.loadUi) ~= "function" then
+
+	applied, applyErr = ENV.Alleral_Core.applyUiLayer(hubUiSrc, hubUiLabel or "@Alleral/core_hub_ui")
+	if not applied then
 		ENV.Alleral_Core = nil
-		return false, "Core UI layer missing loadUi"
+		return false, applyErr or "Core hub UI layer failed"
+	end
+
+	if not ENV.Alleral_Core._UiLayerReady or type(ENV.Alleral_Core.loadUi) ~= "function" then
+		ENV.Alleral_Core = nil
+		return false, "Core UI layers incomplete"
 	end
 
 	cacheRemote(HUB .. "/core.luau", baseSrc)
 	cacheRemote(".alleral/cache/" .. HUB .. "/core.luau", baseSrc)
 	cacheRemote(CORE_UI_PATH, uiSrc)
 	cacheRemote(".alleral/cache/" .. CORE_UI_PATH, uiSrc)
-	log("Core v" .. tostring(ENV.Alleral_Core.VERSION) .. " from " .. tostring(baseLabel) .. " + " .. tostring(uiLabel))
+	cacheRemote(CORE_HUB_UI_PATH, hubUiSrc)
+	cacheRemote(".alleral/cache/" .. CORE_HUB_UI_PATH, hubUiSrc)
+	log(
+		"Core v"
+			.. tostring(ENV.Alleral_Core.VERSION)
+			.. " from "
+			.. tostring(baseLabel)
+			.. " + "
+			.. tostring(uiLabel)
+			.. " + "
+			.. tostring(hubUiLabel)
+	)
 	return true
 end
 
@@ -2040,6 +2112,12 @@ local function buildManagedFiles()
 			expectedKey = "core",
 			extract = "core",
 			isValid = coreUiValid,
+		},
+		{
+			paths = { CORE_HUB_UI_PATH, HUB .. "/core_hub_ui.luau" },
+			expectedKey = "core",
+			extract = "core",
+			isValid = coreHubUiValid,
 		},
 		{
 			paths = { HUB .. "/analytics.luau" },
