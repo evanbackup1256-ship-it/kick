@@ -1,5 +1,5 @@
 local LOADER_VERSION = "7.4.0"
-local MIN_CORE = "2.5"
+local MIN_CORE = "2.5.1"
 local DEFAULT_UPDATE_POLL_SECONDS = 45
 local CORE_MIN_BYTES = 50000
 local HUB = "hub"
@@ -8,7 +8,7 @@ local UI = "ui"
 
 local RELEASE_FALLBACK = {
 	loader = "7.4.0",
-	core = "2.5",
+	core = "2.5.1",
 	ui = "WindUI",
 	analytics = "1.0",
 	telemetry = "3.0",
@@ -1362,7 +1362,7 @@ local GAMES = {
 	{
 		id = "speed_keyboard_escape",
 		name = "Speed Keyboard Escape",
-		version = "1.3",
+		version = "1.3.1",
 		placeIds = { 95082159892680 },
 		scriptFiles = { "games/speed_keyboard_escape.luau", "speed_keyboard_escape.luau" },
 		scriptUrl = "games/speed_keyboard_escape.luau",

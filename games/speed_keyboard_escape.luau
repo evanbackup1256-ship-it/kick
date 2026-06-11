@@ -6,7 +6,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.3"
+local VERSION = "1.3.1"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {}
@@ -454,7 +454,8 @@ local function isRoutePointClear(position)
 			local model = label:FindFirstAncestorOfClass("Model")
 			local part = model and (model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart"))
 			if part and (part.Position - position).Magnitude < 50 then
-				local seconds = tonumber(string.gsub(label.Text, "%s+", ""))
+				local cleaned = string.gsub(label.Text, "%s+", "")
+				local seconds = tonumber(cleaned)
 				if seconds and seconds > 1.5 then
 					return false
 				end

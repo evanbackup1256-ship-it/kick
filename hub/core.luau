@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "2.5"
+Core.VERSION = "2.5.1"
 Core.UI_LIBRARY = "WindUI"
 
 local HttpService = game:GetService("HttpService")
@@ -968,6 +968,10 @@ end
 
 Core.stateHubStop = stateHubStop
 
+local function trimText(value)
+	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
+end
+
 function Core.sanitizeProfileName(name)
 	name = trimText(name):gsub("[^%w%-_%s]", ""):gsub("%s+", "_")
 	if name == "" then
@@ -1164,10 +1168,6 @@ function Core.buildConfigProfileGroup(tab, options)
 	end, "Quick-pick a profile you've saved before.")
 
 	return group
-end
-
-local function trimText(value)
-	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
 end
 
 function Core.normalizeWebhookUrl(url)

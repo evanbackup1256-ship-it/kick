@@ -1,6 +1,6 @@
 {
     "loader":  "7.4.0",
-    "core":  "2.5",
+    "core":  "2.5.1",
     "weao":  "1.0",
     "ui":  "WindUI",
     "commit":  "82aaa9a",
@@ -8,7 +8,7 @@
     "updatePollSeconds":  45,
     "autoUpdate":  true,
     "minLoader":  "7.1.0",
-    "minCore":  "2.5",
+    "minCore":  "2.5.1",
     "analytics":  "1.0",
     "telemetry":  "3.0",
     "helpers":  "1.0",
