@@ -1,7 +1,6 @@
 ﻿--[[
-	Alleral one-time fix — paste in Volt and Execute ONCE.
-	Downloads core + loader, saves to workspace, runs Alleral.
-	After: loadstring(readfile("loader.luau"))()
+	Alleral rescue — paste in Volt and Execute ONCE.
+	Saves core + loader to workspace, validates compile, runs Alleral.
 ]]
 local g = (getgenv and getgenv()) or {}
 local L = g.loadstring or g.LoadString or loadstring or load
@@ -32,34 +31,79 @@ local function fetch(url)
 	return nil
 end
 
-local base = "https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main"
-local coreSrc = fetch(base .. "/core/alleral_core.luau")
+local function coreValid(src)
+	if type(src) ~= "string" or #src < 5000 or not src:find("loadRayfield", 1, true) then
+		return false
+	end
+	local version = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
+	if not version or version < "1.18" then
+		return false
+	end
+	if src:find("fakeUiInstance", 1, true) and not src:find("AlleralGroupShell", 1, true) then
+		return false
+	end
+	local fn = L(src, "Alleral/core-check")
+	return type(fn) == "function"
+end
+
+local function loaderValid(src)
+	return type(src) == "string"
+		and #src > 8000
+		and src:find("Alleral Hub", 1, true)
+		and not src:find("EMBEDDED_CORE = [=", 1, true)
+		and type(L(src, "Alleral/loader-check")) == "function"
+end
+
+local coreUrls = {
+	"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@d9441a1/core/alleral_core.luau",
+	"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/core/alleral_core.luau",
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/core/alleral_core.luau",
+}
+local loaderUrls = {
+	"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/loader.luau",
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau",
+}
+
 local writeFile = g.writefile or writefile
 local makeFolder = g.makefolder or makefolder
 
-if type(coreSrc) == "string" and coreSrc:find("loadRayfield", 1, true) then
-	if type(makeFolder) == "function" then
-		pcall(makeFolder, "core")
+local coreSrc = nil
+for _, url in ipairs(coreUrls) do
+	local body = fetch(url)
+	if coreValid(body) then
+		coreSrc = body
+		break
 	end
-	if type(writeFile) == "function" then
-		pcall(writeFile, "core/alleral_core.luau", coreSrc)
-		print("[Alleral] Saved core/alleral_core.luau")
-	end
-	local coreFn = L(coreSrc, "Alleral/core-rescue")
-	if type(coreFn) == "function" then
-		coreFn()
-	end
-else
-	warn("[Alleral] Core download failed")
+end
+if not coreSrc then
+	return warn("[Alleral] Could not download valid core (need v1.18+)")
 end
 
-local loaderSrc = fetch(base .. "/loader.luau")
-if type(loaderSrc) ~= "string" or not loaderSrc:find("Alleral Hub", 1, true) then
-	loaderSrc = fetch("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau")
+if type(makeFolder) == "function" then
+	pcall(makeFolder, "core")
 end
-if type(loaderSrc) ~= "string" or loaderSrc:find("EMBEDDED_CORE = [=", 1, true) then
-	return warn("[Alleral] Loader download failed or corrupted — retry")
+if type(writeFile) == "function" then
+	pcall(writeFile, "core/alleral_core.luau", coreSrc)
+	print("[Alleral] Saved core/alleral_core.luau")
 end
+
+local coreFn = L(coreSrc, "Alleral/core-rescue")
+if type(coreFn) == "function" then
+	coreFn()
+end
+
+local loaderSrc = nil
+for _, url in ipairs(loaderUrls) do
+	local body = fetch(url)
+	if loaderValid(body) then
+		loaderSrc = body
+		break
+	end
+end
+if not loaderSrc then
+	return warn("[Alleral] Could not download valid loader")
+end
+
 if type(writeFile) == "function" then
 	pcall(writeFile, "loader.luau", loaderSrc)
 	print("[Alleral] Saved loader.luau")

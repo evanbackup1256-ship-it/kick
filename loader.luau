@@ -14,9 +14,24 @@ do
 			return
 		end
 		local urls = {
+			"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@d9441a1/core/alleral_core.luau",
 			"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/core/alleral_core.luau",
 			"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/core/alleral_core.luau",
 		}
+		local function coreLooksValid(src)
+			if type(src) ~= "string" or #src < 5000 or not src:find("loadRayfield", 1, true) then
+				return false
+			end
+			local version = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
+			if not version or version < "1.18" then
+				return false
+			end
+			if src:find("fakeUiInstance", 1, true) and not src:find("AlleralGroupShell", 1, true) then
+				return false
+			end
+			local fn = L(src, "Alleral/core-bootstrap-check")
+			return type(fn) == "function"
+		end
 		local function pull(url)
 			url = url .. "?t=" .. tostring(tick())
 			if type(g.Volt) == "table" and type(g.Volt.request) == "function" then
@@ -41,7 +56,7 @@ do
 		end
 		for _, url in ipairs(urls) do
 			local src = pull(url)
-			if type(src) == "string" and #src > 5000 and src:find("loadRayfield", 1, true) then
+			if coreLooksValid(src) then
 				local fn = L(src, "Alleral/core-bootstrap")
 				if type(fn) == "function" then
 					fn()
@@ -58,9 +73,9 @@ do
 	end
 end
 
-local LOADER_VERSION = "3.9.1"
+local LOADER_VERSION = "4.0.0"
 local REQUIRED_CORE_VERSION = "1.18"
-local MIN_CORE_VERSION = "1.17"
+local MIN_CORE_VERSION = "1.18"
 local REQUIRED_UI_LIBRARY = "Rayfield"
 local GITHUB_REPO = "evanbackup1256-ship-it/kick"
 local REPO_BRANCH = "main"
@@ -73,17 +88,10 @@ local FETCH_RETRIES = 2
 local FETCH_BACKOFF = 0.35
 local MIN_SCRIPT_BYTES = 1000
 local PINNED_COMMITS = {
-	"a9f1a86",
-	"369c8a7",
-	"ee04d1b",
-	"c6191aa",
+	"414cc8d",
 	"d9441a1",
-	"df472aa",
-	"55d3f68",
-	"6a1b22c",
 }
-
-local EMBEDDED_CORE = nil
+local CORE_GOOD_MARKER = "AlleralGroupShell"
 
 local SHARED_CORE_FILES = {
 	"core/alleral_core.luau",
@@ -640,7 +648,7 @@ local function logLocalCoreHints()
 			log("info", "Workspace root: " .. table.concat(names, ", "))
 		end
 	end
-	log("warn", "Sync the full repo (core/ folder) or use the remote load snippet in README once.")
+	log("warn", "Run load.luau once or paste the remote snippet from README.")
 end
 
 local function telemetrySourceMarker()
@@ -671,6 +679,20 @@ local function coreVersionCompatible(version)
 	return coreVersionAtLeast(version, MIN_CORE_VERSION)
 end
 
+local function coreSourceCompileOk(source)
+	if not loadStringFn then
+		return false, "loadstring unavailable"
+	end
+	local compiled, compileErr = loadStringFn(source, "Alleral/core-validate")
+	if not compiled and type(load) == "function" and load ~= loadStringFn then
+		compiled, compileErr = load(source, "Alleral/core-validate")
+	end
+	if not compiled then
+		return false, compileErr
+	end
+	return true
+end
+
 local function coreBodyValid(body)
 	if type(body) ~= "string" or #body < MIN_SCRIPT_BYTES then
 		return false
@@ -678,9 +700,15 @@ local function coreBodyValid(body)
 	if not body:find("loadRayfield", 1, true) then
 		return false
 	end
+	if body:find("fakeUiInstance", 1, true) and not body:find(CORE_GOOD_MARKER, 1, true) then
+		return false
+	end
 	local version = body:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
 		or body:match("Core%.VERSION%s*=%s*'([%d%.]+)'")
-	return coreVersionCompatible(version)
+	if not coreVersionCompatible(version) then
+		return false
+	end
+	return coreSourceCompileOk(body)
 end
 
 local function coreSourceMarker()
@@ -1036,8 +1064,8 @@ local function resolveFromFiles(files, label, urlOrPath, marker)
 
 	if label == "core" and CAPABILITIES.readfile then
 		for _, hit in ipairs(discoverLocalFiles(files)) do
-			if type(hit.source) == "string" and #hit.source >= MIN_SCRIPT_BYTES and hit.source:find("loadRayfield", 1, true) then
-				log("info", "Using local core without strict version pin: " .. hit.path)
+			if coreBodyValid(hit.source) then
+				log("info", "Using validated local core: " .. hit.path)
 				return hit.source, "discovered:" .. hit.path
 			end
 		end
@@ -1218,23 +1246,34 @@ local function trySelfUpgrade()
 			body = httpFetchBody(base, nonce)
 		end
 		if type(body) == "string" and #body > 8000 and body:find("Alleral Hub", 1, true) then
-			local remoteVersion = body:match('LOADER_VERSION%s*=%s*"([%d%.]+)"')
-			if loaderVersionNewer(remoteVersion, LOADER_VERSION) then
-				print("[Alleral] Upgrading loader " .. LOADER_VERSION .. " -> " .. tostring(remoteVersion))
-				ENV.Alleral_LoaderRunning = false
-				local writeFile = firstExecFunc("writefile")
-				if type(writeFile) == "function" then
-					pcall(writeFile, "loader.luau", body)
+			if body:find("EMBEDDED_CORE = [=", 1, true) then
+				log("warn", "Skipping corrupted embedded loader from " .. base)
+			else
+				local remoteVersion = body:match('LOADER_VERSION%s*=%s*"([%d%.]+)"')
+				if loaderVersionNewer(remoteVersion, LOADER_VERSION) then
+					print("[Alleral] Upgrading loader " .. LOADER_VERSION .. " -> " .. tostring(remoteVersion))
+					ENV.Alleral_LoaderRunning = false
+					local writeFile = firstExecFunc("writefile")
+					if type(writeFile) == "function" then
+						pcall(writeFile, "loader.luau", body)
+					end
+					local ok, err = compileAndRun(body, "Alleral/loader-upgrade")
+					if not ok then
+						warn("[Alleral] Self-upgrade failed: " .. tostring(err))
+					end
+					return ok
 				end
-				local ok, err = compileAndRun(body, "Alleral/loader-upgrade")
-				if not ok then
-					warn("[Alleral] Self-upgrade failed: " .. tostring(err))
-				end
-				return ok
 			end
 		end
 	end
 	return false
+end
+
+local function compileCoreSource(source, label)
+	if not coreBodyValid(source) then
+		return false, "Core source invalid or failed compile check"
+	end
+	return compileAndRun(source, label)
 end
 
 local main
@@ -1245,7 +1284,7 @@ local function tryLocalCoreLoad()
 	end
 	for _, hit in ipairs(discoverLocalFiles(SHARED_CORE_FILES)) do
 		if coreBodyValid(hit.source) then
-			local ok, err = compileAndRun(hit.source, "Alleral/core-local")
+			local ok, err = compileCoreSource(hit.source, "Alleral/core-local")
 			if ok and coreVersionOk(ENV.Alleral_Core) then
 				log("info", "Core loaded from " .. hit.path .. " (v" .. tostring(ENV.Alleral_Core.VERSION) .. ")")
 				return true
@@ -1254,34 +1293,6 @@ local function tryLocalCoreLoad()
 			log("warn", "Local core rejected from " .. hit.path .. ": " .. tostring(err or "version mismatch"))
 		end
 	end
-	for _, hit in ipairs(discoverLocalFiles(SHARED_CORE_FILES)) do
-		if type(hit.source) == "string" and #hit.source >= MIN_SCRIPT_BYTES and hit.source:find("loadRayfield", 1, true) then
-			local ok, err = compileAndRun(hit.source, "Alleral/core-local-relaxed")
-			if ok and ENV.Alleral_Core and type(ENV.Alleral_Core.loadRayfield) == "function" then
-				log("info", "Core loaded from " .. hit.path .. " (v" .. tostring(ENV.Alleral_Core.VERSION) .. ", relaxed)")
-				return true
-			end
-			ENV.Alleral_Core = nil
-			log("warn", "Relaxed local core failed from " .. hit.path .. ": " .. tostring(err))
-		end
-	end
-	return false
-end
-
-local function tryEmbeddedCoreLoad()
-	if type(EMBEDDED_CORE) ~= "string" or #EMBEDDED_CORE < MIN_SCRIPT_BYTES then
-		return false
-	end
-	if not EMBEDDED_CORE:find("loadRayfield", 1, true) then
-		return false
-	end
-	local ok, err = compileAndRun(EMBEDDED_CORE, "Alleral/core-embedded")
-	if ok and ENV.Alleral_Core and type(ENV.Alleral_Core.loadRayfield) == "function" then
-		log("info", "Core loaded from embedded bundle (v" .. tostring(ENV.Alleral_Core.VERSION) .. ")")
-		return true
-	end
-	ENV.Alleral_Core = nil
-	log("warn", "Embedded core failed: " .. tostring(err))
 	return false
 end
 
@@ -1289,17 +1300,15 @@ local function tryDirectCoreLoad()
 	if coreVersionOk(ENV.Alleral_Core) then
 		return true
 	end
-	if tryEmbeddedCoreLoad() then
-		return true
-	end
 	if tryLocalCoreLoad() then
 		return true
 	end
 	if not CAPABILITIES.http then
-		return tryEmbeddedCoreLoad()
+		return false
 	end
 
 	local priorityCoreUrls = {
+		"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@d9441a1/core/alleral_core.luau",
 		REPO_BASE .. "/" .. SHARED_CORE_PATH,
 		JSDELIVR_BASE .. "/" .. SHARED_CORE_PATH,
 		GITHUB_WEB_RAW .. "/" .. SHARED_CORE_PATH,
@@ -1308,7 +1317,7 @@ local function tryDirectCoreLoad()
 		local body, via = executorFetch(url)
 		if type(body) == "string" and #body > 0 then
 			if coreBodyValid(body) then
-				local ok, err = compileAndRun(body, "Alleral/core-volt")
+				local ok, err = compileCoreSource(body, "Alleral/core-volt")
 				if ok and coreVersionOk(ENV.Alleral_Core) then
 					log("info", "Core loaded via " .. tostring(via or "executor") .. " (" .. mirrorLabel(url) .. ")")
 					return true
@@ -1330,7 +1339,7 @@ local function tryDirectCoreLoad()
 		local label = mirrorLabel(url)
 		if type(body) == "string" and #body > 0 then
 			if coreBodyValid(body) then
-				local ok, err = compileAndRun(body, "Alleral/core-direct")
+				local ok, err = compileCoreSource(body, "Alleral/core-direct")
 				if ok and coreVersionOk(ENV.Alleral_Core) then
 					log("info", "Core loaded via " .. label)
 					return true
@@ -1346,7 +1355,7 @@ local function tryDirectCoreLoad()
 			log("warn", "Core download failed from " .. label)
 		end
 	end
-	return tryEmbeddedCoreLoad()
+	return false
 end
 
 local function tryRecoveryLoaderBootstrap()
@@ -1414,14 +1423,6 @@ local function preloadCore(required)
 	ENV.Alleral_Rayfield = nil
 	ENV.Alleral_UI = nil
 
-	if coreVersionOk(ENV.Alleral_Core) then
-		return true
-	end
-
-	if tryEmbeddedCoreLoad() then
-		return true
-	end
-
 	if tryLocalCoreLoad() then
 		return true
 	end
@@ -1445,7 +1446,7 @@ local function preloadCore(required)
 			coreSourceMarker()
 		)
 		if source then
-			local ok, err = compileAndRun(source, "Alleral/core")
+			local ok, err = compileCoreSource(source, "Alleral/core")
 			if ok and coreVersionOk(ENV.Alleral_Core) then
 				log("info", "Core loaded from " .. sourceLabel .. " (v" .. tostring(ENV.Alleral_Core.VERSION) .. ")")
 				return true

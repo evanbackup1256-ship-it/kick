@@ -1,66 +1,41 @@
-# Alleral Hub — architecture
+# Alleral Architecture
 
-## Overview
-
-Alleral Hub is a multi-game Roblox executor loader. One `loader.luau` detects the current place, loads shared core modules, then injects the matching game script.
+## Boot chain
 
 ```
-loader.luau
-  ├── core/alleral_core.luau      Rayfield UI, RoScripts browser, supervisors
-  ├── core/game_helpers.luau      Shared combat/movement/remote helpers
-  ├── core/analytics.luau         Kick in-game user webhooks
-  ├── core/telemetry.luau         Owner relay client
-  └── games/<detected>.luau       Game-specific automation
+load.luau (optional rescue, once)
+    └── loader.luau
+            ├── bootstrap prefetch (Volt.request → core v1.18+)
+            ├── detect game by PlaceId
+            ├── load core (local → Volt fetch → mirrors, compile-validated)
+            ├── load analytics, helpers, telemetry
+            ├── preload Rayfield
+            └── run games/*.luau
 ```
 
-## Runtime bridge
+## Entry points
 
-State flows through `getgenv().Alleral_State`. The loader injects an ENV bridge so game scripts can read executor globals safely.
+| File | Purpose |
+|------|---------|
+| `load.luau` | One-time rescue: downloads validated core + loader, saves to workspace |
+| `loader.luau` | Main entry — auto-upgrades, loads core and game script |
 
-Boot order:
+## Core loading (v4.0.0)
 
-1. `detectGame()` — PlaceId + in-game markers
-2. `preloadCore()` → `preloadAnalytics()` → `preloadHelpers()` → `preloadTelemetry()`
-3. Rayfield preload
-4. `runGameScript(profile)` — compile game source into getgenv
+1. Bootstrap block at top prefetches core via `Volt.request` from pinned good commit `d9441a1`
+2. `coreBodyValid()` rejects broken cores (missing `AlleralGroupShell` marker, version < 1.18)
+3. `coreSourceCompileOk()` runs `loadstring` compile check before executing core
+4. Mirror URLs only pin commits with fixed core (`d9441a1`, `414cc8d`)
 
-## Path resolution
+## Dependencies loaded at runtime
 
-| Canonical | Fallbacks (local dev) |
-|-----------|----------------------|
-| `core/*.luau` | `src/*.luau`, flat name |
-| `games/*.luau` | `src/*.luau`, flat name |
-| `games/data/*.luau` | Game data modules (KickBlox brainrot list) |
-| Rayfield (remote) | UI library loaded from Sirius GitHub at runtime |
-| `core/telemetry.luau` | Obfuscated owner telemetry (edit `core/internal/`) |
-| `core/analytics.luau` | Obfuscated user analytics (edit `core/internal/`) |
+| Module | Source |
+|--------|--------|
+| Core | `core/alleral_core.luau` (local, CDN, or bootstrap) |
+| Rayfield | Sirius GitHub or `vendor/rayfield/source.lua` |
+| Game script | `games/<game_id>.luau` |
 
-Remote base: `https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main`
+## Never do
 
-## Game scripts
-
-| ID | Place ID | Version |
-|----|----------|---------|
-| kick_a_lucky_block | 89469502395769 | 6.5 |
-| speed_keyboard_escape | 95082159892680 | 1.1 |
-| slime_rng | 92416421522960 | 1.1 |
-| build_a_ring_farm | 107646426076756 | 1.1 |
-| survive_a_zombie_arena | 114204398207377 | 2.0 |
-
-## Backend
-
-`backend/telemetry_relay.py` — Python Discord relay. Clients POST to `/ingest`; webhook URL stays server-side in `backend/.env`.
-
-## Tools
-
-| Script | Purpose |
-|--------|---------|
-| `tools/luxy_sync.py` | Pull Luxy upstream → cache → `games/` |
-| `tools/prepare_distribution.ps1` | Scrub secrets before sharing |
-| `tools/setup_telemetry.ps1` | One-shot telemetry stack setup |
-
-## Adding a new game
-
-1. Create `games/your_game.luau` using `Core.prepareGame(state)` boot pattern
-2. Register in `loader.luau` `GAMES` table with `placeIds`, `validate`, `preload`
-3. Document in `docs/GAMES.md`
+- Embed core in loader with `[=[` long strings (breaks Volt parser)
+- Pin CDN commits before `d9441a1` (broken `fakeUiInstance` syntax)

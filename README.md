@@ -6,31 +6,21 @@ One loader — detects your game by PlaceId and runs the matching script.
 
 ## Load
 
-### Stuck / core fetch fails? (Volt)
+### First time / stuck on old version / core errors
 
-**Paste and Execute `load.luau` once** — it downloads core + loader, saves both to your workspace, and runs. (Do not use the old v3.9.0 loader — it had a syntax error on Volt.)
+Paste and **Execute** [load.luau](load.luau) once in Volt. It downloads validated core v1.18+ and loader v4.0.0, saves them to your workspace, and runs.
 
 ```lua
 loadstring(readfile("load.luau"))()
 ```
 
-Or copy/paste all of [load.luau](load.luau) into Volt and Execute.
-
-After that:
+Then always use:
 
 ```lua
 loadstring(readfile("loader.luau"))()
 ```
 
-### Normal load
-
-**Local workspace:**
-
-```lua
-loadstring(readfile("loader.luau"))()
-```
-
-**Remote (works on Volt, Synapse, Krnl, Solara, Wave, etc.):**
+### Remote (no local files)
 
 ```lua
 (function()
@@ -38,51 +28,39 @@ loadstring(readfile("loader.luau"))()
 	local L = g.loadstring or g.LoadString or loadstring or load
 	local url = "https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/loader.luau?t=" .. tick()
 	local src
-	if type(L) ~= "function" then
-		return warn("[Alleral] This executor needs loadstring.")
-	end
+	if type(L) ~= "function" then return warn("[Alleral] loadstring missing") end
 	if type(g.Volt) == "table" and type(g.Volt.request) == "function" then
 		pcall(function()
-			local res = g.Volt.request({ Url = url, Method = "GET" })
-			src = res and (res.Body or res.body)
+			local r = g.Volt.request({ Url = url, Method = "GET" })
+			src = r and (r.Body or r.body)
 		end)
 	end
 	if type(src) ~= "string" and type(game.HttpGet) == "function" then
-		pcall(function()
-			src = game.HttpGet(game, url, true)
-		end)
+		pcall(function() src = game.HttpGet(game, url, true) end)
 	end
-	if type(src) ~= "string" then
-		pcall(function()
-			src = game:HttpGet(url, true)
-		end)
-	end
-	if type(src) ~= "string" and type(g.request) == "function" then
-		pcall(function()
-			local res = g.request({ Url = url, Method = "GET" })
-			src = res and (res.Body or res.body)
-		end)
-	end
-	if type(src) ~= "string" then
-		return warn("[Alleral] HTTP failed — enable HttpService in your executor.")
-	end
+	if type(src) ~= "string" then return warn("[Alleral] HTTP failed") end
+	if src:find("EMBEDDED_CORE = [=", 1, true) then return warn("[Alleral] Corrupted loader cached — use load.luau") end
 	local fn, err = L(src, "Alleral/loader")
-	if type(fn) ~= "function" then
-		return warn("[Alleral] Compile failed: " .. tostring(err))
-	end
+	if type(fn) ~= "function" then return warn("[Alleral] " .. tostring(err)) end
 	fn()
 end)()
 ```
 
 Reload: `getgenv().Alleral_Reload()` · Debug: `getgenv().Alleral_LoaderInfo()`
 
+## Requirements
+
+- Loader **v4.0.0+**
+- Core **v1.18+** (fixes broken Rayfield groupbox syntax in older cores)
+- Do **not** use loader v3.9.0 (embedded core breaks Volt) or v3.7.x (stale CDN core)
+
 ## Layout
 
 ```
-loader.luau          ← main entry (core embedded)
-load.luau            ← one-time Volt rescue script
-core/                ← shared UI, helpers, telemetry
-games/               ← one script per supported game
+load.luau            ← one-time rescue (paste once)
+loader.luau          ← main entry
+core/alleral_core.luau
+games/               ← per-game scripts
 ```
 
 ## Docs
