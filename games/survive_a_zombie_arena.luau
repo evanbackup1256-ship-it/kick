@@ -1,36 +1,24 @@
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
-if not getgenv().Alleral_Boot then
-	warn("[Alleral] load the hub first")
+local Core = getgenv().Alleral_Core
+if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
-getgenv().Alleral_Boot = nil
 
 local VERSION = "2.1"
 local state = getgenv().Alleral_State
-local Core = getgenv().Alleral_Core
 local G = (Core and Core.Game) or getgenv().Alleral_GameHelpers or {}
 local connections = {}
 local loops = {}
 local loopControllers = {}
 
-if state.Alleral_Unload then
-	pcall(state.Alleral_Unload)
-end
-
 local ui
 local bootErr
-if not Core or not Core.prepareGame then
-	local msg = "Core not loaded"
-	getgenv().Alleral_StartupFailed = msg
-	warn("[Alleral] " .. msg)
-	return
-end
-Core, ui, bootErr = Core.prepareGame(state)
+Core, ui, bootErr = Core.boot(state)
 if not Core or not ui then
-	local msg = "Boot failed: " .. tostring(bootErr)
+	local msg = bootErr or "boot failed"
 	getgenv().Alleral_StartupFailed = msg
-	warn("[Alleral] " .. msg)
+	Core.logWarn(msg)
 	return
 end
 G = Core.Game or G
@@ -792,7 +780,7 @@ Core.buildStandardSettingsExtras(settingsTab, {
 	window = window,
 })
 
-notify("Alleral", "Survive a Zombie Arena v" .. VERSION .. " loaded.", 4)
+notify("Alleral", "v" .. VERSION .. " ready", 4)
 
 state.Alleral_Unload = function()
 	state.HubRunning = false

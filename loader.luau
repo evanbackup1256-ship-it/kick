@@ -1698,7 +1698,7 @@ local function applyRemoteUpdate(profile, expected, reason)
 	ENV._Alleral_UpdateApplying = true
 	stopAutoUpdater()
 	log("Update available (" .. tostring(reason) .. ") — refreshing from GitHub")
-	notify("Alleral", "Update detected. Reloading...", 4)
+	notify("Alleral", "update found, reloading", 4)
 	ENV._Alleral_ExpectedVersions = expected
 	purgeOutdatedWorkspace()
 	recordInstalledVersions()
@@ -1810,7 +1810,9 @@ local function buildManagedFiles()
 		{
 			paths = {
 				UI .. "/windui/main.lua",
+				UI .. "/windui/aller.luau",
 				"vendor/windui/main.lua",
+				"vendor/windui/aller.luau",
 				UI .. "/addons/ThemeManager.lua",
 				UI .. "/addons/SaveManager.lua",
 			},
@@ -2297,7 +2299,7 @@ local function scheduleHubRelaunch(reason, delaySeconds)
 		ENV._Alleral_RelaunchScheduledAt = nil
 		if type(ENV._Alleral_RunLoader) == "function" then
 			log("Teleport relaunch: " .. tostring(reason))
-			notify("Alleral", "Server changed — reloading hub...", 3)
+			notify("Alleral", "new server — reloading hub", 3)
 			ENV._Alleral_RunLoader(reason)
 		elseif type(ENV.Alleral_Reload) == "function" then
 			ENV.Alleral_Reload()
@@ -2631,8 +2633,8 @@ local function main()
 	ENV._Alleral_PendingRelaunch = nil
 	ensureAutoexecLoader()
 	wireTeleportRelaunch()
-	notify("Alleral", profile.name .. " loaded.", 4)
-	log("Ready — auto-relaunch on teleport enabled")
+	notify("Alleral", profile.name .. " loaded", 4)
+	log("ready (auto-relaunch on hop)")
 end
 
 ENV.Alleral_Reload = function()

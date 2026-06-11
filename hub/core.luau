@@ -17,6 +17,7 @@ local WINDUI_LOCAL_ROOTS = {
 	"windui/",
 }
 local WINDUI_FILE = "main.lua"
+local WINDUI_PATCH_FILE = "aller.luau"
 local WINDUI_MIN_BYTES = 50000
 local ALLERAL_ACCENT = Color3.fromHex("#53fc18")
 local ALLERAL_ACCENT_ALT = Color3.fromHex("#30ff6a")
@@ -29,6 +30,38 @@ local function genv()
 end
 
 local ENV = genv()
+local LOG_TAG = "[Alleral]"
+
+function Core.say(msg)
+	print(LOG_TAG .. " " .. tostring(msg))
+end
+
+function Core.logWarn(msg)
+	warn(LOG_TAG .. " " .. tostring(msg))
+end
+
+function Core.assertLoader()
+	if not getgenv().Alleral_Boot then
+		Core.logWarn("run the loader before this script")
+		return false
+	end
+	getgenv().Alleral_Boot = nil
+	return true
+end
+
+function Core.boot(state)
+	state = state or ENV.Alleral_State or getgenv().Alleral_State
+	if type(state) ~= "table" then
+		return nil, nil, "state missing"
+	end
+	if type(state.Alleral_Unload) == "function" then
+		pcall(state.Alleral_Unload)
+	end
+	if type(Core.prepareGame) ~= "function" then
+		return nil, nil, "core missing"
+	end
+	return Core.prepareGame(state)
+end
 
 function Core.safeCall(scope, fn, ...)
 	if type(fn) ~= "function" then
@@ -50,7 +83,7 @@ function Core.safeCall(scope, fn, ...)
 		})
 	end
 	Core.reportError(tostring(scope or "Core"), err)
-	warn("[Alleral:" .. tostring(scope or "Core") .. "] " .. tostring(err))
+	Core.logWarn(tostring(scope or "Core") .. ": " .. tostring(err))
 	return nil
 end
 
@@ -995,7 +1028,7 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 			Callback = function(value)
 				ENV.Alleral_ForceLoad = value == true
 				getgenv().Alleral_ForceLoad = value == true
-				Core.notify("Alleral", value and "Force load enabled — reload to apply." or "Force load off.", 4)
+				Core.notify("Alleral", value and "force load on — reload to use it" or "force load off", 4)
 			end,
 		}, "ForceLoadToggle")
 	end
@@ -1017,7 +1050,7 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 			if refreshedWeao and labels.WEAO and labels.WEAO.Set then
 				labels.WEAO:Set({ Name = "WEAO: " .. Core.weaoStatusLabel(refreshedWeao) })
 			end
-			Core.notify("Alleral", "Status refreshed — " .. nextStatus.label, 3)
+			Core.notify("Alleral", "status: " .. nextStatus.label, 3)
 		end,
 	}, "RefreshStatus")
 
@@ -1041,10 +1074,10 @@ function Core.buildHubActionsGroup(tab, column)
 	group:CreateButton("Reload script", function()
 		local reload = getgenv().Alleral_Reload
 		if type(reload) == "function" then
-			Core.notify("Alleral", "Reloading...", 3)
+			Core.notify("Alleral", "reloading...", 3)
 			task.defer(reload)
 		else
-			Core.notify("Alleral", "Reload unavailable — re-run the loadstring.", 5)
+			Core.notify("Alleral", "can't reload here — run the loadstring again", 5)
 		end
 	end, "Runs getgenv().Alleral_Reload().")
 
@@ -1065,7 +1098,7 @@ function Core.buildHubActionsGroup(tab, column)
 		local purge = getgenv().Alleral_PurgeCache
 		if type(purge) == "function" then
 			purge()
-			Core.notify("Alleral", "Workspace cache purged.", 4)
+			Core.notify("Alleral", "cache cleared", 4)
 		else
 			Core.notify("Alleral", "Purge unavailable.", 4)
 		end
@@ -1244,7 +1277,7 @@ function Core.syncWeaoConfigNow()
 		local ok = sync(false)
 		Core.notify(
 			"Alleral",
-			ok and "WEAO config synced — executor profile refreshed." or "WEAO config unchanged or offline.",
+			ok and "WEAO config updated" or "WEAO config unchanged (or offline)",
 			4
 		)
 		return ok
@@ -1523,7 +1556,7 @@ function Core.setupHubKeybinds(options)
 		end
 		if input.KeyCode == panicKey then
 			Core.stateHubStop()
-			Core.notify("Alleral", "Panic — automation stopped.", 4)
+			Core.notify("Alleral", "everything stopped", 4)
 		elseif input.KeyCode == uiKey then
 			if Core.toggleUiVisibility() then
 				Core.notify("Alleral", "UI toggled.", 2)
@@ -1556,7 +1589,7 @@ function stateHubStop()
 			pcall(state.Alleral_Unload)
 		end
 	end
-	Core.notify("Alleral", "Automation stopped.", 3)
+	Core.notify("Alleral", "loops stopped", 3)
 end
 
 Core.stateHubStop = stateHubStop
@@ -1900,10 +1933,10 @@ local function compileWindUiModule(source, label)
 		return result
 	end
 	if not ok then
-		warn("[Alleral] WindUI module error: " .. tostring(result))
+		Core.logWarn("WindUI compile error: " .. tostring(result))
 	end
 	if ENV.Alleral_WindUiLastGood and type(ENV.Alleral_WindUiLastGood.CreateWindow) == "function" then
-		warn("[Alleral] WindUI compile failed; using last-good module")
+		Core.logWarn("WindUI compile failed, using last good copy")
 		return ENV.Alleral_WindUiLastGood
 	end
 	return nil, ok and "Invalid WindUI module" or tostring(result)
@@ -1934,27 +1967,53 @@ local function fetchWindUiRemote(relativePath)
 	return nil
 end
 
+local function applyAlleralWindUiPatch(windUi)
+	if type(windUi) ~= "table" or type(windUi.GetAlleralVersion) == "function" then
+		return windUi
+	end
+	local source = readWindUiLocal(WINDUI_PATCH_FILE)
+	if type(source) ~= "string" then
+		return windUi
+	end
+	local loadStringFn = Core.loadStringFn()
+	if type(loadStringFn) ~= "function" then
+		return windUi
+	end
+	local chunk, compileErr = loadStringFn(source, "@Alleral/aller")
+	if not chunk then
+		Core.logWarn("UI patch compile: " .. tostring(compileErr))
+		return windUi
+	end
+	local ok, patchOrErr = pcall(chunk)
+	if not ok or type(patchOrErr) ~= "function" then
+		Core.logWarn("UI patch load: " .. tostring(patchOrErr))
+		return windUi
+	end
+	pcall(patchOrErr, windUi)
+	return windUi
+end
+
 local function loadWindUiModule()
 	local localSource, localPath = readWindUiLocal(WINDUI_FILE)
 	if localSource then
 		local module, err = compileWindUiModule(localSource, "@WindUI/local:" .. localPath)
 		if module then
-			return module
+			return applyAlleralWindUiPatch(module)
 		end
-		warn("[Alleral] Local WindUI failed (" .. tostring(localPath) .. "): " .. tostring(err))
+		Core.logWarn("local WindUI failed (" .. tostring(localPath) .. "): " .. tostring(err))
 	end
 	local remoteSource, remoteUrl = fetchWindUiRemote(WINDUI_FILE)
 	if remoteSource then
 		local module, err = compileWindUiModule(remoteSource, "@WindUI/remote:" .. tostring(remoteUrl))
 		if module then
-			warn("[Alleral] WindUI loaded from " .. tostring(remoteUrl))
-			return module
+			Core.say("WindUI pulled from " .. tostring(remoteUrl))
+			return applyAlleralWindUiPatch(module)
 		end
-		warn("[Alleral] Remote WindUI failed: " .. tostring(err))
+		Core.logWarn("remote WindUI failed: " .. tostring(err))
 	end
 	localSource = readWindUiLocal(WINDUI_FILE)
 	if localSource then
-		return compileWindUiModule(localSource, "@WindUI/local")
+		return applyAlleralWindUiPatch(compileWindUiModule(localSource, "@WindUI/local"))
 	end
 	return nil, "WindUI download failed for " .. WINDUI_FILE
 end
@@ -2015,7 +2074,7 @@ function Core.loadUi()
 	if not WindUI and ENV.Alleral_WindUiLastGood then
 		WindUI = ENV.Alleral_WindUiLastGood
 		libErr = nil
-		warn("[Alleral] Using cached WindUI module")
+		Core.say("using cached WindUI")
 	end
 	if not WindUI then
 		return nil, libErr or "WindUI missing"
@@ -2051,7 +2110,7 @@ function Core.loadUi()
 	}
 	applyAlleralTheme(bundle)
 	bundle.ThemeNames = listUiThemes(WindUI)
-	warn("[Alleral] WindUI " .. tostring(WindUI.GetAlleralVersion and WindUI:GetAlleralVersion() or Core.WINDUI_VERSION) .. " ready")
+	Core.say("WindUI " .. tostring(WindUI.GetAlleralVersion and WindUI:GetAlleralVersion() or Core.WINDUI_VERSION) .. " loaded")
 	return cacheUi(bundle)
 end
 
@@ -2483,7 +2542,7 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 					end
 				end)
 			end
-			Core.notify("Theme", "Applied " .. tostring(selected), 2)
+			Core.notify("Theme", "theme: " .. tostring(selected), 2)
 		end, "Alleral, AlleralNeon, Dark, and more.")
 		group:CreateButton("Next theme", function()
 			if windUi and type(windUi.CycleTheme) == "function" then
@@ -2724,7 +2783,7 @@ function Core.loadSettings(state, keys, filename, defaults)
 	end)
 	if not ok or type(decoded) ~= "table" then
 		if Core.restoreSettingsFromBackup(filename, state, keys, defaults) then
-			Core.notify("Alleral", "Settings file was corrupt — restored from backup.", 5)
+			Core.notify("Alleral", "settings were busted — loaded a backup", 5)
 			return true
 		end
 		return false

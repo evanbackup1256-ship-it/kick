@@ -1,36 +1,23 @@
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
-if not getgenv().Alleral_Boot then
-	warn("[Alleral] load the hub first")
+local Core = getgenv().Alleral_Core
+if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
-getgenv().Alleral_Boot = nil
 
 local VERSION = "1.3.1"
 local state = getgenv().Alleral_State
-local Core = getgenv().Alleral_Core
 local connections = {}
 local loops = {}
 local loopControllers = {}
 
-if state.Alleral_Unload then
-	pcall(state.Alleral_Unload)
-end
-
 local ui
 local bootErr
-local bootApi = getgenv().Alleral_Core
-if not bootApi or not bootApi.prepareGame then
-	local msg = "Core not loaded"
-	getgenv().Alleral_StartupFailed = msg
-	warn("[Alleral] " .. msg)
-	return
-end
-Core, ui, bootErr = bootApi.prepareGame(state)
+Core, ui, bootErr = Core.boot(state)
 if not Core or not ui then
-	local msg = "Boot failed: " .. tostring(bootErr)
+	local msg = bootErr or "boot failed"
 	getgenv().Alleral_StartupFailed = msg
-	warn("[Alleral] " .. msg)
+	Core.logWarn(msg)
 	return
 end
 
@@ -942,7 +929,7 @@ Core.buildStandardSettingsExtras(settingsTab, {
 	window = window,
 })
 
-notify("Alleral", "Loaded. Tabs on the left.")
+notify("Alleral", "v" .. VERSION .. " ready", 4)
 
 saveSettings()
 

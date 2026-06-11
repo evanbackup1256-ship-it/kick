@@ -1,3 +1,3 @@
 1.6.64-fix-aller2
 Base: https://github.com/Footagesus/WindUI/releases/tag/1.6.64-fix
-Alleral hardening: retries, watchdog, safe APIs, theme fallbacks.
+Patch: ui/windui/aller.luau (themes, polish, safe wrappers)
