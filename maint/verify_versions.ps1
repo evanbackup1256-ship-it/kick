@@ -20,7 +20,7 @@ if ($loader -match 'LOADER_VERSION = "([^"]+)"') {
     Fail "loader.luau missing LOADER_VERSION"
 }
 
-$corePath = Join-Path $root "hub/core.luau"
+$corePath = Join-Path $root "hub/core_base.luau"
 $core = Get-Content $corePath -Raw
 if ($core -match 'Core\.VERSION = "([^"]+)"') {
     $coreVer = $Matches[1]

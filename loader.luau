@@ -1,22 +1,26 @@
-local LOADER_VERSION = "7.6.3"
+local LOADER_VERSION = "7.6.4"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 60
 local CORE_MIN_BYTES = 50000
 local CORE_BASE_MIN_BYTES = 30000
-local CORE_BASE_MAX_BYTES = 80000
+local CORE_BASE_MAX_BYTES = 45000
 local CORE_UI_MIN_BYTES = 50000
+local CORE_UI_MAX_BYTES = 70000
 local CORE_HUB_UI_MIN_BYTES = 60000
+local CORE_HUB_UI_MAX_BYTES = 75000
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
+local CORE_BASE_PATH = HUB .. "/core_base.luau"
+local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
 local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.6.3",
-	core = "2.7.4",
+	loader = "7.6.4",
+	core = "2.7.5",
 	ui = "Alleral",
 	analytics = "1.2",
 	telemetry = "3.2",
@@ -906,36 +910,37 @@ local function collectCoreHttpBodies(url)
 		table.insert(results, { body = body, via = via, len = #body })
 	end
 
-	local req = getHttpRequestFn()
-	if req then
-		add(requestVia(req, url .. "?t=" .. tick()), "request")
-		add(requestVia(req, url), "request-plain")
+	local bustUrl = url .. (url:find("?", 1, true) and "&" or "?") .. "alleral=" .. LOADER_VERSION .. "&t=" .. tick()
+
+	for _, transport in ipairs(HTTP_TRANSPORTS) do
+		if transport.id == "httpget" then
+			add(transport.fetch(bustUrl), "httpget")
+			add(transport.fetch(url), "httpget-plain")
+		end
 	end
+	add(select(1, tryGameHttpGet(bustUrl)), "httpget-fallback")
 
 	if HttpService and type(HttpService.GetAsync) == "function" then
 		local ok, body = pcall(function()
-			return HttpService:GetAsync(url, true)
+			return HttpService:GetAsync(bustUrl, true)
 		end)
 		if ok then
 			add(body, "httpservice")
 		end
-		ok, body = pcall(function()
-			return HttpService:GetAsync(url .. "?t=" .. tick(), true)
-		end)
-		if ok then
-			add(body, "httpservice-cache")
-		end
 	end
 
 	for _, transport in ipairs(HTTP_TRANSPORTS) do
-		if transport.id ~= "httpget" then
-			add(transport.fetch(url), transport.id)
-			add(transport.fetch(url .. "?t=" .. tick()), transport.id .. "-cache")
+		if transport.id ~= "httpget" and transport.id ~= "request" then
+			add(transport.fetch(bustUrl), transport.id)
 		end
 	end
 
-	add(select(1, httpFetch(url)), "httpfetch")
-	add(select(1, tryGameHttpGet(url)), "httpget")
+	add(select(1, httpFetch(bustUrl)), "httpfetch")
+
+	local req = getHttpRequestFn()
+	if req then
+		add(requestVia(req, bustUrl), "request")
+	end
 	return results
 end
 
@@ -1091,10 +1096,10 @@ local function coreBaseValid(src)
 	if not src:find("applyUiLayer", 1, true) then
 		return false
 	end
-	if src:find("function Core%.loadUi", 1, true) then
+	if not src:find('Core%._CORE_ARTIFACT%s*=%s*"base"', 1, true) then
 		return false
 	end
-	if not src:find("ENV%.Alleral_Core = Core", 1, true) then
+	if src:find("function Core%.loadUi", 1, true) then
 		return false
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
@@ -1144,14 +1149,17 @@ local function coreRejectReason(src)
 	if coreMonolithValid(src) or coreBaseValid(src) then
 		return "valid"
 	end
+	if #src > CORE_BASE_MAX_BYTES and #src < CORE_MONOLITH_MIN_BYTES then
+		return "stale cached core (" .. tostring(#src) .. "b)"
+	end
 	if #src < CORE_BASE_MIN_BYTES and #src < CORE_MONOLITH_MIN_BYTES then
 		return tostring(#src) .. "b, need " .. tostring(CORE_BASE_MIN_BYTES) .. "b+ base"
 	end
 	if not src:find("applyUiLayer", 1, true) and not src:find("loadUi", 1, true) then
 		return "missing core bootstrap"
 	end
-	if not src:find("ENV%.Alleral_Core = Core", 1, true) then
-		return "truncated core"
+	if not src:find('Core%._CORE_ARTIFACT%s*=%s*"base"', 1, true) and not src:find("ENV%.Alleral_Core = Core", 1, true) then
+		return "truncated core (" .. tostring(#src) .. "b)"
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
 	if not coreVersionOk(ver) then
@@ -1222,20 +1230,15 @@ end
 local function fetchRemoteCoreFile(relativePath, validFn, rejectReasonFn)
 	local best, bestInvalid = nil, nil
 	for _, base in ipairs(CORE_REMOTE_BASES) do
-		for _, suffix in ipairs({ "", "?t=" .. tick() }) do
-			local url = base .. "/" .. relativePath .. suffix
-			for _, item in ipairs(collectCoreHttpBodies(url)) do
-				if validFn(item.body) then
-					if not best or item.len > best.len then
-						best = { body = item.body, via = item.via, base = base, len = item.len }
-					end
-				elseif item.len > (bestInvalid and bestInvalid.len or 0) then
-					bestInvalid = item
+		local url = base .. "/" .. relativePath
+		for _, item in ipairs(collectCoreHttpBodies(url)) do
+			if validFn(item.body) then
+				if not best or item.len > best.len then
+					best = { body = item.body, via = item.via, base = base, len = item.len }
 				end
+			elseif item.len > (bestInvalid and bestInvalid.len or 0) then
+				bestInvalid = item
 			end
-		end
-		if best then
-			break
 		end
 	end
 
@@ -1251,7 +1254,7 @@ local function fetchRemoteCoreFile(relativePath, validFn, rejectReasonFn)
 end
 
 local function fetchCoreRemote()
-	return fetchRemoteCoreFile(HUB .. "/core.luau", coreValid, coreRejectReason)
+	return fetchRemoteCoreFile(CORE_BASE_PATH, coreValid, coreRejectReason)
 end
 
 local function fetchCoreUiRemote()
@@ -1307,13 +1310,40 @@ local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, re
 	return src, label
 end
 
+local function purgeStaleCorePaths()
+	local stalePaths = {
+		CORE_BASE_LEGACY_PATH,
+		".alleral/cache/" .. CORE_BASE_LEGACY_PATH,
+		CORE_BASE_PATH,
+		".alleral/cache/" .. CORE_BASE_PATH,
+	}
+	for _, path in ipairs(stalePaths) do
+		if isFile and readFile then
+			local okExists, exists = pcall(isFile, path)
+			if okExists and exists then
+				local okRead, src = pcall(readFile, path)
+				if okRead and type(src) == "string" and src ~= "" then
+					local stale = #src > CORE_BASE_MAX_BYTES
+					if path:find("core%.luau", 1, true) and not path:find("core_base", 1, true) then
+						stale = true
+					end
+					if stale and not coreValid(src) then
+						deleteWorkspaceFile(path)
+					end
+				end
+			end
+		end
+	end
+end
+
 local function loadCore()
 	ENV.Alleral_Core = nil
+	purgeStaleCorePaths()
 
 	local baseSrc, baseLabel = resolveCoreSource(
-		{ HUB .. "/core.luau", "core/alleral_core.luau", "alleral_core.luau" },
-		{ ".alleral/cache/" .. HUB .. "/core.luau" },
-		HUB .. "/core.luau",
+		{ CORE_BASE_PATH, CORE_BASE_LEGACY_PATH, "core/alleral_core.luau", "alleral_core.luau" },
+		{ ".alleral/cache/" .. CORE_BASE_PATH, ".alleral/cache/" .. CORE_BASE_LEGACY_PATH },
+		CORE_BASE_PATH,
 		coreValid,
 		coreRejectReason,
 		CORE_BASE_MIN_BYTES
@@ -1335,8 +1365,8 @@ local function loadCore()
 		if type(ENV.Alleral_Core.loadUi) ~= "function" then
 			return false, "Monolithic core missing loadUi"
 		end
-		cacheRemote(HUB .. "/core.luau", baseSrc)
-		cacheRemote(".alleral/cache/" .. HUB .. "/core.luau", baseSrc)
+		cacheRemote(CORE_BASE_PATH, baseSrc)
+		cacheRemote(".alleral/cache/" .. CORE_BASE_PATH, baseSrc)
 		log("Core v" .. tostring(ENV.Alleral_Core.VERSION) .. " (monolith) from " .. tostring(baseLabel))
 		return true
 	end
@@ -1388,8 +1418,8 @@ local function loadCore()
 		return false, "Core UI layers incomplete"
 	end
 
-	cacheRemote(HUB .. "/core.luau", baseSrc)
-	cacheRemote(".alleral/cache/" .. HUB .. "/core.luau", baseSrc)
+	cacheRemote(CORE_BASE_PATH, baseSrc)
+	cacheRemote(".alleral/cache/" .. CORE_BASE_PATH, baseSrc)
 	cacheRemote(CORE_UI_PATH, uiSrc)
 	cacheRemote(".alleral/cache/" .. CORE_UI_PATH, uiSrc)
 	cacheRemote(CORE_HUB_UI_PATH, hubUiSrc)
@@ -2102,7 +2132,7 @@ end
 local function buildManagedFiles()
 	local managed = {
 		{
-			paths = { HUB .. "/core.luau", "core/alleral_core.luau", "alleral_core.luau" },
+			paths = { CORE_BASE_PATH, CORE_BASE_LEGACY_PATH, "core/alleral_core.luau", "alleral_core.luau" },
 			expectedKey = "core",
 			extract = "core",
 			isValid = coreValid,

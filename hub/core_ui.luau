@@ -1244,7 +1244,7 @@ function Core.ensureCore()
 	if type(loadStringFn) ~= "function" or type(isFile) ~= "function" or type(readFile) ~= "function" then
 		return nil
 	end
-	for _, path in ipairs({ "hub/core.luau", "core/alleral_core.luau", "src/alleral_core.luau", "alleral_core.luau" }) do
+	for _, path in ipairs({ "hub/core_base.luau", "hub/core.luau", "core/alleral_core.luau", "src/alleral_core.luau", "alleral_core.luau" }) do
 		if isFile(path) then
 			local ok = pcall(loadStringFn(readFile(path), "Alleral/core")())
 			if ok and ENV.Alleral_Core then
