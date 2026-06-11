@@ -1,4 +1,4 @@
-local LOADER_VERSION = "3.5.9"
+local LOADER_VERSION = "3.5.10"
 local REQUIRED_CORE_VERSION = "1.15"
 local REQUIRED_STARLIGHT_BUILD = "Alleral-6"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
@@ -380,21 +380,51 @@ local function discoverLocalFiles(fileNames)
 	return found
 end
 
+local function coreSourceMarker()
+	return 'Core.VERSION = "' .. REQUIRED_CORE_VERSION .. '"'
+end
+
+local function markerMatches(body, marker)
+	if not marker then
+		return true
+	end
+	if type(marker) == "function" then
+		return marker(body) == true
+	end
+	if type(marker) == "table" then
+		for _, entry in ipairs(marker) do
+			if body:find(entry, 1, true) then
+				return true
+			end
+		end
+		return false
+	end
+	return body:find(marker, 1, true) ~= nil
+end
+
 local function withCacheBust(url, nonce)
 	local sep = url:find("?") and "&" or "?"
 	return url
 		.. sep
 		.. "v="
 		.. LOADER_VERSION
+		.. "&core="
+		.. REQUIRED_CORE_VERSION
 		.. "&t="
-		.. tostring(nonce or os.time())
+		.. tostring(nonce or tick())
 		.. "&nocache="
-		.. tostring(math.random(10000, 99999))
+		.. tostring(math.random(100000, 999999))
 end
 
 local function fetchRemote(url, label, marker)
 	local lastErr = nil
-	local nonces = { os.time(), os.time() + 1, math.random(100000, 999999) }
+	local nonces = {
+		tick(),
+		tick() + 1,
+		os.time(),
+		os.time() + 1,
+		math.random(100000, 999999),
+	}
 
 	for attempt = 1, #nonces do
 		local fetchUrl = withCacheBust(url, nonces[attempt])
@@ -402,7 +432,7 @@ local function fetchRemote(url, label, marker)
 		if type(game.HttpGet) == "function" then
 			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
 			if ok and body and body ~= "" and not body:find("404: Not Found") then
-				if not marker or body:find(marker, 1, true) then
+				if markerMatches(body, marker) then
 					return body, nil
 				end
 				lastErr = label .. " HttpGet response looked cached/outdated"
@@ -413,12 +443,16 @@ local function fetchRemote(url, label, marker)
 			local ok, response = pcall(httpRequest, {
 				Url = fetchUrl,
 				Method = "GET",
+				Headers = {
+					["Cache-Control"] = "no-cache, no-store, must-revalidate",
+					["Pragma"] = "no-cache",
+				},
 			})
 			if ok and response then
 				local status = response.StatusCode or response.status or 0
 				local body = response.Body or response.body or ""
 				if status >= 200 and status < 300 and body ~= "" then
-					if not marker or body:find(marker, 1, true) then
+					if markerMatches(body, marker) then
 						return body, nil
 					end
 					lastErr = label .. " response looked cached/outdated"
@@ -458,6 +492,15 @@ local function resolveFromFiles(files, label, url, marker)
 		local source, err = fetchRemote(url, label, marker)
 		if source then
 			return source, url
+		end
+		if CAPABILITIES.readfile and err and tostring(err):find("cached/outdated", 1, true) then
+			for _, file in ipairs(files) do
+				local localSource = readLocalFile(file)
+				if localSource and markerMatches(localSource, marker) then
+					log("warn", label .. " remote cache stale; using local " .. file)
+					return localSource, "local-fallback:" .. file
+				end
+			end
 		end
 		if not devMode then
 			return nil, err
@@ -623,7 +666,7 @@ local function preloadCore(required)
 		SHARED_CORE_FILES,
 		"core",
 		SHARED_CORE_URL,
-		'Core.STARLIGHT_BUILD = "Alleral-6"'
+		coreSourceMarker()
 	)
 	if not source then
 		if required then
