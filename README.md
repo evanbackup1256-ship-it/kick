@@ -9,7 +9,7 @@ One script. Detects your game and runs it.
 There is **only one entry point:** `loader.luau`. Paste this in Volt and click **Execute**:
 
 ```lua
-loadstring(game:HttpGet("https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/loader.luau?t=" .. tick()))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=" .. tick()))()
 ```
 
 You must see this line in the console:

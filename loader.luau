@@ -1,9 +1,9 @@
 --[[
 	Alleral Hub — single entry point (loader.luau only).
-	Fetch from CDN; do not use launch/load/bootstrap/run scripts.
+	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "5.4.2"
+local LOADER_VERSION = "5.4.3"
 local MIN_CORE = "1.18"
 local RELEASE_FALLBACK = {
 	core = "1.19",
@@ -61,10 +61,9 @@ local SCAN_DIRS = {
 }
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
-local RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
-local GH_WEB = "https://github.com/" .. REPO .. "/raw/" .. BRANCH
-local CDN = "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH
-local CDN_PIN = CDN
+local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
+local GITHUB_WEB = "https://github.com/" .. REPO .. "/raw/" .. BRANCH
+local REMOTE_BASES = { GITHUB_RAW, GITHUB_WEB }
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -656,7 +655,7 @@ end
 local function fetchRemote(relativePath, minBytes)
 	minBytes = minBytes or 0
 	local lastErr = nil
-	for _, base in ipairs({ CDN_PIN, CDN, RAW, GH_WEB }) do
+	for _, base in ipairs(REMOTE_BASES) do
 		local body, via = httpGet(base .. "/" .. relativePath, minBytes)
 		if body and looksLikeLua(body) and not body:find("404: Not Found", 1, true) then
 			local label = base .. (via and (" via " .. via) or "")
@@ -780,7 +779,7 @@ local function loadCore()
 	else
 		src, label = nil, nil
 		local lastErr = nil
-		for _, base in ipairs({ CDN_PIN, CDN, RAW }) do
+		for _, base in ipairs(REMOTE_BASES) do
 			local url = base .. "/core/alleral_core.luau"
 			local body, via = httpGet(url, 0)
 			if body and coreValid(body) then
@@ -821,7 +820,7 @@ local function loadModule(localPaths, remotePath, marker, chunkName)
 end
 
 local function loadWeaoStack()
-	local cfgBody = httpFetch(CDN .. "/config/weao.json", { ["Accept"] = "application/json" })
+	local cfgBody = httpFetch(GITHUB_RAW .. "/config/weao.json", { ["Accept"] = "application/json" })
 	local cfg = decodeJson(cfgBody)
 	if cfg then
 		ENV.Alleral_WeaoConfig = cfg
@@ -1036,7 +1035,7 @@ local function fetchExpectedVersions()
 		expected.games[gameProfile.id] = gameProfile.version
 	end
 
-	local release = decodeJson(select(1, httpFetch(CDN .. "/config/release.json")))
+	local release = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/release.json")))
 	if release then
 		expected.loader = release.loader or expected.loader
 		expected.core = release.core or expected.core
@@ -1046,12 +1045,12 @@ local function fetchExpectedVersions()
 		expected.weao = release.weao or expected.weao
 	end
 
-	local weaoCfg = decodeJson(select(1, httpFetch(CDN .. "/config/weao.json")))
+	local weaoCfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/weao.json")))
 	if weaoCfg then
 		ENV._Alleral_WeaoConfigRemote = weaoCfg
 	end
 
-	local manifest = decodeJson(select(1, httpFetch(CDN .. "/config/scripts_manifest.json")))
+	local manifest = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/scripts_manifest.json")))
 	if manifest and type(manifest.scripts) == "table" then
 		for id, entry in pairs(manifest.scripts) do
 			if type(entry) == "table" and type(entry.version) == "string" then
@@ -1328,7 +1327,7 @@ local function installAutoexecRedirect()
 		return
 	end
 	local stub = 'loadstring(game:HttpGet("'
-		.. CDN
+		.. GITHUB_RAW
 		.. '/loader.luau?t=" .. tick()))()\n'
 	for _, dir in ipairs({ "autoexec", "Autoexec" }) do
 		if makeFolderFn then
@@ -1524,7 +1523,7 @@ local function main()
 	ENV.Alleral_Rayfield = nil
 	ENV.Alleral_UI = nil
 	ENV.Alleral_StartupFailed = nil
-	ENV.Alleral_ScriptManifestUrl = CDN .. "/config/scripts_manifest.json"
+	ENV.Alleral_ScriptManifestUrl = GITHUB_RAW .. "/config/scripts_manifest.json"
 
 	local profile, err = detectGame()
 	if not profile then

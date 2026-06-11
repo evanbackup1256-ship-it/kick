@@ -6,10 +6,10 @@ local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
 local RAYFIELD_SOURCE_URL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua"
 local RAYFIELD_MIRROR_URLS = {
-	"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/vendor/rayfield/source.lua",
-	"https://cdn.jsdelivr.net/gh/SiriusSoftwareLtd/Rayfield@main/source.lua",
 	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/vendor/rayfield/source.lua",
+	"https://github.com/evanbackup1256-ship-it/kick/raw/main/vendor/rayfield/source.lua",
 	"https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
+	"https://github.com/SiriusSoftwareLtd/Rayfield/raw/main/source.lua",
 }
 local RAYFIELD_MIN_BYTES = 50000
 local RAYFIELD_LOCAL_FILES = {
@@ -724,9 +724,8 @@ function Core.defaultScriptManifestUrls()
 			table.insert(urls, relay .. "/scripts")
 		end
 	end
-	table.insert(urls, "https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/config/scripts_manifest.json")
-	table.insert(urls, "https://github.com/evanbackup1256-ship-it/kick/raw/main/config/scripts_manifest.json")
 	table.insert(urls, "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/config/scripts_manifest.json")
+	table.insert(urls, "https://github.com/evanbackup1256-ship-it/kick/raw/main/config/scripts_manifest.json")
 	return urls
 end
 
