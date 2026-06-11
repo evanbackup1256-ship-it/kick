@@ -135,6 +135,7 @@ function Util.text(props)
 		TextYAlignment = props.TextYAlignment or Enum.TextYAlignment.Center,
 		TextWrapped = props.TextWrapped == true,
 		RichText = props.RichText == true,
+		TextTransparency = 0,
 		Size = props.Size or UDim2.new(1, 0, 0, 20),
 		Position = props.Position,
 		LayoutOrder = props.LayoutOrder,
@@ -177,12 +178,12 @@ Theme.Palettes = {
 		Accent = Color3.fromRGB(124, 92, 255),
 		AccentSoft = Color3.fromRGB(56, 189, 248),
 		Backgrounds = {
-			Dark = Color3.fromRGB(5, 6, 11),
-			Medium = Color3.fromRGB(9, 10, 17),
-			Light = Color3.fromRGB(14, 16, 26),
-			Groupbox = Color3.fromRGB(11, 12, 20),
-			Highlight = Color3.fromRGB(22, 24, 38),
-			Elevated = Color3.fromRGB(18, 20, 32),
+			Dark = Color3.fromRGB(12, 13, 20),
+			Medium = Color3.fromRGB(18, 19, 28),
+			Light = Color3.fromRGB(26, 28, 40),
+			Groupbox = Color3.fromRGB(22, 24, 36),
+			Highlight = Color3.fromRGB(34, 36, 52),
+			Elevated = Color3.fromRGB(30, 32, 48),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
@@ -315,8 +316,8 @@ Theme.Visual = {
 	Accent = Theme.Palettes.Alleral.Accent,
 	CornerRadius = 8,
 	GroupboxRadius = 10,
-	WindowTransparency = 0.02,
-	GroupboxTransparency = 0.06,
+	WindowTransparency = 0,
+	GroupboxTransparency = 0,
 	BlurEnabled = true,
 	BlurSize = 22,
 	AnimationSpeed = 1,
@@ -639,11 +640,6 @@ function Notification.show(data)
 		Size = UDim2.new(1, 0, 0, 0),
 	})
 	body.AutomaticSize = Enum.AutomaticSize.Y
-
-	card.BackgroundTransparency = 1
-	body.TextTransparency = 1
-	Tween.play(card, { BackgroundTransparency = 0.05 }, nil, Theme.tweenInfo(0.18))
-	Tween.play(body, { TextTransparency = 0 }, nil, Theme.tweenInfo(0.18))
 
 	local duration = data.Duration or math.clamp((#tostring(data.Content or "") * 0.08) + 3, 3, 12)
 	task.delay(duration, function()
@@ -1156,7 +1152,7 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 	})
 	Util.padding(0, 10, 0, 10, closed)
 
-	local popupRoot = library and library._popupRoot or parentFrame
+	local popupRoot = library and (library._screenGui or library._popupRoot) or parentFrame
 	local popup = Util.new("ScrollingFrame", {
 		Name = "DropdownPopup",
 		BackgroundColor3 = theme.Backgrounds.Elevated,
@@ -1507,13 +1503,34 @@ function WindowBuilder.refreshTheme(root)
 end
 
 local function parentGui(screenGui)
-	if gethui then
-		screenGui.Parent = gethui()
-	elseif RunService:IsStudio() then
-		screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-	else
-		local coreGui = game:GetService("CoreGui")
-		screenGui.Parent = coreGui:FindFirstChild("RobloxGui") or coreGui
+	local coreGui = game:GetService("CoreGui")
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	local function protect(instance)
+		pcall(function()
+			if typeof(syn) == "table" and typeof(syn.protect_gui) == "function" then
+				syn.protect_gui(instance)
+			elseif typeof(protectgui) == "function" then
+				protectgui(instance)
+			end
+		end)
+	end
+
+	if typeof(gethui) == "function" then
+		local ok = pcall(function()
+			screenGui.Parent = gethui()
+		end)
+		if ok and screenGui.Parent then
+			return
+		end
+	end
+
+	protect(screenGui)
+	local ok = pcall(function()
+		screenGui.Parent = coreGui
+	end)
+	if not ok or not screenGui.Parent then
+		screenGui.Parent = playerGui
 	end
 end
 
@@ -1533,6 +1550,8 @@ function WindowBuilder.create(library, windowSettings)
 		ResetOnSpawn = false,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		IgnoreGuiInset = true,
+		DisplayOrder = 999,
+		Enabled = true,
 	})
 	parentGui(screenGui)
 	library.Instance = screenGui
@@ -1559,13 +1578,7 @@ function WindowBuilder.create(library, windowSettings)
 		blur.Size = (active and Theme.Visual.BlurEnabled) and Theme.Visual.BlurSize or 0
 	end
 
-	local popupLayer = Util.new("Frame", {
-		Name = "Popups",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		ZIndex = 200,
-	}, { overlay })
-	library._popupRoot = popupLayer
+	library._popupRoot = screenGui
 	library._screenGui = screenGui
 
 	local main = Util.new("Frame", {
@@ -1577,12 +1590,11 @@ function WindowBuilder.create(library, windowSettings)
 		Size = windowSettings.DefaultSize or UDim2.fromOffset(900, 560),
 		Visible = false,
 		ClipsDescendants = true,
+		ZIndex = 100,
 	}, { overlay })
 	main:SetAttribute("TargetTransparency", Theme.Visual.WindowTransparency)
 	Util.corner(Theme.Visual.GroupboxRadius + 6, main)
-	local mainStroke = Util.stroke(theme.Miscellaneous.Divider, 1, 0.35, main)
-	mainStroke.Color = theme.Accent
-	mainStroke.Transparency = 0.75
+	local mainStroke = Util.stroke(theme.Accent, 1, 0.35, main)
 
 	local accentRail = Util.new("Frame", {
 		Name = "AccentRail",
@@ -1597,7 +1609,7 @@ function WindowBuilder.create(library, windowSettings)
 	local sidebar = Util.new("Frame", {
 		Name = "Sidebar",
 		BackgroundColor3 = theme.Backgrounds.Dark,
-		BackgroundTransparency = 0.08,
+		BackgroundTransparency = 0,
 		Position = UDim2.fromOffset(3, 0),
 		Size = UDim2.new(0, Theme.Visual.SidebarWidth, 1, 0),
 	}, { main })
@@ -1764,10 +1776,7 @@ function WindowBuilder.create(library, windowSettings)
 		window.Visible = state
 		main.Visible = state
 		setBlur(state)
-		if state then
-			main.BackgroundTransparency = 1
-			Tween.play(main, { BackgroundTransparency = Theme.Visual.WindowTransparency }, nil, Theme.tweenInfo(0.22))
-		end
+		main.BackgroundTransparency = state and Theme.Visual.WindowTransparency or 1
 	end
 
 	closeBtn.MouseButton1Click:Connect(function()
@@ -1958,24 +1967,21 @@ function WindowBuilder.create(library, windowSettings)
 					AutomaticSize = Enum.AutomaticSize.Y,
 				}, { holder })
 				Util.corner(Theme.Visual.GroupboxRadius, box)
-				Util.stroke(theme.Miscellaneous.Divider, 1, 0.65, box)
+				Util.stroke(theme.Miscellaneous.Divider, 1, 0.45, box)
+
+				local header = Util.new("Frame", {
+					BackgroundTransparency = 1,
+					Size = UDim2.new(1, 0, 0, 24),
+				}, { box })
+				Util.list(8, true, header)
 
 				local groupAccent = Util.new("Frame", {
 					Name = "Accent",
 					BackgroundColor3 = theme.Accent,
-					Size = UDim2.new(1, -24, 0, 2),
-					Position = UDim2.fromOffset(12, 0),
-				}, { box })
+					Size = UDim2.new(1, 0, 0, 2),
+					Position = UDim2.new(0, 0, 0, -6),
+				}, { header })
 				Util.gradient(Theme.accentGradient(), 0, groupAccent)
-
-				Util.padding(14, 12, 12, 12, box)
-				Util.list(8, false, box)
-
-				local header = Util.new("Frame", {
-					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 0, 22),
-				}, { box })
-				Util.list(8, true, header)
 
 				if not Util.isEmpty(groupSettings.Icon) then
 					Util.new("ImageLabel", {
@@ -1994,6 +2000,9 @@ function WindowBuilder.create(library, windowSettings)
 					TextColor3 = theme.Foregrounds.Light,
 					Size = UDim2.new(1, 0, 1, 0),
 				})
+
+				Util.padding(14, 12, 12, 12, box)
+				Util.list(8, false, box)
 
 				local parentingItem = Util.new("Frame", {
 					Name = "Elements",

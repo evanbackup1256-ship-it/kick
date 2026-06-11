@@ -125,6 +125,7 @@ function Util.text(props)
 		TextYAlignment = props.TextYAlignment or Enum.TextYAlignment.Center,
 		TextWrapped = props.TextWrapped == true,
 		RichText = props.RichText == true,
+		TextTransparency = 0,
 		Size = props.Size or UDim2.new(1, 0, 0, 20),
 		Position = props.Position,
 		LayoutOrder = props.LayoutOrder,

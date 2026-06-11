@@ -491,7 +491,7 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 	})
 	Util.padding(0, 10, 0, 10, closed)
 
-	local popupRoot = library and library._popupRoot or parentFrame
+	local popupRoot = library and (library._screenGui or library._popupRoot) or parentFrame
 	local popup = Util.new("ScrollingFrame", {
 		Name = "DropdownPopup",
 		BackgroundColor3 = theme.Backgrounds.Elevated,

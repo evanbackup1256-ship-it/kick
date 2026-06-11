@@ -78,11 +78,6 @@ function Notification.show(data)
 	})
 	body.AutomaticSize = Enum.AutomaticSize.Y
 
-	card.BackgroundTransparency = 1
-	body.TextTransparency = 1
-	Tween.play(card, { BackgroundTransparency = 0.05 }, nil, Theme.tweenInfo(0.18))
-	Tween.play(body, { TextTransparency = 0 }, nil, Theme.tweenInfo(0.18))
-
 	local duration = data.Duration or math.clamp((#tostring(data.Content or "") * 0.08) + 3, 3, 12)
 	task.delay(duration, function()
 		if card.Parent then
