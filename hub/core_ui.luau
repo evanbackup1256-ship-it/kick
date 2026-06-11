@@ -1018,10 +1018,15 @@ local function measureTabContentWidth(rawTab, window)
 		end
 	end
 	local rawWindow = window and window._rawWindow
-	if rawWindow and rawWindow.UIElements and rawWindow.UIElements.MainBar then
-		local width = rawWindow.UIElements.MainBar.AbsoluteSize.X
-		if width >= 64 then
-			return width - 48
+	if rawWindow and rawWindow.UIElements then
+		local mainBar = rawWindow.UIElements.MainBar
+		if mainBar and mainBar.AbsoluteSize.X >= 64 then
+			local width = mainBar.AbsoluteSize.X
+			local pad = mainBar:FindFirstChildOfClass("UIPadding")
+			if pad then
+				width = width - pad.PaddingLeft.Offset - pad.PaddingRight.Offset
+			end
+			return math.max(width - 8, 64)
 		end
 	end
 	return 0
@@ -1032,9 +1037,9 @@ local function fixWrappedLabels(root)
 		return
 	end
 	for _, desc in ipairs(root:GetDescendants()) do
-		if desc:IsA("TextLabel") and desc.TextWrapped then
+		if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and desc.TextWrapped then
 			desc.TextWrapped = false
-			desc.TextTruncate = Enum.TextTruncate.AtEnd
+			desc.TextTruncate = Enum.TextTruncate.None
 			if desc.AutomaticSize == Enum.AutomaticSize.XY then
 				desc.AutomaticSize = Enum.AutomaticSize.Y
 				desc.Size = UDim2.new(1, 0, 0, 0)
@@ -1073,6 +1078,7 @@ local function relayoutTwoColumnFrames(tab)
 	layout.right.Size = colSize
 	layout.right.AutomaticSize = Enum.AutomaticSize.Y
 
+	fixWrappedLabels(layout.row)
 	fixWrappedLabels(layout.left)
 	fixWrappedLabels(layout.right)
 	return true
@@ -1175,6 +1181,7 @@ local function scheduleTwoColumnRelayout(tab)
 	task.defer(tryRelayout)
 	task.delay(0.05, tryRelayout)
 	task.delay(0.15, tryRelayout)
+	task.delay(0.35, tryRelayout)
 end
 
 function Core.refreshAllTabColumns()

@@ -13270,7 +13270,7 @@ local z=40
 local A=aj.ViewportSize
 local B=au.UIElements.Main.AbsoluteSize
 
-if not au.IsFullscreen and au.AutoScale then
+if not au.IsFullscreen and au.AutoScale and not(at.WindUI and at.WindUI._AlleralScaleApi)then
 local C=A.X-(z*2)
 local F=A.Y-(z*2)
 

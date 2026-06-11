@@ -99,7 +99,7 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ARRREL_UI_VERSION = "2.1.0-alleral-v2"
+	WindUI.ARRREL_UI_VERSION = "2.1.2-alleral-v2"
 	WindUI.ARRREL_BRAND = "Alleral"
 	WindUI.ALLERAL_UI_VERSION = WindUI.ARRREL_UI_VERSION
 	WindUI.ALLERAL_BRAND = "Alleral UI V2"
@@ -418,7 +418,7 @@ return function(WindUI)
 	end)()
 
 	if WindUI._AlleralSpringMotion == nil then
-		WindUI._AlleralSpringMotion = true
+		WindUI._AlleralSpringMotion = false
 	end
 
 	local sliderTrackFrames = setmetatable({}, { __mode = "k" })
@@ -448,9 +448,10 @@ return function(WindUI)
 			snapProps(instance, props)
 			return
 		end
+		local useSpring = WindUI._AlleralSpringMotion == true
 		local function run()
 			local ok = pcall(function()
-				if WindUI._AlleralSpringMotion ~= false then
+				if useSpring then
 					local preset = type(infoOrPreset) == "string" and infoOrPreset or Motion.tweenInfoToPreset(infoOrPreset)
 					Motion.target(instance, preset, props)
 					return
@@ -465,7 +466,7 @@ return function(WindUI)
 				snapProps(instance, props)
 			end
 		end
-		if motionEnabled() and infoOrPreset ~= "instant" then
+		if useSpring and motionEnabled() and infoOrPreset ~= "instant" then
 			local jitterMin = MOTION_JITTER.min or 0.004
 			local jitterMax = MOTION_JITTER.max or 0.014
 			local jitter = tonumber(instance:GetAttribute("AlleralMotionJitter"))
@@ -480,35 +481,6 @@ return function(WindUI)
 		end
 		run()
 	end
-
-	local function installTweenCreateHook()
-		local ok, original = pcall(function()
-			return TweenService.Create
-		end)
-		if not ok or type(original) ~= "function" then
-			return false
-		end
-		local hooked, hookErr = pcall(function()
-			TweenService.Create = function(self, instance, tweenInfo, props)
-				if sliderTrackFrames[instance] and props and props.Size and tweenInfo and tweenInfo.Time <= 0.08 then
-					snapProps(instance, props)
-					return stubTween(instance)
-				end
-				if WindUI._AlleralSpringMotion ~= false and WindUI._AlleralReducedMotion ~= true and props and instance then
-					Motion.target(instance, Motion.tweenInfoToPreset(tweenInfo), props)
-					return stubTween(instance)
-				end
-				return original(self, instance, tweenInfo, props)
-			end
-		end)
-		if not hooked and WindUI._AlleralTweenHookWarned ~= true then
-			WindUI._AlleralTweenHookWarned = true
-			uiWarn("tween", "executor TweenService.Create unavailable — using Motion fallback")
-		end
-		return hooked
-	end
-
-	installTweenCreateHook()
 
 	local AutoScaleLib = (function()
 		if type(WindUI._AlleralScaleApi) == "table" and type(WindUI._AlleralScaleApi.apply) == "function" then
@@ -1016,9 +988,49 @@ return function(WindUI)
 		return width
 	end
 
+	local hstackRegistry = setmetatable({}, { __mode = "k" })
+
+	local function isRealColumnLayout(hframe, columns)
+		if not hframe or not columns or #columns < 2 then
+			return false
+		end
+		local name = hframe.Name
+		if name == "AlleralColumns" or name == "TabTitle" then
+			return false
+		end
+		for _, col in ipairs(columns) do
+			if not col or not col:IsA("GuiObject") then
+				return false
+			end
+			if col.Name == "LeftColumn" or col.Name == "RightColumn" or col.Name == "ToggleFrame" then
+				return false
+			end
+			if col:FindFirstChild("ToggleFrame", true) or col:FindFirstChild("Hitbox", true) then
+				return false
+			end
+		end
+		local verticalStacks = 0
+		for _, col in ipairs(columns) do
+			local vlist = col:FindFirstChildOfClass("UIListLayout")
+			if vlist and vlist.FillDirection == Enum.FillDirection.Vertical then
+				verticalStacks += 1
+			end
+		end
+		if verticalStacks >= 2 then
+			return true
+		end
+		if #columns >= 3 then
+			return true
+		end
+		return false
+	end
+
 	local function distributeHStackColumns(hframe, columns)
 		local n = #columns
 		if n == 0 or not hframe then
+			return false
+		end
+		if not isRealColumnLayout(hframe, columns) then
 			return false
 		end
 		local parentWidth = resolveHStackParentWidth(hframe)
@@ -1045,7 +1057,7 @@ return function(WindUI)
 				for _, desc in ipairs(col:GetDescendants()) do
 					if desc:IsA("TextLabel") and desc.TextWrapped then
 						desc.TextWrapped = false
-						desc.TextTruncate = Enum.TextTruncate.AtEnd
+						desc.TextTruncate = Enum.TextTruncate.None
 						if desc.AutomaticSize == Enum.AutomaticSize.XY then
 							desc.AutomaticSize = Enum.AutomaticSize.Y
 							desc.Size = UDim2.new(1, 0, 0, 0)
@@ -1088,13 +1100,16 @@ return function(WindUI)
 			return
 		end
 		stack._AlleralRelayoutHooked = true
+		local hframe = stack.ElementFrame
+		if hframe then
+			hstackRegistry[hframe] = stack
+		end
 		local function tryRelayout()
 			relayoutHorizontalStack(stack)
 		end
 		task.defer(tryRelayout)
 		task.delay(0.05, tryRelayout)
 		task.delay(0.2, tryRelayout)
-		local hframe = stack.ElementFrame
 		if hframe then
 			pcall(function()
 				hframe:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
@@ -1106,34 +1121,12 @@ return function(WindUI)
 		end
 	end
 
-	local function relayoutAllHStacks(window)
-		if type(window) ~= "table" then
-			return
-		end
-		local tabMod = window.TabModule
-		if not tabMod or not tabMod.Tabs then
-			return
-		end
-		for _, tab in pairs(tabMod.Tabs) do
-			local scroll = tab.UIElements and tab.UIElements.ContainerFrame
-			if not scroll then
-				continue
-			end
-			for _, desc in ipairs(scroll:GetDescendants()) do
-				if desc:IsA("Frame") then
-					local layout = desc:FindFirstChildOfClass("UIListLayout")
-					if layout and layout.FillDirection == Enum.FillDirection.Horizontal then
-						local columns = {}
-						for _, child in ipairs(desc:GetChildren()) do
-							if child:IsA("GuiObject") and not child:IsA("UIListLayout") then
-								table.insert(columns, child)
-							end
-						end
-						if #columns >= 2 then
-							distributeHStackColumns(desc, columns)
-						end
-					end
-				end
+	local function relayoutAllHStacks(_window)
+		for frame, stack in pairs(hstackRegistry) do
+			if frame and frame.Parent and type(stack) == "table" then
+				relayoutHorizontalStack(stack)
+			else
+				hstackRegistry[frame] = nil
 			end
 		end
 	end
@@ -2711,13 +2704,13 @@ return function(WindUI)
 			if desc:IsA("TextLabel") and desc.TextWrapped then
 				local layout = desc.Parent and desc.Parent:FindFirstChildOfClass("UIListLayout")
 				if layout and layout.FillDirection == Enum.FillDirection.Horizontal then
-					if desc.TextSize >= 15 and desc.TextSize <= 18 and desc.TextXAlignment == Enum.TextXAlignment.Left then
-						desc.TextWrapped = false
-						desc.TextTruncate = Enum.TextTruncate.AtEnd
-						if desc.AutomaticSize == Enum.AutomaticSize.XY then
-							desc.AutomaticSize = Enum.AutomaticSize.Y
-							desc.Size = UDim2.new(1, 0, 0, 0)
-						end
+					desc.TextWrapped = false
+					desc.TextTruncate = Enum.TextTruncate.None
+					if desc.AutomaticSize == Enum.AutomaticSize.XY then
+						desc.AutomaticSize = Enum.AutomaticSize.Y
+						desc.Size = UDim2.new(1, 0, 0, 0)
+					elseif desc.Size.X.Scale == 0 and desc.Size.X.Offset == 0 then
+						desc.Size = UDim2.new(1, 0, desc.Size.Y.Scale, desc.Size.Y.Offset)
 					end
 				end
 			end
@@ -3041,7 +3034,6 @@ return function(WindUI)
 		if type(window) ~= "table" then
 			return
 		end
-		relayoutAllHStacks(window)
 		local mainBar = window.UIElements and window.UIElements.MainBar
 		if mainBar then
 			polishRowLabels(mainBar)
@@ -3099,6 +3091,9 @@ return function(WindUI)
 			return false
 		end
 		relayoutAllHStacks(window)
+		if AutoScaleLib and type(AutoScaleLib.runLayoutHooks) == "function" then
+			pcall(AutoScaleLib.runLayoutHooks, window)
+		end
 		return true
 	end
 

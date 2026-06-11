@@ -85,7 +85,7 @@ return function(WindUI)
 			if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
 				if desc.TextWrapped then
 					desc.TextWrapped = false
-					desc.TextTruncate = Enum.TextTruncate.AtEnd
+					desc.TextTruncate = Enum.TextTruncate.None
 				end
 				if desc.AutomaticSize == Enum.AutomaticSize.XY then
 					desc.AutomaticSize = Enum.AutomaticSize.Y
@@ -169,6 +169,9 @@ return function(WindUI)
 		task.defer(function()
 			runLayoutHooks(window)
 		end)
+		task.delay(0.05, function()
+			runLayoutHooks(window)
+		end)
 		return scale
 	end
 
@@ -242,7 +245,7 @@ return function(WindUI)
 	end
 
 	local api = {
-		VERSION = "1.1.0",
+		VERSION = "1.1.1",
 		DEFAULTS = DEFAULTS,
 		compute = computeScale,
 		apply = applyScale,

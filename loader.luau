@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.7.0"
+local LOADER_VERSION = "7.7.2"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 60
@@ -19,10 +19,10 @@ local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.7.0",
-	core = "2.8.0",
+	loader = "7.7.2",
+	core = "2.8.2",
 	ui = "Alleral",
-	windui = "2.1.0-alleral-v2",
+	windui = "2.1.2-alleral-v2",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
