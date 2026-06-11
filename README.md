@@ -15,7 +15,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-i
 You must see this line in the console:
 
 ```
-=== Alleral loader 5.4.6 active ===
+=== Alleral loader 5.4.7 active ===
 ```
 
 If you see `[Alleral Loader v3.x]` instead, you are running an **old saved script inside Volt** — not this repo. Delete every Alleral script from Volt's **Scripts / Saved** tab and use the line above.

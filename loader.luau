@@ -3,7 +3,7 @@
 	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "5.4.6"
+local LOADER_VERSION = "5.4.7"
 local MIN_CORE = "1.18"
 local RELEASE_FALLBACK = {
 	core = "1.20",
@@ -626,6 +626,10 @@ local function looksLikeLua(body)
 		return body:find("function", 1, true) ~= nil or body:find("local ", 1, true) ~= nil
 	end
 	return true
+end
+
+local function containsJsdelivr(text)
+	return type(text) == "string" and text:find("jsdelivr", 1, true) ~= nil
 end
 
 local function readLocal(paths, minBytes)
@@ -1259,10 +1263,6 @@ local function buildManagedFiles()
 		})
 	end
 	return managed
-end
-
-local function containsJsdelivr(text)
-	return type(text) == "string" and text:find("jsdelivr", 1, true) ~= nil
 end
 
 local function shouldDeleteCachedFile(src, entry, expected, installedManifest)

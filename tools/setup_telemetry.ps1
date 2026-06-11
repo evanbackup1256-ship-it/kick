@@ -113,7 +113,7 @@ if ($relayUrl -and $relayUrl -notmatch "YOUR-RELAY") {
         player = @{ name = "SetupTest"; userId = 1; displayName = "Setup"; accountAge = 0 }
         context = @{
             executor = "setup_script"
-            loaderVersion = "5.4.6"
+            loaderVersion = "5.4.7"
             gameName = "Telemetry Setup"
             scriptName = "test"
             scriptVersion = "1"
