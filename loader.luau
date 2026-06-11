@@ -1026,6 +1026,9 @@ do
 			if bridge.Alleral_Telemetry then g.Alleral_Telemetry = bridge.Alleral_Telemetry end
 			if bridge.Alleral_Weao then g.Alleral_Weao = bridge.Alleral_Weao end
 			if bridge.Alleral_WeaoConfig then g.Alleral_WeaoConfig = bridge.Alleral_WeaoConfig end
+			if bridge.Alleral_Boot then g.Alleral_Boot = bridge.Alleral_Boot end
+			if bridge.Alleral_LoaderMeta then g.Alleral_LoaderMeta = bridge.Alleral_LoaderMeta end
+			if bridge.Alleral_UI then g.Alleral_UI = bridge.Alleral_UI end
 			g.Alleral_State = g.Alleral_State or bridge.Alleral_State or {}
 			bridge.Alleral_State = g.Alleral_State
 		end
@@ -1042,6 +1045,8 @@ local function publishBridge()
 		shared.Alleral_Telemetry = ENV.Alleral_Telemetry
 		shared.Alleral_Weao = ENV.Alleral_Weao
 		shared.Alleral_WeaoConfig = ENV.Alleral_WeaoConfig
+		shared.Alleral_Boot = ENV.Alleral_Boot
+		shared.Alleral_LoaderMeta = ENV.Alleral_LoaderMeta
 		shared.Alleral_State = ENV.Alleral_State or {}
 	end)
 end
