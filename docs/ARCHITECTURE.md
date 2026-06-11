@@ -3,7 +3,7 @@
 ## Boot chain
 
 ```
-loader.luau (CDN HttpGet — only entry point)
+loader.luau (GitHub HttpGet — only entry point)
     ├── load config/weao.json + core/weao.luau (WEAO client)
     ├── purge legacy workspace files
     ├── detect executor locally, enrich via WEAO API
@@ -20,7 +20,7 @@ Per [WEAO API docs](https://docs.weao.xyz):
 
 - Required header: `User-Agent: WEAO-3PService`
 - Exploits endpoint: `GET /api/status/exploits` (all) or `/api/status/exploits/[name]` (single)
-- Config: `config/weao.json` (CDN + local fallback)
+- Config: `config/weao.json` (GitHub + local fallback)
 - Client: `core/weao.luau` (shared by loader + core)
 - Proxy (primary): [goodcurry/weao-proxy-api](https://github.com/goodcurry/weao-proxy-api) → `http://farts.fadedis.xyz:25551`
 - Fallback domains: weao.xyz, whatexpsare.online, whatexploitsaretra.sh, api.weao.xyz
@@ -31,13 +31,13 @@ The WEAO client tries every base × transport × cache-busted URL, validates JSO
 
 | File | Purpose |
 |------|---------|
-| `loader.luau` | **Only** player entry — fetch from CDN |
+| `loader.luau` | **Only** player entry — fetch from GitHub |
 
 ## Version sources
 
 | Component | Version | File |
 |-----------|---------|------|
-| Loader | 5.4.2 | `loader.luau`, `config/release.json` |
+| Loader | 5.4.5 | `loader.luau`, `config/release.json` |
 | Core | 1.19 | `core/alleral_core.luau` |
 | WEAO | 1.0 | `core/weao.luau`, `config/weao.json` |
 | Analytics | 1.0 | `core/analytics.luau` |

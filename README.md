@@ -23,3 +23,5 @@ If you see `[Alleral Loader v3.x]` instead, you are running an **old saved scrip
 Reload in the same session: `getgenv().Alleral_Reload()`
 
 Scan executor workspace for stale files: `getgenv().Alleral_ScanLegacy()`
+
+Purge jsDelivr-cached workspace files: `getgenv().Alleral_PurgeJsdelivr()`
