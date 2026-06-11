@@ -2,13 +2,11 @@
 .zed/
 __pycache__/
 *.pyc
-tools/.luxy-sync-state.json
-tools/luxy-cache/
 
-# Secrets — never commit or share
-backend/.env
-config/owner_telemetry.luau
-config/telemetry.env
+# Secrets
+relay/.env
+cfg/owner_telemetry.luau
+cfg/telemetry.env
 src/owner_telemetry.luau
 owner_telemetry.luau
 ../Alleral-Private/
@@ -16,7 +14,7 @@ owner_telemetry.luau
 # Local editor overrides
 .vscode/settings.json
 
-# Legacy entry points — removed in v5.x (loader.luau only)
+# Legacy entry points
 /load.luau
 /launch.luau
 /bootstrap.luau

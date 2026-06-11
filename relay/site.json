@@ -1,0 +1,115 @@
+﻿{
+    "version":  1,
+    "updatedAt":  "2026-06-11T03:51:36Z",
+    "brand":  "Alleral",
+    "tagline":  "One loadstring. Every supported game. Live status.",
+    "loaderVersion":  "7.4.0",
+    "announcement":  "",
+    "loadstring":  "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick()))()",
+    "repo":  "evanbackup1256-ship-it/kick",
+    "branch":  "main",
+    "features":  [
+                     "Auto-detects supported games on inject",
+                     "Obsidian UI with live script status",
+                     "HWID gate and ban system",
+                     "Auto-updates from GitHub on push",
+                     "Works across Volt, Synapse, Wave, and more"
+                 ],
+    "faq":  [
+                {
+                    "q":  "How do I load Alleral?",
+                    "a":  "Copy the loadstring from this page, paste it into your executor, and execute it while in a supported Roblox game."
+                },
+                {
+                    "q":  "Which games are supported?",
+                    "a":  "Check the Games tab â€” status updates live from the hub. Only games marked working or testing will load."
+                },
+                {
+                    "q":  "Why did the script not load?",
+                    "a":  "Make sure you are in the correct game, your executor supports loadstring + HTTP, and the game status is not broken or maintenance."
+                },
+                {
+                    "q":  "Does it auto-update?",
+                    "a":  "Yes. The loader polls GitHub every ~45 seconds and reloads when a new version is pushed."
+                },
+                {
+                    "q":  "How do I report a bug?",
+                    "a":  "Use the Bug Report tab on this site. Reports go directly to the maintainer."
+                }
+            ],
+    "changelog":  [
+                      {
+                          "date":  "2026-06-11",
+                          "title":  "HWID gate + public hub site",
+                          "items":  [
+                                        "Security gate on Railway",
+                                        "Public status page",
+                                        "Bug reports to Discord"
+                                    ]
+                      },
+                      {
+                          "date":  "2026-06-10",
+                          "title":  "Obsidian UI migration",
+                          "items":  [
+                                        "Replaced Rayfield with Obsidian",
+                                        "Live script manifest",
+                                        "Auto-updater v7.2"
+                                    ]
+                      }
+                  ],
+    "bugCategories":  [
+                          "Script crash",
+                          "UI bug",
+                          "Game not detected",
+                          "Feature broken",
+                          "Executor issue",
+                          "Other"
+                      ],
+    "games":  {
+                  "kick_a_lucky_block":  {
+                                             "placeIds":  [
+                                                              89469502395769
+                                                          ],
+                                             "universeIds":  [
+                                                                 10004244222
+                                                             ],
+                                             "robloxUrl":  "https://www.roblox.com/games/89469502395769",
+                                             "description":  "Kick automation, UI controls, and live stats."
+                                         },
+                  "speed_keyboard_escape":  {
+                                                "placeIds":  [
+                                                                 95082159892680
+                                                             ],
+                                                "robloxUrl":  "https://www.roblox.com/games/95082159892680",
+                                                "description":  "Speed controls and keyboard escape helpers."
+                                            },
+                  "slime_rng":  {
+                                    "placeIds":  [
+                                                     92416421522960
+                                                 ],
+                                    "universeIds":  [
+                                                        9792947201
+                                                    ],
+                                    "robloxUrl":  "https://www.roblox.com/games/92416421522960",
+                                    "description":  "Slime RNG automation and rolls."
+                                },
+                  "build_a_ring_farm":  {
+                                            "placeIds":  [
+                                                             107646426076756
+                                                         ],
+                                            "robloxUrl":  "https://www.roblox.com/games/107646426076756",
+                                            "description":  "Ring farm planting and farming loops."
+                                        },
+                  "survive_a_zombie_arena":  {
+                                                 "placeIds":  [
+                                                                  114204398207377
+                                                              ],
+                                                 "robloxUrl":  "https://www.roblox.com/games/114204398207377",
+                                                 "description":  "Zombie arena combat and survival tools."
+                                             }
+              },
+    "links":  {
+                  "github":  "https://github.com/evanbackup1256-ship-it/kick",
+                  "loaderRaw":  "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau"
+              }
+}

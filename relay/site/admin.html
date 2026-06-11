@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alleral Admin</title>
+  <link rel="stylesheet" href="/assets/style.css" />
+  <style>
+    .editor label { display: grid; gap: 6px; color: var(--muted); font-size: 0.88rem; }
+    .ban-form { display: grid; gap: 10px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <div class="brand"><span class="brand-dot"></span> Alleral Admin</div>
+      <nav class="nav">
+        <a href="/">← Public site</a>
+        <a href="/health">Health</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap section">
+    <div class="section-head">
+      <div>
+        <h2>Control panel</h2>
+        <p>Script status, HWID bans, and public site content.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="grid two">
+        <label>Admin API key
+          <input id="adminKey" type="password" placeholder="ADMIN_API_KEY from Railway" />
+        </label>
+        <div class="actions" style="align-items:end;">
+          <button id="saveKey" class="secondary" type="button">Remember key</button>
+          <button id="reload" class="primary" type="button">Reload tab</button>
+        </div>
+      </div>
+      <div id="error" class="error" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="tabs admin-tabs">
+      <button class="active" data-tab="scripts" type="button">Scripts</button>
+      <button data-tab="bans" type="button">Bans</button>
+      <button data-tab="site" type="button">Site content</button>
+    </div>
+
+    <section data-tab-panel="scripts">
+      <div id="scriptsGrid" class="grid"></div>
+    </section>
+
+    <section data-tab-panel="bans" class="hidden">
+      <div class="card ban-form">
+        <div class="title" style="margin-bottom:8px;">Add ban</div>
+        <label>Type
+          <select id="banType">
+            <option value="hwid">hwid</option>
+            <option value="userid">userid</option>
+            <option value="fingerprint">fingerprint</option>
+            <option value="ip">ip</option>
+            <option value="executor">executor</option>
+          </select>
+        </label>
+        <label>Value <input id="banValue" placeholder="HWID, Roblox userId, IP…" /></label>
+        <label>Player label <input id="banPlayer" placeholder="Optional display name" /></label>
+        <label>Reason <textarea id="banReason" placeholder="Why"></textarea></label>
+        <button id="addBan" class="primary" type="button">Add ban</button>
+      </div>
+      <div id="bansGrid" class="grid"></div>
+    </section>
+
+    <section data-tab-panel="site" class="hidden">
+      <div class="card editor">
+        <label>Tagline <input id="siteTagline" /></label>
+        <label>Announcement banner <input id="siteAnnouncement" placeholder="Shown on public homepage" /></label>
+        <label>Loader version label <input id="siteLoaderVersion" /></label>
+        <label>Loadstring <textarea id="siteLoadstring" style="min-height:100px;font-family:var(--mono);"></textarea></label>
+        <label>Features (one per line) <textarea id="siteFeatures"></textarea></label>
+        <label>FAQ JSON <textarea id="siteFaq" style="min-height:180px;font-family:var(--mono);"></textarea></label>
+        <button id="saveSite" class="primary" type="button">Save site content</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="/assets/admin.js"></script>
+</body>
+</html>

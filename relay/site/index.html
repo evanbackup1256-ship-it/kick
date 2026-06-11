@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alleral Hub</title>
+  <meta name="description" content="Alleral script hub — supported games, live status, loadstring, FAQ, and bug reports." />
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span id="brandName">Alleral</span>
+      </div>
+      <nav class="nav">
+        <a href="#home" data-section="home">Home</a>
+        <a href="#games" data-section="games">Games</a>
+        <a href="#load" data-section="load">Loadstring</a>
+        <a href="#faq" data-section="faq">FAQ</a>
+        <a href="#report" data-section="report">Bug Report</a>
+        <a href="/admin">Admin</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="home" class="hero">
+      <div id="announcement" class="announce hidden"></div>
+      <h1>All-in-one Roblox script hub</h1>
+      <p id="tagline">One loadstring. Every supported game. Live status.</p>
+      <div class="pill-row">
+        <span class="pill">Loader <strong id="loaderVersion">—</strong></span>
+        <span class="pill"><strong id="gameCount">0</strong> games</span>
+        <span class="pill">Manifest <strong id="scriptsUpdated">—</strong></span>
+      </div>
+    </section>
+
+    <section id="games" class="section">
+      <div class="section-head">
+        <div>
+          <h2>Supported games</h2>
+          <p>Live status from the hub manifest — same data your loader sees in-game.</p>
+        </div>
+        <button id="refreshSite" class="secondary" type="button">Refresh</button>
+      </div>
+      <div id="gamesGrid" class="grid games"></div>
+    </section>
+
+    <section id="load" class="section">
+      <div class="section-head">
+        <div>
+          <h2>Loadstring</h2>
+          <p>Copy and execute in your supported executor while in a supported game.</p>
+        </div>
+      </div>
+      <div class="load-box">
+        <pre id="loadstringCode" class="code">Loading…</pre>
+        <div class="actions">
+          <button id="copyLoadstring" class="primary" type="button">Copy loadstring</button>
+          <a class="btn secondary" href="#games">View supported games</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><h2>Features</h2></div>
+      <div id="features" class="features"></div>
+    </section>
+
+    <section id="faq" class="section">
+      <div class="section-head"><h2>FAQ</h2></div>
+      <div id="faq" class="faq"></div>
+    </section>
+
+    <section id="report" class="section">
+      <div class="section-head">
+        <div>
+          <h2>Bug report &amp; requests</h2>
+          <p>Reports are sent straight to the maintainer.</p>
+        </div>
+      </div>
+      <div class="tabs panel-tabs">
+        <button class="active" data-panel="bug" type="button">Bug report</button>
+        <button data-panel="feature" type="button">Feature request</button>
+      </div>
+
+      <div class="grid two">
+        <div class="card" data-panel-body="bug">
+          <form id="bugForm">
+            <label>Category
+              <select id="bugCategory"></select>
+            </label>
+            <label>Severity
+              <select id="bugSeverity">
+                <option value="low">Low</option>
+                <option value="normal" selected>Normal</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </label>
+            <label>Game
+              <select id="bugGame"><option value="">Select game</option></select>
+            </label>
+            <label>Roblox username
+              <input id="bugUser" placeholder="Your Roblox name" />
+            </label>
+            <label>Executor
+              <input id="bugExecutor" placeholder="Volt, Wave, Synapse, etc." />
+            </label>
+            <label>Contact (optional)
+              <input id="bugContact" placeholder="Discord, email, etc." />
+            </label>
+            <label>What happened?
+              <textarea id="bugDescription" required placeholder="Describe the bug in detail"></textarea>
+            </label>
+            <label>Steps to reproduce
+              <textarea id="bugSteps" placeholder="1. Join game…&#10;2. Open UI…"></textarea>
+            </label>
+            <div id="bugError" class="error"></div>
+            <button class="primary" type="submit">Submit bug report</button>
+          </form>
+        </div>
+
+        <div class="card hidden" data-panel-body="feature">
+          <form id="featureForm">
+            <label>Roblox username
+              <input id="featureUser" placeholder="Your Roblox name" />
+            </label>
+            <label>Game (optional)
+              <input id="featureGame" placeholder="Which game is this for?" />
+            </label>
+            <label>Your idea
+              <textarea id="featureIdea" required placeholder="Describe the feature you'd like"></textarea>
+            </label>
+            <div id="featureError" class="error"></div>
+            <button class="primary" type="submit">Submit feature request</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><h2>Changelog</h2></div>
+      <div id="changelog"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-row">
+      <span>Alleral Hub · live status &amp; loadstring</span>
+      <span><a href="/admin">Admin panel</a> · <a href="/health">API health</a></span>
+    </div>
+  </footer>
+
+  <div id="toast" class="toast"></div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>

@@ -114,7 +114,7 @@ if not Tracker then
 		local loadStringLocal = env.loadstring or loadstring
 		local source
 		if type(readFileFn) == "function" and type(isFileFn) == "function" then
-			for _, path in ipairs({ "core/analytics.luau", "src/analytics.luau", "analytics.luau" }) do
+			for _, path in ipairs({ "hub/analytics.luau", "core/analytics.luau", "src/analytics.luau", "analytics.luau" }) do
 				if isFileFn(path) then
 					source = readFileFn(path)
 					break

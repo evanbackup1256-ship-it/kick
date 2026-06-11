@@ -1,10 +1,11 @@
 FROM python:3.12-slim
 WORKDIR /app
-COPY requirements.txt .
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY telemetry_relay.py script_registry.py ban_registry.py site_registry.py ./
-COPY site ./site
-COPY scripts_manifest.json site.json ./
+COPY backend/telemetry_relay.py backend/script_registry.py backend/ban_registry.py backend/site_registry.py ./
+COPY backend/site ./site
+COPY cfg/scripts_manifest.json ./scripts_manifest.json
+COPY cfg/site.json ./site.json
 RUN mkdir -p /app/data
 ENV TELEMETRY_HOST=0.0.0.0
 ENV SCRIPTS_MANIFEST_PATH=/app/scripts_manifest.json

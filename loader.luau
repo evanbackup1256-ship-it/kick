@@ -1,19 +1,19 @@
---[[
-	Alleral Hub — single entry point (loader.luau only).
-	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
-]]
-
-local LOADER_VERSION = "7.2.0"
+local LOADER_VERSION = "7.4.0"
 local MIN_CORE = "2.1"
 local DEFAULT_UPDATE_POLL_SECONDS = 45
 local CORE_MIN_BYTES = 50000
+local HUB = "hub"
+local CFG = "cfg"
+local UI = "ui"
+
 local RELEASE_FALLBACK = {
-	loader = "7.2.0",
-	core = "2.1",
+	loader = "7.4.0",
+	core = "2.2",
 	analytics = "1.0",
 	telemetry = "3.0",
 	helpers = "1.0",
 	weao = "1.0",
+	security = "1.0",
 	commit = "",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
@@ -969,7 +969,7 @@ local function fetchCoreRemote()
 	local best, bestInvalid = nil, nil
 	for _, base in ipairs(REMOTE_BASES) do
 		for _, suffix in ipairs({ "", "?t=" .. tick() }) do
-			local url = base .. "/core/alleral_core.luau" .. suffix
+			local url = base .. "/" .. HUB .. "/core.luau" .. suffix
 			for _, item in ipairs(collectHttpBodies(url)) do
 				if coreValid(item.body) then
 					if not best or item.len > best.len then
@@ -986,7 +986,7 @@ local function fetchCoreRemote()
 	end
 
 	if best then
-		cacheRemote("core/alleral_core.luau", best.body)
+		cacheRemote(HUB .. "/core.luau", best.body)
 		return best.body, best.base .. " via " .. best.via .. " (" .. tostring(best.len) .. "b)"
 	end
 
@@ -999,7 +999,7 @@ end
 local function loadCore()
 	ENV.Alleral_Core = nil
 
-	local src, label = readLocal({ "core/alleral_core.luau", "alleral_core.luau" }, CORE_MIN_BYTES)
+	local src, label = readLocal({ HUB .. "/core.luau", "core/alleral_core.luau", "alleral_core.luau" }, CORE_MIN_BYTES)
 	if src and not coreValid(src) then
 		log("Removing broken/outdated core at " .. tostring(label), true)
 		deleteWorkspaceFile(label)
@@ -1039,7 +1039,7 @@ local function loadModule(localPaths, remotePath, marker, chunkName)
 end
 
 local function loadWeaoStack()
-	local cfgBody = httpFetch(GITHUB_RAW .. "/config/weao.json", { ["Accept"] = "application/json" })
+	local cfgBody = httpFetch(GITHUB_RAW .. "/" .. CFG .. "/weao.json", { ["Accept"] = "application/json" })
 	local cfg = decodeJson(cfgBody)
 	if cfg then
 		ENV.Alleral_WeaoConfig = cfg
@@ -1049,7 +1049,7 @@ local function loadWeaoStack()
 		return true
 	end
 
-	if loadModule({ "core/weao.luau" }, "core/weao.luau", "Alleral_Weao", "Alleral/weao") then
+	if loadModule({ HUB .. "/weao.luau", "core/weao.luau" }, HUB .. "/weao.luau", "Alleral_Weao", "Alleral/weao") then
 		return ENV.Alleral_Weao ~= nil
 	end
 
@@ -1094,18 +1094,72 @@ end
 
 local function loadTelemetryConfig()
 	local cfg = nil
-	local raw = select(1, httpFetch(GITHUB_RAW .. "/config/telemetry.json"))
+	local raw = select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/telemetry.json"))
 	cfg = decodeJson(raw)
 	if not cfg then
-		local localRaw = readLocal({ "config/telemetry.json" }, 20)
+		local localRaw = readLocal({ CFG .. "/telemetry.json", "config/telemetry.json" }, 20)
 		if localRaw then
 			cfg = decodeJson(localRaw)
 		end
 	end
 	cfg = type(cfg) == "table" and cfg or { enabled = false }
-	cfg = mergeTables(cfg, loadReturnTable({ "config/owner_telemetry.luau" }, "config/owner_telemetry.luau"))
+	cfg = mergeTables(
+		cfg,
+		loadReturnTable({ CFG .. "/owner_telemetry.luau", "config/owner_telemetry.luau" }, CFG .. "/owner_telemetry.luau")
+	)
 	ENV.Alleral_OwnerTelemetry = cfg
 	return cfg
+end
+
+local function loadSecurityConfig()
+	local cfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/security.json?t=" .. tick())))
+	if not cfg then
+		local localRaw = readLocal({ CFG .. "/security.json", "config/security.json" }, 20)
+		cfg = localRaw and decodeJson(localRaw) or nil
+	end
+	cfg = type(cfg) == "table" and cfg or { enabled = false }
+	local owner = ENV.Alleral_OwnerTelemetry
+	if type(owner) == "table" then
+		if trim(owner.apiKey) ~= "" and trim(cfg.apiKey) == "" then
+			cfg.apiKey = owner.apiKey
+		end
+		if trim(cfg.gateUrl) == "" and trim(owner.relayUrl) ~= "" then
+			local base = owner.relayUrl:gsub("/+$", ""):gsub("/ingest$", "")
+			cfg.gateUrl = base .. "/gate/check"
+		end
+		if owner.gateUrl then
+			cfg.gateUrl = owner.gateUrl
+		end
+		if owner.security and type(owner.security) == "table" then
+			cfg = mergeTables(cfg, owner.security)
+		end
+	end
+	ENV.Alleral_OwnerSecurity = cfg
+	return cfg
+end
+
+local function trim(value)
+	if value == nil then
+		return ""
+	end
+	return tostring(value):match("^%s*(.-)%s*$") or ""
+end
+
+local function enforceSecurityGate(profile, stage)
+	local security = ENV.Alleral_Security
+	if type(security) ~= "table" or type(security.enforce) ~= "function" then
+		return true
+	end
+	local ok, reason = security.enforce({
+		stage = stage or "loader",
+		gameId = profile and profile.id,
+	})
+	if ok then
+		return true
+	end
+	notify("Alleral", tostring(reason or "Access denied"), 10)
+	log(tostring(reason or "Access denied"), true)
+	return false
 end
 
 local function wireTelemetry(profile)
@@ -1139,6 +1193,8 @@ do
 			if bridge.Alleral_ReportError then g.Alleral_ReportError = bridge.Alleral_ReportError end
 			if bridge.Alleral_LogEvent then g.Alleral_LogEvent = bridge.Alleral_LogEvent end
 			if bridge.Alleral_OwnerTelemetry then g.Alleral_OwnerTelemetry = bridge.Alleral_OwnerTelemetry end
+			if bridge.Alleral_OwnerSecurity then g.Alleral_OwnerSecurity = bridge.Alleral_OwnerSecurity end
+			if bridge.Alleral_Security then g.Alleral_Security = bridge.Alleral_Security end
 			if bridge.Alleral_UI then g.Alleral_UI = bridge.Alleral_UI end
 			g.Alleral_State = g.Alleral_State or bridge.Alleral_State or {}
 			bridge.Alleral_State = g.Alleral_State
@@ -1161,6 +1217,8 @@ local function publishBridge()
 		shared.Alleral_ReportError = ENV.Alleral_ReportError
 		shared.Alleral_LogEvent = ENV.Alleral_LogEvent
 		shared.Alleral_OwnerTelemetry = ENV.Alleral_OwnerTelemetry
+		shared.Alleral_OwnerSecurity = ENV.Alleral_OwnerSecurity
+		shared.Alleral_Security = ENV.Alleral_Security
 		shared.Alleral_State = ENV.Alleral_State or {}
 	end)
 end
@@ -1177,7 +1235,7 @@ local function waitForPath(root, path, timeout)
 end
 
 local GAMES = {
-	-- Keep versions in sync with config/scripts_manifest.json
+	-- Keep versions in sync with cfg/scripts_manifest.json
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
@@ -1341,7 +1399,7 @@ local function fetchExpectedVersions()
 		expected.games[gameProfile.id] = gameProfile.version
 	end
 
-	local release = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/release.json?t=" .. tick())))
+	local release = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/release.json?t=" .. tick())))
 	if release then
 		expected.loader = release.loader or expected.loader
 		expected.core = release.core or expected.core
@@ -1361,12 +1419,12 @@ local function fetchExpectedVersions()
 		end
 	end
 
-	local weaoCfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/weao.json?t=" .. tick())))
+	local weaoCfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/weao.json?t=" .. tick())))
 	if weaoCfg then
 		ENV._Alleral_WeaoConfigRemote = weaoCfg
 	end
 
-	local manifest = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/config/scripts_manifest.json?t=" .. tick())))
+	local manifest = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/scripts_manifest.json?t=" .. tick())))
 	if manifest and type(manifest.scripts) == "table" then
 		for id, entry in pairs(manifest.scripts) do
 			if type(entry) == "table" and type(entry.version) == "string" then
@@ -1486,33 +1544,41 @@ end
 local function buildManagedFiles()
 	local managed = {
 		{
-			paths = { "core/alleral_core.luau", "alleral_core.luau" },
+			paths = { HUB .. "/core.luau", "core/alleral_core.luau", "alleral_core.luau" },
 			expectedKey = "core",
 			extract = "core",
 			isValid = coreValid,
 		},
 		{
-			paths = { "core/analytics.luau" },
+			paths = { HUB .. "/analytics.luau", "core/analytics.luau" },
 			expectedKey = "analytics",
 			extract = "analytics",
 		},
 		{
-			paths = { "core/telemetry.luau" },
+			paths = { HUB .. "/telemetry.luau", "core/telemetry.luau" },
 			expectedKey = "telemetry",
 			extract = "telemetry",
 		},
 		{
-			paths = { "core/game_helpers.luau" },
+			paths = { HUB .. "/helpers.luau", "core/game_helpers.luau" },
 			expectedKey = "helpers",
 			extract = "helpers",
 		},
 		{
-			paths = { "core/weao.luau" },
+			paths = { HUB .. "/weao.luau", "core/weao.luau" },
 			expectedKey = "weao",
 			extract = "weao",
 		},
 		{
+			paths = { HUB .. "/security.luau", "core/security.luau" },
+			expectedKey = "security",
+			extract = "security",
+		},
+		{
 			paths = {
+				UI .. "/Library.lua",
+				UI .. "/addons/ThemeManager.lua",
+				UI .. "/addons/SaveManager.lua",
 				"vendor/obsidian/Library.lua",
 				"vendor/obsidian/addons/ThemeManager.lua",
 				"vendor/obsidian/addons/SaveManager.lua",
@@ -1521,15 +1587,19 @@ local function buildManagedFiles()
 			purgeOnLoaderChange = true,
 		},
 		{
-			paths = { "config/weao.json" },
+			paths = { CFG .. "/weao.json", "config/weao.json" },
 			purgeOnLoaderChange = true,
 		},
 		{
-			paths = { "config/telemetry.json" },
+			paths = { CFG .. "/telemetry.json", "config/telemetry.json" },
 			purgeOnLoaderChange = true,
 		},
 		{
-			paths = { "config/owner_telemetry.luau" },
+			paths = { CFG .. "/security.json", "config/security.json" },
+			purgeOnLoaderChange = true,
+		},
+		{
+			paths = { CFG .. "/owner_telemetry.luau", "config/owner_telemetry.luau" },
 			purgeOnLoaderChange = true,
 		},
 		{
@@ -1970,7 +2040,7 @@ local function main()
 		notify("Alleral", "v3.x ran earlier. Check Saved Scripts tab and workspace loader.luau.", 15)
 	end
 
-	ENV.Alleral_ScriptManifestUrl = GITHUB_RAW .. "/config/scripts_manifest.json"
+	ENV.Alleral_ScriptManifestUrl = GITHUB_RAW .. "/" .. CFG .. "/scripts_manifest.json"
 
 	local profile, err = detectGame()
 	if not profile then
@@ -2007,9 +2077,16 @@ local function main()
 	end
 
 	loadTelemetryConfig()
-	loadModule({ "core/analytics.luau" }, "core/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
-	loadModule({ "core/game_helpers.luau" }, "core/game_helpers.luau", "GameHelpers", "Alleral/helpers")
-	loadModule({ "core/telemetry.luau" }, "core/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
+	loadSecurityConfig()
+	loadModule({ HUB .. "/analytics.luau", "core/analytics.luau" }, HUB .. "/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
+	loadModule({ HUB .. "/helpers.luau", "core/game_helpers.luau" }, HUB .. "/helpers.luau", "GameHelpers", "Alleral/helpers")
+	loadModule({ HUB .. "/telemetry.luau", "core/telemetry.luau" }, HUB .. "/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
+	loadModule({ HUB .. "/security.luau", "core/security.luau" }, HUB .. "/security.luau", "Alleral_Security", "Alleral/security")
+
+	if not enforceSecurityGate(profile, "pre_inject") then
+		ENV.Alleral_LoaderRunning = false
+		return
+	end
 
 	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadUi) == "function" then
 		local ui, uiErr = ENV.Alleral_Core.loadUi()

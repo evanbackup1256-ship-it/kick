@@ -1,0 +1,16 @@
+﻿{
+    "loader":  "7.4.0",
+    "core":  "2.2",
+    "weao":  "1.0",
+    "ui":  "Obsidian",
+    "commit":  "c1a9b14",
+    "updatedAt":  "2026-06-11T03:51:36Z",
+    "updatePollSeconds":  45,
+    "autoUpdate":  true,
+    "minLoader":  "7.1.0",
+    "minCore":  "2.1",
+    "analytics":  "1.0",
+    "telemetry":  "3.0",
+    "helpers":  "1.0",
+    "security":  "1.0"
+}

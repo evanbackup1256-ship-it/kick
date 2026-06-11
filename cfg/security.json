@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "gateUrl": "https://alleral-telemetry-production.up.railway.app/gate/check",
+  "cacheSeconds": 300,
+  "failClosedOnBan": true,
+  "failOpenOnError": true
+}
