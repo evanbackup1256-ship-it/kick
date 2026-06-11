@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.7.9"
+local LOADER_VERSION = "7.8.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -10,6 +10,8 @@ local CORE_UI_MIN_BYTES = 50000
 local CORE_UI_MAX_BYTES = 70000
 local CORE_HUB_UI_MIN_BYTES = 60000
 local CORE_HUB_UI_MAX_BYTES = 75000
+local CORE_NEVERLOSE_UI_MIN_BYTES = 10000
+local CORE_NEVERLOSE_UI_MAX_BYTES = 30000
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
@@ -18,12 +20,14 @@ local CORE_BASE_PATH = HUB .. "/core_base.luau"
 local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
 local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
+local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.7.9",
-	core = "2.8.6",
+	loader = "7.8.1",
+	core = "2.8.8",
 	ui = "Alleral",
-	windui = "2.1.4-alleral-v2",
+	neverlose = "1.1.0-kick",
+	windui = "1.1.0-kick",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -1142,6 +1146,25 @@ local function coreHubUiValid(src)
 	return compileCoreSource(src, "Alleral/core_hub_ui")
 end
 
+local function neverloseUiValid(src)
+	if type(src) ~= "string" or #src < CORE_NEVERLOSE_UI_MIN_BYTES then
+		return false
+	end
+	if not src:find("return function%(Core%)", 1, true) then
+		return false
+	end
+	if not src:find("function Core%.loadUi", 1, true) then
+		return false
+	end
+	if not src:find("createWindUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
+		return false
+	end
+	if not src:find("Neverlose UI layer", 1, true) then
+		return false
+	end
+	return compileCoreSource(src, "Alleral/neverlose_ui")
+end
+
 local function coreValid(src)
 	return coreMonolithValid(src) or coreBaseValid(src)
 end
@@ -1224,6 +1247,28 @@ local function coreHubUiRejectReason(src)
 	end
 	if loadStringFn then
 		local ok, err = compileCoreSource(src, "Alleral/core_hub_ui-check")
+		if not ok then
+			return "compile failed: " .. tostring(err)
+		end
+	end
+	return "unknown"
+end
+
+local function neverloseUiRejectReason(src)
+	if type(src) ~= "string" or src == "" then
+		return "empty response"
+	end
+	if neverloseUiValid(src) then
+		return "valid"
+	end
+	if #src < CORE_NEVERLOSE_UI_MIN_BYTES then
+		return tostring(#src) .. "b, need " .. tostring(CORE_NEVERLOSE_UI_MIN_BYTES) .. "b+"
+	end
+	if not src:find("function Core.loadUi", 1, true) then
+		return "missing loadUi override"
+	end
+	if loadStringFn then
+		local ok, err = compileCoreSource(src, "Alleral/neverlose_ui-check")
 		if not ok then
 			return "compile failed: " .. tostring(err)
 		end
@@ -1354,6 +1399,14 @@ local function loadCore()
 		coreHubUiRejectReason,
 		CORE_HUB_UI_MIN_BYTES,
 	}
+	local neverloseArgs = {
+		{ CORE_NEVERLOSE_UI_PATH, HUB .. "/neverlose_ui.luau" },
+		{ ".alleral/cache/" .. CORE_NEVERLOSE_UI_PATH },
+		CORE_NEVERLOSE_UI_PATH,
+		neverloseUiValid,
+		neverloseUiRejectReason,
+		CORE_NEVERLOSE_UI_MIN_BYTES,
+	}
 
 	local function resolveArgs(args)
 		return resolveCoreSource(args[1], args[2], args[3], args[4], args[5], args[6])
@@ -1374,13 +1427,17 @@ local function loadCore()
 			return resolveArgs(uiArgs)
 		end,
 		function()
+			return resolveArgs(neverloseArgs)
+		end,
+		function()
 			return resolveArgs(hubArgs)
 		end,
 	})
 
 	local baseSrc, baseLabel = unwrap(parallel[1])
 	local uiSrc, uiLabel = unwrap(parallel[2])
-	local hubUiSrc, hubUiLabel = unwrap(parallel[3])
+	local neverloseUiSrc, neverloseUiLabel = unwrap(parallel[3])
+	local hubUiSrc, hubUiLabel = unwrap(parallel[4])
 	if not baseSrc then
 		return false, baseLabel or "Core download failed"
 	end
@@ -1413,6 +1470,11 @@ local function loadCore()
 		return false, uiLabel or "Core UI download failed"
 	end
 
+	if not neverloseUiSrc then
+		ENV.Alleral_Core = nil
+		return false, neverloseUiLabel or "Neverlose UI layer download failed"
+	end
+
 	if not hubUiSrc then
 		ENV.Alleral_Core = nil
 		return false, hubUiLabel or "Core hub UI download failed"
@@ -1422,6 +1484,12 @@ local function loadCore()
 	if not applied then
 		ENV.Alleral_Core = nil
 		return false, applyErr or "Core UI layer failed"
+	end
+
+	applied, applyErr = ENV.Alleral_Core.applyUiLayer(neverloseUiSrc, neverloseUiLabel or "@Alleral/neverlose_ui")
+	if not applied then
+		ENV.Alleral_Core = nil
+		return false, applyErr or "Neverlose UI layer failed"
 	end
 
 	applied, applyErr = ENV.Alleral_Core.applyUiLayer(hubUiSrc, hubUiLabel or "@Alleral/core_hub_ui")
@@ -1439,6 +1507,8 @@ local function loadCore()
 	cacheRemote(".alleral/cache/" .. CORE_BASE_PATH, baseSrc)
 	cacheRemote(CORE_UI_PATH, uiSrc)
 	cacheRemote(".alleral/cache/" .. CORE_UI_PATH, uiSrc)
+	cacheRemote(CORE_NEVERLOSE_UI_PATH, neverloseUiSrc)
+	cacheRemote(".alleral/cache/" .. CORE_NEVERLOSE_UI_PATH, neverloseUiSrc)
 	cacheRemote(CORE_HUB_UI_PATH, hubUiSrc)
 	cacheRemote(".alleral/cache/" .. CORE_HUB_UI_PATH, hubUiSrc)
 	log(
@@ -1448,6 +1518,8 @@ local function loadCore()
 			.. tostring(baseLabel)
 			.. " + "
 			.. tostring(uiLabel)
+			.. " + "
+			.. tostring(neverloseUiLabel)
 			.. " + "
 			.. tostring(hubUiLabel)
 	)
@@ -1939,7 +2011,8 @@ local VERSION_PATTERNS = {
 	security = 'Security%.VERSION%s*=%s*"([%d%.]+)"',
 	access = 'Access%.VERSION%s*=%s*"([%d%.]+)"',
 	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
-	windui = 'ARRREL_UI_VERSION%s*=%s*"([^"]+)"',
+	neverlose = 'NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"',
+	windui = 'NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"',
 	game = 'local VERSION%s*=%s*"([%d%.]+)"',
 }
 
@@ -1993,7 +2066,8 @@ local function fetchExpectedVersionsFast()
 		telemetry = RELEASE_FALLBACK.telemetry,
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
-		windui = RELEASE_FALLBACK.windui,
+		neverlose = RELEASE_FALLBACK.neverlose,
+		windui = RELEASE_FALLBACK.neverlose,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -2039,7 +2113,8 @@ fetchExpectedVersions = function(forceRefresh)
 		telemetry = RELEASE_FALLBACK.telemetry,
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
-		windui = RELEASE_FALLBACK.windui,
+		neverlose = RELEASE_FALLBACK.neverlose,
+		windui = RELEASE_FALLBACK.neverlose,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -2060,7 +2135,8 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.telemetry = release.telemetry or expected.telemetry
 		expected.helpers = release.helpers or expected.helpers
 		expected.weao = release.weao or expected.weao
-		expected.windui = release.windui or expected.windui
+		expected.neverlose = release.neverlose or release.windui or expected.neverlose
+		expected.windui = expected.neverlose
 		expected.commit = release.commit or expected.commit
 		expected.updatedAt = release.updatedAt or expected.updatedAt
 		expected.minLoader = release.minLoader or expected.minLoader
@@ -2239,6 +2315,12 @@ local function buildManagedFiles()
 			isValid = coreUiValid,
 		},
 		{
+			paths = { CORE_NEVERLOSE_UI_PATH, HUB .. "/neverlose_ui.luau" },
+			expectedKey = "core",
+			extract = "core",
+			isValid = neverloseUiValid,
+		},
+		{
 			paths = { CORE_HUB_UI_PATH, HUB .. "/core_hub_ui.luau" },
 			expectedKey = "core",
 			extract = "core",
@@ -2276,16 +2358,11 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				UI .. "/windui/main.lua",
-				UI .. "/windui/arrrel.luau",
-				UI .. "/windui/autoscale.luau",
-				UI .. "/windui/aller.luau",
-				UI .. "/windui/bootstrap.lua",
-				UI .. "/windui/v2/boost.luau",
-				UI .. "/windui/VERSION",
+				UI .. "/neverlose/library.lua",
+				UI .. "/neverlose/spring.luau",
 			},
-			expectedKey = "windui",
-			extract = "windui",
+			expectedKey = "neverlose",
+			extract = "neverlose",
 		},
 		{
 			paths = { CFG .. "/weao.json", "config/weao.json" },

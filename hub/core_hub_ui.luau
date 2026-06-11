@@ -332,11 +332,17 @@ function Core.syncUiState(state, options)
 end
 
 function Core.releaseUiWindow()
-	local ui = ENV.Alleral_UI
-	local wind = ui and (ui.WindUI or ui.Library)
-	if type(wind) == "table" and type(wind.ReleaseWindow) == "function" then
+	local window = ENV.Alleral_UiWindow
+	if type(window) == "table" and window._nlWindow and type(window._nlWindow.SetOpen) == "function" then
 		pcall(function()
-			wind:ReleaseWindow(wind.Window)
+			window._nlWindow:SetOpen(false)
+		end)
+	end
+	local ui = ENV.Alleral_UI
+	local lib = ui and (ui.Neverlose or ui.Library or ui.WindUI)
+	if type(lib) == "table" and type(lib.ReleaseWindow) == "function" then
+		pcall(function()
+			lib:ReleaseWindow(lib.Window)
 		end)
 	end
 	ENV.Alleral_UiWindow = nil
@@ -351,6 +357,12 @@ function Core.toggleUiVisibility()
 	local raw = window._rawWindow
 	if type(raw.Toggle) == "function" then
 		pcall(raw.Toggle, raw)
+		return true
+	end
+	if type(raw.SetOpen) == "function" then
+		pcall(function()
+			raw:SetOpen(not raw.IsOpen)
+		end)
 		return true
 	end
 	return false
@@ -1230,8 +1242,8 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
 	local group = Core.buildUiGroup(tab, "Customization V2", column, nil, nil, "CustomizationV2")
 
-	if not windUi or windUi.ALLERAL_UI_V2 ~= true then
-		group:CreateLabel("Alleral UI V2 layer not loaded — sync ui/windui/v2/boost.luau")
+	if not windUi or type(windUi.SetMotionProfile) ~= "function" then
+		group:CreateLabel("Neverlose UI layer not loaded — sync hub/neverlose_ui.luau")
 		return group
 	end
 
@@ -1347,7 +1359,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 		end
 	end)
 
-	group:CreateDropdown("V2 theme", v2Themes, "Arrrel", function(selected)
+	group:CreateDropdown("V2 theme", v2Themes, ENV.Alleral_ActiveTheme or "Arrrel", function(selected)
 		if type(windUi.SetTheme) == "function" then
 			pcall(function()
 				windUi:SetTheme(selected)

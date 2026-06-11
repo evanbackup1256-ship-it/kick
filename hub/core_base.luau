@@ -1,9 +1,10 @@
 local Core = {}
-Core.VERSION = "2.8.6"
+Core.VERSION = "2.8.8"
 Core._CORE_ARTIFACT = "base"
-Core.UI_LIBRARY = "Alleral"
-Core.ALLERAL_UI_VERSION = "2.1.4-alleral-v2"
-Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
+Core.UI_LIBRARY = "Neverlose"
+Core.NEVERLOSE_UI_VERSION = "1.1.0-kick"
+Core.ALLERAL_UI_VERSION = Core.NEVERLOSE_UI_VERSION
+Core.WINDUI_VERSION = Core.NEVERLOSE_UI_VERSION
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -1178,9 +1179,6 @@ function Core.writeFile(path, data)
 end
 
 function Core.applyUiLayer(source, label)
-	if Core._UiLayerReady then
-		return true
-	end
 	if type(source) ~= "string" or source == "" then
 		return false, "empty ui layer"
 	end
