@@ -937,7 +937,11 @@ def public_site():
     client_ip = resolve_client_ip(request)
     if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
         return jsonify({"ok": False, "error": "rate_limited"}), 429
-    return jsonify(build_public_site_payload())
+    try:
+        return jsonify(build_public_site_payload())
+    except Exception as exc:
+        print(f"[site] /api/site failed: {exc}", file=sys.stderr)
+        return jsonify({"ok": False, "error": "site_unavailable"}), 500
 
 
 @app.patch("/api/site")

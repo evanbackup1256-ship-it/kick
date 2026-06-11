@@ -62,7 +62,7 @@ class ScriptRegistry:
                 data = self._default()
                 self._cache = data
                 return deepcopy(data)
-            raw = self.path.read_text(encoding="utf-8")
+            raw = self.path.read_text(encoding="utf-8-sig")
             data = json.loads(raw)
             if not isinstance(data, dict) or not isinstance(data.get("scripts"), dict):
                 data = self._default()
