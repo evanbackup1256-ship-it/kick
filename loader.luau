@@ -3,11 +3,11 @@
 	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "5.4.8"
+local LOADER_VERSION = "5.4.9"
 local MIN_CORE = "1.18"
 local CORE_MIN_BYTES = 50000
 local RELEASE_FALLBACK = {
-	core = "1.20",
+	core = "1.21",
 	analytics = "1.0",
 	telemetry = "2.2",
 	helpers = "1.0",
@@ -629,10 +629,6 @@ local function looksLikeLua(body)
 	return true
 end
 
-local function containsJsdelivr(text)
-	return type(text) == "string" and text:find("jsdelivr", 1, true) ~= nil
-end
-
 local function readLocal(paths, minBytes)
 	minBytes = minBytes or 0
 	if not readFile or not isFile then
@@ -705,10 +701,7 @@ local function getSource(localPaths, remotePath, opts)
 
 	local src, path = readLocal(localPaths, minBytes)
 	if src then
-		if containsJsdelivr(src) then
-			log("Removing jsDelivr-cached " .. tostring(path), true)
-			deleteWorkspaceFile(path)
-		elseif marker and not src:find(marker, 1, true) then
+		if marker and not src:find(marker, 1, true) then
 			log("Skipping outdated local " .. path, true)
 			deleteWorkspaceFile(path)
 		else
@@ -872,9 +865,6 @@ local function coreValid(src)
 	if src:find("fakeUiInstance", 1, true) and not src:find("AlleralGroupShell", 1, true) then
 		return false
 	end
-	if containsJsdelivr(src) then
-		return false
-	end
 	if not loadStringFn then
 		return true
 	end
@@ -895,9 +885,6 @@ local function coreRejectReason(src)
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
 	if not coreVersionOk(ver) then
 		return "bad core version " .. tostring(ver)
-	end
-	if containsJsdelivr(src) then
-		return "jsDelivr cache"
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua"
@@ -1315,9 +1302,6 @@ local function buildManagedFiles()
 end
 
 local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
-	if containsJsdelivr(src) then
-		return true
-	end
 	if entry.alwaysDelete then
 		return true
 	end
@@ -1350,60 +1334,6 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 	end
 
 	return foundVersion ~= expectedVersion
-end
-
-local JSDELIVR_CACHE_PATHS = {
-	"core/alleral_core.luau",
-	"alleral_core.luau",
-	"core/weao.luau",
-	"core/analytics.luau",
-	"core/telemetry.luau",
-	"core/game_helpers.luau",
-	"config/weao.json",
-	"config/owner_telemetry.luau",
-	"vendor/rayfield/source.lua",
-	"rayfield/source.lua",
-	"games/kick_a_lucky_block.luau",
-	"kick_a_lucky_block.luau",
-	"games/speed_keyboard_escape.luau",
-	"speed_keyboard_escape.luau",
-	"games/slime_rng.luau",
-	"slime_rng.luau",
-	"games/build_a_ring_farm.luau",
-	"build_a_ring_farm.luau",
-	"games/survive_a_zombie_arena.luau",
-	"survive_a_zombie_arena.luau",
-	"loader.luau",
-	"kick/loader.luau",
-	"autoexec/alleral.luau",
-	"Autoexec/alleral.luau",
-}
-
-local function purgeJsdelivrCachedFiles()
-	if not isFile or not readFile then
-		return 0
-	end
-
-	local removed = 0
-	for _, root in ipairs(WORKSPACE_ROOTS) do
-		for _, path in ipairs(JSDELIVR_CACHE_PATHS) do
-			local fullPath = root .. path
-			local okExists, exists = pcall(isFile, fullPath)
-			if okExists and exists then
-				local okRead, src = pcall(readFile, fullPath)
-				if okRead and containsJsdelivr(src) then
-					if deleteWorkspaceFile(fullPath) then
-						removed += 1
-					end
-				end
-			end
-		end
-	end
-
-	if removed > 0 then
-		log("Removed " .. tostring(removed) .. " jsDelivr-cached file(s) from workspace")
-	end
-	return removed
 end
 
 local function isLegacyAlleralLoader(src)
@@ -1716,7 +1646,6 @@ local function main()
 		log("Upgrading from loader v" .. PREVIOUS_LOADER_VERSION .. " — purging stale workspace cache")
 	end
 
-	purgeJsdelivrCachedFiles()
 	purgeOutdatedWorkspace()
 
 	loadWeaoStack()
@@ -1871,10 +1800,9 @@ ENV.Alleral_ScanLegacy = function()
 	return hits
 end
 
-ENV.Alleral_PurgeJsdelivr = function()
-	local removed = purgeJsdelivrCachedFiles()
-	print("[Alleral v" .. LOADER_VERSION .. "] Purged " .. tostring(removed) .. " jsDelivr-cached file(s)")
-	return removed
+ENV.Alleral_PurgeCache = function()
+	purgeOutdatedWorkspace()
+	print("[Alleral v" .. LOADER_VERSION .. "] Workspace cache purge complete")
 end
 
 print("=== Alleral loader " .. LOADER_VERSION .. " active ===")

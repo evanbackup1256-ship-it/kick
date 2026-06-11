@@ -125,12 +125,15 @@ foreach ($pattern in $legacyPatterns) {
 }
 
 Get-ChildItem -Path $root -Recurse -Include *.luau,*.lua,*.json,*.md,*.ps1 -File |
-    Where-Object { $_.FullName -notmatch '\\vendor\\rayfield\\' } |
+    Where-Object { $_.FullName -notmatch '\\vendor\\rayfield\\' -and $_.Name -ne 'verify_versions.ps1' } |
     ForEach-Object {
         $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
         if (-not $text) { return }
-        if ($text -match 'https?://[^\s"''`]*jsdelivr[^\s"''`]*') {
-            Fail "$($_.FullName.Replace($root + '\', '')) contains jsDelivr URL"
+        if ($text -match 'kick@main') {
+            Fail "$($_.FullName.Replace($root + '\', '')) contains legacy mirror path kick@main"
+        }
+        if ($text -match '\.net/gh/') {
+            Fail "$($_.FullName.Replace($root + '\', '')) contains legacy .net/gh/ mirror URL"
         }
     }
 
