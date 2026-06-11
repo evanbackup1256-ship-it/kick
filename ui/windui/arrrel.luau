@@ -99,7 +99,7 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ARRREL_UI_VERSION = "2.0.0-alleral-v2"
+	WindUI.ARRREL_UI_VERSION = "2.0.1-alleral-v2"
 	WindUI.ARRREL_BRAND = "Alleral"
 	WindUI.ALLERAL_UI_VERSION = WindUI.ARRREL_UI_VERSION
 	WindUI.ALLERAL_BRAND = "Alleral UI V2"
@@ -172,6 +172,10 @@ return function(WindUI)
 				instance[key] = value
 			end
 		end)
+	end
+
+	local function motionEnabled()
+		return WindUI._AlleralReducedMotion ~= true
 	end
 
 	local Motion = (function()
@@ -443,18 +447,21 @@ return function(WindUI)
 			return
 		end
 		local function run()
-			if WindUI._AlleralSpringMotion ~= false then
-				local preset = type(infoOrPreset) == "string" and infoOrPreset or Motion.tweenInfoToPreset(infoOrPreset)
-				Motion.target(instance, preset, props)
-				return
-			end
-			pcall(function()
+			local ok = pcall(function()
+				if WindUI._AlleralSpringMotion ~= false then
+					local preset = type(infoOrPreset) == "string" and infoOrPreset or Motion.tweenInfoToPreset(infoOrPreset)
+					Motion.target(instance, preset, props)
+					return
+				end
 				local info = infoOrPreset
 				if type(info) == "string" then
 					info = TweenInfo.new(0.22, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 				end
 				TweenService:Create(instance, info, props):Play()
 			end)
+			if not ok then
+				snapProps(instance, props)
+			end
 		end
 		if motionEnabled() and infoOrPreset ~= "instant" then
 			local jitterMin = RESOURCES.motion.jitterMin or 0.004
@@ -542,10 +549,6 @@ return function(WindUI)
 		MenuCanvas = true,
 		Menu = true,
 	}
-
-	local function motionEnabled()
-		return WindUI._AlleralReducedMotion ~= true
-	end
 
 	local function isDropdownDescendant(gui)
 		local dropdownGui = WindUI.DropdownGui

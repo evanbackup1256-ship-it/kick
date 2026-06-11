@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.6.5"
+local LOADER_VERSION = "7.6.6"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 60
@@ -19,7 +19,7 @@ local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.6.5",
+	loader = "7.6.6",
 	core = "2.7.6",
 	ui = "Alleral",
 	analytics = "1.2",
@@ -2284,6 +2284,9 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 
 	local foundVersion = extractFileVersion(src, entry.extract)
 	if not foundVersion then
+		if entry.isValid and entry.isValid(src) then
+			return false
+		end
 		return true
 	end
 
@@ -3055,8 +3058,8 @@ local function main()
 	end
 
 	wireTelemetry(profile)
-	purgeOutdatedWorkspace()
 	recordInstalledVersions()
+	purgeOutdatedWorkspace()
 	checkForRemoteUpdate(profile, true)
 	startAutoUpdater(profile)
 	ENV._Alleral_LastLoadAt = tick()
