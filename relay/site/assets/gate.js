@@ -1,5 +1,6 @@
 (() => {
   const STORAGE_KEY = "alleral_gate_ok";
+  const DEV_TOKEN_KEY = "alleral_dev_token";
   const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
   const FALLBACK_SITE_KEY = "1x00000000000000000000AA";
   const INTERACTIVE_SITE_KEY = "3x00000000000000000000FF";
@@ -30,6 +31,22 @@
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ until: Date.now() + SESSION_TTL_MS }));
   }
 
+  async function isDevBypass() {
+    const token = sessionStorage.getItem(DEV_TOKEN_KEY);
+    if (!token) return false;
+    const base = window.ALLERAL_API || "";
+    try {
+      const res = await fetch(`${base}/api/dev/status`, {
+        headers: { "X-Dev-Token": token },
+        cache: "no-store",
+      });
+      const data = await res.json();
+      return data.ok === true;
+    } catch {
+      return false;
+    }
+  }
+
   function unlockPage() {
     document.documentElement.classList.remove("cf-gate-lock");
     document.body?.classList.remove("cf-gate-lock");
@@ -47,8 +64,11 @@
     }, 480);
   }
 
-  function boot() {
-    if (isGatePassed()) return;
+  async function boot() {
+    if (isGatePassed() || await isDevBypass()) {
+      if (!isGatePassed()) markGatePassed();
+      return;
+    }
     if (!document.body) return;
 
     document.documentElement.classList.add("cf-gate-lock");

@@ -1,4 +1,11 @@
-.cora/
+# Site build deps
+relay/site/node_modules/
+backend/site/node_modules/
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/
+
 .zed/
 __pycache__/
 *.pyc

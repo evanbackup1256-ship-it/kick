@@ -8,9 +8,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/style.css" />
+  <link rel="stylesheet" href="/assets/animations.css" />
+  <script src="/assets/config.js"></script>
 </head>
 <body class="admin-page">
   <div class="aurora" aria-hidden="true"></div>
+  <div class="cursor-glow" aria-hidden="true"></div>
 
   <header class="nav-shell admin-nav">
     <nav class="nav-bar wrap">
@@ -41,7 +44,8 @@
         </label>
         <div class="admin-key-actions">
           <button id="saveKey" class="btn btn-outline" type="button">Remember Key</button>
-          <button id="reload" class="btn btn-fill" type="button">Reload Tab</button>
+          <button id="signInAdmin" class="btn btn-fill" type="button">Sign In</button>
+          <button id="reload" class="btn btn-outline" type="button">Reload Tab</button>
         </div>
       </form>
       <div id="error" class="form-error"></div>

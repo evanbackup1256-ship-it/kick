@@ -1,0 +1,13 @@
+{
+  "name": "alleral-site",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/site.ts --bundle --outfile=assets/app.js --format=iife --target=es2020",
+    "watch": "esbuild src/site.ts --bundle --outfile=assets/app.js --format=iife --target=es2020 --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.2"
+  }
+}

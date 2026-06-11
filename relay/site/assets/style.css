@@ -1271,6 +1271,40 @@ body.cf-gate-active > :not(#cfGate) {
 .faq-item[open] summary {
   color: var(--text);
 }
+.faq-feedback {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.faq-feedback-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-right: 4px;
+}
+.faq-feedback-btn {
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.35s var(--ease-out), color 0.35s var(--ease-out), background 0.35s var(--ease-out);
+}
+.faq-feedback-btn:hover {
+  border-color: rgba(41, 151, 255, 0.35);
+  color: var(--text);
+  background: rgba(41, 151, 255, 0.08);
+}
+.faq-feedback-thanks {
+  font-size: 0.82rem;
+  color: var(--green);
+}
 
 /* ── Panel / modal motion ── */
 .panel-enter {
@@ -1376,6 +1410,102 @@ body.admin-page {
 .admin-script-form {
   margin-top: 12px;
 }
+
+/* ── Dev portal ── */
+.dev-kv {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 20px;
+}
+.dev-kv > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.dev-kv dt {
+  margin: 0;
+  color: var(--text-secondary);
+}
+.dev-kv dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 500;
+}
+.dev-links {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.dev-links a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.35s var(--ease-out), background 0.35s var(--ease-out), transform 0.35s var(--ease-out);
+}
+.dev-links a::after {
+  content: "→";
+  opacity: 0.5;
+  transition: transform 0.35s var(--ease-out), opacity 0.35s var(--ease-out);
+}
+.dev-links a:hover {
+  border-color: rgba(41, 151, 255, 0.35);
+  background: rgba(255, 255, 255, 0.03);
+  transform: translateX(2px);
+}
+.dev-links a:hover::after {
+  transform: translateX(4px);
+  opacity: 1;
+}
+.dev-note {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.manage-audit-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  max-height: 520px;
+  overflow: auto;
+}
+.manage-audit-item {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.25);
+}
+.manage-audit-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+.manage-audit-meta {
+  margin: 6px 0 8px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.manage-audit-payload {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.35);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  overflow: auto;
+  max-height: 140px;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -1461,4 +1591,8 @@ body.admin-page {
   }
   .reveal { opacity: 1; transform: none; filter: none; }
   .section-intro.reveal > * { opacity: 1; transform: none; }
+  html.has-view-timeline .reveal,
+  html.has-view-timeline .game-card,
+  html.has-view-timeline .feature-card,
+  html.has-view-timeline .changelog-card { animation: none !important; }
 }

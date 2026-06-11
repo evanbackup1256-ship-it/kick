@@ -1,6 +1,11 @@
 (() => {
   const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const hasViewTimeline = !prefersReduced && CSS.supports("(animation-timeline: view())");
   const EASE = (t) => 1 - (1 - t) ** 3;
+
+  if (hasViewTimeline) {
+    document.documentElement.classList.add("has-view-timeline");
+  }
 
   function animateNumber(el, target, duration = 1100) {
     if (prefersReduced || !el) {
@@ -86,6 +91,10 @@
 
   window.AlleralEffects = {
     observeReveals(root = document) {
+      if (hasViewTimeline) {
+        root.querySelectorAll(".reveal").forEach((el) => el.classList.add("visible"));
+        return;
+      }
       const items = root.querySelectorAll(".reveal:not(.visible)");
       if (!items.length) return;
 
@@ -122,6 +131,7 @@
       if (prefersReduced) return;
       root.querySelectorAll(".tilt-card:not([data-tilt-bound])").forEach(bindTilt);
       root.querySelectorAll(".hero .btn-fill:not([data-magnetic])").forEach((btn) => bindMagnetic(btn, 0.18));
+      root.querySelectorAll(".nav-links a:not([data-magnetic])").forEach((link) => bindMagnetic(link, 0.08));
     },
 
     animateNumber,
@@ -131,7 +141,30 @@
     initHeroSequence();
     window.AlleralEffects.observeReveals();
 
+    document.body.classList.add("has-cursor-glow");
+    const cursorGlow = document.querySelector(".cursor-glow");
+    let glowX = 0;
+    let glowY = 0;
+    let smoothGX = 0;
+    let smoothGY = 0;
+
+    window.addEventListener("mousemove", (e) => {
+      glowX = e.clientX;
+      glowY = e.clientY;
+    }, { passive: true });
+
+    function cursorFrame() {
+      smoothGX += (glowX - smoothGX) * 0.12;
+      smoothGY += (glowY - smoothGY) * 0.12;
+      if (cursorGlow) {
+        cursorGlow.style.transform = `translate3d(${smoothGX.toFixed(1)}px, ${smoothGY.toFixed(1)}px, 0)`;
+      }
+      requestAnimationFrame(cursorFrame);
+    }
+    requestAnimationFrame(cursorFrame);
+
     const aurora = document.querySelector(".aurora");
+    const orbs = document.querySelector(".hero-orbs");
     let scrollY = window.scrollY;
     let smoothY = scrollY;
 
@@ -141,9 +174,15 @@
 
     function parallaxFrame() {
       smoothY += (scrollY - smoothY) * 0.06;
-      if (aurora) {
-        aurora.style.transform = `translate3d(0, ${(smoothY * 0.08).toFixed(2)}px, 0)`;
-      }
+      const y = smoothY * 0.08;
+      if (aurora) aurora.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
+      if (orbs) orbs.style.transform = `translate3d(0, ${(y * 0.5).toFixed(2)}px, 0)`;
+      document.querySelectorAll(".section-intro").forEach((section) => {
+        const rect = section.getBoundingClientRect();
+        const center = rect.top + rect.height / 2 - window.innerHeight / 2;
+        const shift = Math.max(-24, Math.min(24, center * -0.02));
+        section.style.transform = `translate3d(0, ${shift.toFixed(2)}px, 0)`;
+      });
       requestAnimationFrame(parallaxFrame);
     }
     requestAnimationFrame(parallaxFrame);

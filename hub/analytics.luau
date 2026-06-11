@@ -74,6 +74,22 @@ local function embedFooter()
 	return { text = Analytics.Config.brand or "Alleral" }
 end
 
+local function hashSeed(text)
+	if trim(text) == "" then
+		local ok, id = pcall(function()
+			return HttpService:GenerateGUID(false)
+		end)
+		return ok and id or ("al_" .. tostring(os.time()))
+	end
+	local h1, h2 = 5381, 0
+	for i = 1, #text do
+		local byte = string.byte(text, i)
+		h1 = (h1 * 33 + byte) % 2147483647
+		h2 = (h2 * 31 + byte * (i % 7 + 1)) % 2147483647
+	end
+	return string.format("al_%x_%x_%x", h1, h2, #text)
+end
+
 function Analytics:GetClientId()
 	local genv = getgenv and getgenv() or {}
 	if genv.Alleral_ClientId and genv.Alleral_ClientId ~= "" then
@@ -85,10 +101,7 @@ function Analytics:GetClientId()
 		tostring(game.PlaceId),
 		tostring(executorName()),
 	}, ":")
-	local id = HttpService:GenerateGUID(false)
-	pcall(function()
-		id = HttpService:Hash(seed)
-	end)
+	local id = hashSeed(seed)
 	genv.Alleral_ClientId = id
 	return id
 end

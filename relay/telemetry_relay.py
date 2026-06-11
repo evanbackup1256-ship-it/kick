@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
 import sys
 import threading
 import time
@@ -116,6 +117,10 @@ MAX_BODY_BYTES = int(os.environ.get("TELEMETRY_MAX_BODY_BYTES", "32768"))
 REPLAY_CACHE_SEC = int(os.environ.get("TELEMETRY_REPLAY_CACHE_SEC", "300"))
 MAX_EVENT_AGE_SEC = int(os.environ.get("TELEMETRY_MAX_EVENT_AGE_SEC", "600"))
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", API_KEY).strip()
+DEV_ACCESS_KEY = os.environ.get("DEV_ACCESS_KEY", "").strip()
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+SUPABASE_AUDIT_TABLE = os.environ.get("SUPABASE_AUDIT_TABLE", "alleral_audit").strip()
 TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "3x00000000000000000000FF").strip()
 TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "").strip()
 SCRIPTS_MANIFEST_PATH = resolve_manifest_path()
@@ -133,6 +138,11 @@ EVENT_COLORS = {
     "milestone": 15844367,
     "log": 7506394,
     "hub_visit": 5793266,
+    "games_sync": 5763719,
+    "bug_report": 15105570,
+    "feature_request": 3447003,
+    "support_question": 10181046,
+    "faq_feedback": 9807270,
 }
 
 TITLE_MAP = {
@@ -171,6 +181,11 @@ except ImportError:
     AutoSyncEngine = None  # type: ignore
 
 try:
+    from manage_backend import ManageBackend
+except ImportError:
+    ManageBackend = None  # type: ignore
+
+try:
     from roblox_api import fetch_user, resolve_username, resolve_usernames
 except ImportError:
     def resolve_username(username: str):  # type: ignore
@@ -189,7 +204,7 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
 @app.after_request
 def apply_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Alleral-Key, X-Admin-Key"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Alleral-Key, X-Admin-Key, X-Admin-Token, X-Dev-Token, Authorization"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
     return response
 
@@ -199,10 +214,22 @@ def apply_cors(response):
 @app.route("/api/gate/config", methods=["OPTIONS"])
 @app.route("/api/gate/verify", methods=["OPTIONS"])
 @app.route("/api/sync/status", methods=["OPTIONS"])
+@app.route("/api/support", methods=["OPTIONS"])
+@app.route("/api/faq-feedback", methods=["OPTIONS"])
 @app.route("/api/bug-report", methods=["OPTIONS"])
 @app.route("/api/feature-request", methods=["OPTIONS"])
 @app.route("/api/hub/visit", methods=["OPTIONS"])
 @app.route("/api/games/thumbnails", methods=["OPTIONS"])
+@app.route("/api/manage/status", methods=["OPTIONS"])
+@app.route("/api/manage/audit", methods=["OPTIONS"])
+@app.route("/api/manage/supabase/test", methods=["OPTIONS"])
+@app.route("/api/manage/sync", methods=["OPTIONS"])
+@app.route("/api/admin/login", methods=["OPTIONS"])
+@app.route("/api/admin/status", methods=["OPTIONS"])
+@app.route("/api/admin/logout", methods=["OPTIONS"])
+@app.route("/api/dev/login", methods=["OPTIONS"])
+@app.route("/api/dev/status", methods=["OPTIONS"])
+@app.route("/api/dev/logout", methods=["OPTIONS"])
 @app.route("/api/ban/check", methods=["OPTIONS"])
 @app.route("/gate/check", methods=["OPTIONS"])
 def cors_preflight():
@@ -220,6 +247,16 @@ SCRIPT_REGISTRY = ScriptRegistry(SCRIPTS_MANIFEST_PATH)
 BAN_REGISTRY = BanRegistry(BAN_DB_PATH)
 SITE_REGISTRY = SiteRegistry(resolve_site_path())
 
+MANAGE = None
+if ManageBackend is not None:
+    MANAGE = ManageBackend(
+        DATA_DIR,
+        supabase_url=SUPABASE_URL,
+        supabase_service_key=SUPABASE_SERVICE_KEY,
+        supabase_table=SUPABASE_AUDIT_TABLE,
+        enabled=True,
+    )
+
 AUTO_SYNC = None
 if AutoSyncEngine is not None:
     AUTO_SYNC = AutoSyncEngine(
@@ -231,7 +268,6 @@ if AutoSyncEngine is not None:
         interval_sec=GITHUB_SYNC_SECONDS,
         enabled=AUTO_SYNC_ENABLED,
     )
-    AUTO_SYNC.start()
 GATE_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 BUG_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 HUB_VISIT_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
@@ -240,6 +276,14 @@ THUMB_CACHE: dict[str, tuple[str, float]] = {}
 THUMB_CACHE_SEC = int(os.environ.get("THUMB_CACHE_SEC", "3600"))
 BUG_RATE_PER_MIN = int(os.environ.get("BUG_RATE_PER_MIN", "6"))
 HUB_VISIT_RATE_PER_MIN = int(os.environ.get("HUB_VISIT_RATE_PER_MIN", "30"))
+DEV_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
+DEV_SESSIONS: dict[str, float] = {}
+DEV_SESSION_TTL_SEC = int(os.environ.get("DEV_SESSION_TTL_SEC", str(86400 * 7)))
+DEV_RATE_PER_MIN = int(os.environ.get("DEV_RATE_PER_MIN", "12"))
+ADMIN_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
+ADMIN_SESSIONS: dict[str, float] = {}
+ADMIN_SESSION_TTL_SEC = int(os.environ.get("ADMIN_SESSION_TTL_SEC", str(86400)))
+ADMIN_RATE_PER_MIN = int(os.environ.get("ADMIN_RATE_PER_MIN", "20"))
 THUMB_RATE_PER_MIN = int(os.environ.get("THUMB_RATE_PER_MIN", "60"))
 PUBLIC_RATE_PER_MIN = int(os.environ.get("PUBLIC_RATE_PER_MIN", "120"))
 
@@ -280,6 +324,63 @@ def parse_place_ids(raw: object) -> list[str]:
         if part.isdigit() and 1 <= len(part) <= 20:
             ids.append(part)
     return ids[:50]
+
+
+def dev_enabled() -> bool:
+    return bool(DEV_ACCESS_KEY) and len(DEV_ACCESS_KEY) >= MIN_API_KEY_LEN
+
+
+def dev_issue_token() -> tuple[str, str]:
+    token = secrets.token_urlsafe(48)
+    expiry = time.time() + DEV_SESSION_TTL_SEC
+    DEV_SESSIONS[token] = expiry
+    return token, datetime.fromtimestamp(expiry, tz=timezone.utc).replace(microsecond=0).isoformat()
+
+
+def dev_authorized() -> bool:
+    token = (request.headers.get("X-Dev-Token") or "").strip()
+    if not token:
+        return False
+    expiry = DEV_SESSIONS.get(token)
+    if not expiry or time.time() > expiry:
+        DEV_SESSIONS.pop(token, None)
+        return False
+    return True
+
+
+def purge_dev_sessions() -> None:
+    now = time.time()
+    stale = [token for token, expiry in DEV_SESSIONS.items() if expiry <= now]
+    for token in stale:
+        DEV_SESSIONS.pop(token, None)
+
+
+def admin_enabled() -> bool:
+    return bool(ADMIN_API_KEY) and len(ADMIN_API_KEY) >= MIN_API_KEY_LEN
+
+
+def admin_issue_token() -> tuple[str, str]:
+    token = secrets.token_urlsafe(48)
+    expiry = time.time() + ADMIN_SESSION_TTL_SEC
+    ADMIN_SESSIONS[token] = expiry
+    return token, datetime.fromtimestamp(expiry, tz=timezone.utc).replace(microsecond=0).isoformat()
+
+
+def admin_token_valid(token: str) -> bool:
+    if not token:
+        return False
+    expiry = ADMIN_SESSIONS.get(token)
+    if not expiry or time.time() > expiry:
+        ADMIN_SESSIONS.pop(token, None)
+        return False
+    return True
+
+
+def purge_admin_sessions() -> None:
+    now = time.time()
+    stale = [token for token, expiry in ADMIN_SESSIONS.items() if expiry <= now]
+    for token in stale:
+        ADMIN_SESSIONS.pop(token, None)
 
 
 def build_public_site_payload() -> dict[str, Any]:
@@ -340,18 +441,119 @@ def post_simple_discord_embed(title: str, color: int, fields: list[dict[str, Any
         "footer": {"text": footer},
         "timestamp": utc_iso(),
     }
+    body = json.dumps({"username": BRAND, "embeds": [embed]})
+    headers = {"Content-Type": "application/json"}
+    for attempt in range(2):
+        try:
+            response = requests.post(WEBHOOK_URL, data=body, headers=headers, timeout=12)
+        except requests.RequestException as exc:
+            if attempt == 0:
+                time.sleep(1.5)
+                continue
+            return False, str(exc)
+        if response.status_code == 429 and attempt == 0:
+            retry = float(response.headers.get("Retry-After", "2") or 2)
+            time.sleep(min(retry, 8))
+            continue
+        if response.status_code < 200 or response.status_code >= 300:
+            return False, f"Discord HTTP {response.status_code}"
+        return True, "ok"
+    return False, "discord_retry_exhausted"
+
+
+def submission_meta(body: dict[str, Any], client_ip: str) -> list[dict[str, Any]]:
+    page = clip(body.get("pageUrl") or body.get("page") or "", 240)
+    ua = clip(body.get("userAgent") or request.headers.get("User-Agent") or "", 220)
+    fields: list[dict[str, Any]] = []
+    if page:
+        fields.append({"name": "Page", "value": page, "inline": False})
+    if ua:
+        fields.append({"name": "User agent", "value": ua, "inline": False})
+    fields.append({"name": "Reporter IP", "value": client_ip or "unknown", "inline": False})
+    return fields
+
+
+def manage_audit(event: str, payload: dict[str, Any] | None = None, actor: str = "system") -> None:
+    if MANAGE is None:
+        return
     try:
-        response = requests.post(
-            WEBHOOK_URL,
-            data=json.dumps({"username": BRAND, "embeds": [embed]}),
-            headers={"Content-Type": "application/json"},
-            timeout=12,
+        MANAGE.record(event, payload, actor=actor)
+    except Exception as exc:
+        print(f"[manage] audit failed: {exc}", file=sys.stderr)
+
+
+def notify_games_sync(payload: dict[str, Any]) -> None:
+    if not WEBHOOK_URL:
+        return
+    if os.environ.get("SYNC_GAME_WEBHOOK", "1").strip().lower() in {"0", "false", "no"}:
+        return
+
+    scripts = payload.get("scripts") if isinstance(payload.get("scripts"), dict) else {}
+    added = scripts.get("added") or []
+    removed = scripts.get("removed") or []
+    version_changes = scripts.get("versionChanges") or []
+    status_changes = scripts.get("statusChanges") or []
+    meta_diff = payload.get("gamesMeta") or []
+    commit = clip(str(payload.get("commit") or ""), 16)
+    commit_msg = clip(str(payload.get("commitMessage") or ""), 200)
+    total = payload.get("totalGames") or 0
+
+    lines: list[str] = []
+    if payload.get("loaderChanged"):
+        lines.append(
+            f"**Loader:** {payload.get('previousLoaderVersion') or '?'} → {payload.get('loaderVersion') or '?'}"
         )
-    except requests.RequestException as exc:
-        return False, str(exc)
-    if response.status_code < 200 or response.status_code >= 300:
-        return False, f"Discord HTTP {response.status_code}"
-    return True, "ok"
+    if added:
+        lines.append("**New games:** " + ", ".join(f"`{g}`" for g in added[:12]))
+    if removed:
+        lines.append("**Removed:** " + ", ".join(f"`{g}`" for g in removed[:12]))
+    for item in version_changes[:8]:
+        lines.append(f"• **{item.get('name')}** v{item.get('from')} → v{item.get('to')}")
+    for item in status_changes[:8]:
+        lines.append(f"• **{item.get('name')}** status {item.get('from')} → {item.get('to')}")
+    for item in meta_diff[:6]:
+        lines.append(f"• `{item.get('id')}` {item.get('field')}: {item.get('from')} → {item.get('to')}")
+
+    if not lines:
+        return
+
+    fields = [
+        {"name": "Commit", "value": f"`{commit}` — {commit_msg or 'sync'}", "inline": False},
+        {"name": "Supported games", "value": str(total), "inline": True},
+        {"name": "Changes", "value": "\n".join(lines)[:1024], "inline": False},
+    ]
+    post_simple_discord_embed(
+        "Supported games updated",
+        EVENT_COLORS["games_sync"],
+        fields,
+        f"{BRAND} · auto-sync",
+    )
+    manage_audit("games.sync", {
+        "commit": commit,
+        "added": added,
+        "removed": removed,
+        "versionChanges": len(version_changes),
+        "statusChanges": len(status_changes),
+    })
+    if MANAGE is not None and MANAGE.supabase_configured():
+        try:
+            manifest = SCRIPT_REGISTRY.list_scripts()
+            scripts = manifest.get("scripts") if isinstance(manifest.get("scripts"), dict) else {}
+            games_list = [{"id": sid, **entry} for sid, entry in scripts.items() if isinstance(entry, dict)]
+            MANAGE.push_games_snapshot(commit, games_list)
+        except Exception as exc:
+            print(f"[supabase] games snapshot failed: {exc}", file=sys.stderr)
+
+
+def bootstrap_auto_sync() -> None:
+    global AUTO_SYNC
+    if AUTO_SYNC is None:
+        return
+    AUTO_SYNC.notify_fn = notify_games_sync
+    AUTO_SYNC.start()
+
+
+bootstrap_auto_sync()
 
 
 def ban_check_payload(body: dict, client_ip: str = "") -> dict[str, Any]:
@@ -955,10 +1157,23 @@ def ingest():
 
 
 def admin_authorized() -> bool:
-    if not ADMIN_API_KEY or len(ADMIN_API_KEY) < MIN_API_KEY_LEN:
+    if not admin_enabled():
         return False
-    provided = request.headers.get("X-Admin-Key", "")
-    return secure_compare(provided, ADMIN_API_KEY)
+    token = (request.headers.get("X-Admin-Token") or "").strip()
+    if admin_token_valid(token):
+        return True
+    auth = (request.headers.get("Authorization") or "").strip()
+    if auth.lower().startswith("bearer "):
+        bearer = auth[7:].strip()
+        if admin_token_valid(bearer):
+            return True
+        if secure_compare(bearer, ADMIN_API_KEY):
+            return True
+    for header in ("X-Admin-Key", "X-Alleral-Key"):
+        provided = (request.headers.get(header) or "").strip()
+        if provided and secure_compare(provided, ADMIN_API_KEY):
+            return True
+    return False
 
 
 @app.get("/scripts")
@@ -1099,6 +1314,7 @@ def admin_add_ban():
         )
     except (ValueError, RuntimeError) as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
+    manage_audit("ban.add", {"ban": created}, actor="admin")
     return jsonify({"ok": True, "ban": created})
 
 
@@ -1108,6 +1324,7 @@ def admin_remove_ban(ban_id: int):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
     if not BAN_REGISTRY.remove_ban(ban_id):
         return jsonify({"ok": False, "error": "not_found"}), 404
+    manage_audit("ban.remove", {"banId": ban_id}, actor="admin")
     return jsonify({"ok": True, "removed": ban_id})
 
 
@@ -1134,6 +1351,7 @@ def admin_ban_roblox_player():
         )
     except (ValueError, RuntimeError) as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
+    manage_audit("ban.roblox", {"result": result}, actor="admin")
     return jsonify(result)
 
 
@@ -1312,6 +1530,7 @@ def admin_patch_site():
         updated = SITE_REGISTRY.patch(payload)
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
+    manage_audit("site.patch", {"keys": list(payload.keys())}, actor="admin")
     return jsonify({"ok": True, "site": updated})
 
 
@@ -1350,16 +1569,18 @@ def public_bug_report():
     ]
     if steps:
         fields.append({"name": "Steps to reproduce", "value": steps, "inline": False})
-    fields.append({"name": "Reporter IP", "value": client_ip or "unknown", "inline": False})
+    fields.extend(submission_meta(body, client_ip))
 
     ok, detail = post_simple_discord_embed(
         f"Bug Report — {game}",
-        15105570,
+        EVENT_COLORS["bug_report"],
         fields,
         f"{BRAND} · website bug report",
     )
     if not ok:
         return jsonify({"ok": False, "error": detail}), 503
+    if MANAGE is not None:
+        MANAGE.push_hub_event("bug.report", {"category": category, "game": game, "severity": severity})
     return jsonify({"ok": True, "status": "sent"})
 
 
@@ -1409,6 +1630,8 @@ def hub_visit():
     if not ok:
         print(f"[hub-visit] discord failed: {detail}", file=sys.stderr)
         return jsonify({"ok": True, "status": "queued_offline"}), 202
+    if MANAGE is not None:
+        MANAGE.push_hub_event("hub.visit", {"path": path, "source": source, "host": host, "ip": client_ip})
     return jsonify({"ok": True, "status": "sent"})
 
 
@@ -1431,20 +1654,93 @@ def public_feature_request():
     fields = [
         {"name": "Roblox user", "value": clip(body.get("robloxUser") or "Anonymous", 64), "inline": True},
         {"name": "Game", "value": clip(body.get("game") or "Any", 120), "inline": True},
+        {"name": "Contact", "value": clip(body.get("contact") or "—", 120), "inline": True},
         {"name": "Idea", "value": idea, "inline": False},
     ]
+    fields.extend(submission_meta(body, client_ip))
     ok, detail = post_simple_discord_embed(
         "Feature Request",
-        3447003,
+        EVENT_COLORS["feature_request"],
         fields,
         f"{BRAND} · website feature request",
     )
     if not ok:
         return jsonify({"ok": False, "error": detail}), 503
+    if MANAGE is not None:
+        MANAGE.push_hub_event("feature.request", {"game": clip(body.get("game") or "Any", 120)})
     return jsonify({"ok": True, "status": "sent"})
+def public_support_question():
+    if not WEBHOOK_URL:
+        return jsonify({"ok": False, "error": "unavailable"}), 503
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, BUG_IP_HITS, BUG_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
 
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
 
-@app.get("/admin")
+    question = clip(body.get("question") or body.get("message"), 1800)
+    if len(question) < 8:
+        return jsonify({"ok": False, "error": "question_too_short"}), 400
+
+    fields = [
+        {"name": "Roblox user", "value": clip(body.get("robloxUser") or "Anonymous", 64), "inline": True},
+        {"name": "Topic", "value": clip(body.get("topic") or "General", 64), "inline": True},
+        {"name": "Contact", "value": clip(body.get("contact") or "—", 120), "inline": True},
+        {"name": "Question", "value": question, "inline": False},
+    ]
+    fields.extend(submission_meta(body, client_ip))
+    ok, detail = post_simple_discord_embed(
+        "Support Question",
+        EVENT_COLORS["support_question"],
+        fields,
+        f"{BRAND} · website support",
+    )
+    if not ok:
+        return jsonify({"ok": False, "error": detail}), 503
+    if MANAGE is not None:
+        MANAGE.push_hub_event("support.question", {"topic": clip(body.get("topic") or "General", 64)})
+    return jsonify({"ok": True, "status": "sent"})
+def public_faq_feedback():
+    if not WEBHOOK_URL:
+        return jsonify({"ok": False, "error": "unavailable"}), 503
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, BUG_IP_HITS, BUG_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+
+    helpful = body.get("helpful")
+    if helpful not in {True, False, "yes", "no", 1, 0}:
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    is_helpful = helpful in {True, "yes", 1}
+
+    question = clip(body.get("question") or body.get("faq") or "FAQ item", 400)
+    comment = clip(body.get("comment") or "", 800)
+    verdict = "Helpful" if is_helpful else "Not helpful"
+
+    fields = [
+        {"name": "Verdict", "value": verdict, "inline": True},
+        {"name": "FAQ", "value": question, "inline": False},
+    ]
+    if comment:
+        fields.append({"name": "Comment", "value": comment, "inline": False})
+    fields.extend(submission_meta(body, client_ip))
+
+    ok, detail = post_simple_discord_embed(
+        f"FAQ feedback — {verdict}",
+        EVENT_COLORS["faq_feedback"],
+        fields,
+        f"{BRAND} · FAQ feedback",
+    )
+    if not ok:
+        return jsonify({"ok": False, "error": detail}), 503
+    if MANAGE is not None:
+        MANAGE.push_hub_event("faq.feedback", {"helpful": is_helpful, "question": question[:120]})
+    return jsonify({"ok": True, "status": "sent"})
 def admin_panel():
     rendered = serve_html("admin.html")
     if rendered:
@@ -1453,6 +1749,161 @@ def admin_panel():
     if legacy.is_file():
         return legacy.read_text(encoding="utf-8"), 200, {"Content-Type": "text/html; charset=utf-8"}
     return "Admin UI missing", 404
+
+
+@app.post("/api/admin/login")
+def admin_login():
+    purge_admin_sessions()
+    if not admin_enabled():
+        return jsonify({"ok": False, "error": "disabled", "hint": "Set ADMIN_API_KEY on Railway (24+ chars)"}), 503
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, ADMIN_IP_HITS, ADMIN_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    provided = str(body.get("key") or body.get("adminKey") or "").strip()
+    if not provided or not secure_compare(provided, ADMIN_API_KEY):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    token, expires_at = admin_issue_token()
+    manage_audit("admin.login", {"ip": resolve_client_ip(request)}, actor="admin")
+    return jsonify({"ok": True, "token": token, "expiresAt": expires_at})
+
+
+@app.get("/api/admin/status")
+def admin_status():
+    token = (request.headers.get("X-Admin-Token") or "").strip()
+    if not admin_token_valid(token):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    expiry = ADMIN_SESSIONS.get(token)
+    return jsonify({
+        "ok": True,
+        "expiresAt": datetime.fromtimestamp(expiry, tz=timezone.utc).replace(microsecond=0).isoformat() if expiry else None,
+        "time": utc_iso(),
+    })
+
+
+@app.post("/api/admin/logout")
+def admin_logout():
+    token = (request.headers.get("X-Admin-Token") or "").strip()
+    if token:
+        ADMIN_SESSIONS.pop(token, None)
+    return jsonify({"ok": True})
+
+
+@app.get("/dev")
+def dev_login():
+    purge_dev_sessions()
+    if not dev_enabled():
+        return jsonify({"ok": False, "error": "disabled"}), 503
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, DEV_IP_HITS, DEV_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    provided = str(body.get("key") or body.get("passphrase") or "").strip()
+    if not provided or not secure_compare(provided, DEV_ACCESS_KEY):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    token, expires_at = dev_issue_token()
+    return jsonify({"ok": True, "token": token, "expiresAt": expires_at})
+
+
+@app.get("/api/dev/status")
+def dev_status():
+    token = (request.headers.get("X-Dev-Token") or "").strip()
+    if not dev_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    expiry = DEV_SESSIONS.get(token)
+    sync_meta = AUTO_SYNC.status() if AUTO_SYNC is not None else {}
+    return jsonify({
+        "ok": True,
+        "version": "3.7.1",
+        "brand": BRAND,
+        "autoSync": sync_meta.get("enabled", False),
+        "githubCommit": sync_meta.get("commit") or "",
+        "lastSyncAt": sync_meta.get("lastSyncAt"),
+        "bans": len(BAN_REGISTRY.list_bans()),
+        "devSessions": len(DEV_SESSIONS),
+        "expiresAt": datetime.fromtimestamp(expiry, tz=timezone.utc).replace(microsecond=0).isoformat() if expiry else None,
+        "time": utc_iso(),
+    })
+
+
+@app.post("/api/dev/logout")
+def dev_logout():
+    token = (request.headers.get("X-Dev-Token") or "").strip()
+    if token:
+        DEV_SESSIONS.pop(token, None)
+    return jsonify({"ok": True})
+
+
+@app.get("/dev")
+def dev_panel():
+    rendered = serve_html("dev.html")
+    if rendered:
+        return rendered
+    return "Dev portal missing", 404
+
+
+@app.get("/manage")
+def manage_panel():
+    rendered = serve_html("manage.html")
+    if rendered:
+        return rendered
+    return "Manage portal missing", 404
+
+
+@app.get("/api/manage/status")
+def manage_status():
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    meta = MANAGE.status() if MANAGE is not None else {"enabled": False, "provider": "none"}
+    sync_meta = AUTO_SYNC.status() if AUTO_SYNC is not None else {}
+    return jsonify({
+        "ok": True,
+        "brand": BRAND,
+        "manage": meta,
+        "sync": sync_meta,
+        "bans": len(BAN_REGISTRY.list_bans()),
+        "supabaseConfigured": bool(meta.get("supabaseConfigured")),
+    })
+
+
+@app.get("/api/manage/audit")
+def manage_audit_list():
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    if MANAGE is None:
+        return jsonify({"ok": False, "error": "disabled"}), 503
+    query = request.args.get("q", "")
+    limit = int(request.args.get("limit", "50") or 50)
+    events = MANAGE.list_events(limit=limit, query=query)
+    return jsonify({"ok": True, "events": events, "status": MANAGE.status()})
+
+
+@app.post("/api/manage/sync")
+def manage_sync_push():
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    if MANAGE is None:
+        return jsonify({"ok": False, "error": "disabled"}), 503
+    result = MANAGE.sync_pending()
+    manage_audit("manage.sync", result, actor="admin")
+    return jsonify(result)
+
+
+@app.get("/api/manage/supabase/test")
+def manage_supabase_test():
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    if MANAGE is None:
+        return jsonify({"ok": False, "error": "disabled"}), 503
+    result = MANAGE.test_connection()
+    if result.get("ok"):
+        manage_audit("supabase.test", {"status": "ok"}, actor="admin")
+    return jsonify(result)
 
 
 def main() -> None:

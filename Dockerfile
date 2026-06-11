@@ -2,7 +2,7 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY backend/telemetry_relay.py backend/script_registry.py backend/ban_registry.py backend/site_registry.py backend/roblox_api.py backend/auto_sync.py ./
+COPY backend/telemetry_relay.py backend/script_registry.py backend/ban_registry.py backend/site_registry.py backend/roblox_api.py backend/auto_sync.py backend/manage_backend.py ./
 COPY backend/site ./site
 COPY cfg/scripts_manifest.json ./scripts_manifest.json
 COPY cfg/site.json ./site.json

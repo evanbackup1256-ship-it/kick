@@ -10,12 +10,14 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 try:
     import requests
 except ImportError:
     requests = None  # type: ignore
+
+SyncNotifyFn = Callable[[dict[str, Any]], None]
 
 VALID_STATUSES = frozenset({"working", "detected", "broken", "maintenance", "testing"})
 VERSION_RE = re.compile(r'local\s+VERSION\s*=\s*"([^"]+)"', re.IGNORECASE)
@@ -25,6 +27,95 @@ FETCH_TIMEOUT = 5
 
 def utc_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def script_snapshot(scripts: dict[str, Any]) -> dict[str, dict[str, str]]:
+    out: dict[str, dict[str, str]] = {}
+    for script_id, entry in scripts.items():
+        if not isinstance(entry, dict):
+            continue
+        out[str(script_id)] = {
+            "name": str(entry.get("name") or humanize_id(script_id)),
+            "status": str(entry.get("status") or "testing").lower(),
+            "version": str(entry.get("version") or "?"),
+            "message": str(entry.get("message") or "")[:200],
+        }
+    return out
+
+
+def games_meta_snapshot(games: dict[str, Any]) -> dict[str, dict[str, str]]:
+    out: dict[str, dict[str, str]] = {}
+    for game_id, entry in games.items():
+        if not isinstance(entry, dict):
+            continue
+        place_ids = entry.get("placeIds") if isinstance(entry.get("placeIds"), list) else []
+        out[str(game_id)] = {
+            "placeIds": ",".join(str(p) for p in place_ids[:5]),
+            "robloxUrl": str(entry.get("robloxUrl") or "")[:200],
+            "description": str(entry.get("description") or "")[:200],
+        }
+    return out
+
+
+def diff_script_snapshots(
+    previous: dict[str, dict[str, str]],
+    current: dict[str, dict[str, str]],
+) -> dict[str, Any]:
+    prev_ids = set(previous.keys())
+    curr_ids = set(current.keys())
+    added = sorted(curr_ids - prev_ids)
+    removed = sorted(prev_ids - curr_ids)
+    version_changes: list[dict[str, str]] = []
+    status_changes: list[dict[str, str]] = []
+    for script_id in sorted(curr_ids & prev_ids):
+        before = previous[script_id]
+        after = current[script_id]
+        if before.get("version") != after.get("version"):
+            version_changes.append({
+                "id": script_id,
+                "name": after.get("name") or script_id,
+                "from": before.get("version") or "?",
+                "to": after.get("version") or "?",
+            })
+        if before.get("status") != after.get("status"):
+            status_changes.append({
+                "id": script_id,
+                "name": after.get("name") or script_id,
+                "from": before.get("status") or "?",
+                "to": after.get("status") or "?",
+            })
+    return {
+        "added": added,
+        "removed": removed,
+        "versionChanges": version_changes,
+        "statusChanges": status_changes,
+        "totalGames": len(current),
+    }
+
+
+def diff_games_meta(
+    previous: dict[str, dict[str, str]],
+    current: dict[str, dict[str, str]],
+) -> list[dict[str, str]]:
+    changes: list[dict[str, str]] = []
+    for game_id in sorted(set(previous.keys()) | set(current.keys())):
+        before = previous.get(game_id) or {}
+        after = current.get(game_id) or {}
+        if before.get("placeIds") != after.get("placeIds"):
+            changes.append({
+                "id": game_id,
+                "field": "placeIds",
+                "from": before.get("placeIds") or "—",
+                "to": after.get("placeIds") or "—",
+            })
+        if before.get("robloxUrl") != after.get("robloxUrl") and (before or after):
+            changes.append({
+                "id": game_id,
+                "field": "robloxUrl",
+                "from": before.get("robloxUrl") or "—",
+                "to": after.get("robloxUrl") or "—",
+            })
+    return changes
 
 
 def humanize_id(script_id: str) -> str:
@@ -126,6 +217,7 @@ class AutoSyncEngine:
         data_dir: Path,
         interval_sec: int = 30,
         enabled: bool = True,
+        notify_fn: SyncNotifyFn | None = None,
     ) -> None:
         self.repo = repo.strip() or "evanbackup1256-ship-it/kick"
         self.branch = branch.strip() or "main"
@@ -133,6 +225,7 @@ class AutoSyncEngine:
         self.site_registry = site_registry
         self.interval_sec = max(15, interval_sec)
         self.enabled = enabled
+        self.notify_fn = notify_fn
         self.data_dir = data_dir
         self.stats = TelemetryStatsStore(data_dir / "telemetry_stats.db")
         self._lock = threading.Lock()
@@ -306,12 +399,55 @@ class AutoSyncEngine:
         site_data["githubCommit"] = commit_sha or release.get("commit") or known_commit or ""
         self.site_registry.save(site_data)
 
+        current_scripts = script_snapshot(merged_scripts)
+        current_games_meta = games_meta_snapshot(site_data["games"] if isinstance(site_data.get("games"), dict) else {})
+        loader_version = str(site_data.get("loaderVersion") or "")
+
         with self._lock:
+            prev_scripts = self._state.get("scriptSnapshot") if isinstance(self._state.get("scriptSnapshot"), dict) else {}
+            prev_games_meta = self._state.get("gamesMetaSnapshot") if isinstance(self._state.get("gamesMetaSnapshot"), dict) else {}
+            prev_loader = str(self._state.get("loaderVersion") or "")
+            initialized = bool(self._state.get("notifyInitialized"))
+
+            script_diff = diff_script_snapshots(prev_scripts, current_scripts)
+            meta_diff = diff_games_meta(prev_games_meta, current_games_meta)
+            loader_changed = bool(prev_loader and loader_version and prev_loader != loader_version)
+
+            has_changes = any([
+                script_diff["added"],
+                script_diff["removed"],
+                script_diff["versionChanges"],
+                script_diff["statusChanges"],
+                meta_diff,
+                loader_changed,
+            ])
+
+            self._state["scriptSnapshot"] = current_scripts
+            self._state["gamesMetaSnapshot"] = current_games_meta
+            self._state["loaderVersion"] = loader_version
             self._state["commit"] = commit_sha or release.get("commit") or known_commit or ""
             self._state["lastSyncAt"] = utc_iso()
             self._state["lastError"] = None
             self._state["syncCount"] = int(self._state.get("syncCount") or 0) + 1
+            self._state["notifyInitialized"] = True
             self._save_state()
+
+        if self.notify_fn and initialized and has_changes:
+            try:
+                self.notify_fn({
+                    "type": "games_sync",
+                    "commit": commit_sha or "",
+                    "commitMessage": commit_msg or "",
+                    "loaderVersion": loader_version,
+                    "loaderChanged": loader_changed,
+                    "previousLoaderVersion": prev_loader,
+                    "scripts": script_diff,
+                    "gamesMeta": meta_diff,
+                    "totalGames": script_diff.get("totalGames") or len(current_scripts),
+                })
+            except Exception:
+                pass
+
         return self.status()
 
     def _raw_url(self, path: str) -> str:

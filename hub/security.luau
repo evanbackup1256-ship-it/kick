@@ -1,5 +1,5 @@
 local Security = {}
-Security.VERSION = "1.1"
+Security.VERSION = "1.2"
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
@@ -54,15 +54,13 @@ local function hashText(text)
 	if trim(text) == "" then
 		return ""
 	end
-	if HttpService and type(HttpService.Hash) == "function" then
-		local ok, digest = pcall(function()
-			return HttpService:Hash(text)
-		end)
-		if ok and type(digest) == "string" and digest ~= "" then
-			return digest
-		end
+	local h1, h2 = 5381, 0
+	for i = 1, #text do
+		local byte = string.byte(text, i)
+		h1 = (h1 * 33 + byte) % 2147483647
+		h2 = (h2 * 31 + byte * (i % 7 + 1)) % 2147483647
 	end
-	return text
+	return string.format("al_%x_%x_%x", h1, h2, #text)
 end
 
 local function executorSlug()

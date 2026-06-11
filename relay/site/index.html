@@ -17,6 +17,12 @@
 </head>
 <body>
   <div class="aurora" aria-hidden="true"></div>
+  <div class="hero-orbs" aria-hidden="true">
+    <span class="hero-orb hero-orb-1"></span>
+    <span class="hero-orb hero-orb-2"></span>
+    <span class="hero-orb hero-orb-3"></span>
+  </div>
+  <div class="cursor-glow" aria-hidden="true"></div>
   <div class="grain" aria-hidden="true"></div>
 
   <header class="nav-shell" id="siteNav">
@@ -128,6 +134,7 @@
         <div class="support-tabs reveal">
           <button class="active" data-panel="bug" type="button">Bug Report</button>
           <button data-panel="feature" type="button">Feature Request</button>
+          <button data-panel="support" type="button">Ask a Question</button>
         </div>
 
         <div class="support-grid">
@@ -171,9 +178,33 @@
             <form id="featureForm" class="form">
               <label>Roblox Username<input id="featureUser" class="field-input" placeholder="Your username" /></label>
               <label>Game <span class="muted-inline">optional</span><input id="featureGame" class="field-input" placeholder="Which game?" /></label>
+              <label>Contact <span class="muted-inline">optional</span><input id="featureContact" class="field-input" placeholder="Discord or email" /></label>
               <label>Your Idea<textarea id="featureIdea" class="field-textarea" required placeholder="Describe the feature…"></textarea></label>
               <div id="featureError" class="form-error"></div>
               <button class="btn btn-fill" type="submit">Submit Idea</button>
+            </form>
+          </div>
+
+          <div class="panel hidden reveal panel-enter" data-panel-body="support">
+            <form id="supportForm" class="form">
+              <label>Topic
+                <div class="select-wrap">
+                  <select id="supportTopic" class="field-select">
+                    <option value="Loading">How to load Alleral</option>
+                    <option value="Games">Supported games</option>
+                    <option value="Ban">Ban / access issue</option>
+                    <option value="Executor">Executor compatibility</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </label>
+              <div class="form-row">
+                <label>Roblox Username<input id="supportUser" class="field-input" placeholder="Your username" /></label>
+                <label>Contact <span class="muted-inline">optional</span><input id="supportContact" class="field-input" placeholder="Discord or email" /></label>
+              </div>
+              <label>Your question<textarea id="supportQuestion" class="field-textarea" required placeholder="What do you need help with?"></textarea></label>
+              <div id="supportError" class="form-error"></div>
+              <button class="btn btn-fill" type="submit">Send Question</button>
             </form>
           </div>
         </div>
