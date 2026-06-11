@@ -1,9 +1,9 @@
 {
-  "loader": "5.4.0",
+  "loader": "5.4.1",
   "core": "1.19",
   "ui": "Rayfield",
   "commit": "da36cf0",
-  "minLoader": "5.4.0",
+  "minLoader": "5.4.1",
   "minCore": "1.18",
   "analytics": "1.0",
   "telemetry": "2.2",

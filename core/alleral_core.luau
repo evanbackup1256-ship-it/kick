@@ -401,7 +401,9 @@ function Core.detectExecutor()
 	}
 end
 
+-- WEAO proxy: https://github.com/goodcurry/weao-proxy-api
 Core.WEAO_API_URLS = {
+	"http://farts.fadedis.xyz:25551/api/status/exploits",
 	"https://api.weao.xyz/api/status/exploits",
 	"https://whatexpsare.online/api/status/exploits",
 	"https://api.whatexpsare.online/api/status/exploits",

@@ -5,7 +5,7 @@
 ```
 loader.luau (CDN HttpGet — only entry point)
     ├── purge legacy workspace files (v3.x launch/load/bootstrap/run)
-    ├── detect executor + game by PlaceId
+    ├── detect executor + game by PlaceId (WEAO via [goodcurry/weao-proxy-api](https://github.com/goodcurry/weao-proxy-api))
     ├── download core/alleral_core.luau
     ├── load analytics, helpers, telemetry
     ├── preload Rayfield
@@ -24,7 +24,7 @@ There is no `load.luau`, `launch.luau`, `bootstrap.luau`, or `run.luau`. Those w
 
 | Component | Version | File |
 |-----------|---------|------|
-| Loader | 5.4.0 | `loader.luau`, `config/release.json` |
+| Loader | 5.4.1 | `loader.luau`, `config/release.json` |
 | Core | 1.19 | `core/alleral_core.luau` |
 | Analytics | 1.0 | `core/analytics.luau` |
 | Telemetry | 2.2 | `core/telemetry.luau` |
