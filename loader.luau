@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.6.1"
+local LOADER_VERSION = "7.6.2"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 60
@@ -6,13 +6,13 @@ local CORE_MIN_BYTES = 50000
 local CORE_BASE_MIN_BYTES = 90000
 local CORE_UI_MIN_BYTES = 50000
 local CORE_MONOLITH_MIN_BYTES = 130000
-local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
+local CORE_UI_PATH = HUB .. "/core_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.6.1",
+	loader = "7.6.2",
 	core = "2.7.3",
 	ui = "Alleral",
 	analytics = "1.2",
