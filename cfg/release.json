@@ -1,10 +1,10 @@
 {
-    "loader":  "7.7.5",
+    "loader":  "7.7.6",
     "core":  "2.8.4",
     "weao":  "1.1",
     "ui":  "Alleral",
     "windui":  "2.1.4-alleral-v2",
-    "commit":  "6f1c5f1",
+    "commit":  "pending",
     "updatedAt":  "2026-06-11T00:00:00Z",
     "updatePollSeconds":  120,
     "autoUpdate":  true,

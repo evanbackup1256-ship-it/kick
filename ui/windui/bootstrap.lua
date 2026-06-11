@@ -3,6 +3,8 @@
 	Used by main.lua; can also be required from core as a fallback.
 ]]
 
+local ALLERAL_UI_VERSION = "2.1.4-alleral-v2"
+
 local PATCH_FILE = "arrrel.luau"
 local PATCH_FALLBACK = "aller.luau"
 local AUTOSCALE_FILE = "autoscale.luau"

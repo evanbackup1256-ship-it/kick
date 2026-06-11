@@ -194,13 +194,13 @@ local function applyAlleralWindUiPatch(windUi)
 	end
 
 	local bootstrapSource, bootstrapPath = readWindUiLocal("bootstrap.lua")
-	if bootstrapSource and bootstrapSourceValid(bootstrapSource) and runPatchLoader(bootstrapSource, "@Arrrel/bootstrap:" .. tostring(bootstrapPath or "local")) then
+	if bootstrapSource and bootstrapSourceValid(bootstrapSource) and patchVersionCurrent(bootstrapSource) and runPatchLoader(bootstrapSource, "@Arrrel/bootstrap:" .. tostring(bootstrapPath or "local")) then
 		return windUi
 	end
 
 	for _, base in ipairs(WINDUI_MIRROR_URLS) do
 		local body = Core.httpGet(base .. "bootstrap.lua")
-		if bootstrapSourceValid(body) and runPatchLoader(body, "@Arrrel/bootstrap:remote") then
+		if bootstrapSourceValid(body) and patchVersionCurrent(body) and runPatchLoader(body, "@Arrrel/bootstrap:remote") then
 			return windUi
 		end
 	end

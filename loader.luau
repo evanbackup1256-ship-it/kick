@@ -1,8 +1,8 @@
-local LOADER_VERSION = "7.7.5"
+local LOADER_VERSION = "7.7.6"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
-local FAST_COMPILE_VALIDATE = true
+local COMPILE_VALIDATE_CACHE = {}
 local CORE_MIN_BYTES = 50000
 local CORE_BASE_MIN_BYTES = 30000
 local CORE_BASE_MAX_BYTES = 45000
@@ -20,7 +20,7 @@ local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.7.5",
+	loader = "7.7.6",
 	core = "2.8.4",
 	ui = "Alleral",
 	windui = "2.1.4-alleral-v2",
@@ -1028,17 +1028,32 @@ local function coreVersionOk(v)
 	return type(v) == "string" and compareVersions(v, MIN_CORE) >= 0
 end
 
+local function compileCacheKey(src, label)
+	return (label or "Alleral/core-check") .. "|" .. tostring(#src) .. "|" .. src:sub(1, 64) .. "|" .. src:sub(-64)
+end
+
 local function compileCoreSource(src, label)
-	if FAST_COMPILE_VALIDATE then
-		return true
+	if type(src) ~= "string" then
+		return false, "invalid source"
+	end
+	local cacheKey = compileCacheKey(src, label)
+	local cached = COMPILE_VALIDATE_CACHE[cacheKey]
+	if cached ~= nil then
+		if cached == true then
+			return true
+		end
+		return false, cached
 	end
 	if type(loadStringFn) ~= "function" then
+		COMPILE_VALIDATE_CACHE[cacheKey] = true
 		return true
 	end
 	local fn, err = loadStringFn(src, label or "Alleral/core-check")
 	if type(fn) == "function" then
+		COMPILE_VALIDATE_CACHE[cacheKey] = true
 		return true
 	end
+	COMPILE_VALIDATE_CACHE[cacheKey] = err or "compile failed"
 	return false, err
 end
 
@@ -1988,6 +2003,7 @@ local function fetchExpectedVersionsFast()
 	end
 
 	ENV._Alleral_ExpectedVersions = expected
+	ENV._Alleral_ExpectedVersionsAt = tick()
 	return expected
 end
 
