@@ -3,7 +3,7 @@
 	Detects game, fetches core + game script, runs.
 ]]
 
-local LOADER_VERSION = "5.0.0"
+local LOADER_VERSION = "5.0.1"
 local MIN_CORE = "1.18"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
@@ -109,10 +109,22 @@ local function httpGet(url)
 	return nil
 end
 
-local function readLocal(paths)
+local function looksLikeLua(body)
+	if type(body) ~= "string" or #body < 50 then
+		return false
+	end
+	if body:find("<!DOCTYPE", 1, true) or body:find("<html", 1, true) then
+		return body:find("function", 1, true) ~= nil or body:find("local ", 1, true) ~= nil
+	end
+	return true
+end
+
+local function readLocal(paths, minBytes)
+	minBytes = minBytes or 0
 	if not readFile or not isFile then
 		return nil
 	end
+	local bestSrc, bestPath, bestLen = nil, nil, 0
 	local roots = { "", "kick/", "kick/kick/", "workspace/" }
 	for _, root in ipairs(roots) do
 		for _, path in ipairs(paths) do
@@ -120,34 +132,44 @@ local function readLocal(paths)
 			local okExists, exists = pcall(isFile, full)
 			if okExists and exists then
 				local okRead, src = pcall(readFile, full)
-				if okRead and type(src) == "string" and #src > 0 then
-					return src, full
+				if okRead and type(src) == "string" and #src >= minBytes and #src > bestLen then
+					bestSrc, bestPath, bestLen = src, full, #src
 				end
 			end
 		end
 	end
-	return nil
+	return bestSrc, bestPath
 end
 
-local function fetchRemote(relativePath)
+local function fetchRemote(relativePath, minBytes)
+	minBytes = minBytes or 0
 	for _, base in ipairs({ CDN, RAW }) do
 		local body = httpGet(base .. "/" .. relativePath)
-		if body and not body:find("404: Not Found", 1, true) then
+		if body and #body >= minBytes and looksLikeLua(body) and not body:find("404: Not Found", 1, true) then
 			return body, base
 		end
 	end
 	return nil
 end
 
-local function getSource(localPaths, remotePath, marker)
-	local src, path = readLocal(localPaths)
+local function getSource(localPaths, remotePath, opts)
+	opts = type(opts) == "table" and opts or { marker = opts }
+	local minBytes = opts.minBytes or 0
+	local marker = opts.marker
+
+	local src, path = readLocal(localPaths, minBytes)
 	if src and (not marker or src:find(marker, 1, true)) then
 		return src, "local:" .. path
 	end
-	src = fetchRemote(remotePath)
-	if src and (not marker or src:find(marker, 1, true)) then
+
+	src, path = fetchRemote(remotePath, minBytes)
+	if src then
+		if marker and not src:find(marker, 1, true) then
+			log("Script may be outdated (missing " .. marker .. ")", true)
+		end
 		return src, "remote"
 	end
+
 	return nil, "Could not load " .. remotePath
 end
 
@@ -200,7 +222,11 @@ local function loadCore()
 	end
 	ENV.Alleral_Core = nil
 
-	local src, label = getSource({ "core/alleral_core.luau", "alleral_core.luau" }, "core/alleral_core.luau")
+	local src, label = getSource(
+		{ "core/alleral_core.luau", "alleral_core.luau" },
+		"core/alleral_core.luau",
+		{ minBytes = 5000 }
+	)
 	if not src or not coreValid(src) then
 		return false, label or "Core download failed"
 	end
@@ -217,7 +243,7 @@ local function loadCore()
 end
 
 local function loadModule(localPaths, remotePath, marker, chunkName)
-	local src, label = getSource(localPaths, remotePath, marker)
+	local src, label = getSource(localPaths, remotePath, { marker = marker, minBytes = 500 })
 	if not src then
 		return false
 	end
@@ -465,9 +491,13 @@ local function main()
 		end
 	end
 
-	local src, label = getSource(profile.scriptFiles, profile.scriptUrl, profile.sourceMarker)
-	if not src or #src < 1000 then
-		notify("Alleral", "Game script download failed", 8)
+	local src, label = getSource(profile.scriptFiles, profile.scriptUrl, {
+		marker = profile.sourceMarker,
+		minBytes = 5000,
+	})
+	if not src then
+		notify("Alleral", "Game script failed: " .. tostring(label), 8)
+		log("Game script failed: " .. tostring(label), true)
 		ENV.Alleral_LoaderRunning = false
 		return
 	end
