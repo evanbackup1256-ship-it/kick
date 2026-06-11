@@ -57,10 +57,8 @@ body {
   will-change: transform;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .aurora {
-    animation: aurora-drift 28s var(--ease-drift) infinite alternate;
-  }
+.aurora {
+  animation: aurora-drift 28s var(--ease-drift) infinite alternate;
 }
 
 @keyframes aurora-drift {
@@ -1174,10 +1172,8 @@ body.cf-gate-active > :not(#cfGate) {
   will-change: transform;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .grain {
-    animation: grain-drift 12s steps(8) infinite;
-  }
+.grain {
+  animation: grain-drift 12s steps(8) infinite;
 }
 
 @keyframes grain-drift {
@@ -1582,17 +1578,4 @@ body.admin-page {
   .admin-key-form { grid-template-columns: 1fr; }
   .admin-key-actions { width: 100%; }
   .admin-key-actions .btn { flex: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
-  .reveal { opacity: 1; transform: none; filter: none; }
-  .section-intro.reveal > * { opacity: 1; transform: none; }
-  html.has-view-timeline .reveal,
-  html.has-view-timeline .game-card,
-  html.has-view-timeline .feature-card,
-  html.has-view-timeline .changelog-card { animation: none !important; }
 }

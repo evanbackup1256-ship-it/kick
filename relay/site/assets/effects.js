@@ -1,6 +1,6 @@
 (() => {
-  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const hasViewTimeline = !prefersReduced && CSS.supports("(animation-timeline: view())");
+  const prefersReduced = false;
+  const hasViewTimeline = CSS.supports("(animation-timeline: view())");
   const EASE = (t) => 1 - (1 - t) ** 3;
 
   if (hasViewTimeline) {
