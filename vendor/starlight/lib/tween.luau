@@ -3,12 +3,37 @@ local Theme = require(script.Parent.theme)
 
 local Tween = {}
 
-function Tween.play(instance, goal, callback, info)
-	local tween = TweenService:Create(instance, info or Theme.tweenInfo(), goal)
-	if callback then
-		tween.Completed:Once(callback)
+function Tween.set(instance, props)
+	if not instance or type(props) ~= "table" then
+		return
 	end
-	tween:Play()
+	for key, value in pairs(props) do
+		pcall(function()
+			instance[key] = value
+		end)
+	end
+end
+
+function Tween.play(instance, goal, callback, info)
+	if not instance or type(goal) ~= "table" then
+		if callback then
+			callback()
+		end
+		return nil
+	end
+
+	Tween.set(instance, goal)
+
+	local tween
+	local ok = pcall(function()
+		tween = TweenService:Create(instance, info or Theme.tweenInfo(), goal)
+	end)
+	if ok and tween then
+		if callback then
+			tween.Completed:Once(callback)
+		end
+		tween:Play()
+	end
 	return tween
 end
 

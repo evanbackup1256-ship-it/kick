@@ -140,6 +140,7 @@ function Util.button(props)
 	local frame = Util.new("TextButton", {
 		AutoButtonColor = false,
 		BackgroundColor3 = props.BackgroundColor3 or Color3.fromRGB(42, 44, 52),
+		BackgroundTransparency = props.BackgroundTransparency or 0,
 		BorderSizePixel = 0,
 		Text = "",
 		Size = props.Size or UDim2.new(1, 0, 0, 34),
@@ -150,6 +151,30 @@ function Util.button(props)
 		frame.Parent = props.Parent
 	end
 	return frame
+end
+
+function Util.inputBox(props)
+	local box = Util.new("TextBox", {
+		AutoButtonColor = false,
+		BackgroundColor3 = props.BackgroundColor3 or Color3.fromRGB(38, 38, 48),
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		ClearTextOnFocus = props.ClearTextOnFocus == true,
+		Font = props.Font or Enum.Font.Gotham,
+		PlaceholderText = props.PlaceholderText or "",
+		Text = props.Text or "",
+		TextColor3 = props.TextColor3 or Color3.fromRGB(240, 240, 245),
+		TextTransparency = 0,
+		PlaceholderColor3 = props.PlaceholderColor3 or Color3.fromRGB(120, 120, 135),
+		TextSize = props.TextSize or 13,
+		TextXAlignment = props.TextXAlignment or Enum.TextXAlignment.Left,
+		Size = props.Size or UDim2.fromScale(1, 1),
+	})
+	Util.corner(props.Radius or 6, box)
+	if props.Parent then
+		box.Parent = props.Parent
+	end
+	return box
 end
 
 return Util

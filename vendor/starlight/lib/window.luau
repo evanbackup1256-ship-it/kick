@@ -1,6 +1,5 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 
 local Util = require(script.Parent.util)
 local Theme = require(script.Parent.theme)
@@ -25,35 +24,39 @@ function WindowBuilder.refreshTheme(root)
 	end
 end
 
+local function protectGui(instance)
+	pcall(function()
+		if typeof(syn) == "table" and typeof(syn.protect_gui) == "function" then
+			syn.protect_gui(instance)
+		elseif typeof(protectgui) == "function" then
+			protectgui(instance)
+		end
+	end)
+end
+
 local function parentGui(screenGui)
 	local coreGui = game:GetService("CoreGui")
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-	local function protect(instance)
-		pcall(function()
-			if typeof(syn) == "table" and typeof(syn.protect_gui) == "function" then
-				syn.protect_gui(instance)
-			elseif typeof(protectgui) == "function" then
-				protectgui(instance)
-			end
-		end)
-	end
-
-	if typeof(gethui) == "function" then
-		local ok = pcall(function()
-			screenGui.Parent = gethui()
-		end)
-		if ok and screenGui.Parent then
-			return
-		end
-	end
-
-	protect(screenGui)
+	protectGui(screenGui)
 	local ok = pcall(function()
 		screenGui.Parent = coreGui
 	end)
-	if not ok or not screenGui.Parent then
+	if ok and screenGui.Parent then
+		return
+	end
+
+	ok = pcall(function()
 		screenGui.Parent = playerGui
+	end)
+	if ok and screenGui.Parent then
+		return
+	end
+
+	if typeof(gethui) == "function" then
+		pcall(function()
+			screenGui.Parent = gethui()
+		end)
 	end
 end
 
@@ -61,7 +64,6 @@ function WindowBuilder.create(library, windowSettings)
 	windowSettings = windowSettings or {}
 	windowSettings.NotifyOnCallbackError = windowSettings.NotifyOnCallbackError ~= false
 
-	local player = Players.LocalPlayer
 	local theme = Theme.current()
 
 	if windowSettings.FileSettings then
@@ -78,13 +80,9 @@ function WindowBuilder.create(library, windowSettings)
 	})
 	parentGui(screenGui)
 	library.Instance = screenGui
+	library._screenGui = screenGui
+	library._popupRoot = screenGui
 	Notification.init(screenGui, library)
-
-	local overlay = Util.new("Frame", {
-		Name = "Overlay",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-	}, { screenGui })
 
 	local lighting = game:GetService("Lighting")
 	local blur = lighting:FindFirstChild("AlleralBlur") or lighting:FindFirstChild("StarlightBlur")
@@ -101,158 +99,166 @@ function WindowBuilder.create(library, windowSettings)
 		blur.Size = (active and Theme.Visual.BlurEnabled) and Theme.Visual.BlurSize or 0
 	end
 
-	library._popupRoot = screenGui
-	library._screenGui = screenGui
-
 	local main = Util.new("Frame", {
 		Name = "MainWindow",
 		BackgroundColor3 = theme.Backgrounds.Medium,
-		BackgroundTransparency = Theme.Visual.WindowTransparency,
+		BackgroundTransparency = 0,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = windowSettings.DefaultSize or UDim2.fromOffset(900, 560),
+		Size = windowSettings.DefaultSize or UDim2.fromOffset(868, 598),
 		Visible = false,
 		ClipsDescendants = true,
-		ZIndex = 100,
-	}, { overlay })
-	main:SetAttribute("TargetTransparency", Theme.Visual.WindowTransparency)
-	Util.corner(Theme.Visual.GroupboxRadius + 6, main)
-	local mainStroke = Util.stroke(theme.Accent, 1, 0.35, main)
-
-	local accentRail = Util.new("Frame", {
-		Name = "AccentRail",
-		BackgroundColor3 = theme.Accent,
-		Size = UDim2.new(0, 3, 1, -24),
-		Position = UDim2.new(0, 0, 0, 12),
-		ZIndex = 2,
-	}, { main })
-	Util.corner(999, accentRail)
-	Util.gradient(Theme.accentGradient(), 90, accentRail)
+	}, { screenGui })
+	Util.corner(10, main)
+	Util.stroke(theme.Miscellaneous.Divider, 1, 0.35, main)
 
 	local sidebar = Util.new("Frame", {
 		Name = "Sidebar",
 		BackgroundColor3 = theme.Backgrounds.Dark,
 		BackgroundTransparency = 0,
-		Position = UDim2.fromOffset(3, 0),
 		Size = UDim2.new(0, Theme.Visual.SidebarWidth, 1, 0),
 	}, { main })
-	Util.padding(16, 14, 16, 14, sidebar)
-	Util.list(12, false, sidebar)
+	Util.padding(14, 12, 14, 12, sidebar)
+	Util.list(10, false, sidebar)
 
 	local brand = Util.new("Frame", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 52),
+		Size = UDim2.new(1, 0, 0, 48),
+		LayoutOrder = 0,
 	}, { sidebar })
-	Util.list(4, false, brand)
+	Util.list(6, true, brand)
 
 	if not Util.isEmpty(windowSettings.Icon) then
 		Util.new("ImageLabel", {
 			BackgroundTransparency = 1,
 			Image = Util.iconAsset(windowSettings.Icon),
-			Size = UDim2.fromOffset(28, 28),
+			Size = UDim2.fromOffset(24, 24),
 			ImageColor3 = theme.Accent,
+			ImageTransparency = 0,
 		}, { brand })
 	end
 
+	local brandText = Util.new("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -30, 1, 0),
+	}, { brand })
+	Util.list(2, false, brandText)
+
 	Util.text({
-		Parent = brand,
+		Parent = brandText,
 		Text = windowSettings.Name or "Alleral",
 		Font = Enum.Font.GothamBold,
-		TextSize = 19 * Theme.Visual.FontScale,
+		TextSize = 17 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
 	})
 	Util.text({
-		Parent = brand,
+		Parent = brandText,
 		Text = windowSettings.Subtitle or "Interface Suite",
 		TextSize = 11 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Medium,
 	})
 
-	local brandStripe = Util.new("Frame", {
-		Name = "BrandStripe",
-		BackgroundColor3 = theme.Accent,
-		Size = UDim2.new(1, 0, 0, 2),
-		Position = UDim2.new(0, 0, 1, -2),
-	}, { brand })
-	Util.gradient(Theme.accentGradient(), 0, brandStripe)
+	Util.new("Frame", {
+		BackgroundColor3 = theme.Miscellaneous.Divider,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 0, 1),
+		LayoutOrder = 1,
+	}, { sidebar })
 
 	local navHolder = Util.new("ScrollingFrame", {
 		Name = "Navigation",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 1, -120),
+		Size = UDim2.new(1, 0, 1, -100),
+		LayoutOrder = 2,
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 0,
+		BorderSizePixel = 0,
 	}, { sidebar })
 	Util.list(6, false, navHolder)
+
+	Util.text({
+		Parent = sidebar,
+		Text = "Press " .. (library.WindowKeybind or "K") .. " to toggle",
+		TextSize = 11 * Theme.Visual.FontScale,
+		TextColor3 = theme.Foregrounds.Dark,
+		Size = UDim2.new(1, 0, 0, 16),
+		LayoutOrder = 3,
+	})
+
+	local divider = Util.new("Frame", {
+		Name = "Divider",
+		BackgroundColor3 = theme.Miscellaneous.Divider,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, Theme.Visual.SidebarWidth, 0, 0),
+		Size = UDim2.new(0, 1, 1, 0),
+	}, { main })
 
 	local content = Util.new("Frame", {
 		Name = "Content",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, Theme.Visual.SidebarWidth + 3, 0, 0),
-		Size = UDim2.new(1, -(Theme.Visual.SidebarWidth + 3), 1, 0),
+		Position = UDim2.new(0, Theme.Visual.SidebarWidth + 1, 0, 0),
+		Size = UDim2.new(1, -(Theme.Visual.SidebarWidth + 1), 1, 0),
 	}, { main })
 
 	local topBar = Util.new("Frame", {
 		Name = "TopBar",
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 48),
+		BackgroundColor3 = theme.Backgrounds.Medium,
+		BackgroundTransparency = 0,
+		Size = UDim2.new(1, 0, 0, 42),
 	}, { content })
-	Util.padding(0, 16, 0, 16, topBar)
-
-	local topAccent = Util.new("Frame", {
-		Name = "TopAccent",
-		BackgroundColor3 = theme.Accent,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, 0, 1, 0),
-		Size = UDim2.new(1, 0, 0, 1),
-		BackgroundTransparency = 0.35,
-	}, { topBar })
-	Util.gradient(Theme.accentGradient(), 0, topAccent)
 
 	local titleLabel = Util.text({
 		Parent = topBar,
-		Text = "Dashboard",
+		Text = "Home",
 		Font = Enum.Font.GothamBold,
-		TextSize = 18 * Theme.Visual.FontScale,
+		TextSize = 16 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Size = UDim2.new(1, -120, 1, 0),
+		Position = UDim2.fromOffset(16, 0),
+		Size = UDim2.new(1, -130, 1, 0),
 	})
 
 	local controls = Util.new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, 0, 0.5, 0),
-		Size = UDim2.fromOffset(96, 28),
+		Position = UDim2.new(1, -12, 0.5, 0),
+		Size = UDim2.fromOffset(72, 26),
 	}, { topBar })
-	Util.list(8, true, controls)
+	Util.list(6, true, controls)
 
 	local function controlButton(text, color)
 		local btn = Util.button({
 			Parent = controls,
-			Size = UDim2.fromOffset(28, 28),
+			Size = UDim2.fromOffset(26, 26),
 			BackgroundColor3 = theme.Backgrounds.Highlight,
-			Radius = 8,
+			Radius = 6,
 		})
 		Util.text({
 			Parent = btn,
 			Text = text,
 			TextXAlignment = Enum.TextXAlignment.Center,
-			TextSize = 16,
+			TextSize = 15,
 			TextColor3 = color or theme.Foregrounds.Light,
 			Size = UDim2.fromScale(1, 1),
 		})
 		return btn
 	end
 
-	local minimizeBtn = controlButton("—")
+	local minimizeBtn = controlButton("−")
 	local closeBtn = controlButton("×", theme.Miscellaneous.Danger)
+
+	Util.new("Frame", {
+		BackgroundColor3 = theme.Miscellaneous.Divider,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, 1, -1),
+		Size = UDim2.new(1, 0, 0, 1),
+	}, { topBar })
 
 	local pages = Util.new("Frame", {
 		Name = "Pages",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 0, 0, 48),
-		Size = UDim2.new(1, 0, 1, -48),
+		Position = UDim2.new(0, 0, 0, 42),
+		Size = UDim2.new(1, 0, 1, -42),
 	}, { content })
 
 	local window = {
@@ -299,7 +305,6 @@ function WindowBuilder.create(library, windowSettings)
 		window.Visible = state
 		main.Visible = state
 		setBlur(state)
-		main.BackgroundTransparency = state and Theme.Visual.WindowTransparency or 1
 	end
 
 	closeBtn.MouseButton1Click:Connect(function()
@@ -340,9 +345,9 @@ function WindowBuilder.create(library, windowSettings)
 			Util.text({
 				Parent = sectionFrame,
 				Text = string.upper(name),
-				TextSize = 11 * Theme.Visual.FontScale,
+				TextSize = 10 * Theme.Visual.FontScale,
 				TextColor3 = theme.Foregrounds.Dark,
-				Size = UDim2.new(1, 0, 0, 16),
+				Size = UDim2.new(1, 0, 0, 14),
 			})
 		end
 
@@ -365,33 +370,42 @@ function WindowBuilder.create(library, windowSettings)
 
 			local navButton = Util.button({
 				Parent = tabsFrame,
-				BackgroundColor3 = theme.Backgrounds.Highlight,
-				BackgroundTransparency = 1,
-				Size = UDim2.new(1, 0, 0, 34),
-				Radius = 999,
+				BackgroundColor3 = theme.Backgrounds.Dark,
+				BackgroundTransparency = 0,
+				Size = UDim2.new(1, 0, 0, 32),
+				Radius = 6,
 			})
-			local navStroke = Util.stroke(theme.Accent, 1, 1, navButton)
+
+			local indicator = Util.new("Frame", {
+				Name = "Indicator",
+				BackgroundColor3 = theme.Accent,
+				Size = UDim2.new(0, 3, 1, -10),
+				Position = UDim2.fromOffset(0, 5),
+				BackgroundTransparency = 1,
+			}, { navButton })
 
 			local navRow = Util.new("Frame", {
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
 			}, { navButton })
-			Util.list(10, true, navRow)
-			Util.padding(0, 12, 0, 12, navRow)
+			Util.list(8, true, navRow)
+			Util.padding(0, 10, 0, 14, navRow)
 
+			local navIcon
 			if not Util.isEmpty(tabSettings.Icon) then
-				Util.new("ImageLabel", {
+				navIcon = Util.new("ImageLabel", {
 					BackgroundTransparency = 1,
 					Image = Util.iconAsset(tabSettings.Icon),
 					Size = UDim2.fromOffset(16, 16),
 					ImageColor3 = theme.Foregrounds.Medium,
+					ImageTransparency = 0,
 				}, { navRow })
 			end
 
 			local navLabel = Util.text({
 				Parent = navRow,
 				Text = tabSettings.Name or tabIndex,
-				TextSize = 14 * Theme.Visual.FontScale,
+				TextSize = 13 * Theme.Visual.FontScale,
 				TextColor3 = theme.Foregrounds.Medium,
 				Size = UDim2.new(1, 0, 1, 0),
 			})
@@ -402,10 +416,12 @@ function WindowBuilder.create(library, windowSettings)
 				Size = UDim2.fromScale(1, 1),
 				CanvasSize = UDim2.new(),
 				AutomaticCanvasSize = Enum.AutomaticSize.Y,
-				ScrollBarThickness = 4,
+				ScrollBarThickness = 3,
+				ScrollBarImageColor3 = theme.Accent,
+				BorderSizePixel = 0,
 				Visible = false,
 			}, { pages })
-			Util.padding(16, 16, 16, 16, page)
+			Util.padding(14, 14, 14, 14, page)
 
 			local columns = tabSettings.Columns or 2
 			local columnsFrame = Util.new("Frame", {
@@ -414,17 +430,26 @@ function WindowBuilder.create(library, windowSettings)
 				Size = UDim2.new(1, 0, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 			}, { page })
-			Util.list(14, true, columnsFrame)
+			Util.list(12, true, columnsFrame)
 
 			local columnFrames = {}
 			for i = 1, columns do
 				columnFrames[i] = Util.new("Frame", {
 					Name = "Column" .. i,
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1 / columns, -8, 0, 0),
+					Size = UDim2.new(1 / columns, -6, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 				}, { columnsFrame })
-				Util.list(12, false, columnFrames[i])
+				Util.list(10, false, columnFrames[i])
+			end
+
+			local function styleNav(active)
+				indicator.BackgroundTransparency = active and 0 or 1
+				navButton.BackgroundColor3 = active and theme.Backgrounds.Highlight or theme.Backgrounds.Dark
+				navLabel.TextColor3 = active and theme.Foregrounds.Light or theme.Foregrounds.Medium
+				if navIcon then
+					navIcon.ImageColor3 = active and theme.Accent or theme.Foregrounds.Medium
+				end
 			end
 
 			local function activate()
@@ -433,29 +458,21 @@ function WindowBuilder.create(library, windowSettings)
 					if other.Page then
 						other.Page.Visible = false
 					end
-					if other.NavButton then
-						Tween.play(other.NavButton, { BackgroundTransparency = 1 })
-						if other.NavStroke then
-							Tween.play(other.NavStroke, { Transparency = 1 })
-						end
-						if other.NavLabel then
-							Tween.play(other.NavLabel, { TextColor3 = theme.Foregrounds.Medium })
-						end
+					if other.StyleNav then
+						other.StyleNav(false)
 					end
 				end
 				tab.Active = true
 				tab.Page.Visible = true
 				titleLabel.Text = tabSettings.Name or tabIndex
-				Tween.play(navButton, { BackgroundTransparency = 0.15, BackgroundColor3 = theme.Backgrounds.Highlight })
-				Tween.play(navStroke, { Transparency = 0.55, Color = theme.Accent })
-				Tween.play(navLabel, { TextColor3 = theme.Foregrounds.Light })
+				styleNav(true)
 				window.CurrentTab = tab
 			end
 
 			tab.Page = page
 			tab.NavButton = navButton
-			tab.NavStroke = navStroke
 			tab.NavLabel = navLabel
+			tab.StyleNav = styleNav
 			navButton.MouseButton1Click:Connect(activate)
 			self.Tabs[tabIndex] = tab
 
@@ -485,33 +502,31 @@ function WindowBuilder.create(library, windowSettings)
 				local box = Util.new("Frame", {
 					Name = groupIndex,
 					BackgroundColor3 = theme.Backgrounds.Groupbox,
-					BackgroundTransparency = Theme.Visual.GroupboxTransparency,
+					BackgroundTransparency = 0,
 					Size = UDim2.new(1, 0, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 				}, { holder })
 				Util.corner(Theme.Visual.GroupboxRadius, box)
-				Util.stroke(theme.Miscellaneous.Divider, 1, 0.45, box)
+				if Theme.Visual.ShowShadows then
+					Util.stroke(theme.Miscellaneous.Divider, 1, 0.55, box)
+				end
+				Util.padding(12, 12, 12, 12, box)
+				Util.list(8, false, box)
 
 				local header = Util.new("Frame", {
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 0, 24),
+					Size = UDim2.new(1, 0, 0, 20),
+					LayoutOrder = 1,
 				}, { box })
-				Util.list(8, true, header)
-
-				local groupAccent = Util.new("Frame", {
-					Name = "Accent",
-					BackgroundColor3 = theme.Accent,
-					Size = UDim2.new(1, 0, 0, 2),
-					Position = UDim2.new(0, 0, 0, -6),
-				}, { header })
-				Util.gradient(Theme.accentGradient(), 0, groupAccent)
+				Util.list(6, true, header)
 
 				if not Util.isEmpty(groupSettings.Icon) then
 					Util.new("ImageLabel", {
 						BackgroundTransparency = 1,
 						Image = Util.iconAsset(groupSettings.Icon),
-						Size = UDim2.fromOffset(16, 16),
+						Size = UDim2.fromOffset(14, 14),
 						ImageColor3 = theme.Accent,
+						ImageTransparency = 0,
 					}, { header })
 				end
 
@@ -519,19 +534,24 @@ function WindowBuilder.create(library, windowSettings)
 					Parent = header,
 					Text = groupSettings.Name or groupIndex,
 					Font = Enum.Font.GothamBold,
-					TextSize = 14 * Theme.Visual.FontScale,
-					TextColor3 = theme.Foregrounds.Light,
+					TextSize = 13 * Theme.Visual.FontScale,
+					TextColor3 = theme.Accent,
 					Size = UDim2.new(1, 0, 1, 0),
 				})
 
-				Util.padding(14, 12, 12, 12, box)
-				Util.list(8, false, box)
+				Util.new("Frame", {
+					BackgroundColor3 = theme.Miscellaneous.Divider,
+					BorderSizePixel = 0,
+					Size = UDim2.new(1, 0, 0, 1),
+					LayoutOrder = 2,
+				}, { box })
 
 				local parentingItem = Util.new("Frame", {
 					Name = "Elements",
 					BackgroundTransparency = 1,
 					Size = UDim2.new(1, 0, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
+					LayoutOrder = 3,
 				}, { box })
 				Util.list(6, false, parentingItem)
 
@@ -648,7 +668,8 @@ function WindowBuilder.create(library, windowSettings)
 			function tab:BuildConfigGroupbox(column, style, buttonsCentered)
 				local groupbox = self:CreateGroupbox({ Name = "Configuration", Column = column or 1 }, "Config")
 				local configName = "default"
-				local nameInput = groupbox:CreateInput({
+
+				groupbox:CreateInput({
 					Name = "Config name",
 					Placeholder = "default",
 					CurrentValue = configName,
@@ -715,7 +736,7 @@ function WindowBuilder.create(library, windowSettings)
 
 	if windowSettings.LoadingEnabled ~= false then
 		task.defer(function()
-			task.wait(0.15)
+			task.wait(0.1)
 			setVisible(true)
 		end)
 	else

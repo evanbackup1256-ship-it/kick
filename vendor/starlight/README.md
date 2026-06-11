@@ -1,18 +1,6 @@
 # Starlight — Alleral UI
 
-Programmatic UI library for Alleral game scripts. No Roblox asset model required.
-
-## Protected artifacts
-
-Critical runtime modules are **obfuscated** before distribution. Edit readable sources, then rebuild:
-
-| Edit | Command |
-|------|---------|
-| Starlight UI (`vendor/starlight/lib/`) | `python vendor/starlight/bundle.py` |
-| Telemetry / analytics (`core/internal/`) | `python tools/obfuscate_critical.py` |
-| Verify all protected outputs | `python tools/verify_obfuscation.py` |
-
-Loader and game scripts stay readable. `core/alleral_core.luau` and `loader.luau` are not obfuscated (they change often and glue everything together).
+Programmatic UI library for Alleral game scripts. Inspired by Linoria, Rayfield, and Fluent — dark sidebar layout, solid panels, executor-safe rendering.
 
 ## Layout
 
@@ -30,20 +18,11 @@ vendor/starlight/
 python vendor/starlight/bundle.py
 ```
 
-This writes:
-- `Source.plain.lua` — readable bundle (edit `lib/` instead)
-- `Source.lua` — **obfuscated** distribution build (what executors load)
-
-To re-protect telemetry/analytics after editing `core/internal/`:
-
-```bash
-python tools/obfuscate_critical.py
-python tools/verify_obfuscation.py
-```
+Writes `Source.plain.lua` and `Source.lua` (plain readable bundle).
 
 ## Usage
 
-Loaded automatically via `Alleral_Core.loadStarlight()` → `vendor/starlight/Source.lua`.
+Loaded via `Alleral_Core.loadStarlight()` → `vendor/starlight/Source.lua`.
 
 ```lua
 local window = Starlight:CreateWindow({
@@ -65,6 +44,6 @@ group:CreateToggle({
 }, "AutoFarm")
 ```
 
-Use `Core.wrapStarlightGroup(groupbox, callbackWrapper)` in game scripts for shorthand helpers (`CreateToggle`, `AddDropdown`, etc.).
+Use `Core.wrapStarlightGroup(groupbox, callbackWrapper)` in game scripts for shorthand helpers.
 
-Press **K** to toggle the window (configurable via `Starlight.WindowKeybind`).
+Press **K** to toggle the window.

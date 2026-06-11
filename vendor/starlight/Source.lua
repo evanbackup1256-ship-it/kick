@@ -150,6 +150,7 @@ function Util.button(props)
 	local frame = Util.new("TextButton", {
 		AutoButtonColor = false,
 		BackgroundColor3 = props.BackgroundColor3 or Color3.fromRGB(42, 44, 52),
+		BackgroundTransparency = props.BackgroundTransparency or 0,
 		BorderSizePixel = 0,
 		Text = "",
 		Size = props.Size or UDim2.new(1, 0, 0, 34),
@@ -160,6 +161,30 @@ function Util.button(props)
 		frame.Parent = props.Parent
 	end
 	return frame
+end
+
+function Util.inputBox(props)
+	local box = Util.new("TextBox", {
+		AutoButtonColor = false,
+		BackgroundColor3 = props.BackgroundColor3 or Color3.fromRGB(38, 38, 48),
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		ClearTextOnFocus = props.ClearTextOnFocus == true,
+		Font = props.Font or Enum.Font.Gotham,
+		PlaceholderText = props.PlaceholderText or "",
+		Text = props.Text or "",
+		TextColor3 = props.TextColor3 or Color3.fromRGB(240, 240, 245),
+		TextTransparency = 0,
+		PlaceholderColor3 = props.PlaceholderColor3 or Color3.fromRGB(120, 120, 135),
+		TextSize = props.TextSize or 13,
+		TextXAlignment = props.TextXAlignment or Enum.TextXAlignment.Left,
+		Size = props.Size or UDim2.fromScale(1, 1),
+	})
+	Util.corner(props.Radius or 6, box)
+	if props.Parent then
+		box.Parent = props.Parent
+	end
+	return box
 end
 
 return Util
@@ -173,28 +198,110 @@ local Util = requireModule('util')
 
 local Theme = {}
 
+-- Palettes inspired by Linoria (dark flat), Rayfield (accent glow), Fluent (clean hierarchy)
 Theme.Palettes = {
 	Alleral = {
-		Accent = Color3.fromRGB(124, 92, 255),
-		AccentSoft = Color3.fromRGB(56, 189, 248),
+		Accent = Color3.fromRGB(76, 110, 245),
+		AccentSoft = Color3.fromRGB(106, 140, 255),
 		Backgrounds = {
-			Dark = Color3.fromRGB(12, 13, 20),
-			Medium = Color3.fromRGB(18, 19, 28),
-			Light = Color3.fromRGB(26, 28, 40),
-			Groupbox = Color3.fromRGB(22, 24, 36),
-			Highlight = Color3.fromRGB(34, 36, 52),
-			Elevated = Color3.fromRGB(30, 32, 48),
+			Dark = Color3.fromRGB(18, 18, 22),
+			Medium = Color3.fromRGB(24, 24, 30),
+			Light = Color3.fromRGB(32, 32, 40),
+			Groupbox = Color3.fromRGB(28, 28, 36),
+			Highlight = Color3.fromRGB(38, 38, 48),
+			Elevated = Color3.fromRGB(34, 34, 44),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
-			Light = Color3.fromRGB(232, 234, 244),
-			Medium = Color3.fromRGB(142, 146, 168),
-			Dark = Color3.fromRGB(82, 86, 108),
-			MediumHover = Color3.fromRGB(188, 192, 212),
-			DarkHover = Color3.fromRGB(108, 112, 134),
+			Light = Color3.fromRGB(240, 240, 245),
+			Medium = Color3.fromRGB(160, 160, 175),
+			Dark = Color3.fromRGB(100, 100, 115),
+			MediumHover = Color3.fromRGB(200, 200, 210),
+			DarkHover = Color3.fromRGB(130, 130, 145),
 		},
 		Miscellaneous = {
-			Divider = Color3.fromRGB(38, 40, 58),
+			Divider = Color3.fromRGB(50, 50, 62),
+			Shadow = Color3.fromRGB(0, 0, 0),
+			Success = Color3.fromRGB(72, 199, 142),
+			Warning = Color3.fromRGB(255, 184, 77),
+			Danger = Color3.fromRGB(255, 96, 112),
+		},
+	},
+	Midnight = {
+		Accent = Color3.fromRGB(168, 85, 247),
+		AccentSoft = Color3.fromRGB(192, 132, 252),
+		Backgrounds = {
+			Dark = Color3.fromRGB(12, 10, 18),
+			Medium = Color3.fromRGB(18, 16, 26),
+			Light = Color3.fromRGB(26, 22, 36),
+			Groupbox = Color3.fromRGB(22, 18, 32),
+			Highlight = Color3.fromRGB(36, 30, 52),
+			Elevated = Color3.fromRGB(30, 26, 44),
+		},
+		Foregrounds = {
+			Active = Color3.fromRGB(255, 255, 255),
+			Light = Color3.fromRGB(236, 232, 248),
+			Medium = Color3.fromRGB(164, 156, 188),
+			Dark = Color3.fromRGB(96, 88, 118),
+			MediumHover = Color3.fromRGB(196, 188, 220),
+			DarkHover = Color3.fromRGB(124, 116, 148),
+		},
+		Miscellaneous = {
+			Divider = Color3.fromRGB(48, 42, 68),
+			Shadow = Color3.fromRGB(0, 0, 0),
+			Success = Color3.fromRGB(52, 211, 153),
+			Warning = Color3.fromRGB(251, 191, 36),
+			Danger = Color3.fromRGB(248, 113, 113),
+		},
+	},
+	Aurora = {
+		Accent = Color3.fromRGB(45, 212, 191),
+		AccentSoft = Color3.fromRGB(94, 234, 212),
+		Backgrounds = {
+			Dark = Color3.fromRGB(10, 16, 18),
+			Medium = Color3.fromRGB(14, 22, 26),
+			Light = Color3.fromRGB(20, 30, 36),
+			Groupbox = Color3.fromRGB(16, 26, 30),
+			Highlight = Color3.fromRGB(24, 42, 48),
+			Elevated = Color3.fromRGB(22, 36, 42),
+		},
+		Foregrounds = {
+			Active = Color3.fromRGB(255, 255, 255),
+			Light = Color3.fromRGB(230, 250, 246),
+			Medium = Color3.fromRGB(148, 188, 182),
+			Dark = Color3.fromRGB(88, 118, 114),
+			MediumHover = Color3.fromRGB(178, 214, 208),
+			DarkHover = Color3.fromRGB(108, 142, 136),
+		},
+		Miscellaneous = {
+			Divider = Color3.fromRGB(36, 58, 64),
+			Shadow = Color3.fromRGB(0, 0, 0),
+			Success = Color3.fromRGB(52, 211, 153),
+			Warning = Color3.fromRGB(251, 191, 36),
+			Danger = Color3.fromRGB(248, 113, 113),
+		},
+	},
+	Rose = {
+		Accent = Color3.fromRGB(244, 114, 182),
+		AccentSoft = Color3.fromRGB(251, 182, 206),
+		Backgrounds = {
+			Dark = Color3.fromRGB(16, 10, 14),
+			Medium = Color3.fromRGB(24, 14, 20),
+			Light = Color3.fromRGB(34, 20, 28),
+			Groupbox = Color3.fromRGB(28, 16, 24),
+			Highlight = Color3.fromRGB(48, 24, 38),
+			Elevated = Color3.fromRGB(40, 22, 32),
+		},
+		Foregrounds = {
+			Active = Color3.fromRGB(255, 255, 255),
+			Light = Color3.fromRGB(252, 236, 244),
+			Medium = Color3.fromRGB(196, 156, 176),
+			Dark = Color3.fromRGB(118, 84, 102),
+			MediumHover = Color3.fromRGB(220, 184, 202),
+			DarkHover = Color3.fromRGB(142, 104, 124),
+		},
+		Miscellaneous = {
+			Divider = Color3.fromRGB(64, 36, 52),
 			Shadow = Color3.fromRGB(0, 0, 0),
 			Success = Color3.fromRGB(52, 211, 153),
 			Warning = Color3.fromRGB(251, 191, 36),
@@ -228,103 +335,22 @@ Theme.Palettes = {
 			Danger = Color3.fromRGB(255, 96, 112),
 		},
 	},
-	Midnight = {
-		Accent = Color3.fromRGB(168, 85, 247),
-		AccentSoft = Color3.fromRGB(124, 58, 237),
-		Backgrounds = {
-			Dark = Color3.fromRGB(8, 8, 12),
-			Medium = Color3.fromRGB(14, 14, 20),
-			Light = Color3.fromRGB(22, 22, 30),
-			Groupbox = Color3.fromRGB(18, 18, 26),
-			Highlight = Color3.fromRGB(34, 30, 48),
-			Elevated = Color3.fromRGB(28, 26, 38),
-		},
-		Foregrounds = {
-			Active = Color3.fromRGB(255, 255, 255),
-			Light = Color3.fromRGB(236, 232, 248),
-			Medium = Color3.fromRGB(164, 156, 188),
-			Dark = Color3.fromRGB(96, 88, 118),
-			MediumHover = Color3.fromRGB(196, 188, 220),
-			DarkHover = Color3.fromRGB(124, 116, 148),
-		},
-		Miscellaneous = {
-			Divider = Color3.fromRGB(48, 42, 68),
-			Shadow = Color3.fromRGB(0, 0, 0),
-			Success = Color3.fromRGB(52, 211, 153),
-			Warning = Color3.fromRGB(251, 191, 36),
-			Danger = Color3.fromRGB(248, 113, 113),
-		},
-	},
-	Aurora = {
-		Accent = Color3.fromRGB(45, 212, 191),
-		AccentSoft = Color3.fromRGB(20, 184, 166),
-		Backgrounds = {
-			Dark = Color3.fromRGB(10, 16, 18),
-			Medium = Color3.fromRGB(14, 22, 26),
-			Light = Color3.fromRGB(20, 30, 36),
-			Groupbox = Color3.fromRGB(16, 26, 30),
-			Highlight = Color3.fromRGB(24, 42, 48),
-			Elevated = Color3.fromRGB(22, 36, 42),
-		},
-		Foregrounds = {
-			Active = Color3.fromRGB(255, 255, 255),
-			Light = Color3.fromRGB(230, 250, 246),
-			Medium = Color3.fromRGB(148, 188, 182),
-			Dark = Color3.fromRGB(88, 118, 114),
-			MediumHover = Color3.fromRGB(178, 214, 208),
-			DarkHover = Color3.fromRGB(108, 142, 136),
-		},
-		Miscellaneous = {
-			Divider = Color3.fromRGB(36, 58, 64),
-			Shadow = Color3.fromRGB(0, 0, 0),
-			Success = Color3.fromRGB(52, 211, 153),
-			Warning = Color3.fromRGB(251, 191, 36),
-			Danger = Color3.fromRGB(248, 113, 113),
-		},
-	},
-	Rose = {
-		Accent = Color3.fromRGB(244, 114, 182),
-		AccentSoft = Color3.fromRGB(219, 39, 119),
-		Backgrounds = {
-			Dark = Color3.fromRGB(16, 10, 14),
-			Medium = Color3.fromRGB(24, 14, 20),
-			Light = Color3.fromRGB(34, 20, 28),
-			Groupbox = Color3.fromRGB(28, 16, 24),
-			Highlight = Color3.fromRGB(48, 24, 38),
-			Elevated = Color3.fromRGB(40, 22, 32),
-		},
-		Foregrounds = {
-			Active = Color3.fromRGB(255, 255, 255),
-			Light = Color3.fromRGB(252, 236, 244),
-			Medium = Color3.fromRGB(196, 156, 176),
-			Dark = Color3.fromRGB(118, 84, 102),
-			MediumHover = Color3.fromRGB(220, 184, 202),
-			DarkHover = Color3.fromRGB(142, 104, 124),
-		},
-		Miscellaneous = {
-			Divider = Color3.fromRGB(64, 36, 52),
-			Shadow = Color3.fromRGB(0, 0, 0),
-			Success = Color3.fromRGB(52, 211, 153),
-			Warning = Color3.fromRGB(251, 191, 36),
-			Danger = Color3.fromRGB(248, 113, 113),
-		},
-	},
 }
 
 Theme.Visual = {
 	ThemeName = "Alleral",
 	Accent = Theme.Palettes.Alleral.Accent,
-	CornerRadius = 8,
-	GroupboxRadius = 10,
+	CornerRadius = 6,
+	GroupboxRadius = 8,
 	WindowTransparency = 0,
 	GroupboxTransparency = 0,
 	BlurEnabled = true,
-	BlurSize = 22,
+	BlurSize = 16,
 	AnimationSpeed = 1,
 	FontScale = 1,
 	CompactMode = false,
 	ShowShadows = true,
-	SidebarWidth = 196,
+	SidebarWidth = 210,
 }
 
 function Theme.current()
@@ -358,7 +384,7 @@ end
 
 function Theme.tweenInfo(time, style, direction)
 	local speed = Theme.Visual.AnimationSpeed
-	return TweenInfo.new((time or 0.25) / speed, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out)
+	return TweenInfo.new((time or 0.2) / speed, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out)
 end
 
 return Theme
@@ -373,12 +399,37 @@ local Theme = requireModule('theme')
 
 local Tween = {}
 
-function Tween.play(instance, goal, callback, info)
-	local tween = TweenService:Create(instance, info or Theme.tweenInfo(), goal)
-	if callback then
-		tween.Completed:Once(callback)
+function Tween.set(instance, props)
+	if not instance or type(props) ~= "table" then
+		return
 	end
-	tween:Play()
+	for key, value in pairs(props) do
+		pcall(function()
+			instance[key] = value
+		end)
+	end
+end
+
+function Tween.play(instance, goal, callback, info)
+	if not instance or type(goal) ~= "table" then
+		if callback then
+			callback()
+		end
+		return nil
+	end
+
+	Tween.set(instance, goal)
+
+	local tween
+	local ok = pcall(function()
+		tween = TweenService:Create(instance, info or Theme.tweenInfo(), goal)
+	end)
+	if ok and tween then
+		if callback then
+			tween.Completed:Once(callback)
+		end
+		tween:Play()
+	end
 	return tween
 end
 
@@ -574,10 +625,11 @@ function Notification.init(gui, library)
 	Notification._container = Util.new("Frame", {
 		Name = "Notifications",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(0, 320, 1, -40),
-		Position = UDim2.new(1, -340, 0, 20),
+		Size = UDim2.new(0, 300, 1, -40),
+		Position = UDim2.new(1, -320, 0, 20),
+		ZIndex = 500,
 	}, { gui })
-	Util.list(10, false, Notification._container)
+	Util.list(8, false, Notification._container)
 end
 
 function Notification.show(data)
@@ -592,33 +644,42 @@ function Notification.show(data)
 			layoutOrder += 1
 		end
 	end
+
 	local card = Util.new("Frame", {
 		Name = "Notification",
 		BackgroundColor3 = theme.Backgrounds.Elevated,
-		BackgroundTransparency = 0.05,
+		BackgroundTransparency = 0,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = layoutOrder,
+		ZIndex = 500,
 	}, { Notification._container })
 	Util.corner(Theme.Visual.CornerRadius, card)
-	if Theme.Visual.ShowShadows then
-		Util.stroke(theme.Miscellaneous.Divider, 1, 0.35, card)
-	end
-	Util.padding(12, 14, 12, 14, card)
-	Util.list(6, false, card)
+	Util.stroke(theme.Miscellaneous.Divider, 1, 0.5, card)
+
+	local accent = Util.new("Frame", {
+		BackgroundColor3 = theme.Accent,
+		Size = UDim2.new(0, 3, 1, -12),
+		Position = UDim2.fromOffset(0, 6),
+	}, { card })
+	Util.corner(999, accent)
+
+	Util.padding(12, 14, 12, 18, card)
+	Util.list(4, false, card)
 
 	local headerRow = Util.new("Frame", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 22),
+		Size = UDim2.new(1, 0, 0, 20),
 	}, { card })
 	Util.list(8, true, headerRow)
 
 	if not Util.isEmpty(data.Icon) then
-		local icon = Util.new("ImageLabel", {
+		Util.new("ImageLabel", {
 			BackgroundTransparency = 1,
 			Image = Util.iconAsset(data.Icon),
-			Size = UDim2.fromOffset(18, 18),
+			Size = UDim2.fromOffset(16, 16),
 			ImageColor3 = theme.Accent,
+			ImageTransparency = 0,
 		}, { headerRow })
 	end
 
@@ -626,9 +687,9 @@ function Notification.show(data)
 		Parent = headerRow,
 		Text = data.Title or "Notification",
 		Font = Enum.Font.GothamBold,
-		TextSize = 15 * Theme.Visual.FontScale,
+		TextSize = 14 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Size = UDim2.new(1, -26, 1, 0),
+		Size = UDim2.new(1, -22, 1, 0),
 	})
 
 	local body = Util.text({
@@ -644,9 +705,7 @@ function Notification.show(data)
 	local duration = data.Duration or math.clamp((#tostring(data.Content or "") * 0.08) + 3, 3, 12)
 	task.delay(duration, function()
 		if card.Parent then
-			Tween.play(card, { BackgroundTransparency = 1 }, function()
-				card:Destroy()
-			end, Theme.tweenInfo(0.2))
+			card:Destroy()
 		end
 	end)
 	return card
@@ -682,7 +741,7 @@ function Elements.runCallback(windowSettings, label, callback, library)
 end
 
 function Elements.createRow(parent, settings, theme)
-	local height = Theme.Visual.CompactMode and 34 or 38
+	local height = Theme.Visual.CompactMode and 32 or 36
 	local row = Util.new("Frame", {
 		Name = settings.Name or "Row",
 		BackgroundTransparency = 1,
@@ -693,22 +752,23 @@ function Elements.createRow(parent, settings, theme)
 	local label = Util.text({
 		Parent = row,
 		Text = settings.Name or "",
-		TextSize = 14 * Theme.Visual.FontScale,
+		TextSize = 13 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Size = UDim2.new(1, -120, 1, 0),
+		Size = UDim2.new(1, -130, 1, 0),
 	})
 	label.Name = "Header"
 
 	if not Util.isEmpty(settings.Icon) then
-		local icon = Util.new("ImageLabel", {
+		Util.new("ImageLabel", {
 			BackgroundTransparency = 1,
 			Image = Util.iconAsset(settings.Icon),
-			Size = UDim2.fromOffset(16, 16),
+			Size = UDim2.fromOffset(14, 14),
 			Position = UDim2.fromOffset(0, 10),
 			ImageColor3 = theme.Accent,
+			ImageTransparency = 0,
 		}, { row })
-		label.Position = UDim2.fromOffset(22, 0)
-		label.Size = UDim2.new(1, -142, 1, 0)
+		label.Position = UDim2.fromOffset(20, 0)
+		label.Size = UDim2.new(1, -150, 1, 0)
 	end
 
 	local slot = Util.new("Frame", {
@@ -716,7 +776,7 @@ function Elements.createRow(parent, settings, theme)
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, 0, 0.5, 0),
-		Size = UDim2.fromOffset(110, 24),
+		Size = UDim2.fromOffset(120, 26),
 	}, { row })
 
 	local dropdownHolder = Util.new("Frame", {
@@ -747,30 +807,22 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 
 	local track = Util.new("Frame", {
 		BackgroundColor3 = theme.Backgrounds.Highlight,
-		Size = UDim2.fromOffset(46, 24),
+		Size = UDim2.fromOffset(42, 22),
 	}, { slot })
 	Util.corner(999, track)
-	local trackGradient = Util.gradient(Theme.accentGradient(), 0, track)
-	trackGradient.Enabled = settings.CurrentValue == true
 
 	local knob = Util.new("Frame", {
-		BackgroundColor3 = theme.Foregrounds.Medium,
-		Size = UDim2.fromOffset(18, 18),
+		BackgroundColor3 = theme.Foregrounds.Active,
+		Size = UDim2.fromOffset(16, 16),
 		Position = UDim2.fromOffset(3, 3),
 	}, { track })
 	Util.corner(999, knob)
-	Util.stroke(theme.Backgrounds.Dark, 1, 0.4, knob)
 
 	local function paint(on)
-		trackGradient.Enabled = on
-		Tween.play(track, {
-			BackgroundColor3 = on and theme.Accent or theme.Backgrounds.Highlight,
-			BackgroundTransparency = on and 0.15 or 0,
-		}, nil, Theme.tweenInfo(0.15))
-		Tween.play(knob, {
-			BackgroundColor3 = on and theme.Foregrounds.Active or theme.Foregrounds.Medium,
-			Position = on and UDim2.fromOffset(25, 3) or UDim2.fromOffset(3, 3),
-		}, nil, Theme.tweenInfo(0.15))
+		track.BackgroundColor3 = on and theme.Accent or theme.Backgrounds.Highlight
+		knob.Position = on and UDim2.fromOffset(23, 3) or UDim2.fromOffset(3, 3)
+		Tween.play(track, { BackgroundColor3 = on and theme.Accent or theme.Backgrounds.Highlight }, nil, Theme.tweenInfo(0.12))
+		Tween.play(knob, { Position = knob.Position }, nil, Theme.tweenInfo(0.12))
 	end
 	paint(settings.CurrentValue)
 
@@ -785,9 +837,7 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 		settings.CurrentValue = not settings.CurrentValue
 		paint(settings.CurrentValue)
 		Elements.runCallback(windowSettings, settings.Name or "Toggle", function()
-			if settings.Callback then
-				settings.Callback(settings.CurrentValue)
-			end
+			settings.Callback(settings.CurrentValue)
 		end, library)
 	end)
 
@@ -824,12 +874,12 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
-	slot.Size = UDim2.fromOffset(140, 24)
+	slot.Size = UDim2.fromOffset(150, 26)
 
 	local bar = Util.new("Frame", {
 		BackgroundColor3 = theme.Backgrounds.Highlight,
-		Size = UDim2.new(1, -36, 0, 6),
-		Position = UDim2.new(0, 0, 0.5, -3),
+		Size = UDim2.new(1, -40, 0, 5),
+		Position = UDim2.new(0, 0, 0.5, -2),
 	}, { slot })
 	Util.corner(999, bar)
 
@@ -838,7 +888,14 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		Size = UDim2.new(0, 0, 1, 0),
 	}, { bar })
 	Util.corner(999, fill)
-	Util.gradient(Theme.accentGradient(), 0, fill)
+
+	local thumb = Util.new("Frame", {
+		BackgroundColor3 = theme.Foregrounds.Active,
+		Size = UDim2.fromOffset(10, 10),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0, 0, 0.5, 0),
+	}, { bar })
+	Util.corner(999, thumb)
 
 	local valueLabel = Util.text({
 		Parent = slot,
@@ -846,8 +903,8 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextSize = 12 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Medium,
-		Size = UDim2.fromOffset(32, 24),
-		Position = UDim2.new(1, -32, 0, 0),
+		Size = UDim2.fromOffset(36, 26),
+		Position = UDim2.new(1, -36, 0, 0),
 	})
 
 	local dragging = false
@@ -855,6 +912,7 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		settings.CurrentValue = snapValue(raw)
 		local alpha = (settings.CurrentValue - minValue) / math.max(maxValue - minValue, increment)
 		fill.Size = UDim2.new(alpha, 0, 1, 0)
+		thumb.Position = UDim2.new(alpha, 0, 0.5, 0)
 		valueLabel.Text = tostring(settings.CurrentValue)
 		if fire and settings.Callback then
 			Elements.runCallback(windowSettings, settings.Name or "Slider", function()
@@ -869,7 +927,14 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		setValue(minValue + (maxValue - minValue) * rel, dragging)
 	end
 
-	local hit = Util.button({ Parent = bar, Size = UDim2.fromScale(1, 3), Position = UDim2.fromScale(0, -1), BackgroundTransparency = 1, Radius = 999 })
+	local hit = Util.button({
+		Parent = bar,
+		Size = UDim2.new(1, 0, 4, 0),
+		Position = UDim2.new(0, 0, 0.5, -2),
+		BackgroundTransparency = 1,
+		Radius = 999,
+	})
+	hit.ZIndex = 3
 	hit.MouseButton1Down:Connect(function()
 		dragging = true
 		local mouse = UserInputService:GetMouseLocation()
@@ -878,9 +943,7 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 	end)
 	UserInputService.InputEnded:Connect(function(input)
 		if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-			if dragging then
-				setValue(settings.CurrentValue, true)
-			end
+			setValue(settings.CurrentValue, true)
 			dragging = false
 		end
 	end)
@@ -889,12 +952,6 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 			return
 		end
 		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			updateFromInput(input)
-		end
-	end)
-	bar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
 			updateFromInput(input)
 		end
 	end)
@@ -929,27 +986,24 @@ function Elements.createButton(groupbox, settings, index, windowSettings, librar
 	local element = { Class = "Button", Values = settings, NestedElements = {} }
 	local row = Util.button({
 		Parent = groupbox.ParentingItem,
-		BackgroundColor3 = theme.Backgrounds.Elevated,
-		Size = UDim2.new(1, 0, 0, Theme.Visual.CompactMode and 32 or 36),
+		BackgroundColor3 = theme.Backgrounds.Highlight,
+		Size = UDim2.new(1, 0, 0, Theme.Visual.CompactMode and 30 or 34),
 		Radius = Theme.Visual.CornerRadius,
 	})
 	element.Instance = row
-	local btnStroke = Util.stroke(theme.Accent, 1, 0.82, row)
 	Util.text({
 		Parent = row,
 		Text = settings.Name or "Button",
 		TextXAlignment = Enum.TextXAlignment.Center,
-		TextSize = 14 * Theme.Visual.FontScale,
+		TextSize = 13 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
 		Size = UDim2.fromScale(1, 1),
 	})
 	row.MouseEnter:Connect(function()
-		Tween.play(row, { BackgroundColor3 = theme.Backgrounds.Highlight }, nil, Theme.tweenInfo(0.12))
-		Tween.play(btnStroke, { Transparency = 0.35 }, nil, Theme.tweenInfo(0.12))
+		Tween.play(row, { BackgroundColor3 = theme.Accent }, nil, Theme.tweenInfo(0.1))
 	end)
 	row.MouseLeave:Connect(function()
-		Tween.play(row, { BackgroundColor3 = theme.Backgrounds.Elevated }, nil, Theme.tweenInfo(0.12))
-		Tween.play(btnStroke, { Transparency = 0.82 }, nil, Theme.tweenInfo(0.12))
+		Tween.play(row, { BackgroundColor3 = theme.Backgrounds.Highlight }, nil, Theme.tweenInfo(0.1))
 	end)
 	row.MouseButton1Click:Connect(function()
 		Elements.runCallback(windowSettings, settings.Name or "Button", settings.Callback or function() end, library)
@@ -973,28 +1027,24 @@ function Elements.createInput(groupbox, settings, index, windowSettings, library
 
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
-	slot.Size = UDim2.fromOffset(150, 28)
+	slot.Size = UDim2.fromOffset(160, 26)
 
-	local box = Util.new("TextBox", {
+	local box = Util.inputBox({
+		Parent = slot,
 		BackgroundColor3 = theme.Backgrounds.Highlight,
-		BorderSizePixel = 0,
-		ClearTextOnFocus = settings.RemoveTextOnFocus == true,
-		Font = Enum.Font.Gotham,
 		PlaceholderText = settings.PlaceholderText or settings.Placeholder or "",
 		Text = settings.CurrentValue,
 		TextColor3 = theme.Foregrounds.Light,
 		TextSize = 13 * Theme.Visual.FontScale,
-		Size = UDim2.fromScale(1, 1),
-	}, { slot })
-	Util.corner(8, box)
+		ClearTextOnFocus = settings.RemoveTextOnFocus == true,
+		Radius = 6,
+	})
 	Util.padding(0, 8, 0, 8, box)
 
 	box.FocusLost:Connect(function()
 		settings.CurrentValue = box.Text
 		Elements.runCallback(windowSettings, settings.Name or "Input", function()
-			if settings.Callback then
-				settings.Callback(settings.CurrentValue)
-			end
+			settings.Callback(settings.CurrentValue)
 		end, library)
 	end)
 
@@ -1055,13 +1105,17 @@ function Elements.createDivider(groupbox)
 	local theme = Theme.current()
 	local line = Util.new("Frame", {
 		BackgroundColor3 = theme.Miscellaneous.Divider,
-		BackgroundTransparency = 0.35,
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, 1),
 	}, { groupbox.ParentingItem })
-	return { Class = "Divider", Instance = line, Destroy = function()
-		line:Destroy()
-	end }
+	return {
+		Class = "Divider",
+		Instance = line,
+		Destroy = function()
+			line:Destroy()
+		end,
+	}
 end
 
 function Elements.createParagraph(groupbox, settings, index)
@@ -1077,7 +1131,7 @@ function Elements.createParagraph(groupbox, settings, index)
 		Parent = frame,
 		Text = settings.Name or settings.Title or "",
 		Font = Enum.Font.GothamBold,
-		TextSize = 15 * Theme.Visual.FontScale,
+		TextSize = 14 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
 	})
 	Util.text({
@@ -1111,23 +1165,21 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		if type(settings.CurrentOptions) ~= "table" then
 			settings.CurrentOptions = { settings.CurrentOptions }
 		end
-		if type(settings.CurrentOption) == "table" and settings.CurrentOptions == settings.CurrentOption then
-			-- already aligned
-		elseif type(settings.CurrentOption) == "table" then
+		if type(settings.CurrentOption) == "table" and settings.CurrentOptions ~= settings.CurrentOption then
 			settings.CurrentOptions = settings.CurrentOption
 		end
 	else
 		settings.CurrentOption = settings.CurrentOption or settings.Default or settings.Options[1] or ""
 	end
 
-	local parentFrame = holderOverride
+	local parentFrame
 	local rowLabel
-	if not parentFrame then
+	if not holderOverride then
 		local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 		rowLabel = label
 		element.Instance = row
 		parentFrame = slot
-		parentFrame.Size = UDim2.fromOffset(150, 28)
+		parentFrame.Size = UDim2.fromOffset(160, 26)
 	else
 		local wrapper = Util.new("Frame", {
 			BackgroundTransparency = 1,
@@ -1141,34 +1193,45 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		Parent = parentFrame,
 		BackgroundColor3 = theme.Backgrounds.Highlight,
 		Size = UDim2.fromScale(1, 1),
-		Radius = 8,
+		Radius = 6,
 	})
 	local valueText = Util.text({
 		Parent = closed,
 		Text = "",
-		TextSize = 13 * Theme.Visual.FontScale,
+		TextSize = 12 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Size = UDim2.new(1, -24, 1, 0),
+		Size = UDim2.new(1, -28, 1, 0),
 	})
-	Util.padding(0, 10, 0, 10, closed)
+	Util.text({
+		Parent = closed,
+		Text = "▼",
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextSize = 10,
+		TextColor3 = theme.Foregrounds.Medium,
+		Size = UDim2.new(1, -8, 1, 0),
+	})
+	Util.padding(0, 8, 0, 8, closed)
 
 	local popupRoot = library and (library._screenGui or library._popupRoot) or parentFrame
 	local popup = Util.new("ScrollingFrame", {
 		Name = "DropdownPopup",
 		BackgroundColor3 = theme.Backgrounds.Elevated,
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
-		Size = UDim2.fromOffset(180, 160),
+		Size = UDim2.fromOffset(200, 180),
 		Position = UDim2.fromOffset(0, 0),
 		Visible = false,
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollBarThickness = 4,
-		ZIndex = 250,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = theme.Accent,
+		ZIndex = 300,
 		ClipsDescendants = true,
 	}, { popupRoot })
-	Util.corner(8, popup)
+	Util.corner(6, popup)
 	local popupLayout = Util.list(2, false, popup)
 	Util.stroke(theme.Miscellaneous.Divider, 1, 0.4, popup)
+	Util.padding(4, 4, 4, 4, popup)
 
 	local openDropdowns = library and library._openDropdowns
 	if not openDropdowns and library then
@@ -1179,7 +1242,7 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 	local function positionPopup()
 		local anchor = closed.AbsolutePosition
 		local size = closed.AbsoluteSize
-		popup.Size = UDim2.fromOffset(math.max(size.X, 180), 160)
+		popup.Size = UDim2.fromOffset(math.max(size.X, 200), 180)
 		popup.Position = UDim2.fromOffset(anchor.X, anchor.Y + size.Y + 4)
 	end
 
@@ -1190,23 +1253,16 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		end
 	end
 
-	local function clearOpenDropdowns()
-		if not openDropdowns then
-			return
-		end
-		for key in pairs(openDropdowns) do
-			openDropdowns[key] = nil
-		end
-	end
-
 	local function openPopup()
 		if openDropdowns then
-			for other, _ in pairs(openDropdowns) do
+			for other in pairs(openDropdowns) do
 				if other ~= popup and other.Parent then
 					other.Visible = false
 				end
 			end
-			clearOpenDropdowns()
+			for key in pairs(openDropdowns) do
+				openDropdowns[key] = nil
+			end
 			openDropdowns[popup] = true
 		end
 		positionPopup()
@@ -1231,28 +1287,33 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		end
 		local options = filtered or settings.Options
 		for i, option in ipairs(options) do
-			local opt = Util.button({
-				Name = "Option",
-				Parent = popup,
-				BackgroundColor3 = theme.Backgrounds.Light,
-				Size = UDim2.new(1, -8, 0, 28),
-				Radius = 6,
-			})
-			opt.ZIndex = popup.ZIndex + 1
-			opt.LayoutOrder = i
 			local selected = settings.Multi
 				and table.find(settings.CurrentOptions, option) ~= nil
 				or settings.CurrentOption == option
-			if selected then
-				opt.BackgroundColor3 = theme.AccentSoft
-			end
+			local opt = Util.button({
+				Name = "Option",
+				Parent = popup,
+				BackgroundColor3 = selected and theme.Accent or theme.Backgrounds.Light,
+				Size = UDim2.new(1, -4, 0, 28),
+				Radius = 4,
+			})
+			opt.ZIndex = popup.ZIndex + 1
+			opt.LayoutOrder = i
 			Util.text({
 				Parent = opt,
 				Text = tostring(option),
-				TextSize = 13 * Theme.Visual.FontScale,
+				TextSize = 12 * Theme.Visual.FontScale,
 				TextColor3 = theme.Foregrounds.Light,
 				Size = UDim2.fromScale(1, 1),
 			})
+			opt.MouseEnter:Connect(function()
+				if not selected then
+					opt.BackgroundColor3 = theme.Backgrounds.Highlight
+				end
+			end)
+			opt.MouseLeave:Connect(function()
+				opt.BackgroundColor3 = selected and theme.Accent or theme.Backgrounds.Light
+			end)
 			opt.MouseButton1Click:Connect(function()
 				if settings.Multi then
 					local found = table.find(settings.CurrentOptions, option)
@@ -1276,7 +1337,9 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 				end
 			end)
 		end
-		popup.CanvasSize = UDim2.new(0, 0, 0, math.max(#options * 30, popupLayout.AbsoluteContentSize.Y))
+		task.defer(function()
+			popup.CanvasSize = UDim2.new(0, 0, 0, popupLayout.AbsoluteContentSize.Y + 8)
+		end)
 	end
 
 	displayValue()
@@ -1355,7 +1418,11 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		else
 			settings.CurrentOption = newDefault or settings.CurrentOption
 		end
-		element:Set({ Options = settings.Options, CurrentOption = settings.CurrentOption, CurrentOptions = settings.CurrentOptions })
+		element:Set({
+			Options = settings.Options,
+			CurrentOption = settings.CurrentOption,
+			CurrentOptions = settings.CurrentOptions,
+		})
 	end
 	function element:Refresh(newValues, newDefault)
 		self:SetValues(newValues, newDefault)
@@ -1397,9 +1464,10 @@ end
 function Elements.createBind(groupbox, settings, index, windowSettings, parentElement, slot)
 	local theme = Theme.current()
 	local element = { Class = "Bind", Values = settings, NestedElements = {} }
-	settings.CurrentValue = settings.CurrentValue or "No Bind"
+	settings.CurrentValue = settings.CurrentValue or "None"
 	local bindButton = Util.button({
 		Parent = slot or groupbox.ParentingItem,
+		BackgroundColor3 = theme.Backgrounds.Highlight,
 		Size = UDim2.fromOffset(80, 24),
 		Radius = 6,
 	})
@@ -1451,7 +1519,7 @@ function Elements.createColorPicker(groupbox, settings, index, windowSettings, p
 	element.Instance = swatch
 	swatch.MouseButton1Click:Connect(function()
 		local presets = {
-			Color3.fromRGB(99, 132, 255),
+			Color3.fromRGB(76, 110, 245),
 			Color3.fromRGB(72, 199, 142),
 			Color3.fromRGB(255, 184, 77),
 			Color3.fromRGB(255, 96, 112),
@@ -1477,7 +1545,6 @@ do
 	modules['window'] = (function()
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 
 local Util = requireModule('util')
 local Theme = requireModule('theme')
@@ -1502,35 +1569,39 @@ function WindowBuilder.refreshTheme(root)
 	end
 end
 
+local function protectGui(instance)
+	pcall(function()
+		if typeof(syn) == "table" and typeof(syn.protect_gui) == "function" then
+			syn.protect_gui(instance)
+		elseif typeof(protectgui) == "function" then
+			protectgui(instance)
+		end
+	end)
+end
+
 local function parentGui(screenGui)
 	local coreGui = game:GetService("CoreGui")
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-	local function protect(instance)
-		pcall(function()
-			if typeof(syn) == "table" and typeof(syn.protect_gui) == "function" then
-				syn.protect_gui(instance)
-			elseif typeof(protectgui) == "function" then
-				protectgui(instance)
-			end
-		end)
-	end
-
-	if typeof(gethui) == "function" then
-		local ok = pcall(function()
-			screenGui.Parent = gethui()
-		end)
-		if ok and screenGui.Parent then
-			return
-		end
-	end
-
-	protect(screenGui)
+	protectGui(screenGui)
 	local ok = pcall(function()
 		screenGui.Parent = coreGui
 	end)
-	if not ok or not screenGui.Parent then
+	if ok and screenGui.Parent then
+		return
+	end
+
+	ok = pcall(function()
 		screenGui.Parent = playerGui
+	end)
+	if ok and screenGui.Parent then
+		return
+	end
+
+	if typeof(gethui) == "function" then
+		pcall(function()
+			screenGui.Parent = gethui()
+		end)
 	end
 end
 
@@ -1538,7 +1609,6 @@ function WindowBuilder.create(library, windowSettings)
 	windowSettings = windowSettings or {}
 	windowSettings.NotifyOnCallbackError = windowSettings.NotifyOnCallbackError ~= false
 
-	local player = Players.LocalPlayer
 	local theme = Theme.current()
 
 	if windowSettings.FileSettings then
@@ -1555,13 +1625,9 @@ function WindowBuilder.create(library, windowSettings)
 	})
 	parentGui(screenGui)
 	library.Instance = screenGui
+	library._screenGui = screenGui
+	library._popupRoot = screenGui
 	Notification.init(screenGui, library)
-
-	local overlay = Util.new("Frame", {
-		Name = "Overlay",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-	}, { screenGui })
 
 	local lighting = game:GetService("Lighting")
 	local blur = lighting:FindFirstChild("AlleralBlur") or lighting:FindFirstChild("StarlightBlur")
@@ -1578,158 +1644,166 @@ function WindowBuilder.create(library, windowSettings)
 		blur.Size = (active and Theme.Visual.BlurEnabled) and Theme.Visual.BlurSize or 0
 	end
 
-	library._popupRoot = screenGui
-	library._screenGui = screenGui
-
 	local main = Util.new("Frame", {
 		Name = "MainWindow",
 		BackgroundColor3 = theme.Backgrounds.Medium,
-		BackgroundTransparency = Theme.Visual.WindowTransparency,
+		BackgroundTransparency = 0,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = windowSettings.DefaultSize or UDim2.fromOffset(900, 560),
+		Size = windowSettings.DefaultSize or UDim2.fromOffset(868, 598),
 		Visible = false,
 		ClipsDescendants = true,
-		ZIndex = 100,
-	}, { overlay })
-	main:SetAttribute("TargetTransparency", Theme.Visual.WindowTransparency)
-	Util.corner(Theme.Visual.GroupboxRadius + 6, main)
-	local mainStroke = Util.stroke(theme.Accent, 1, 0.35, main)
-
-	local accentRail = Util.new("Frame", {
-		Name = "AccentRail",
-		BackgroundColor3 = theme.Accent,
-		Size = UDim2.new(0, 3, 1, -24),
-		Position = UDim2.new(0, 0, 0, 12),
-		ZIndex = 2,
-	}, { main })
-	Util.corner(999, accentRail)
-	Util.gradient(Theme.accentGradient(), 90, accentRail)
+	}, { screenGui })
+	Util.corner(10, main)
+	Util.stroke(theme.Miscellaneous.Divider, 1, 0.35, main)
 
 	local sidebar = Util.new("Frame", {
 		Name = "Sidebar",
 		BackgroundColor3 = theme.Backgrounds.Dark,
 		BackgroundTransparency = 0,
-		Position = UDim2.fromOffset(3, 0),
 		Size = UDim2.new(0, Theme.Visual.SidebarWidth, 1, 0),
 	}, { main })
-	Util.padding(16, 14, 16, 14, sidebar)
-	Util.list(12, false, sidebar)
+	Util.padding(14, 12, 14, 12, sidebar)
+	Util.list(10, false, sidebar)
 
 	local brand = Util.new("Frame", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 52),
+		Size = UDim2.new(1, 0, 0, 48),
+		LayoutOrder = 0,
 	}, { sidebar })
-	Util.list(4, false, brand)
+	Util.list(6, true, brand)
 
 	if not Util.isEmpty(windowSettings.Icon) then
 		Util.new("ImageLabel", {
 			BackgroundTransparency = 1,
 			Image = Util.iconAsset(windowSettings.Icon),
-			Size = UDim2.fromOffset(28, 28),
+			Size = UDim2.fromOffset(24, 24),
 			ImageColor3 = theme.Accent,
+			ImageTransparency = 0,
 		}, { brand })
 	end
 
+	local brandText = Util.new("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -30, 1, 0),
+	}, { brand })
+	Util.list(2, false, brandText)
+
 	Util.text({
-		Parent = brand,
+		Parent = brandText,
 		Text = windowSettings.Name or "Alleral",
 		Font = Enum.Font.GothamBold,
-		TextSize = 19 * Theme.Visual.FontScale,
+		TextSize = 17 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
 	})
 	Util.text({
-		Parent = brand,
+		Parent = brandText,
 		Text = windowSettings.Subtitle or "Interface Suite",
 		TextSize = 11 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Medium,
 	})
 
-	local brandStripe = Util.new("Frame", {
-		Name = "BrandStripe",
-		BackgroundColor3 = theme.Accent,
-		Size = UDim2.new(1, 0, 0, 2),
-		Position = UDim2.new(0, 0, 1, -2),
-	}, { brand })
-	Util.gradient(Theme.accentGradient(), 0, brandStripe)
+	Util.new("Frame", {
+		BackgroundColor3 = theme.Miscellaneous.Divider,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 0, 1),
+		LayoutOrder = 1,
+	}, { sidebar })
 
 	local navHolder = Util.new("ScrollingFrame", {
 		Name = "Navigation",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 1, -120),
+		Size = UDim2.new(1, 0, 1, -100),
+		LayoutOrder = 2,
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 0,
+		BorderSizePixel = 0,
 	}, { sidebar })
 	Util.list(6, false, navHolder)
+
+	Util.text({
+		Parent = sidebar,
+		Text = "Press " .. (library.WindowKeybind or "K") .. " to toggle",
+		TextSize = 11 * Theme.Visual.FontScale,
+		TextColor3 = theme.Foregrounds.Dark,
+		Size = UDim2.new(1, 0, 0, 16),
+		LayoutOrder = 3,
+	})
+
+	local divider = Util.new("Frame", {
+		Name = "Divider",
+		BackgroundColor3 = theme.Miscellaneous.Divider,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, Theme.Visual.SidebarWidth, 0, 0),
+		Size = UDim2.new(0, 1, 1, 0),
+	}, { main })
 
 	local content = Util.new("Frame", {
 		Name = "Content",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, Theme.Visual.SidebarWidth + 3, 0, 0),
-		Size = UDim2.new(1, -(Theme.Visual.SidebarWidth + 3), 1, 0),
+		Position = UDim2.new(0, Theme.Visual.SidebarWidth + 1, 0, 0),
+		Size = UDim2.new(1, -(Theme.Visual.SidebarWidth + 1), 1, 0),
 	}, { main })
 
 	local topBar = Util.new("Frame", {
 		Name = "TopBar",
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 48),
+		BackgroundColor3 = theme.Backgrounds.Medium,
+		BackgroundTransparency = 0,
+		Size = UDim2.new(1, 0, 0, 42),
 	}, { content })
-	Util.padding(0, 16, 0, 16, topBar)
-
-	local topAccent = Util.new("Frame", {
-		Name = "TopAccent",
-		BackgroundColor3 = theme.Accent,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, 0, 1, 0),
-		Size = UDim2.new(1, 0, 0, 1),
-		BackgroundTransparency = 0.35,
-	}, { topBar })
-	Util.gradient(Theme.accentGradient(), 0, topAccent)
 
 	local titleLabel = Util.text({
 		Parent = topBar,
-		Text = "Dashboard",
+		Text = "Home",
 		Font = Enum.Font.GothamBold,
-		TextSize = 18 * Theme.Visual.FontScale,
+		TextSize = 16 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Size = UDim2.new(1, -120, 1, 0),
+		Position = UDim2.fromOffset(16, 0),
+		Size = UDim2.new(1, -130, 1, 0),
 	})
 
 	local controls = Util.new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, 0, 0.5, 0),
-		Size = UDim2.fromOffset(96, 28),
+		Position = UDim2.new(1, -12, 0.5, 0),
+		Size = UDim2.fromOffset(72, 26),
 	}, { topBar })
-	Util.list(8, true, controls)
+	Util.list(6, true, controls)
 
 	local function controlButton(text, color)
 		local btn = Util.button({
 			Parent = controls,
-			Size = UDim2.fromOffset(28, 28),
+			Size = UDim2.fromOffset(26, 26),
 			BackgroundColor3 = theme.Backgrounds.Highlight,
-			Radius = 8,
+			Radius = 6,
 		})
 		Util.text({
 			Parent = btn,
 			Text = text,
 			TextXAlignment = Enum.TextXAlignment.Center,
-			TextSize = 16,
+			TextSize = 15,
 			TextColor3 = color or theme.Foregrounds.Light,
 			Size = UDim2.fromScale(1, 1),
 		})
 		return btn
 	end
 
-	local minimizeBtn = controlButton("—")
+	local minimizeBtn = controlButton("−")
 	local closeBtn = controlButton("×", theme.Miscellaneous.Danger)
+
+	Util.new("Frame", {
+		BackgroundColor3 = theme.Miscellaneous.Divider,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, 1, -1),
+		Size = UDim2.new(1, 0, 0, 1),
+	}, { topBar })
 
 	local pages = Util.new("Frame", {
 		Name = "Pages",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 0, 0, 48),
-		Size = UDim2.new(1, 0, 1, -48),
+		Position = UDim2.new(0, 0, 0, 42),
+		Size = UDim2.new(1, 0, 1, -42),
 	}, { content })
 
 	local window = {
@@ -1776,7 +1850,6 @@ function WindowBuilder.create(library, windowSettings)
 		window.Visible = state
 		main.Visible = state
 		setBlur(state)
-		main.BackgroundTransparency = state and Theme.Visual.WindowTransparency or 1
 	end
 
 	closeBtn.MouseButton1Click:Connect(function()
@@ -1817,9 +1890,9 @@ function WindowBuilder.create(library, windowSettings)
 			Util.text({
 				Parent = sectionFrame,
 				Text = string.upper(name),
-				TextSize = 11 * Theme.Visual.FontScale,
+				TextSize = 10 * Theme.Visual.FontScale,
 				TextColor3 = theme.Foregrounds.Dark,
-				Size = UDim2.new(1, 0, 0, 16),
+				Size = UDim2.new(1, 0, 0, 14),
 			})
 		end
 
@@ -1842,33 +1915,42 @@ function WindowBuilder.create(library, windowSettings)
 
 			local navButton = Util.button({
 				Parent = tabsFrame,
-				BackgroundColor3 = theme.Backgrounds.Highlight,
-				BackgroundTransparency = 1,
-				Size = UDim2.new(1, 0, 0, 34),
-				Radius = 999,
+				BackgroundColor3 = theme.Backgrounds.Dark,
+				BackgroundTransparency = 0,
+				Size = UDim2.new(1, 0, 0, 32),
+				Radius = 6,
 			})
-			local navStroke = Util.stroke(theme.Accent, 1, 1, navButton)
+
+			local indicator = Util.new("Frame", {
+				Name = "Indicator",
+				BackgroundColor3 = theme.Accent,
+				Size = UDim2.new(0, 3, 1, -10),
+				Position = UDim2.fromOffset(0, 5),
+				BackgroundTransparency = 1,
+			}, { navButton })
 
 			local navRow = Util.new("Frame", {
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
 			}, { navButton })
-			Util.list(10, true, navRow)
-			Util.padding(0, 12, 0, 12, navRow)
+			Util.list(8, true, navRow)
+			Util.padding(0, 10, 0, 14, navRow)
 
+			local navIcon
 			if not Util.isEmpty(tabSettings.Icon) then
-				Util.new("ImageLabel", {
+				navIcon = Util.new("ImageLabel", {
 					BackgroundTransparency = 1,
 					Image = Util.iconAsset(tabSettings.Icon),
 					Size = UDim2.fromOffset(16, 16),
 					ImageColor3 = theme.Foregrounds.Medium,
+					ImageTransparency = 0,
 				}, { navRow })
 			end
 
 			local navLabel = Util.text({
 				Parent = navRow,
 				Text = tabSettings.Name or tabIndex,
-				TextSize = 14 * Theme.Visual.FontScale,
+				TextSize = 13 * Theme.Visual.FontScale,
 				TextColor3 = theme.Foregrounds.Medium,
 				Size = UDim2.new(1, 0, 1, 0),
 			})
@@ -1879,10 +1961,12 @@ function WindowBuilder.create(library, windowSettings)
 				Size = UDim2.fromScale(1, 1),
 				CanvasSize = UDim2.new(),
 				AutomaticCanvasSize = Enum.AutomaticSize.Y,
-				ScrollBarThickness = 4,
+				ScrollBarThickness = 3,
+				ScrollBarImageColor3 = theme.Accent,
+				BorderSizePixel = 0,
 				Visible = false,
 			}, { pages })
-			Util.padding(16, 16, 16, 16, page)
+			Util.padding(14, 14, 14, 14, page)
 
 			local columns = tabSettings.Columns or 2
 			local columnsFrame = Util.new("Frame", {
@@ -1891,17 +1975,26 @@ function WindowBuilder.create(library, windowSettings)
 				Size = UDim2.new(1, 0, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 			}, { page })
-			Util.list(14, true, columnsFrame)
+			Util.list(12, true, columnsFrame)
 
 			local columnFrames = {}
 			for i = 1, columns do
 				columnFrames[i] = Util.new("Frame", {
 					Name = "Column" .. i,
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1 / columns, -8, 0, 0),
+					Size = UDim2.new(1 / columns, -6, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 				}, { columnsFrame })
-				Util.list(12, false, columnFrames[i])
+				Util.list(10, false, columnFrames[i])
+			end
+
+			local function styleNav(active)
+				indicator.BackgroundTransparency = active and 0 or 1
+				navButton.BackgroundColor3 = active and theme.Backgrounds.Highlight or theme.Backgrounds.Dark
+				navLabel.TextColor3 = active and theme.Foregrounds.Light or theme.Foregrounds.Medium
+				if navIcon then
+					navIcon.ImageColor3 = active and theme.Accent or theme.Foregrounds.Medium
+				end
 			end
 
 			local function activate()
@@ -1910,29 +2003,21 @@ function WindowBuilder.create(library, windowSettings)
 					if other.Page then
 						other.Page.Visible = false
 					end
-					if other.NavButton then
-						Tween.play(other.NavButton, { BackgroundTransparency = 1 })
-						if other.NavStroke then
-							Tween.play(other.NavStroke, { Transparency = 1 })
-						end
-						if other.NavLabel then
-							Tween.play(other.NavLabel, { TextColor3 = theme.Foregrounds.Medium })
-						end
+					if other.StyleNav then
+						other.StyleNav(false)
 					end
 				end
 				tab.Active = true
 				tab.Page.Visible = true
 				titleLabel.Text = tabSettings.Name or tabIndex
-				Tween.play(navButton, { BackgroundTransparency = 0.15, BackgroundColor3 = theme.Backgrounds.Highlight })
-				Tween.play(navStroke, { Transparency = 0.55, Color = theme.Accent })
-				Tween.play(navLabel, { TextColor3 = theme.Foregrounds.Light })
+				styleNav(true)
 				window.CurrentTab = tab
 			end
 
 			tab.Page = page
 			tab.NavButton = navButton
-			tab.NavStroke = navStroke
 			tab.NavLabel = navLabel
+			tab.StyleNav = styleNav
 			navButton.MouseButton1Click:Connect(activate)
 			self.Tabs[tabIndex] = tab
 
@@ -1962,33 +2047,31 @@ function WindowBuilder.create(library, windowSettings)
 				local box = Util.new("Frame", {
 					Name = groupIndex,
 					BackgroundColor3 = theme.Backgrounds.Groupbox,
-					BackgroundTransparency = Theme.Visual.GroupboxTransparency,
+					BackgroundTransparency = 0,
 					Size = UDim2.new(1, 0, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 				}, { holder })
 				Util.corner(Theme.Visual.GroupboxRadius, box)
-				Util.stroke(theme.Miscellaneous.Divider, 1, 0.45, box)
+				if Theme.Visual.ShowShadows then
+					Util.stroke(theme.Miscellaneous.Divider, 1, 0.55, box)
+				end
+				Util.padding(12, 12, 12, 12, box)
+				Util.list(8, false, box)
 
 				local header = Util.new("Frame", {
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 0, 24),
+					Size = UDim2.new(1, 0, 0, 20),
+					LayoutOrder = 1,
 				}, { box })
-				Util.list(8, true, header)
-
-				local groupAccent = Util.new("Frame", {
-					Name = "Accent",
-					BackgroundColor3 = theme.Accent,
-					Size = UDim2.new(1, 0, 0, 2),
-					Position = UDim2.new(0, 0, 0, -6),
-				}, { header })
-				Util.gradient(Theme.accentGradient(), 0, groupAccent)
+				Util.list(6, true, header)
 
 				if not Util.isEmpty(groupSettings.Icon) then
 					Util.new("ImageLabel", {
 						BackgroundTransparency = 1,
 						Image = Util.iconAsset(groupSettings.Icon),
-						Size = UDim2.fromOffset(16, 16),
+						Size = UDim2.fromOffset(14, 14),
 						ImageColor3 = theme.Accent,
+						ImageTransparency = 0,
 					}, { header })
 				end
 
@@ -1996,19 +2079,24 @@ function WindowBuilder.create(library, windowSettings)
 					Parent = header,
 					Text = groupSettings.Name or groupIndex,
 					Font = Enum.Font.GothamBold,
-					TextSize = 14 * Theme.Visual.FontScale,
-					TextColor3 = theme.Foregrounds.Light,
+					TextSize = 13 * Theme.Visual.FontScale,
+					TextColor3 = theme.Accent,
 					Size = UDim2.new(1, 0, 1, 0),
 				})
 
-				Util.padding(14, 12, 12, 12, box)
-				Util.list(8, false, box)
+				Util.new("Frame", {
+					BackgroundColor3 = theme.Miscellaneous.Divider,
+					BorderSizePixel = 0,
+					Size = UDim2.new(1, 0, 0, 1),
+					LayoutOrder = 2,
+				}, { box })
 
 				local parentingItem = Util.new("Frame", {
 					Name = "Elements",
 					BackgroundTransparency = 1,
 					Size = UDim2.new(1, 0, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
+					LayoutOrder = 3,
 				}, { box })
 				Util.list(6, false, parentingItem)
 
@@ -2125,7 +2213,8 @@ function WindowBuilder.create(library, windowSettings)
 			function tab:BuildConfigGroupbox(column, style, buttonsCentered)
 				local groupbox = self:CreateGroupbox({ Name = "Configuration", Column = column or 1 }, "Config")
 				local configName = "default"
-				local nameInput = groupbox:CreateInput({
+
+				groupbox:CreateInput({
 					Name = "Config name",
 					Placeholder = "default",
 					CurrentValue = configName,
@@ -2192,7 +2281,7 @@ function WindowBuilder.create(library, windowSettings)
 
 	if windowSettings.LoadingEnabled ~= false then
 		task.defer(function()
-			task.wait(0.15)
+			task.wait(0.1)
 			setVisible(true)
 		end)
 	else

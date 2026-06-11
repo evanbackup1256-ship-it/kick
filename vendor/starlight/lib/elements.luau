@@ -21,7 +21,7 @@ function Elements.runCallback(windowSettings, label, callback, library)
 end
 
 function Elements.createRow(parent, settings, theme)
-	local height = Theme.Visual.CompactMode and 34 or 38
+	local height = Theme.Visual.CompactMode and 32 or 36
 	local row = Util.new("Frame", {
 		Name = settings.Name or "Row",
 		BackgroundTransparency = 1,
@@ -32,22 +32,23 @@ function Elements.createRow(parent, settings, theme)
 	local label = Util.text({
 		Parent = row,
 		Text = settings.Name or "",
-		TextSize = 14 * Theme.Visual.FontScale,
+		TextSize = 13 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Size = UDim2.new(1, -120, 1, 0),
+		Size = UDim2.new(1, -130, 1, 0),
 	})
 	label.Name = "Header"
 
 	if not Util.isEmpty(settings.Icon) then
-		local icon = Util.new("ImageLabel", {
+		Util.new("ImageLabel", {
 			BackgroundTransparency = 1,
 			Image = Util.iconAsset(settings.Icon),
-			Size = UDim2.fromOffset(16, 16),
+			Size = UDim2.fromOffset(14, 14),
 			Position = UDim2.fromOffset(0, 10),
 			ImageColor3 = theme.Accent,
+			ImageTransparency = 0,
 		}, { row })
-		label.Position = UDim2.fromOffset(22, 0)
-		label.Size = UDim2.new(1, -142, 1, 0)
+		label.Position = UDim2.fromOffset(20, 0)
+		label.Size = UDim2.new(1, -150, 1, 0)
 	end
 
 	local slot = Util.new("Frame", {
@@ -55,7 +56,7 @@ function Elements.createRow(parent, settings, theme)
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, 0, 0.5, 0),
-		Size = UDim2.fromOffset(110, 24),
+		Size = UDim2.fromOffset(120, 26),
 	}, { row })
 
 	local dropdownHolder = Util.new("Frame", {
@@ -86,30 +87,22 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 
 	local track = Util.new("Frame", {
 		BackgroundColor3 = theme.Backgrounds.Highlight,
-		Size = UDim2.fromOffset(46, 24),
+		Size = UDim2.fromOffset(42, 22),
 	}, { slot })
 	Util.corner(999, track)
-	local trackGradient = Util.gradient(Theme.accentGradient(), 0, track)
-	trackGradient.Enabled = settings.CurrentValue == true
 
 	local knob = Util.new("Frame", {
-		BackgroundColor3 = theme.Foregrounds.Medium,
-		Size = UDim2.fromOffset(18, 18),
+		BackgroundColor3 = theme.Foregrounds.Active,
+		Size = UDim2.fromOffset(16, 16),
 		Position = UDim2.fromOffset(3, 3),
 	}, { track })
 	Util.corner(999, knob)
-	Util.stroke(theme.Backgrounds.Dark, 1, 0.4, knob)
 
 	local function paint(on)
-		trackGradient.Enabled = on
-		Tween.play(track, {
-			BackgroundColor3 = on and theme.Accent or theme.Backgrounds.Highlight,
-			BackgroundTransparency = on and 0.15 or 0,
-		}, nil, Theme.tweenInfo(0.15))
-		Tween.play(knob, {
-			BackgroundColor3 = on and theme.Foregrounds.Active or theme.Foregrounds.Medium,
-			Position = on and UDim2.fromOffset(25, 3) or UDim2.fromOffset(3, 3),
-		}, nil, Theme.tweenInfo(0.15))
+		track.BackgroundColor3 = on and theme.Accent or theme.Backgrounds.Highlight
+		knob.Position = on and UDim2.fromOffset(23, 3) or UDim2.fromOffset(3, 3)
+		Tween.play(track, { BackgroundColor3 = on and theme.Accent or theme.Backgrounds.Highlight }, nil, Theme.tweenInfo(0.12))
+		Tween.play(knob, { Position = knob.Position }, nil, Theme.tweenInfo(0.12))
 	end
 	paint(settings.CurrentValue)
 
@@ -124,9 +117,7 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 		settings.CurrentValue = not settings.CurrentValue
 		paint(settings.CurrentValue)
 		Elements.runCallback(windowSettings, settings.Name or "Toggle", function()
-			if settings.Callback then
-				settings.Callback(settings.CurrentValue)
-			end
+			settings.Callback(settings.CurrentValue)
 		end, library)
 	end)
 
@@ -163,12 +154,12 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
-	slot.Size = UDim2.fromOffset(140, 24)
+	slot.Size = UDim2.fromOffset(150, 26)
 
 	local bar = Util.new("Frame", {
 		BackgroundColor3 = theme.Backgrounds.Highlight,
-		Size = UDim2.new(1, -36, 0, 6),
-		Position = UDim2.new(0, 0, 0.5, -3),
+		Size = UDim2.new(1, -40, 0, 5),
+		Position = UDim2.new(0, 0, 0.5, -2),
 	}, { slot })
 	Util.corner(999, bar)
 
@@ -177,7 +168,14 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		Size = UDim2.new(0, 0, 1, 0),
 	}, { bar })
 	Util.corner(999, fill)
-	Util.gradient(Theme.accentGradient(), 0, fill)
+
+	local thumb = Util.new("Frame", {
+		BackgroundColor3 = theme.Foregrounds.Active,
+		Size = UDim2.fromOffset(10, 10),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0, 0, 0.5, 0),
+	}, { bar })
+	Util.corner(999, thumb)
 
 	local valueLabel = Util.text({
 		Parent = slot,
@@ -185,8 +183,8 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextSize = 12 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Medium,
-		Size = UDim2.fromOffset(32, 24),
-		Position = UDim2.new(1, -32, 0, 0),
+		Size = UDim2.fromOffset(36, 26),
+		Position = UDim2.new(1, -36, 0, 0),
 	})
 
 	local dragging = false
@@ -194,6 +192,7 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		settings.CurrentValue = snapValue(raw)
 		local alpha = (settings.CurrentValue - minValue) / math.max(maxValue - minValue, increment)
 		fill.Size = UDim2.new(alpha, 0, 1, 0)
+		thumb.Position = UDim2.new(alpha, 0, 0.5, 0)
 		valueLabel.Text = tostring(settings.CurrentValue)
 		if fire and settings.Callback then
 			Elements.runCallback(windowSettings, settings.Name or "Slider", function()
@@ -208,7 +207,14 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		setValue(minValue + (maxValue - minValue) * rel, dragging)
 	end
 
-	local hit = Util.button({ Parent = bar, Size = UDim2.fromScale(1, 3), Position = UDim2.fromScale(0, -1), BackgroundTransparency = 1, Radius = 999 })
+	local hit = Util.button({
+		Parent = bar,
+		Size = UDim2.new(1, 0, 4, 0),
+		Position = UDim2.new(0, 0, 0.5, -2),
+		BackgroundTransparency = 1,
+		Radius = 999,
+	})
+	hit.ZIndex = 3
 	hit.MouseButton1Down:Connect(function()
 		dragging = true
 		local mouse = UserInputService:GetMouseLocation()
@@ -217,9 +223,7 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 	end)
 	UserInputService.InputEnded:Connect(function(input)
 		if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-			if dragging then
-				setValue(settings.CurrentValue, true)
-			end
+			setValue(settings.CurrentValue, true)
 			dragging = false
 		end
 	end)
@@ -228,12 +232,6 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 			return
 		end
 		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			updateFromInput(input)
-		end
-	end)
-	bar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
 			updateFromInput(input)
 		end
 	end)
@@ -268,27 +266,24 @@ function Elements.createButton(groupbox, settings, index, windowSettings, librar
 	local element = { Class = "Button", Values = settings, NestedElements = {} }
 	local row = Util.button({
 		Parent = groupbox.ParentingItem,
-		BackgroundColor3 = theme.Backgrounds.Elevated,
-		Size = UDim2.new(1, 0, 0, Theme.Visual.CompactMode and 32 or 36),
+		BackgroundColor3 = theme.Backgrounds.Highlight,
+		Size = UDim2.new(1, 0, 0, Theme.Visual.CompactMode and 30 or 34),
 		Radius = Theme.Visual.CornerRadius,
 	})
 	element.Instance = row
-	local btnStroke = Util.stroke(theme.Accent, 1, 0.82, row)
 	Util.text({
 		Parent = row,
 		Text = settings.Name or "Button",
 		TextXAlignment = Enum.TextXAlignment.Center,
-		TextSize = 14 * Theme.Visual.FontScale,
+		TextSize = 13 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
 		Size = UDim2.fromScale(1, 1),
 	})
 	row.MouseEnter:Connect(function()
-		Tween.play(row, { BackgroundColor3 = theme.Backgrounds.Highlight }, nil, Theme.tweenInfo(0.12))
-		Tween.play(btnStroke, { Transparency = 0.35 }, nil, Theme.tweenInfo(0.12))
+		Tween.play(row, { BackgroundColor3 = theme.Accent }, nil, Theme.tweenInfo(0.1))
 	end)
 	row.MouseLeave:Connect(function()
-		Tween.play(row, { BackgroundColor3 = theme.Backgrounds.Elevated }, nil, Theme.tweenInfo(0.12))
-		Tween.play(btnStroke, { Transparency = 0.82 }, nil, Theme.tweenInfo(0.12))
+		Tween.play(row, { BackgroundColor3 = theme.Backgrounds.Highlight }, nil, Theme.tweenInfo(0.1))
 	end)
 	row.MouseButton1Click:Connect(function()
 		Elements.runCallback(windowSettings, settings.Name or "Button", settings.Callback or function() end, library)
@@ -312,28 +307,24 @@ function Elements.createInput(groupbox, settings, index, windowSettings, library
 
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
-	slot.Size = UDim2.fromOffset(150, 28)
+	slot.Size = UDim2.fromOffset(160, 26)
 
-	local box = Util.new("TextBox", {
+	local box = Util.inputBox({
+		Parent = slot,
 		BackgroundColor3 = theme.Backgrounds.Highlight,
-		BorderSizePixel = 0,
-		ClearTextOnFocus = settings.RemoveTextOnFocus == true,
-		Font = Enum.Font.Gotham,
 		PlaceholderText = settings.PlaceholderText or settings.Placeholder or "",
 		Text = settings.CurrentValue,
 		TextColor3 = theme.Foregrounds.Light,
 		TextSize = 13 * Theme.Visual.FontScale,
-		Size = UDim2.fromScale(1, 1),
-	}, { slot })
-	Util.corner(8, box)
+		ClearTextOnFocus = settings.RemoveTextOnFocus == true,
+		Radius = 6,
+	})
 	Util.padding(0, 8, 0, 8, box)
 
 	box.FocusLost:Connect(function()
 		settings.CurrentValue = box.Text
 		Elements.runCallback(windowSettings, settings.Name or "Input", function()
-			if settings.Callback then
-				settings.Callback(settings.CurrentValue)
-			end
+			settings.Callback(settings.CurrentValue)
 		end, library)
 	end)
 
@@ -394,13 +385,17 @@ function Elements.createDivider(groupbox)
 	local theme = Theme.current()
 	local line = Util.new("Frame", {
 		BackgroundColor3 = theme.Miscellaneous.Divider,
-		BackgroundTransparency = 0.35,
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, 1),
 	}, { groupbox.ParentingItem })
-	return { Class = "Divider", Instance = line, Destroy = function()
-		line:Destroy()
-	end }
+	return {
+		Class = "Divider",
+		Instance = line,
+		Destroy = function()
+			line:Destroy()
+		end,
+	}
 end
 
 function Elements.createParagraph(groupbox, settings, index)
@@ -416,7 +411,7 @@ function Elements.createParagraph(groupbox, settings, index)
 		Parent = frame,
 		Text = settings.Name or settings.Title or "",
 		Font = Enum.Font.GothamBold,
-		TextSize = 15 * Theme.Visual.FontScale,
+		TextSize = 14 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
 	})
 	Util.text({
@@ -450,23 +445,21 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		if type(settings.CurrentOptions) ~= "table" then
 			settings.CurrentOptions = { settings.CurrentOptions }
 		end
-		if type(settings.CurrentOption) == "table" and settings.CurrentOptions == settings.CurrentOption then
-			-- already aligned
-		elseif type(settings.CurrentOption) == "table" then
+		if type(settings.CurrentOption) == "table" and settings.CurrentOptions ~= settings.CurrentOption then
 			settings.CurrentOptions = settings.CurrentOption
 		end
 	else
 		settings.CurrentOption = settings.CurrentOption or settings.Default or settings.Options[1] or ""
 	end
 
-	local parentFrame = holderOverride
+	local parentFrame
 	local rowLabel
-	if not parentFrame then
+	if not holderOverride then
 		local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 		rowLabel = label
 		element.Instance = row
 		parentFrame = slot
-		parentFrame.Size = UDim2.fromOffset(150, 28)
+		parentFrame.Size = UDim2.fromOffset(160, 26)
 	else
 		local wrapper = Util.new("Frame", {
 			BackgroundTransparency = 1,
@@ -480,34 +473,45 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		Parent = parentFrame,
 		BackgroundColor3 = theme.Backgrounds.Highlight,
 		Size = UDim2.fromScale(1, 1),
-		Radius = 8,
+		Radius = 6,
 	})
 	local valueText = Util.text({
 		Parent = closed,
 		Text = "",
-		TextSize = 13 * Theme.Visual.FontScale,
+		TextSize = 12 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Size = UDim2.new(1, -24, 1, 0),
+		Size = UDim2.new(1, -28, 1, 0),
 	})
-	Util.padding(0, 10, 0, 10, closed)
+	Util.text({
+		Parent = closed,
+		Text = "▼",
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextSize = 10,
+		TextColor3 = theme.Foregrounds.Medium,
+		Size = UDim2.new(1, -8, 1, 0),
+	})
+	Util.padding(0, 8, 0, 8, closed)
 
 	local popupRoot = library and (library._screenGui or library._popupRoot) or parentFrame
 	local popup = Util.new("ScrollingFrame", {
 		Name = "DropdownPopup",
 		BackgroundColor3 = theme.Backgrounds.Elevated,
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
-		Size = UDim2.fromOffset(180, 160),
+		Size = UDim2.fromOffset(200, 180),
 		Position = UDim2.fromOffset(0, 0),
 		Visible = false,
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollBarThickness = 4,
-		ZIndex = 250,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = theme.Accent,
+		ZIndex = 300,
 		ClipsDescendants = true,
 	}, { popupRoot })
-	Util.corner(8, popup)
+	Util.corner(6, popup)
 	local popupLayout = Util.list(2, false, popup)
 	Util.stroke(theme.Miscellaneous.Divider, 1, 0.4, popup)
+	Util.padding(4, 4, 4, 4, popup)
 
 	local openDropdowns = library and library._openDropdowns
 	if not openDropdowns and library then
@@ -518,7 +522,7 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 	local function positionPopup()
 		local anchor = closed.AbsolutePosition
 		local size = closed.AbsoluteSize
-		popup.Size = UDim2.fromOffset(math.max(size.X, 180), 160)
+		popup.Size = UDim2.fromOffset(math.max(size.X, 200), 180)
 		popup.Position = UDim2.fromOffset(anchor.X, anchor.Y + size.Y + 4)
 	end
 
@@ -529,23 +533,16 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		end
 	end
 
-	local function clearOpenDropdowns()
-		if not openDropdowns then
-			return
-		end
-		for key in pairs(openDropdowns) do
-			openDropdowns[key] = nil
-		end
-	end
-
 	local function openPopup()
 		if openDropdowns then
-			for other, _ in pairs(openDropdowns) do
+			for other in pairs(openDropdowns) do
 				if other ~= popup and other.Parent then
 					other.Visible = false
 				end
 			end
-			clearOpenDropdowns()
+			for key in pairs(openDropdowns) do
+				openDropdowns[key] = nil
+			end
 			openDropdowns[popup] = true
 		end
 		positionPopup()
@@ -570,28 +567,33 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		end
 		local options = filtered or settings.Options
 		for i, option in ipairs(options) do
-			local opt = Util.button({
-				Name = "Option",
-				Parent = popup,
-				BackgroundColor3 = theme.Backgrounds.Light,
-				Size = UDim2.new(1, -8, 0, 28),
-				Radius = 6,
-			})
-			opt.ZIndex = popup.ZIndex + 1
-			opt.LayoutOrder = i
 			local selected = settings.Multi
 				and table.find(settings.CurrentOptions, option) ~= nil
 				or settings.CurrentOption == option
-			if selected then
-				opt.BackgroundColor3 = theme.AccentSoft
-			end
+			local opt = Util.button({
+				Name = "Option",
+				Parent = popup,
+				BackgroundColor3 = selected and theme.Accent or theme.Backgrounds.Light,
+				Size = UDim2.new(1, -4, 0, 28),
+				Radius = 4,
+			})
+			opt.ZIndex = popup.ZIndex + 1
+			opt.LayoutOrder = i
 			Util.text({
 				Parent = opt,
 				Text = tostring(option),
-				TextSize = 13 * Theme.Visual.FontScale,
+				TextSize = 12 * Theme.Visual.FontScale,
 				TextColor3 = theme.Foregrounds.Light,
 				Size = UDim2.fromScale(1, 1),
 			})
+			opt.MouseEnter:Connect(function()
+				if not selected then
+					opt.BackgroundColor3 = theme.Backgrounds.Highlight
+				end
+			end)
+			opt.MouseLeave:Connect(function()
+				opt.BackgroundColor3 = selected and theme.Accent or theme.Backgrounds.Light
+			end)
 			opt.MouseButton1Click:Connect(function()
 				if settings.Multi then
 					local found = table.find(settings.CurrentOptions, option)
@@ -615,7 +617,9 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 				end
 			end)
 		end
-		popup.CanvasSize = UDim2.new(0, 0, 0, math.max(#options * 30, popupLayout.AbsoluteContentSize.Y))
+		task.defer(function()
+			popup.CanvasSize = UDim2.new(0, 0, 0, popupLayout.AbsoluteContentSize.Y + 8)
+		end)
 	end
 
 	displayValue()
@@ -694,7 +698,11 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		else
 			settings.CurrentOption = newDefault or settings.CurrentOption
 		end
-		element:Set({ Options = settings.Options, CurrentOption = settings.CurrentOption, CurrentOptions = settings.CurrentOptions })
+		element:Set({
+			Options = settings.Options,
+			CurrentOption = settings.CurrentOption,
+			CurrentOptions = settings.CurrentOptions,
+		})
 	end
 	function element:Refresh(newValues, newDefault)
 		self:SetValues(newValues, newDefault)
@@ -736,9 +744,10 @@ end
 function Elements.createBind(groupbox, settings, index, windowSettings, parentElement, slot)
 	local theme = Theme.current()
 	local element = { Class = "Bind", Values = settings, NestedElements = {} }
-	settings.CurrentValue = settings.CurrentValue or "No Bind"
+	settings.CurrentValue = settings.CurrentValue or "None"
 	local bindButton = Util.button({
 		Parent = slot or groupbox.ParentingItem,
+		BackgroundColor3 = theme.Backgrounds.Highlight,
 		Size = UDim2.fromOffset(80, 24),
 		Radius = 6,
 	})
@@ -790,7 +799,7 @@ function Elements.createColorPicker(groupbox, settings, index, windowSettings, p
 	element.Instance = swatch
 	swatch.MouseButton1Click:Connect(function()
 		local presets = {
-			Color3.fromRGB(99, 132, 255),
+			Color3.fromRGB(76, 110, 245),
 			Color3.fromRGB(72, 199, 142),
 			Color3.fromRGB(255, 184, 77),
 			Color3.fromRGB(255, 96, 112),
