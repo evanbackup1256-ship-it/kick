@@ -1486,58 +1486,6 @@ local HIGHLIGHT_RARITIES = {
 	Ethernal = true,
 }
 
-local function parseJobIdInput(raw)
-	raw = trim(raw)
-	if raw == "" then
-		return nil, game.PlaceId
-	end
-	local luxyPayload = raw:match("LUXY:<([^>]+)>")
-	if luxyPayload then
-		local alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-		local cleaned = luxyPayload:gsub("[^" .. alphabet .. "=]", "")
-		local bits = cleaned:gsub(".", function(char)
-			if char == "=" then
-				return ""
-			end
-			local index = alphabet:find(char, 1, true)
-			if not index then
-				return ""
-			end
-			local output = ""
-			for bitIndex = 6, 1, -1 do
-				output = output .. (((index % (2 ^ bitIndex)) - (index % (2 ^ (bitIndex - 1))) > 0) and "1" or "0")
-			end
-			return output
-		end)
-		local decoded = bits:gsub("%d%d%d?%d?%d?%d?%d?%d?", function(chunk)
-			if #chunk ~= 8 then
-				return ""
-			end
-			local value = 0
-			for bitIndex = 1, 8 do
-				if chunk:sub(bitIndex, bitIndex) == "1" then
-					value = value + (2 ^ (8 - bitIndex))
-				end
-			end
-			return string.char(value)
-		end)
-		if decoded ~= "" then
-			raw = decoded
-		end
-	end
-	local placeId = tonumber(raw:match("placeId=(%d+)")) or game.PlaceId
-	local jobId = raw:match("instanceId=([^&%s]+)")
-		or raw:match("gameInstanceId=([%w%-]+)")
-		or raw:match("(%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x)")
-		or raw:match("([%w]+%-[%w]+%-[%w]+%-[%w]+%-[%w]+)")
-		or raw
-	jobId = trim(jobId)
-	if jobId == "" then
-		return nil, placeId
-	end
-	return jobId, placeId
-end
-
 local function encodeJoinPayload(jobId)
 	jobId = tostring(jobId or "")
 	if jobId == "" then
@@ -1604,11 +1552,7 @@ local function reportWeatherEvent(weatherName, expiresAt)
 		math.floor(remaining % 60)
 	)
 	local jobId = tostring(game.JobId)
-	local joinUrl = string.format(
-		"https://www.roblox.com/games/start?placeId=%d&gameInstanceId=%s",
-		game.PlaceId,
-		jobId
-	)
+	local joinUrl = Core.currentWebJoinUrl()
 	local joinPayload = "LUXY:<" .. encodeJoinPayload(jobId) .. ">"
 	syncTrackerConfig()
 	if Tracker and Tracker.SendSatelliteLog then
@@ -4296,30 +4240,11 @@ serverGroup:CreateToggle(
 	end
 )
 serverGroup:CreateDivider()
-serverGroup:CreateInput(
-	"Server link or job id",
-	"paste invite link",
-	state.JoinJobId or "",
-	function(value)
-		state.JoinJobId = trim(value)
-		saveSettings()
-	end,
-	"Full roblox share link or raw job id both work."
-)
-serverGroup:CreateButton(
-	"Hop to server",
-	function()
-		local jobId, placeId = parseJobIdInput(state.JoinJobId)
-		if jobId and jobId ~= "" then
-			safeCall("ServerJoin", function()
-				TeleportService:TeleportToPlaceInstance(placeId or game.PlaceId, jobId, LocalPlayer)
-			end, true)
-		else
-			notify("Can't join", "That doesn't look like a valid link or job id.", 3)
-		end
-	end,
-	"Sends you to whoever's server you pasted."
-)
+Core.buildJoinServerControls(serverGroup, {
+	state = state,
+	saveSettings = saveSettings,
+	dividerFirst = false,
+})
 
 webhookGroup:CreateToggle(
 	"Discord alerts",

@@ -1,0 +1,17 @@
+name: Verify repo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version and deploy copy checks
+        shell: pwsh
+        run: ./maint/verify_versions.ps1

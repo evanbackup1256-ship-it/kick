@@ -394,6 +394,7 @@ if AutoSyncEngine is not None:
         enabled=AUTO_SYNC_ENABLED,
     )
 GATE_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
+BAN_DEMO_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 BUG_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 HUB_VISIT_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 THUMB_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
@@ -412,6 +413,7 @@ ADMIN_REMEMBER_TTL_SEC = int(os.environ.get("ADMIN_REMEMBER_TTL_SEC", str(86400 
 ADMIN_RATE_PER_MIN = int(os.environ.get("ADMIN_RATE_PER_MIN", "20"))
 THUMB_RATE_PER_MIN = int(os.environ.get("THUMB_RATE_PER_MIN", "60"))
 PUBLIC_RATE_PER_MIN = int(os.environ.get("PUBLIC_RATE_PER_MIN", "120"))
+BAN_DEMO_RATE_PER_MIN = int(os.environ.get("BAN_DEMO_RATE_PER_MIN", "12"))
 
 
 def gate_allow_ip(ip: str) -> bool:
@@ -542,6 +544,8 @@ def build_public_site_payload() -> dict[str, Any]:
         "tagline": site.get("tagline") or "",
         "announcement": site.get("announcement") or "",
         "loaderVersion": site.get("loaderVersion") or "",
+        "coreVersion": site.get("coreVersion") or "",
+        "uiLibrary": site.get("uiLibrary") or "",
         "loadstring": site.get("loadstring") or "",
         "features": site.get("features") or [],
         "faq": site.get("faq") or [],
@@ -2382,7 +2386,9 @@ def admin_users_search():
     try:
         users = search_users(query, limit=max(1, min(limit, 25)))
     except RuntimeError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 502
+        message = str(exc)
+        status = 429 if "HTTP 429" in message else 502
+        return jsonify({"ok": False, "error": message}), status
     ids = [row.get("id") for row in users if row.get("id")]
     avatars = fetch_avatar_renders(ids) if ids else {}
     enriched: list[dict[str, Any]] = []

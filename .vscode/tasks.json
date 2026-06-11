@@ -1,0 +1,15 @@
+{
+  "recommendations": ["ms-vscode.powershell"],
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Alleral: sync repo",
+        "type": "shell",
+        "command": "pwsh -NoProfile -File maint/sync_repo.ps1",
+        "group": "build",
+        "presentation": { "reveal": "always", "panel": "shared" }
+      }
+    ]
+  }
+}

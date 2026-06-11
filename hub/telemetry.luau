@@ -281,6 +281,15 @@ local function avatarUrl(userId)
 end
 
 local function joinUrl(placeId, jobId)
+	local core = coreApi()
+	if core then
+		if type(core.buildWebJoinUrl) == "function" then
+			return core.buildWebJoinUrl(placeId, jobId)
+		end
+		if type(core.currentWebJoinUrl) == "function" and (placeId == nil or placeId == game.PlaceId) and (jobId == nil or jobId == game.JobId) then
+			return core.currentWebJoinUrl()
+		end
+	end
 	return string.format(
 		"https://www.roblox.com/games/start?placeId=%s&gameInstanceId=%s",
 		tostring(placeId or game.PlaceId),
@@ -289,6 +298,10 @@ local function joinUrl(placeId, jobId)
 end
 
 local function robloxJoinUrl(placeId, jobId)
+	local core = coreApi()
+	if core and type(core.buildRobloxJoinUrl) == "function" then
+		return core.buildRobloxJoinUrl(placeId, jobId)
+	end
 	return string.format(
 		"roblox://experiences/start?placeId=%s&gameInstanceId=%s",
 		tostring(placeId or game.PlaceId),

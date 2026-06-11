@@ -23,6 +23,8 @@ class SiteRegistry:
         "tagline",
         "loadstring",
         "loaderVersion",
+        "coreVersion",
+        "uiLibrary",
         "features",
         "faq",
         "changelog",

@@ -1196,9 +1196,15 @@ function Core.buildHubActionsGroup(tab, column)
 		Core.copyPlaceJoinLink()
 	end, "Copies a roblox:// link for this server.")
 
+	group:CreateButton("Copy web join link", function()
+		Core.copyWebJoinLink()
+	end, "Copies the https:// join link for this server.")
+
 	group:CreateButton("Rejoin server", function()
 		Core.rejoinServer()
 	end, "Teleports you back into this same server instance.")
+
+	Core.buildJoinServerControls(group, { dividerFirst = true })
 
 	return group
 end
@@ -1316,6 +1322,161 @@ function Core.setLowGraphics(enabled)
 	ENV.Alleral_LowGraphics = enabled == true
 end
 
+function Core.buildWebJoinUrl(placeId, jobId)
+	placeId = tonumber(placeId) or game.PlaceId
+	jobId = tostring(jobId or game.JobId or "")
+	return string.format(
+		"https://www.roblox.com/games/start?placeId=%s&gameInstanceId=%s",
+		tostring(placeId),
+		jobId
+	)
+end
+
+function Core.buildRobloxJoinUrl(placeId, jobId)
+	placeId = tonumber(placeId) or game.PlaceId
+	jobId = tostring(jobId or game.JobId or "")
+	return string.format(
+		"roblox://experiences/start?placeId=%s&gameInstanceId=%s",
+		tostring(placeId),
+		jobId
+	)
+end
+
+function Core.currentWebJoinUrl()
+	return Core.buildWebJoinUrl(game.PlaceId, game.JobId)
+end
+
+local function decodeLuxyJoinPayload(raw)
+	local luxyPayload = tostring(raw or ""):match("LUXY:<([^>]+)>")
+	if not luxyPayload then
+		return nil
+	end
+	local alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	local cleaned = luxyPayload:gsub("[^" .. alphabet .. "=]", "")
+	local bits = cleaned:gsub(".", function(char)
+		if char == "=" then
+			return ""
+		end
+		local index = alphabet:find(char, 1, true)
+		if not index then
+			return ""
+		end
+		local output = ""
+		for bitIndex = 6, 1, -1 do
+			output = output .. (((index % (2 ^ bitIndex)) - (index % (2 ^ (bitIndex - 1))) > 0) and "1" or "0")
+		end
+		return output
+	end)
+	local decoded = bits:gsub("%d%d%d?%d?%d?%d?%d?%d?", function(chunk)
+		if #chunk ~= 8 then
+			return ""
+		end
+		local value = 0
+		for bitIndex = 1, 8 do
+			if chunk:sub(bitIndex, bitIndex) == "1" then
+				value = value + (2 ^ (8 - bitIndex))
+			end
+		end
+		return string.char(value)
+	end)
+	if decoded == "" then
+		return nil
+	end
+	return decoded
+end
+
+function Core.parseJoinJobId(raw, defaultPlaceId)
+	raw = tostring(raw or ""):gsub("^%s*(.-)%s*$", "%1")
+	local placeId = tonumber(defaultPlaceId) or game.PlaceId
+	if raw == "" then
+		return nil, placeId
+	end
+	local luxyDecoded = decodeLuxyJoinPayload(raw)
+	if luxyDecoded then
+		raw = luxyDecoded
+	end
+	placeId = tonumber(raw:match("placeId=(%d+)")) or placeId
+	local jobId = raw:match("gameInstanceId=([%w%-]+)")
+		or raw:match("instanceId=([^&%s]+)")
+		or raw:match("(%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x)")
+		or raw:match("([%w]+%-[%w]+%-[%w]+%-[%w]+%-[%w]+)")
+		or raw
+	jobId = tostring(jobId or ""):gsub("^%s*(.-)%s*$", "%1")
+	if jobId == "" then
+		return nil, placeId
+	end
+	return jobId, placeId
+end
+
+function Core.teleportToJoinInput(raw, defaultPlaceId)
+	local jobId, placeId = Core.parseJoinJobId(raw, defaultPlaceId)
+	if not jobId or jobId == "" then
+		return false, "invalid_join_input"
+	end
+	local TeleportService = game:GetService("TeleportService")
+	local Players = game:GetService("Players")
+	local ok, err = pcall(function()
+		TeleportService:TeleportToPlaceInstance(placeId or game.PlaceId, jobId, Players.LocalPlayer)
+	end)
+	if not ok then
+		return false, tostring(err)
+	end
+	return true
+end
+
+function Core.buildJoinServerControls(group, options)
+	options = options or {}
+	local key = options.key or "JoinJobId"
+	local state = type(options.state) == "table" and options.state or getgenv().Alleral_State
+	local saveSettings = options.saveSettings
+	local inputLabel = options.inputLabel or "Server link or job id"
+	local inputPlaceholder = options.inputPlaceholder or "paste invite link"
+	local buttonLabel = options.buttonLabel or "Hop to server"
+	local buttonTooltip = options.buttonTooltip or "Full roblox share link or raw job id both work."
+
+	local function readJoinInput()
+		if type(state) == "table" and state[key] ~= nil then
+			return tostring(state[key])
+		end
+		local g = getgenv()
+		g.Alleral_JoinJobId = g.Alleral_JoinJobId or ""
+		return g.Alleral_JoinJobId
+	end
+
+	local function writeJoinInput(value)
+		value = tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
+		if type(state) == "table" then
+			state[key] = value
+		end
+		getgenv().Alleral_JoinJobId = value
+		if type(saveSettings) == "function" then
+			saveSettings()
+		end
+	end
+
+	if options.dividerFirst == true then
+		group:CreateDivider()
+	end
+	group:CreateInput(
+		inputLabel,
+		inputPlaceholder,
+		readJoinInput(),
+		function(value)
+			writeJoinInput(value)
+		end,
+		buttonTooltip
+	)
+	group:CreateButton(buttonLabel, function()
+		local ok, err = Core.teleportToJoinInput(readJoinInput())
+		if not ok then
+			Core.notify("Alleral", "That doesn't look like a valid link or job id.", 3, "warn")
+			if err and err ~= "invalid_join_input" and ENV.Alleral_TelemetryDebug == true then
+				warn("[Alleral] Join hop failed: " .. tostring(err))
+			end
+		end
+	end, buttonTooltip)
+end
+
 function Core.copyJobId()
 	local clip = Core.execFunction("setclipboard") or Core.execFunction("setclipboard", true)
 	if type(clip) == "function" then
@@ -1328,15 +1489,23 @@ function Core.copyJobId()
 end
 
 function Core.copyPlaceJoinLink()
-	local link = string.format(
-		"roblox://experiences/start?placeId=%d&gameInstanceId=%s",
-		game.PlaceId,
-		game.JobId
-	)
+	local link = Core.buildRobloxJoinUrl(game.PlaceId, game.JobId)
 	local clip = Core.execFunction("setclipboard") or Core.execFunction("setclipboard", true)
 	if type(clip) == "function" then
 		pcall(clip, link)
 		Core.notify("Alleral", "Join link copied.", 3)
+		return true
+	end
+	Core.notify("Alleral", link, 8)
+	return false
+end
+
+function Core.copyWebJoinLink()
+	local link = Core.currentWebJoinUrl()
+	local clip = Core.execFunction("setclipboard") or Core.execFunction("setclipboard", true)
+	if type(clip) == "function" then
+		pcall(clip, link)
+		Core.notify("Alleral", "Web join link copied.", 3)
 		return true
 	end
 	Core.notify("Alleral", link, 8)
