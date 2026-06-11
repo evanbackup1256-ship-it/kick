@@ -6,35 +6,32 @@ One script. Detects your game and runs it.
 
 ## Load
 
-Paste this in Volt and Execute:
-
-```lua
-loadstring(game:HttpGet("https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/loader.luau", true))()
-```
-
-If HttpGet doesn't work on your executor, use this instead:
+Paste this in your executor and **Execute**:
 
 ```lua
 (function()
-	local g = getgenv and getgenv() or {}
 	local url = "https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/loader.luau?t=" .. tick()
 	local src
-	if g.Volt and g.Volt.request then
-		local r = g.Volt.request({ Url = url, Method = "GET" })
-		src = r and (r.Body or r.body)
+	if type(game.HttpGet) == "function" then
+		pcall(function() src = game:HttpGet(url, true) end)
 	end
-	if not src and g.request then
-		local r = g.request({ Url = url, Method = "GET" })
-		src = r and (r.Body or r.body)
+	if type(src) ~= "string" or not src:find("5.2", 1, true) then
+		local g = getgenv and getgenv() or {}
+		local req = type(g.request) == "function" and g.request or type(g.http_request) == "function" and g.http_request
+		if req then
+			pcall(function()
+				local r = req({ Url = url, Method = "GET" })
+				src = type(r) == "string" and r or (r and (r.Body or r.body))
+			end)
+		end
+	end
+	if type(src) ~= "string" or not src:find("5.2", 1, true) then
+		return warn("[Alleral] Download failed — delete old loader.luau from workspace/autoexec")
 	end
 	loadstring(src)()
 end)()
 ```
 
-**Local files:** save `loader.luau` to your workspace, then:
-
-```lua
-loadstring(readfile("loader.luau"))()
-```
+**Important:** Remove old `loader.luau` from workspace and **Autoexec** (v3.x will conflict).
 
 Reload: `getgenv().Alleral_Reload()`
