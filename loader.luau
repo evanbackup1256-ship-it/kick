@@ -1,4 +1,8 @@
-local LOADER_VERSION = "3.7.5"
+--[[
+	Alleral Hub — single entry point.
+	Detects game.PlaceId, loads core + matching games/*.luau script.
+]]
+local LOADER_VERSION = "3.8.0"
 local REQUIRED_CORE_VERSION = "1.17"
 local REQUIRED_UI_LIBRARY = "Rayfield"
 local GITHUB_REPO = "evanbackup1256-ship-it/kick"
@@ -154,7 +158,7 @@ end
 
 local CAPABILITIES = {
 	executor = detectExecutor(),
-	http = httpRequest ~= nil,
+	http = type(game.HttpGet) == "function" or httpRequest ~= nil,
 	loadstring = loadStringFn ~= nil,
 	readfile = readFile ~= nil,
 	isfile = isFile ~= nil,
@@ -1429,4 +1433,5 @@ ENV.Alleral_LoaderInfo = function()
 	}
 end
 
+print("[Alleral] v" .. LOADER_VERSION .. " | PlaceId " .. tostring(game.PlaceId))
 main()
