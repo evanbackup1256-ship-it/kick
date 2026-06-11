@@ -3,8 +3,9 @@
 	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "5.4.7"
+local LOADER_VERSION = "5.4.8"
 local MIN_CORE = "1.18"
+local CORE_MIN_BYTES = 50000
 local RELEASE_FALLBACK = {
 	core = "1.20",
 	analytics = "1.0",
@@ -861,7 +862,7 @@ local function coreVersionOk(v)
 end
 
 local function coreValid(src)
-	if type(src) ~= "string" or #src < 5000 or not src:find("loadRayfield", 1, true) then
+	if type(src) ~= "string" or #src < CORE_MIN_BYTES or not src:find("loadRayfield", 1, true) then
 		return false
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
@@ -881,10 +882,70 @@ local function coreValid(src)
 	return type(fn) == "function"
 end
 
+local function coreRejectReason(src)
+	if type(src) ~= "string" or src == "" then
+		return "empty response"
+	end
+	if #src < CORE_MIN_BYTES then
+		return tostring(#src) .. "b, need " .. tostring(CORE_MIN_BYTES) .. "b+"
+	end
+	if not src:find("loadRayfield", 1, true) then
+		return "missing loadRayfield"
+	end
+	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
+	if not coreVersionOk(ver) then
+		return "bad core version " .. tostring(ver)
+	end
+	if containsJsdelivr(src) then
+		return "jsDelivr cache"
+	end
+	if not looksLikeLua(src) then
+		return "invalid lua"
+	end
+	if loadStringFn then
+		local fn = loadStringFn(src, "Alleral/core-check")
+		if type(fn) ~= "function" then
+			return "compile failed"
+		end
+	end
+	return "unknown"
+end
+
+local function fetchCoreRemote()
+	local best, bestInvalid = nil, nil
+	for _, base in ipairs(REMOTE_BASES) do
+		for _, suffix in ipairs({ "", "?t=" .. tick() }) do
+			local url = base .. "/core/alleral_core.luau" .. suffix
+			for _, item in ipairs(collectHttpBodies(url)) do
+				if coreValid(item.body) then
+					if not best or item.len > best.len then
+						best = { body = item.body, via = item.via, base = base, len = item.len }
+					end
+				elseif item.len > (bestInvalid and bestInvalid.len or 0) then
+					bestInvalid = item
+				end
+			end
+		end
+		if best then
+			break
+		end
+	end
+
+	if best then
+		cacheRemote("core/alleral_core.luau", best.body)
+		return best.body, best.base .. " via " .. best.via .. " (" .. tostring(best.len) .. "b)"
+	end
+
+	if bestInvalid then
+		return nil, bestInvalid.via .. " (" .. coreRejectReason(bestInvalid.body) .. ")"
+	end
+	return nil, "all transports failed"
+end
+
 local function loadCore()
 	ENV.Alleral_Core = nil
 
-	local src, label = readLocal({ "core/alleral_core.luau", "alleral_core.luau" }, 5000)
+	local src, label = readLocal({ "core/alleral_core.luau", "alleral_core.luau" }, CORE_MIN_BYTES)
 	if src and not coreValid(src) then
 		log("Removing broken/outdated core at " .. tostring(label), true)
 		deleteWorkspaceFile(label)
@@ -893,21 +954,9 @@ local function loadCore()
 	if src and coreValid(src) then
 		label = "local:" .. label
 	else
-		src, label = nil, nil
-		local lastErr = nil
-		for _, base in ipairs(REMOTE_BASES) do
-			local url = base .. "/core/alleral_core.luau"
-			local body, via = httpGet(url, 0)
-			if body and coreValid(body) then
-				src = body
-				label = url .. (via and (" via " .. via) or "")
-				cacheRemote("core/alleral_core.luau", body)
-				break
-			end
-			lastErr = via
-		end
+		src, label = fetchCoreRemote()
 		if not src then
-			return false, lastErr or "Core download failed"
+			return false, label or "Core download failed"
 		end
 	end
 
