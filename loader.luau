@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.8.2"
+local LOADER_VERSION = "7.8.3"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -23,7 +23,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.8.2",
+	loader = "7.8.3",
 	core = "2.8.8",
 	ui = "Alleral",
 	neverlose = "1.1.0-kick",
@@ -797,7 +797,7 @@ local function usesLegacyHttpHash(src)
 	if type(src) ~= "string" then
 		return false
 	end
-	return src:find("HttpService:Hash", 1, true) ~= nil or src:find("HttpService%.Hash", 1, true) ~= nil
+	return src:find("HttpService:Hash", 1, true) ~= nil or src:find("HttpService.Hash", 1, true) ~= nil
 end
 
 local function getSource(localPaths, remotePath, opts)
@@ -1157,10 +1157,10 @@ local function neverloseUiValid(src)
 	if type(src) ~= "string" or #src < CORE_NEVERLOSE_UI_MIN_BYTES then
 		return false
 	end
-	if not src:find("return function%(Core%)", 1, true) then
+	if not src:find("return function(Core)", 1, true) then
 		return false
 	end
-	if not src:find("function Core%.loadUi", 1, true) then
+	if not src:find("function Core.loadUi", 1, true) then
 		return false
 	end
 	if not src:find("createWindUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
@@ -1276,6 +1276,21 @@ local function neverloseUiRejectReason(src)
 	end
 	if not src:find("function Core.loadUi", 1, true) then
 		return "missing loadUi override"
+	end
+	if not src:find("return function(Core)", 1, true) then
+		return "missing return function(Core) wrapper"
+	end
+	if not src:find("createWindUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
+		return "missing Neverlose UI helpers"
+	end
+	if not src:find("Neverlose UI layer", 1, true) then
+		return "missing Neverlose UI layer marker"
+	end
+	if EXECUTOR.slug == "volt" or EXECUTOR.slug == "awp" then
+		if not looksLikeLua(src) then
+			return "invalid lua body"
+		end
+		return "unknown"
 	end
 	if loadStringFn then
 		local ok, err = compileCoreSource(src, "Alleral/neverlose_ui-check")
