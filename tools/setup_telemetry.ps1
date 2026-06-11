@@ -97,27 +97,8 @@ if ($publicBase) {
     }
 }
 
-# --- private client config ---
-New-Item -ItemType Directory -Force -Path $privateDir | Out-Null
-
-if ($relayUrl) {
-    $enabled = "true"
-} else {
-    $enabled = "false"
-    $relayUrl = "https://alleral-telemetry-production.up.railway.app/ingest"
-}
-
-@"
-return {
-    enabled = $enabled,
-    relayUrl = "$relayUrl",
-    apiKey = "$key",
-    brand = "Alleral Ops",
-    heartbeatMinutes = 15,
-    logLevel = "info",
-}
-"@ | Set-Content -Path $privateFile -Encoding UTF8
-Write-Host "[ok] Wrote $privateFile"
+# --- client config (config/ + Alleral-Private/) ---
+& (Join-Path $PSScriptRoot "sync_telemetry_config.ps1")
 
 # --- test ingest ---
 if ($relayUrl -and $relayUrl -notmatch "YOUR-RELAY") {
@@ -153,8 +134,8 @@ if ($relayUrl -and $relayUrl -notmatch "YOUR-RELAY") {
 Write-Host ""
 Write-Host "=== Telemetry setup complete ==="
 Write-Host "API key: $key"
-Write-Host "Private config: $privateFile"
-Write-Host "Loader reads: ../Alleral-Private/owner_telemetry.luau"
+Write-Host "Client config: config/owner_telemetry.luau + Alleral-Private/owner_telemetry.luau"
+Write-Host "Loader auto-loads these when readfile works (Volt workspace / local files)."
 if (-not $publicBase) {
     Write-Host "NEXT: Deploy backend/ to Railway and re-run with TELEMETRY_PUBLIC_URL set."
 }

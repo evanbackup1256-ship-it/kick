@@ -134,7 +134,7 @@ def verify(path: Path) -> bool:
 
 def main() -> None:
     targets = [
-        ROOT / "vendor/starlight/Source.lua",
+        ROOT / "core/alleral_core.luau",
         ROOT / "core/telemetry.luau",
         ROOT / "core/analytics.luau",
     ]

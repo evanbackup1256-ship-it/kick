@@ -6,7 +6,7 @@ Alleral Hub is a multi-game Roblox executor loader. One `loader.luau` detects th
 
 ```
 loader.luau
-  ├── core/alleral_core.luau      Starlight UI, settings, supervisors
+  ├── core/alleral_core.luau      Rayfield UI, RoScripts browser, supervisors
   ├── core/game_helpers.luau      Shared combat/movement/remote helpers
   ├── core/analytics.luau         Kick in-game user webhooks
   ├── core/telemetry.luau         Owner relay client
@@ -21,7 +21,7 @@ Boot order:
 
 1. `detectGame()` — PlaceId + in-game markers
 2. `preloadCore()` → `preloadAnalytics()` → `preloadHelpers()` → `preloadTelemetry()`
-3. Starlight preload
+3. Rayfield preload
 4. `runGameScript(profile)` — compile game source into getgenv
 
 ## Path resolution
@@ -31,7 +31,7 @@ Boot order:
 | `core/*.luau` | `src/*.luau`, flat name |
 | `games/*.luau` | `src/*.luau`, flat name |
 | `games/data/*.luau` | Game data modules (KickBlox brainrot list) |
-| `vendor/starlight/Source.lua` | Obfuscated UI bundle (edit `lib/`, run `bundle.py`) |
+| Rayfield (remote) | UI library loaded from Sirius GitHub at runtime |
 | `core/telemetry.luau` | Obfuscated owner telemetry (edit `core/internal/`) |
 | `core/analytics.luau` | Obfuscated user analytics (edit `core/internal/`) |
 

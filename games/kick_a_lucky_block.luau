@@ -3,10 +3,15 @@ do
 	if type(bridge) == "table" and getgenv then
 		local g = getgenv()
 		if type(g) == "table" then
-			if bridge.Alleral_Starlight
-				and bridge.Alleral_Starlight.InterfaceBuild == "Alleral-6"
-				and type(bridge.Alleral_Starlight.CreateWindow) == "function" then
-				g.Alleral_Starlight = bridge.Alleral_Starlight
+			if bridge.Alleral_Rayfield
+				and bridge.Alleral_Rayfield.InterfaceBuild == "Rayfield"
+				and type(bridge.Alleral_Rayfield.CreateWindow) == "function" then
+				g.Alleral_Rayfield = bridge.Alleral_Rayfield
+				g.Alleral_UI = bridge.Alleral_Rayfield
+			end
+			if bridge.Alleral_UI and type(bridge.Alleral_UI.CreateWindow) == "function" then
+				g.Alleral_UI = bridge.Alleral_UI
+				g.Alleral_Rayfield = bridge.Alleral_UI
 			end
 			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
 			if bridge.Alleral_Analytics then g.Alleral_Analytics = bridge.Alleral_Analytics end
@@ -311,15 +316,15 @@ end
 state.HubRunning = true
 
 local Core = getgenv().Alleral_Core
-local starlight
+local rayfield
 local bootErr
 if not Core or not Core.prepareGame then
 	warn("[Alleral] Core missing, run loader.luau first")
 	getgenv().Alleral_StartupFailed = "Alleral_Core missing"
 	return
 end
-Core, starlight, bootErr = Core.prepareGame(state)
-if not Core or not starlight then
+Core, rayfield, bootErr = Core.prepareGame(state)
+if not Core or not rayfield then
 	warn("[Alleral] Boot failed: " .. tostring(bootErr))
 	return
 end
@@ -841,7 +846,7 @@ local function loadLuaSource(source, label)
 	end
 	if getgenv then
 		local env = getgenv()
-		return env.Starlight or env.Library or env.AlleralLib
+		return env.Alleral_Rayfield or env.Alleral_UI or env.Library or env.AlleralLib
 	end
 return nil
 end
@@ -2903,52 +2908,53 @@ local function loggedCallback(label, callback)
 	end
 end
 
-local starlightWindow = Core.buildStarlightWindow(starlight, {
+local rayfieldWindow = Core.buildRayfieldWindow(rayfield, {
 	Subtitle = "Kick a Lucky Block · v" .. VERSION,
 	FileSettings = {
 		RootFolder = "Alleral_Configs",
 		ConfigFolder = "Interface",
 	},
 })
-local starlightSection = Core.buildStarlightSection(starlightWindow)
+local rayfieldSection = Core.buildRayfieldSection(rayfieldWindow)
 
-local function createStarlightTab(name, icon)
-	return Core.buildStarlightTab(starlightSection, name, icon, 2)
+local function createRayfieldTab(name, icon)
+	return Core.buildRayfieldTab(rayfieldSection, name, icon, 2)
 end
 
-local function createStarlightGroup(tab, name, icon, column)
-	return Core.buildStarlightGroup(tab, name, column, function(label, callback)
+local function createRayfieldGroup(tab, name, icon, column)
+	return Core.buildRayfieldGroup(tab, name, column, function(label, callback)
 		return loggedCallback(label, callback)
 	end, icon)
 end
 
-local mainTab = createStarlightTab("Kick", "rbxassetid://10723407389")
-local autoTab = createStarlightTab("Plot", "rbxassetid://10734923214")
-local eventsTab = createStarlightTab("Events", "rbxassetid://10709789407")
-local shopTab = createStarlightTab("Inventory", "rbxassetid://10734952479")
-local miscTab = createStarlightTab("Tools", "rbxassetid://10734950020")
-local configTab = createStarlightTab("Settings", "rbxassetid://10734950309")
+local mainTab = createRayfieldTab("Kick", "rbxassetid://10723407389")
+local autoTab = createRayfieldTab("Plot", "rbxassetid://10734923214")
+local eventsTab = createRayfieldTab("Events", "rbxassetid://10709789407")
+local shopTab = createRayfieldTab("Inventory", "rbxassetid://10734952479")
+local miscTab = createRayfieldTab("Tools", "rbxassetid://10734950020")
+local configTab = createRayfieldTab("Settings", "rbxassetid://10734950309")
 
-local kickGroup = createStarlightGroup(mainTab, "Auto Kick", "rbxassetid://10734975692", 1)
-local filterGroup = createStarlightGroup(mainTab, "Keep / Skip", "rbxassetid://10734975692", 2)
-local trainGroup = createStarlightGroup(mainTab, "Train", "rbxassetid://10734975692", 2)
-local placeGroup = createStarlightGroup(autoTab, "Auto Place", "rbxassetid://10734975692", 1)
-local upgradeGroup = createStarlightGroup(autoTab, "Upgrades", "rbxassetid://10734975692", 2)
-local economyGroup = createStarlightGroup(autoTab, "Shop", "rbxassetid://10734975692", 1)
-local battleGroup = createStarlightGroup(eventsTab, "Battle", "rbxassetid://10709789407", 1)
-local masteryGroup = createStarlightGroup(eventsTab, "Mastery", "rbxassetid://10709789407", 2)
-local weatherGroup = createStarlightGroup(eventsTab, "Weather", "rbxassetid://10709789407", 1)
-local styleGroup = createStarlightGroup(shopTab, "Styles", "rbxassetid://10734952479", 1)
-local favoriteGroup = createStarlightGroup(shopTab, "Favorites", "rbxassetid://10734952479", 2)
-local serverGroup = createStarlightGroup(miscTab, "Server", "rbxassetid://10734950020", 1)
-local webhookGroup = createStarlightGroup(miscTab, "Webhooks", "rbxassetid://10734950020", 2)
-local configGroup = createStarlightGroup(configTab, "Alerts", "rbxassetid://10734950309", 1)
-local recoveryGroup = createStarlightGroup(configTab, "Stuck?", "rbxassetid://10734950309", 2)
-local tuningGroup = createStarlightGroup(configTab, "Speed tweaks", "rbxassetid://10734950309", 1)
-local diagnosticsGroup = createStarlightGroup(configTab, "Debug info", "rbxassetid://10734950309", 2)
-local profileGroup = createStarlightGroup(configTab, "Save slots", "rbxassetid://10734950309", 1)
+local kickGroup = createRayfieldGroup(mainTab, "Auto Kick", "rbxassetid://10734975692", 1)
+local filterGroup = createRayfieldGroup(mainTab, "Keep / Skip", "rbxassetid://10734975692", 2)
+local trainGroup = createRayfieldGroup(mainTab, "Train", "rbxassetid://10734975692", 2)
+local placeGroup = createRayfieldGroup(autoTab, "Auto Place", "rbxassetid://10734975692", 1)
+local upgradeGroup = createRayfieldGroup(autoTab, "Upgrades", "rbxassetid://10734975692", 2)
+local economyGroup = createRayfieldGroup(autoTab, "Shop", "rbxassetid://10734975692", 1)
+local battleGroup = createRayfieldGroup(eventsTab, "Battle", "rbxassetid://10709789407", 1)
+local masteryGroup = createRayfieldGroup(eventsTab, "Mastery", "rbxassetid://10709789407", 2)
+local weatherGroup = createRayfieldGroup(eventsTab, "Weather", "rbxassetid://10709789407", 1)
+local styleGroup = createRayfieldGroup(shopTab, "Styles", "rbxassetid://10734952479", 1)
+local favoriteGroup = createRayfieldGroup(shopTab, "Favorites", "rbxassetid://10734952479", 2)
+local serverGroup = createRayfieldGroup(miscTab, "Server", "rbxassetid://10734950020", 1)
+local webhookGroup = createRayfieldGroup(miscTab, "Webhooks", "rbxassetid://10734950020", 2)
+local configGroup = createRayfieldGroup(configTab, "Alerts", "rbxassetid://10734950309", 1)
+local recoveryGroup = createRayfieldGroup(configTab, "Stuck?", "rbxassetid://10734950309", 2)
+local tuningGroup = createRayfieldGroup(configTab, "Speed tweaks", "rbxassetid://10734950309", 1)
+local diagnosticsGroup = createRayfieldGroup(configTab, "Debug info", "rbxassetid://10734950309", 2)
+local profileGroup = createRayfieldGroup(configTab, "Save slots", "rbxassetid://10734950309", 1)
 configTab:BuildThemeGroupbox(2)
 Core.buildScriptStatusGroupbox(configTab, 1, "kick_a_lucky_block", VERSION)
+Core.buildRoScriptsSearch(configTab, 2, rayfield)
 local protectedDropdown
 local upgradeDropdown
 

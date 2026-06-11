@@ -1,6 +1,6 @@
-local LOADER_VERSION = "3.5.11"
-local REQUIRED_CORE_VERSION = "1.15"
-local REQUIRED_STARLIGHT_BUILD = "Alleral-6"
+local LOADER_VERSION = "3.7.2"
+local REQUIRED_CORE_VERSION = "1.17"
+local REQUIRED_UI_LIBRARY = "Rayfield"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local SCRIPT_MANIFEST_URL = REPO_BASE .. "/config/scripts_manifest.json"
 local FETCH_RETRIES = 3
@@ -27,16 +27,26 @@ local SHARED_HELPERS_FILES = {
 	"src/game_helpers.luau",
 	"game_helpers.luau",
 }
+local DEFAULT_TELEMETRY_RELAY = "https://alleral-telemetry-production.up.railway.app/ingest"
+
 local OWNER_TELEMETRY_FILES = {
 	"../Alleral-Private/owner_telemetry.luau",
-	"../../Alleral-Private/owner_telemetry.luau",
-	"kick/../Alleral-Private/owner_telemetry.luau",
-	"kick/kick/../Alleral-Private/owner_telemetry.luau",
 	"Alleral-Private/owner_telemetry.luau",
 	"kick/Alleral-Private/owner_telemetry.luau",
+	"kick/../Alleral-Private/owner_telemetry.luau",
+	"config/owner_telemetry.luau",
+	"kick/kick/config/owner_telemetry.luau",
+	"../../Alleral-Private/owner_telemetry.luau",
+	"kick/kick/../Alleral-Private/owner_telemetry.luau",
 	"workspace/Alleral-Private/owner_telemetry.luau",
 	"workspace/../Alleral-Private/owner_telemetry.luau",
 	"owner_telemetry.luau",
+}
+local OWNER_TELEMETRY_ENV_FILES = {
+	"backend/.env",
+	"kick/kick/backend/.env",
+	"../backend/.env",
+	"config/telemetry.env",
 }
 local TELEMETRY_MODULE_VERSION = "2.2"
 local SHARED_CORE_URL = REPO_BASE .. "/core/alleral_core.luau"
@@ -171,7 +181,7 @@ local GAMES = {
 			"kick a lucky block.luau",
 		},
 		scriptUrl = REPO_BASE .. "/games/kick_a_lucky_block.luau",
-		sourceMarker = "Alleral_Starlight",
+		sourceMarker = "Alleral_Rayfield",
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Shared" }, 20)
 			local areas = Workspace:WaitForChild("Areas", 20)
@@ -380,6 +390,10 @@ local function discoverLocalFiles(fileNames)
 	return found
 end
 
+local function telemetrySourceMarker()
+	return 'Telemetry.Version = "' .. TELEMETRY_MODULE_VERSION .. '"'
+end
+
 local function coreSourceMarker()
 	return 'Core.VERSION = "' .. REQUIRED_CORE_VERSION .. '"'
 end
@@ -515,10 +529,15 @@ do
 	if type(bridge) == "table" and getgenv then
 		local g = getgenv()
 		if type(g) == "table" then
-			if bridge.Alleral_Starlight
-				and bridge.Alleral_Starlight.InterfaceBuild == "Alleral-6"
-				and type(bridge.Alleral_Starlight.CreateWindow) == "function" then
-				g.Alleral_Starlight = bridge.Alleral_Starlight
+			if bridge.Alleral_Rayfield
+				and bridge.Alleral_Rayfield.InterfaceBuild == "Rayfield"
+				and type(bridge.Alleral_Rayfield.CreateWindow) == "function" then
+				g.Alleral_Rayfield = bridge.Alleral_Rayfield
+				g.Alleral_UI = bridge.Alleral_Rayfield
+			end
+			if bridge.Alleral_UI and type(bridge.Alleral_UI.CreateWindow) == "function" then
+				g.Alleral_UI = bridge.Alleral_UI
+				g.Alleral_Rayfield = bridge.Alleral_UI
 			end
 			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
 			if bridge.Alleral_Analytics then g.Alleral_Analytics = bridge.Alleral_Analytics end
@@ -545,7 +564,8 @@ end
 local function publishBridge()
 	ENV.Alleral_State = ENV.Alleral_State or {}
 	pcall(function()
-		shared.Alleral_Starlight = ENV.Alleral_Starlight
+		shared.Alleral_Rayfield = ENV.Alleral_Rayfield
+		shared.Alleral_UI = ENV.Alleral_UI
 		shared.Alleral_Core = ENV.Alleral_Core
 		shared.Alleral_Analytics = ENV.Alleral_Analytics
 		shared.Alleral_Telemetry = ENV.Alleral_Telemetry
@@ -560,17 +580,6 @@ local function publishBridge()
 end
 
 local function patchGameSource(profile, source)
-	if profile.id == "kick_a_lucky_block" then
-		if source:find("HTTP is unavailable; cannot load Starlight", 1, true) then
-			source = source:gsub(
-				"(local function loadStarlight%(%)\r?\n)",
-				"%1\tif shared and type(shared.Alleral_Starlight) == \"table\" then return shared.Alleral_Starlight end\n"
-					.. "\tif getgenv and type((getgenv()).Alleral_Starlight) == \"table\" then return getgenv().Alleral_Starlight end\n",
-				1
-			)
-			log("warn", "Patched cached Kick script to use preloaded Starlight")
-		end
-	end
 	return ENV_BRIDGE .. "\n" .. source
 end
 
@@ -624,7 +633,8 @@ end
 local function clearSharedBridge()
 	pcall(function()
 		if typeof(shared) == "table" then
-			shared.Alleral_Starlight = nil
+			shared.Alleral_Rayfield = nil
+			shared.Alleral_UI = nil
 			shared.Alleral_Core = nil
 			shared.Alleral_Analytics = nil
 			shared.Alleral_Telemetry = nil
@@ -638,7 +648,8 @@ local function invalidateStaleModules()
 		return
 	end
 	ENV.Alleral_Core = nil
-	ENV.Alleral_Starlight = nil
+	ENV.Alleral_Rayfield = nil
+	ENV.Alleral_UI = nil
 	ENV.Alleral_Analytics = nil
 	ENV.Alleral_Telemetry = nil
 	ENV.Alleral_ReportError = nil
@@ -650,9 +661,9 @@ end
 
 local function coreVersionOk(core)
 	return core
-		and type(core.loadStarlight) == "function"
+		and type(core.loadRayfield) == "function"
 		and core.VERSION == REQUIRED_CORE_VERSION
-		and core.STARLIGHT_BUILD == REQUIRED_STARLIGHT_BUILD
+		and core.UI_LIBRARY == REQUIRED_UI_LIBRARY
 end
 
 local function preloadCore(required)
@@ -661,7 +672,8 @@ local function preloadCore(required)
 		return true
 	end
 	ENV.Alleral_Core = nil
-	ENV.Alleral_Starlight = nil
+	ENV.Alleral_Rayfield = nil
+	ENV.Alleral_UI = nil
 	local source, sourceLabel = resolveFromFiles(
 		SHARED_CORE_FILES,
 		"core",
@@ -707,6 +719,75 @@ local function ownerTelemetryValid(cfg)
 		and cfg.enabled ~= false
 		and trim(cfg.relayUrl or "") ~= ""
 		and trim(cfg.apiKey or "") ~= ""
+		and trim(cfg.apiKey) ~= "aller_CHANGE_ME"
+		and not trim(cfg.apiKey):find("paste%-", 1, true)
+end
+
+local function parseEnvFile(raw)
+	local out = {}
+	for line in tostring(raw or ""):gmatch("[^\r\n]+") do
+		line = trim(line)
+		if line ~= "" and not line:match("^#") and line:find("=") then
+			local key, value = line:match("^([^=]+)=(.*)$")
+			if key then
+				out[trim(key)] = trim(value)
+			end
+		end
+	end
+	return out
+end
+
+local function buildTelemetryConfigFromEnv(env)
+	if type(env) ~= "table" then
+		return nil
+	end
+	local apiKey = trim(env.TELEMETRY_API_KEY or env.ADMIN_API_KEY or "")
+	if apiKey == "" or apiKey == "aller_CHANGE_ME" or #apiKey < 24 then
+		return nil
+	end
+	local relayUrl = DEFAULT_TELEMETRY_RELAY
+	local publicUrl = trim(env.TELEMETRY_PUBLIC_URL or env.TELEMETRY_RELAY_URL or "")
+	if publicUrl ~= "" then
+		publicUrl = publicUrl:gsub("/+$", "")
+		if publicUrl:find("/ingest$") then
+			relayUrl = publicUrl
+		else
+			relayUrl = publicUrl .. "/ingest"
+		end
+	end
+	return {
+		enabled = true,
+		relayUrl = relayUrl,
+		apiKey = apiKey,
+		brand = trim(env.TELEMETRY_BRAND) ~= "" and trim(env.TELEMETRY_BRAND) or "Alleral Ops",
+		heartbeatMinutes = tonumber(env.TELEMETRY_HEARTBEAT_MINUTES) or 15,
+		logLevel = trim(env.TELEMETRY_LOG_LEVEL) ~= "" and trim(env.TELEMETRY_LOG_LEVEL) or "info",
+	}
+end
+
+local function bootstrapTelemetryFromEnvFiles()
+	for _, path in ipairs(OWNER_TELEMETRY_ENV_FILES) do
+		local raw = readLocalFile(path)
+		if raw then
+			local cfg = buildTelemetryConfigFromEnv(parseEnvFile(raw))
+			if ownerTelemetryValid(cfg) then
+				ENV.Alleral_OwnerTelemetry = cfg
+				log("info", "Telemetry config auto-loaded from " .. path)
+				return true
+			end
+		end
+	end
+	if CAPABILITIES.readfile then
+		for _, hit in ipairs(discoverLocalFiles(OWNER_TELEMETRY_ENV_FILES)) do
+			local cfg = buildTelemetryConfigFromEnv(parseEnvFile(hit.source))
+			if ownerTelemetryValid(cfg) then
+				ENV.Alleral_OwnerTelemetry = cfg
+				log("info", "Telemetry config auto-loaded from " .. hit.path)
+				return true
+			end
+		end
+	end
+	return false
 end
 
 local function loadOwnerTelemetryTable(raw, label)
@@ -737,16 +818,22 @@ local function loadOwnerTelemetryConfig()
 				ENV.Alleral_OwnerTelemetry = cfg
 				log("info", "Telemetry config loaded from " .. label)
 				return true
+			elseif raw:find("enabled%s*=%s*false") or raw:find('apiKey%s*=%s*""') then
+				log("warn", "Skipping disabled/empty telemetry config: " .. path)
 			end
 		end
 	end
 
+	if bootstrapTelemetryFromEnvFiles() then
+		return true
+	end
+
 	if CAPABILITIES.readfile then
 		for _, hit in ipairs(discoverLocalFiles({
-			"owner_telemetry.luau",
 			"../Alleral-Private/owner_telemetry.luau",
 			"Alleral-Private/owner_telemetry.luau",
-			"kick/../Alleral-Private/owner_telemetry.luau",
+			"config/owner_telemetry.luau",
+			"owner_telemetry.luau",
 		})) do
 			local cfg, label = loadOwnerTelemetryTable(hit.source, hit.path)
 			if cfg then
@@ -780,7 +867,14 @@ local function preloadHelpers()
 end
 
 local function preloadTelemetry()
-	local source, sourceLabel = resolveFromFiles(SHARED_TELEMETRY_FILES, "telemetry", SHARED_TELEMETRY_URL, "Alleral_Telemetry")
+	loadOwnerTelemetryConfig()
+
+	local source, sourceLabel = resolveFromFiles(
+		SHARED_TELEMETRY_FILES,
+		"telemetry",
+		SHARED_TELEMETRY_URL,
+		telemetrySourceMarker()
+	)
 	if not source then
 		log("warn", "Telemetry skipped: " .. tostring(sourceLabel))
 		return false
@@ -833,6 +927,11 @@ local function preloadTelemetry()
 				telemetry:HookLifecycle()
 			end)
 		end
+		if type(telemetry.StartHeartbeat) == "function" then
+			pcall(function()
+				telemetry:StartHeartbeat()
+			end)
+		end
 		local relayHost = ""
 		pcall(function()
 			local cfg = telemetry._config or ENV.Alleral_OwnerTelemetry or {}
@@ -840,7 +939,7 @@ local function preloadTelemetry()
 		end)
 		log("info", "Telemetry on" .. (relayHost ~= "" and (" (" .. relayHost .. ")") or ""))
 	else
-		log("info", "Telemetry off (set getgenv().Alleral_OwnerTelemetry before loader)")
+		log("info", "Telemetry off — run tools/sync_telemetry_config.ps1 or add config/owner_telemetry.luau")
 	end
 	return telemetry ~= nil
 end
@@ -865,9 +964,6 @@ local function runGameScript(profile)
 	end
 
 	if profile.sourceMarker and not source:find(profile.sourceMarker, 1, true) then
-		if source:find("HTTP is unavailable; cannot load Starlight", 1, true) then
-			return false, "Cached Kick script is stale, run loader again"
-		end
 		log("warn", profile.name .. " download may be outdated (missing " .. profile.sourceMarker .. ")")
 	end
 
@@ -1005,8 +1101,10 @@ local function main()
 
 	invalidateStaleModules()
 	clearSharedBridge()
+	loadOwnerTelemetryConfig()
 	ENV.Alleral_StartupFailed = nil
-	ENV.Alleral_Starlight = nil
+	ENV.Alleral_Rayfield = nil
+	ENV.Alleral_UI = nil
 	ENV.Alleral_Core = nil
 	unloadPrevious()
 
@@ -1060,8 +1158,8 @@ local function main()
 
 	preloadAnalytics()
 	preloadHelpers()
-	preloadTelemetry()
 	applyCoreCapabilities()
+	preloadTelemetry()
 
 	if ENV.Alleral_Core and type(ENV.Alleral_Core.fetchWeaoExploits) == "function" then
 		task.spawn(function()
@@ -1098,17 +1196,19 @@ local function main()
 		return
 	end
 
-	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadStarlight) == "function" then
-		local starlight, starlightErr = ENV.Alleral_Core.loadStarlight()
-		if starlight and starlight.InterfaceBuild == REQUIRED_STARLIGHT_BUILD then
-			ENV.Alleral_Starlight = starlight
-			log("info", "Starlight preloaded (" .. tostring(starlight.InterfaceBuild) .. ")")
+	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadRayfield) == "function" then
+		local uiLibrary, uiErr = ENV.Alleral_Core.loadRayfield()
+		if uiLibrary and uiLibrary.InterfaceBuild == REQUIRED_UI_LIBRARY then
+			ENV.Alleral_Rayfield = uiLibrary
+			ENV.Alleral_UI = uiLibrary
+			log("info", "Rayfield preloaded (" .. tostring(uiLibrary.InterfaceBuild) .. ")")
 		else
-			ENV.Alleral_Starlight = nil
-			local detail = starlightErr
-				or ("Starlight build mismatch: " .. tostring(starlight and starlight.InterfaceBuild or "nil"))
-			log("warn", "Starlight preload failed: " .. detail)
-			notify("Alleral", "Starlight failed: " .. detail, 8)
+			ENV.Alleral_Rayfield = nil
+			ENV.Alleral_UI = nil
+			local detail = uiErr
+				or ("UI library mismatch: " .. tostring(uiLibrary and uiLibrary.InterfaceBuild or "nil"))
+			log("warn", "Rayfield preload failed: " .. detail)
+			notify("Alleral", "Rayfield failed: " .. detail, 8)
 			ENV.Alleral_LoaderRunning = false
 			return
 		end

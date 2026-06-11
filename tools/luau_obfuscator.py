@@ -45,18 +45,18 @@ LUA_GLOBALS = {
     "identifyexecutor", "getexecutorname", "readfile", "writefile", "isfile",
     "listfiles", "makefolder", "delfile", "isfolder", "appendfile", "request",
     "http_request", "syn", "fluxus", "getgc", "getreg", "getscripts", "getnilinstances",
-    "_G", "_VERSION", "self", "Starlight", "Alleral_Core", "Alleral_Analytics",
+    "_G", "_VERSION", "self", "Rayfield", "Alleral_Core", "Alleral_Analytics",
     "Alleral_Telemetry", "Alleral_GameHelpers", "Telemetry", "Analytics", "Helpers",
     "Core", "FileSystem", "Theme", "Notification", "WindowBuilder", "Util", "Elements",
     "modules", "requireModule",
 }
 
 PUBLIC_EXPORTS = {
-    "Starlight", "Telemetry", "Analytics", "Helpers", "Core",
+    "Rayfield", "Telemetry", "Analytics", "Helpers", "Core",
     "CreateWindow", "Notification", "SetTheme", "SetAccent", "GetVisualSettings",
     "SetVisualSettings", "FileSystem", "InterfaceBuild", "WindowKeybind",
     "Version", "Config", "Init", "Start", "Stop", "Track", "Report", "Flush",
-    "Send", "Notify", "PrepareGame", "LoadStarlight", "WrapStarlightGroup",
+    "Send", "Notify", "PrepareGame", "LoadRayfield", "WrapUiGroup",
 }
 
 STRING_PATTERN = re.compile(

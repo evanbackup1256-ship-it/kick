@@ -17,7 +17,7 @@ if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
 end
 
-local starlight
+local rayfield
 local bootErr
 local bootApi = getgenv().Alleral_Core
 if not bootApi or not bootApi.prepareGame then
@@ -26,8 +26,8 @@ if not bootApi or not bootApi.prepareGame then
 	warn("[Alleral] " .. msg)
 	return
 end
-Core, starlight, bootErr = bootApi.prepareGame(state)
-if not Core or not starlight then
+Core, rayfield, bootErr = bootApi.prepareGame(state)
+if not Core or not rayfield then
 	local msg = "Boot failed: " .. tostring(bootErr)
 	getgenv().Alleral_StartupFailed = msg
 	warn("[Alleral] " .. msg)
@@ -770,22 +770,22 @@ Core.makeSupervisor(state, loops, loopControllers, "autoRebirth", 0.5, function(
 	end
 end)
 
-local window = Core.buildStarlightWindow(starlight, {
+local window = Core.buildRayfieldWindow(rayfield, {
 	Subtitle = "Speed Keyboard Escape · v" .. VERSION,
 })
-local section = Core.buildStarlightSection(window)
-local mainTab = Core.buildStarlightTab(section, "Main", 10723407389, 2, "main")
-local autoTab = Core.buildStarlightTab(section, "Auto", 10734923214, 2, "auto")
-local shopTab = Core.buildStarlightTab(section, "Shop", 10734952479, 1, "shop")
-local miscTab = Core.buildStarlightTab(section, "Misc", 10734950020, 1, "misc")
-local settingsTab = Core.buildStarlightTab(section, "Settings", 10734950309, 1, "settings")
+local section = Core.buildRayfieldSection(window)
+local mainTab = Core.buildRayfieldTab(section, "Main", 10723407389, 2, "main")
+local autoTab = Core.buildRayfieldTab(section, "Auto", 10734923214, 2, "auto")
+local shopTab = Core.buildRayfieldTab(section, "Shop", 10734952479, 1, "shop")
+local miscTab = Core.buildRayfieldTab(section, "Misc", 10734950020, 1, "misc")
+local settingsTab = Core.buildRayfieldTab(section, "Settings", 10734950309, 1, "settings")
 
-local farm = Core.buildStarlightGroup(mainTab, "Farming", 1, nil, nil, "farm")
-local tween = Core.buildStarlightGroup(mainTab, "Movement", 2, nil, nil, "tween")
-local aura = Core.buildStarlightGroup(autoTab, "Auras", 1, nil, nil, "aura")
-local equip = Core.buildStarlightGroup(autoTab, "Gear", 2, nil, nil, "equip")
-local shop = Core.buildStarlightGroup(shopTab, "Shop", 1, nil, nil, "shop_items")
-local util = Core.buildStarlightGroup(miscTab, "Extras", 1, nil, nil, "utils")
+local farm = Core.buildRayfieldGroup(mainTab, "Farming", 1, nil, nil, "farm")
+local tween = Core.buildRayfieldGroup(mainTab, "Movement", 2, nil, nil, "tween")
+local aura = Core.buildRayfieldGroup(autoTab, "Auras", 1, nil, nil, "aura")
+local equip = Core.buildRayfieldGroup(autoTab, "Gear", 2, nil, nil, "equip")
+local shop = Core.buildRayfieldGroup(shopTab, "Shop", 1, nil, nil, "shop_items")
+local util = Core.buildRayfieldGroup(miscTab, "Extras", 1, nil, nil, "utils")
 
 local winTargetsW1 = { "Win 1", "Win 3", "Win 10", "Win 20", "Win 50", "Win 100", "Win 150", "Win 300", "Win 500", "Win 1000", "Win 2500" }
 local winTargetsW2 = { "Win 250k", "Win 400k", "Win 600k", "Win 1M", "Win 1.5M", "Win 2.5M" }
@@ -871,6 +871,7 @@ end)
 
 settingsTab:BuildThemeGroupbox(1)
 Core.buildScriptStatusGroupbox(settingsTab, 1, "speed_keyboard_escape", VERSION)
+Core.buildRoScriptsSearch(settingsTab, 2, rayfield)
 
 notify("Alleral", "Loaded. Tabs on the left.")
 

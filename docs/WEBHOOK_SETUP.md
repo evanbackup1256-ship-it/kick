@@ -24,7 +24,7 @@ kick/
 ├── backend/                Python relay (Railway/local)
 ├── docs/                   Architecture + setup docs
 ├── tools/                  Dev + ops scripts
-└── vendor/starlight/       UI library
+└── core/                     Shared runtime modules
 ```
 
 ## Relay URL

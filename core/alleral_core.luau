@@ -1,19 +1,29 @@
 local Core = {}
-Core.VERSION = "1.15"
-Core.STARLIGHT_BUILD = "Alleral-6"
+Core.VERSION = "1.17"
+Core.UI_LIBRARY = "Rayfield"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
-local STARLIGHT_REMOTE_URLS = {
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/vendor/starlight/Source.lua",
+local RAYFIELD_SOURCE_URL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua"
+local RAYFIELD_LOCAL_FILES = {
+	"vendor/rayfield/source.lua",
+	"rayfield/source.lua",
 }
-local STARLIGHT_LOCAL_FILES = {
-	"vendor/starlight/Source.lua",
-	"vendor/starlight/Source.plain.lua",
-	"starlight/Source.lua",
-	"kick/vendor/starlight/Source.lua",
-	"kick/kick/vendor/starlight/Source.lua",
+local RAYFIELD_THEME_NAMES = {
+	"Default",
+	"Ocean",
+	"AmberGlow",
+	"Light",
+	"Amethyst",
+	"Green",
+	"Bloom",
+	"DarkBlue",
+	"Serenity",
 }
+local ROSCRIPTS_SEARCH_URL = "https://rscripts.net/api/v2/scripts"
+local ROSCRIPTS_SCRIPT_URL = "https://rscripts.net/api/v2/script"
+local ROSCRIPTS_WEB_HOME = "https://roscripts.io/"
+local ROSCRIPTS_WEB_SCRIPT = "https://rscripts.net/script/"
 
 local function genv()
 	local ok, env = pcall(function()
@@ -1042,75 +1052,83 @@ function Core.writeFile(path, data)
 	return pcall(writeFile, path, data)
 end
 
-function Core.patchStarlightSource(source)
-	if not source or source == "" then
-		return source
-	end
-	if source:find("Alleral%-[123]") or source:find("Alleral Rewrite") then
-		return source
-	end
-	source = source:gsub(
-		"function Tab:Show%(%)[\r\n]+%s*if Library%.ActiveTab then",
-		"function Tab:Show()\n\t\t\tif Library.ActiveTab == Tab then\n\t\t\t\treturn\n\t\t\tend\n\t\t\tif Library.ActiveTab then"
-	)
-	local inputStart = source:find("function Groupbox:CreateInput", 1, true)
-	local labelStart = inputStart and source:find("function Groupbox:CreateLabel", inputStart, true)
-	if not inputStart or not labelStart then
-		return source
-	end
-	local before = source:sub(1, inputStart - 1)
-	local block = source:sub(inputStart, labelStart - 1)
-	local after = source:sub(labelStart)
-	block = block:gsub(
-		"(Element%.Instance = GroupboxTemplateInstance%.Input_TEMPLATE:Clone%(%)[\r\n]+%s*Element%.Instance%.Visible = true)",
-		"%1\n\t\t\t\t\t\tElement.Instance.Parent = Groupbox.ParentingItem",
-		1
-	)
-	block = block:gsub(
-		"\n%s*Element%.Instance%.Parent = Groupbox%.ParentingItem\n\n%s*(Starlight%.Window%.TabSections%[Name%]%.Tabs%[TabIndex%]%.Groupboxes%[GroupIndex%]%.Elements%[Index%] = Element)",
-		"\n\n\t\t\t\t\t%1",
-		1
-	)
-	return before .. block .. after
+local function rayfieldOk(library)
+	return type(library) == "table"
+		and type(library.CreateWindow) == "function"
+		and type(library.Notify) == "function"
 end
 
-local function compileStarlightSource(source, label)
+local function stampRayfield(library)
+	if type(library) ~= "table" then
+		return library
+	end
+	library.InterfaceBuild = Core.UI_LIBRARY
+	library.UI_LIBRARY = Core.UI_LIBRARY
+	return library
+end
+
+local function compileRayfieldSource(source, label)
 	local loadStringFn = Core.loadStringFn()
 	if not loadStringFn or not source or source == "" then
-		return nil, "Empty Starlight source"
+		return nil, "Empty Rayfield source"
 	end
-	if source:find("Alleral Protected") or source:find("Nebula%-Softworks") then
-		return nil, "Refusing cached or third-party Starlight — need Alleral Source.lua"
+	if not source:find("RayfieldLibrary") and not source:find("CreateWindow") then
+		return nil, "Not a Rayfield source file"
 	end
-	local buildMarker = Core.STARLIGHT_BUILD:gsub("-", "%%-")
-	if not source:find(buildMarker) and not source:find('InterfaceBuild%s*=%s*"' .. buildMarker .. '"') then
-		return nil, "Not an Alleral Starlight build (need " .. Core.STARLIGHT_BUILD .. ")"
-	end
-	local compiled, compileErr = loadStringFn(Core.patchStarlightSource(source), label)
+	local compiled, compileErr = loadStringFn(source, label)
 	if not compiled then
 		return nil, tostring(compileErr)
 	end
 	local ok, result = pcall(compiled)
-	if ok and type(result) == "table" and type(result.CreateWindow) == "function" then
-		if result.InterfaceBuild ~= Core.STARLIGHT_BUILD then
-			return nil, "Refusing non-Alleral Starlight (" .. tostring(result.InterfaceBuild) .. ")"
+	if ok and rayfieldOk(result) then
+		return stampRayfield(result)
+	end
+	return nil, ok and "Invalid Rayfield library" or tostring(result)
+end
+
+local function fetchRayfieldSource(url)
+	local sep = url:find("?") and "&" or "?"
+	local fetchUrl = url .. sep .. "nocache=" .. tostring(math.random(10000, 99999))
+	if type(game.HttpGet) == "function" then
+		local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
+		if ok and body and body ~= "" and not body:find("404: Not Found") then
+			return body
 		end
-		return result
 	end
-	return nil, ok and "Invalid Starlight library" or tostring(result)
+	local httpGet = Core.requestFunction()
+	if httpGet then
+		local ok, response = pcall(httpGet, {
+			Url = fetchUrl,
+			Method = "GET",
+			Headers = {
+				["Cache-Control"] = "no-cache, no-store, must-revalidate",
+				["Pragma"] = "no-cache",
+			},
+		})
+		if ok and response then
+			local body = response.Body or response.body or (type(response) == "string" and response)
+			if body and body ~= "" and not body:find("404: Not Found") then
+				return body
+			end
+		end
+	end
+	return nil
 end
 
-local function starlightBuildOk(library)
-	return type(library) == "table"
-		and type(library.CreateWindow) == "function"
-		and library.InterfaceBuild == Core.STARLIGHT_BUILD
+local function cacheRayfield(library)
+	stampRayfield(library)
+	ENV.Alleral_Rayfield = library
+	ENV.Alleral_UI = library
+	return library
 end
 
-function Core.loadStarlight()
-	if starlightBuildOk(ENV.Alleral_Starlight) then
-		return ENV.Alleral_Starlight
+function Core.loadRayfield()
+	local cached = ENV.Alleral_Rayfield or ENV.Alleral_UI
+	if rayfieldOk(cached) then
+		return cacheRayfield(cached)
 	end
-	ENV.Alleral_Starlight = nil
+	ENV.Alleral_Rayfield = nil
+	ENV.Alleral_UI = nil
 
 	local loadStringFn = Core.loadStringFn()
 	if not loadStringFn then
@@ -1119,89 +1137,495 @@ function Core.loadStarlight()
 
 	local preferLocal = ENV.Alleral_DevMode == true or ENV.Alleral_PreferLocal == true
 
-	local function loadLocalStarlight()
-		for _, path in ipairs(STARLIGHT_LOCAL_FILES) do
+	local function loadLocalRayfield()
+		for _, path in ipairs(RAYFIELD_LOCAL_FILES) do
 			local source = Core.readFile(path)
 			if source then
-				local starlight, err = compileStarlightSource(source, "@Starlight/local")
-				if starlight then
-					ENV.Alleral_Starlight = starlight
-					return starlight
+				local library, err = compileRayfieldSource(source, "@Rayfield/local")
+				if library then
+					return cacheRayfield(library)
 				end
-				warn("[Alleral] Local Starlight failed (" .. path .. "): " .. tostring(err))
+				warn("[Alleral] Local Rayfield failed (" .. path .. "): " .. tostring(err))
 			end
 		end
 		return nil
-	end
-
-	local function fetchRemoteSource(url)
-		local sep = url:find("?") and "&" or "?"
-		local fetchUrl = url
-			.. sep
-			.. "build="
-			.. Core.STARLIGHT_BUILD
-			.. "&nocache="
-			.. tostring(math.random(10000, 99999))
-		if type(game.HttpGet) == "function" then
-			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
-			if ok and body and body ~= "" and not body:find("404: Not Found") then
-				return body
-			end
-		end
-		local httpGet = Core.requestFunction()
-		if httpGet then
-			local ok, response = pcall(httpGet, { Url = fetchUrl, Method = "GET" })
-			if ok and response then
-				local body = response.Body or response.body or (type(response) == "string" and response)
-				if body and body ~= "" and not body:find("404: Not Found") then
-					return body
-				end
-			end
-		end
-		return nil
-	end
-
-	local function loadRemoteStarlight()
-		local lastErr = "Starlight download failed"
-		for _, url in ipairs(STARLIGHT_REMOTE_URLS) do
-			local source = fetchRemoteSource(url)
-			if source then
-				local starlight, err = compileStarlightSource(source, "@Starlight/remote")
-				if starlight then
-					ENV.Alleral_Starlight = starlight
-					return starlight
-				end
-				lastErr = err or "Invalid Starlight library"
-			else
-				lastErr = "Starlight download failed: " .. url
-			end
-		end
-		return nil, lastErr
 	end
 
 	if preferLocal then
-		local localStarlight = loadLocalStarlight()
-		if localStarlight then
-			return localStarlight
+		local localLibrary = loadLocalRayfield()
+		if localLibrary then
+			return localLibrary
 		end
 	end
 
-	local remoteStarlight, remoteErr = loadRemoteStarlight()
-	if remoteStarlight then
-		warn("[Alleral] Starlight loaded (" .. tostring(remoteStarlight.InterfaceBuild) .. ") from remote")
-		return remoteStarlight
+	local source = fetchRayfieldSource(RAYFIELD_SOURCE_URL)
+	if source then
+		local library, err = compileRayfieldSource(source, "@Rayfield/remote")
+		if library then
+			warn("[Alleral] Rayfield loaded from Sirius GitHub")
+			return cacheRayfield(library)
+		end
+		if not preferLocal then
+			return nil, err or "Invalid Rayfield library"
+		end
+	else
+		if not preferLocal then
+			return nil, "Rayfield download failed — check HTTP / docs.sirius.menu/rayfield"
+		end
 	end
 
-	if not preferLocal then
-		return nil, remoteErr or "HTTP unavailable and no Alleral-2 Starlight found"
+	local localLibrary = loadLocalRayfield()
+	if localLibrary then
+		return localLibrary
 	end
 
-	local localStarlight = loadLocalStarlight()
-	if localStarlight then
-		return localStarlight
+	return nil, "No Rayfield source found"
+end
+
+function Core.httpGet(url)
+	if type(game.HttpGet) == "function" then
+		local ok, body = pcall(game.HttpGet, game, url, true)
+		if ok and type(body) == "string" and body ~= "" and not body:find("404: Not Found") then
+			return body
+		end
+	end
+	local httpGet = Core.requestFunction()
+	if httpGet then
+		local ok, response = pcall(httpGet, {
+			Url = url,
+			Method = "GET",
+			Headers = {
+				["Cache-Control"] = "no-cache, no-store, must-revalidate",
+			},
+		})
+		if ok and response then
+			local body = response.Body or response.body or (type(response) == "string" and response)
+			if body and body ~= "" and not body:find("404: Not Found") then
+				return body
+			end
+		end
+	end
+	return nil
+end
+
+function Core.httpGetJson(url)
+	local body = Core.httpGet(url)
+	if not body then
+		return nil, "HTTP unavailable"
+	end
+	local ok, decoded = pcall(function()
+		return HttpService:JSONDecode(body)
+	end)
+	if not ok or type(decoded) ~= "table" then
+		return nil, "Invalid response from RoScripts"
+	end
+	return decoded
+end
+
+function Core.setClipboard(text)
+	local clip = Core.execFunction("setclipboard") or Core.execFunction("toclipboard")
+	if clip then
+		pcall(clip, tostring(text or ""))
+		return true
+	end
+	return false
+end
+
+function Core.searchRoScripts(query, options)
+	options = options or {}
+	query = trimText(query)
+	if query == "" then
+		return nil, "Enter a search term"
+	end
+	local params = {
+		"page=" .. tostring(options.page or 1),
+		"orderBy=" .. HttpService:UrlEncode(options.orderBy or "views"),
+		"sort=desc",
+		"q=" .. HttpService:UrlEncode(query),
+	}
+	if options.freeOnly ~= false then
+		table.insert(params, "notPaid=true")
+	end
+	if options.noKey then
+		table.insert(params, "noKeySystem=true")
+	end
+	if options.unpatched then
+		table.insert(params, "unpatched=true")
+	end
+	local url = ROSCRIPTS_SEARCH_URL .. "?" .. table.concat(params, "&")
+	local data, err = Core.httpGetJson(url)
+	if not data then
+		return nil, err
+	end
+	if type(data.scripts) ~= "table" then
+		return nil, "RoScripts returned no results"
+	end
+	return {
+		scripts = data.scripts,
+		page = data.info and data.info.currentPage or 1,
+		maxPages = data.info and data.info.maxPages or 1,
+	}, nil
+end
+
+function Core.formatRoScriptLabel(entry)
+	local title = tostring(entry.title or "Untitled")
+	if #title > 46 then
+		title = title:sub(1, 43) .. "..."
+	end
+	local gameTitle = entry.game and entry.game.title or "Universal"
+	local author = entry.user and entry.user.username or "unknown"
+	local suffix = entry.keySystem and " [Key]" or ""
+	return title .. " — " .. gameTitle .. " (@" .. author .. ")" .. suffix
+end
+
+function Core.roScriptWebUrl(entry)
+	if type(entry) ~= "table" then
+		return ROSCRIPTS_WEB_HOME
+	end
+	if entry.slug and entry.slug ~= "" then
+		return ROSCRIPTS_WEB_SCRIPT .. entry.slug
+	end
+	if entry._id then
+		return ROSCRIPTS_WEB_SCRIPT .. tostring(entry._id)
+	end
+	return ROSCRIPTS_WEB_HOME
+end
+
+function Core.executeRoScript(entry, rayfield)
+	if type(entry) ~= "table" or type(entry.rawScript) ~= "string" or entry.rawScript == "" then
+		return false, "No script selected"
+	end
+	local notify = rayfield and rayfield.Notify
+	if notify then
+		pcall(notify, rayfield, {
+			Title = "RoScripts",
+			Content = "Loading: " .. tostring(entry.title or "script"),
+			Duration = 4,
+		})
+	end
+	local source = Core.httpGet(entry.rawScript)
+	if not source or source == "" then
+		return false, "Could not download script source"
+	end
+	local loadStringFn = Core.loadStringFn()
+	if not loadStringFn then
+		return false, "loadstring unavailable"
+	end
+	local compiled, compileErr = loadStringFn(source, "@RoScripts/" .. tostring(entry.slug or entry._id or "script"))
+	if not compiled then
+		return false, tostring(compileErr)
+	end
+	local ok, runErr = pcall(compiled)
+	if not ok then
+		return false, tostring(runErr)
+	end
+	return true
+end
+
+function Core.buildRoScriptsSearch(tab, column, rayfield)
+	local group = Core.buildRayfieldGroup(tab, "RoScripts", column or 2)
+	local browser = {
+		query = "",
+		freeOnly = true,
+		noKey = false,
+		entries = {},
+		byLabel = {},
+		selected = nil,
+	}
+
+	local status = group:CreateStatus("RoScripts", {
+		Status = "Ready",
+		Results = "0",
+		Selected = "None",
+	})
+
+	group:CreateToggle("Free scripts only", true, nil, function(value)
+		browser.freeOnly = value == true
+	end)
+	group:CreateToggle("No key system", false, nil, function(value)
+		browser.noKey = value == true
+	end)
+
+	local queryInput = group:CreateInput("Search query", "auto farm, hub, ESP...", "", function(text)
+		browser.query = tostring(text or "")
+	end)
+
+	local resultsDropdown
+
+	local function applyResults(entries)
+		browser.entries = entries or {}
+		browser.byLabel = {}
+		local labels = {}
+		for index, entry in ipairs(browser.entries) do
+			local label = Core.formatRoScriptLabel(entry)
+			browser.byLabel[label] = entry
+			labels[index] = label
+		end
+		if #labels == 0 then
+			labels = { "No results" }
+			browser.selected = nil
+		else
+			browser.selected = browser.entries[1]
+		end
+		if resultsDropdown then
+			resultsDropdown:Refresh(labels, labels[1])
+		end
+		status:Update("Results", tostring(#browser.entries))
+		status:Update("Selected", browser.selected and browser.selected.title or "None")
 	end
 
-	return nil, remoteErr or "No Starlight source found"
+	local function runSearch(query)
+		query = trimText(query)
+		if query == "" then
+			status:Update("Status", "Enter a search term")
+			return
+		end
+		status:Update("Status", "Searching...")
+		task.spawn(function()
+			local data, err = Core.searchRoScripts(query, {
+				freeOnly = browser.freeOnly,
+				noKey = browser.noKey,
+			})
+			if not data then
+				status:Update("Status", tostring(err or "Search failed"))
+				applyResults({})
+				return
+			end
+			status:Update("Status", "Found " .. tostring(#data.scripts) .. " script(s)")
+			applyResults(data.scripts)
+		end)
+	end
+
+	resultsDropdown = group:AddDropdown("roscripts_results", {
+		Text = "Results",
+		Values = { "Search to populate" },
+		Default = "Search to populate",
+		Callback = function(selected)
+			browser.selected = browser.byLabel[selected]
+			status:Update("Selected", browser.selected and browser.selected.title or "None")
+		end,
+	})
+
+	group:CreateButton("Search RoScripts", function()
+		runSearch(browser.query)
+	end, "Query RoScripts.io via rscripts.net API")
+
+	group:CreateButton("Search this game", function()
+		local gameName = ""
+		pcall(function()
+			gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+		end)
+		if gameName == "" then
+			gameName = tostring(game.PlaceId)
+		end
+		browser.query = gameName
+		if queryInput and queryInput.Set then
+			queryInput:Set({ CurrentValue = gameName })
+		end
+		runSearch(gameName)
+	end, "Find scripts for the current place")
+
+	group:CreateButton("Load selected script", function()
+		local ok, err = Core.executeRoScript(browser.selected, rayfield)
+		if ok then
+			status:Update("Status", "Script loaded")
+			Core.notify("RoScripts", "Script executed.", 3)
+		else
+			status:Update("Status", tostring(err or "Load failed"))
+			Core.notify("RoScripts", tostring(err or "Load failed"), 5)
+		end
+	end, "Runs the selected script in your executor")
+
+	group:CreateButton("Copy RoScripts link", function()
+		local url = Core.roScriptWebUrl(browser.selected)
+		if Core.setClipboard(url) then
+			status:Update("Status", "Link copied")
+			Core.notify("RoScripts", "Link copied to clipboard.", 3)
+		else
+			status:Update("Status", "Clipboard unavailable")
+		end
+	end)
+
+	group:CreateButton("Open RoScripts.io", function()
+		if Core.setClipboard(ROSCRIPTS_WEB_HOME) then
+			Core.notify("RoScripts", "Open roscripts.io in your browser.", 4)
+		end
+	end)
+
+	group:CreateLabel("Powered by RoScripts.io")
+	return group
+end
+
+local function fakeUiInstance(visible)
+
+function Core.createRayfieldGroupbox(tab, sectionName)
+	if sectionName and sectionName ~= "" then
+		tab:CreateSection(sectionName)
+	end
+
+	local shell = fakeUiInstance(true)
+	local groupbox = {
+		Instance = shell,
+		ParentingItem = shell,
+	}
+	local serial = 0
+
+	local function nextFlag(name, explicit)
+		serial += 1
+		return explicit or Core.uiElementId(name) .. "_" .. serial
+	end
+
+	local function wrapElement(elem, applySet)
+		return {
+			Instance = shell,
+			Set = function(_, settings)
+				if type(settings) == "table" then
+					applySet(settings, elem)
+				else
+					applySet({ CurrentValue = settings }, elem)
+				end
+			end,
+		}
+	end
+
+	function groupbox:CreateToggle(settings, id)
+		local elem = tab:CreateToggle({
+			Name = settings.Name,
+			CurrentValue = settings.CurrentValue == true,
+			Flag = nextFlag(settings.Name, id),
+			Callback = settings.Callback or function() end,
+		})
+		return wrapElement(elem, function(nextSettings)
+			if nextSettings.CurrentValue ~= nil then
+				elem:Set(nextSettings.CurrentValue == true)
+			end
+		end)
+	end
+
+	function groupbox:CreateSlider(settings, id)
+		local range = settings.Range or { 0, 100 }
+		local elem = tab:CreateSlider({
+			Name = settings.Name,
+			Range = range,
+			Increment = settings.Increment or (range[2] <= 5 and 0.05 or 1),
+			Suffix = settings.Suffix,
+			CurrentValue = tonumber(settings.CurrentValue) or range[1],
+			Flag = nextFlag(settings.Name, id),
+			Callback = settings.Callback or function() end,
+		})
+		return wrapElement(elem, function(nextSettings)
+			if nextSettings.CurrentValue ~= nil then
+				elem:Set(tonumber(nextSettings.CurrentValue) or range[1])
+			end
+		end)
+	end
+
+	function groupbox:CreateButton(settings, id)
+		local elem = tab:CreateButton({
+			Name = settings.Name,
+			Callback = settings.Callback or function() end,
+		})
+		return wrapElement(elem, function(nextSettings)
+			if nextSettings.Name then
+				elem:Set(nextSettings.Name)
+			end
+		end)
+	end
+
+	function groupbox:CreateInput(settings, id)
+		local elem = tab:CreateInput({
+			Name = settings.Name,
+			PlaceholderText = settings.PlaceholderText or settings.Placeholder or "",
+			CurrentValue = settings.CurrentValue or "",
+			RemoveTextAfterFocusLost = settings.RemoveTextOnFocus == true,
+			Flag = nextFlag(settings.Name, id),
+			Callback = settings.Callback or function() end,
+		})
+		return wrapElement(elem, function(nextSettings)
+			if nextSettings.CurrentValue ~= nil then
+				elem:Set(tostring(nextSettings.CurrentValue))
+			end
+		end)
+	end
+
+	function groupbox:CreateDropdown(settings, id)
+		local current = settings.CurrentOption
+		if type(current) ~= "table" then
+			current = current and current ~= "" and { tostring(current) } or {}
+		end
+		local elem = tab:CreateDropdown({
+			Name = settings.Name,
+			Options = settings.Options or settings.Values or {},
+			CurrentOption = current,
+			MultipleOptions = settings.MultipleOptions == true,
+			Flag = nextFlag(settings.Name, id),
+			Callback = settings.Callback or function() end,
+		})
+		return wrapElement(elem, function(nextSettings)
+			if nextSettings.CurrentOption or nextSettings.CurrentOptions then
+				elem:Set(nextSettings.CurrentOption or nextSettings.CurrentOptions)
+			end
+		end)
+	end
+
+	function groupbox:CreateLabel(settings, id)
+		local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
+		local elem = tab:CreateLabel(text)
+		return {
+			Instance = shell,
+			Set = function(_, nextSettings)
+				local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text)
+					or tostring(nextSettings or "")
+				elem:Set(nextText)
+			end,
+			AddDropdown = function(_, nestedSettings, nestedId)
+				return groupbox:CreateDropdown({
+					Name = nestedSettings.Name or text,
+					Options = nestedSettings.Options or nestedSettings.Values or {},
+					CurrentOption = nestedSettings.CurrentOption,
+					MultipleOptions = nestedSettings.MultipleOptions,
+					Callback = nestedSettings.Callback,
+				}, nestedId)
+			end,
+		}
+	end
+
+	function groupbox:CreateDivider()
+		tab:CreateDivider()
+		return { Instance = shell }
+	end
+
+	return groupbox
+end
+
+function Core.wrapRayfieldTab(rawTab, rayfield, window)
+	local tab = {
+		_rawTab = rawTab,
+		_rayfield = rayfield,
+		_window = window,
+	}
+
+	function tab:CreateGroupbox(settings)
+		return Core.createRayfieldGroupbox(rawTab, settings and settings.Name)
+	end
+
+	function tab:BuildThemeGroupbox(column)
+		local group = Core.buildRayfieldGroup(tab, "Appearance", column or 1)
+		group:CreateDropdown("Theme preset", RAYFIELD_THEME_NAMES, "Default", function(selected)
+			if window and type(window.ModifyTheme) == "function" then
+				window:ModifyTheme(selected)
+			elseif rayfield and rayfield.Notify then
+				rayfield:Notify({
+					Title = "Theme",
+					Content = "Applied " .. tostring(selected),
+					Duration = 2,
+				})
+			end
+		end)
+		return group
+	end
+
+	return tab
 end
 
 function Core.ensureCore()
@@ -1259,9 +1683,9 @@ function Core.prepareGame(state)
 	if state.AntiAFK ~= false then
 		core.setupAntiAfk(game:GetService("Players").LocalPlayer)
 	end
-	local starlight, err = core.loadStarlight()
-	if not starlight then
-		local msg = err or "Starlight unavailable"
+	local uiLibrary, err = core.loadRayfield()
+	if not uiLibrary then
+		local msg = err or "Rayfield unavailable"
 		signalBootFailure(msg)
 		return nil, nil, msg
 	end
@@ -1284,7 +1708,7 @@ function Core.prepareGame(state)
 			core.notifyExecutorCompat()
 		end
 	end)
-	return core, starlight
+	return core, uiLibrary
 end
 
 function Core.stopAutomation(state, connections, loopControllers, loops, onStop)
@@ -1337,7 +1761,7 @@ function Core.loadSettings(state, keys, filename)
 	end
 end
 
-function Core.wrapStarlightGroup(groupbox, callbackWrapper)
+function Core.wrapUiGroup(groupbox, callbackWrapper)
 	local group = {}
 	local serial = 0
 	local MAX_RENDERED_DROPDOWN_OPTIONS = 50
@@ -1476,7 +1900,7 @@ function Core.wrapStarlightGroup(groupbox, callbackWrapper)
 			callback = arg3
 			tip = arg4
 		elseif type(arg4) == "function" and isIcon(arg3) then
-			icon = Core.starlightIcon(arg3)
+			icon = Core.uiIcon(arg3)
 			callback = arg4
 			tip = arg5
 		elseif type(arg4) == "function" then
@@ -1484,7 +1908,7 @@ function Core.wrapStarlightGroup(groupbox, callbackWrapper)
 			callback = arg4
 			tip = arg5
 		else
-			icon = Core.starlightIcon(arg3)
+			icon = Core.uiIcon(arg3)
 			callback = arg4
 			tip = arg5
 		end
@@ -1548,15 +1972,39 @@ function Core.wrapStarlightGroup(groupbox, callbackWrapper)
 			end
 		end
 		if not waitForElement(label, 3) or not (label.Instance and label.Instance:FindFirstChild("DropdownHolder")) then
+			local renderedValues = config.Searchable and compactOptions(values, current) or values
+			local dropdown = groupbox:CreateDropdown({
+				Name = config.Text or config.Name or id,
+				Options = renderedValues,
+				Values = renderedValues,
+				CurrentOption = current,
+				MultipleOptions = multi,
+				Callback = safeCallback,
+			}, nextId(id .. "_dd"))
+			handle.Dropdown = dropdown
 			function handle:SetValues(newValues, newDefault)
 				self.Values = normalizeOptions(newValues)
 				self.Selection = currentSelection(newDefault or self.Selection, multi)
+				rebuild(self.Values)
 			end
 			function handle:Refresh(newValues, newDefault)
 				self:SetValues(newValues, newDefault)
 			end
 			function handle:Search(query)
 				self.LastSearch = tostring(query or "")
+				local filtered = self.LastSearch == "" and self.Values
+					or compactOptions(Core.filterDropdownOptions(self.Values, self.LastSearch), self.Selection)
+				rebuild(filtered)
+			end
+			if config.Searchable then
+				groupbox:CreateInput({
+					Name = (config.Text or config.Name or id) .. " filter",
+					PlaceholderText = "search...",
+					RemoveTextOnFocus = false,
+					Callback = wrap((config.Text or config.Name or id) .. " Search", function(text)
+						handle:Search(text)
+					end),
+				}, nextId(id .. "_search"))
 			end
 			return handle
 		end
@@ -1644,39 +2092,49 @@ function Core.wrapStarlightGroup(groupbox, callbackWrapper)
 	return group
 end
 
-function Core.starlightIcon(icon)
+function Core.uiIcon(icon)
 	return tostring(icon or ""):match("%d+$") or ""
 end
 
-function Core.starlightId(text)
+function Core.uiElementId(text)
 	return (tostring(text or "Element"):gsub("[^%w_]", "_"))
 end
 
-function Core.buildStarlightWindow(starlight, settings)
+function Core.buildRayfieldWindow(rayfield, settings)
 	settings = settings or {}
-	return starlight:CreateWindow({
+	local fileSettings = settings.FileSettings or {}
+	local window = rayfield:CreateWindow({
 		Name = settings.Name or "Alleral",
-		Subtitle = settings.Subtitle or "",
-		Icon = Core.starlightIcon(settings.Icon or 10723407389),
-		LoadingEnabled = false,
-		NotifyOnCallbackError = settings.NotifyOnCallbackError ~= false,
-		FileSettings = settings.FileSettings,
+		LoadingTitle = settings.Name or "Alleral",
+		LoadingSubtitle = settings.Subtitle or "",
+		Icon = tonumber(Core.uiIcon(settings.Icon or 10723407389)) or 10723407389,
+		ConfigurationSaving = {
+			Enabled = fileSettings.Enabled ~= false,
+			FolderName = fileSettings.RootFolder or fileSettings.ConfigFolder or "Alleral_Configs",
+			FileName = fileSettings.FileName or tostring(game.PlaceId),
+		},
+		DisableRayfieldPrompts = true,
+		DisableBuildWarnings = true,
+		KeySystem = false,
 	})
+	window._rayfield = rayfield
+	return window
 end
 
-function Core.buildStarlightSection(window, name, expanded)
-	return window:CreateTabSection(name or "Alleral", expanded ~= false)
+function Core.buildRayfieldSection(window, name, expanded)
+	return {
+		_window = window,
+		_rayfield = window._rayfield,
+	}
 end
 
-function Core.buildStarlightTab(section, name, icon, columns, id)
-	return section:CreateTab({
-		Name = name,
-		Icon = Core.starlightIcon(icon or 10723407389),
-		Columns = columns or 2,
-	}, id or Core.starlightId(name))
+function Core.buildRayfieldTab(section, name, icon, columns, id)
+	local window = section._window or section
+	local rawTab = window:CreateTab(name, tonumber(Core.uiIcon(icon or 10723407389)) or 10723407389)
+	return Core.wrapRayfieldTab(rawTab, window._rayfield or section._rayfield, window)
 end
 
-function Core.onStarlightSave(saveFn)
+function Core.onUiSave(saveFn)
 	return function(_, callback)
 		return function(...)
 			local result = callback(...)
@@ -1688,17 +2146,16 @@ function Core.onStarlightSave(saveFn)
 	end
 end
 
-function Core.buildStarlightGroup(tab, name, column, callbackWrapper, icon, id)
+function Core.buildRayfieldGroup(tab, name, column, callbackWrapper, icon, id)
 	local groupbox = tab:CreateGroupbox({
 		Name = name,
 		Column = column or 1,
-		Icon = icon and Core.starlightIcon(icon) or nil,
-	}, id or Core.starlightId(name))
-	Core.waitForStarlightGroupbox(groupbox, 1.5)
+		Icon = icon and Core.uiIcon(icon) or nil,
+	}, id or Core.uiElementId(name))
 	if callbackWrapper then
-		return Core.wrapStarlightGroup(groupbox, callbackWrapper)
+		return Core.wrapUiGroup(groupbox, callbackWrapper)
 	end
-	return Core.wrapStarlightGroup(groupbox)
+	return Core.wrapUiGroup(groupbox)
 end
 
 function Core.filterDropdownOptions(values, query)
@@ -1713,17 +2170,6 @@ function Core.filterDropdownOptions(values, query)
 		end
 	end
 	return filtered
-end
-
-function Core.waitForStarlightGroupbox(groupbox, timeout)
-	local started = tick()
-	repeat
-		if groupbox and groupbox.Instance and groupbox.ParentingItem then
-			return true
-		end
-		task.wait()
-	until tick() - started >= (timeout or 1.5)
-	return groupbox and groupbox.Instance and groupbox.ParentingItem
 end
 
 function Core.makeSupervisor(state, loops, controllers, name, interval, callback)

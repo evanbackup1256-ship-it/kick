@@ -83,9 +83,12 @@ end
 local function requestFunction()
 	local core = coreApi()
 	if core and type(core.requestFunction) == "function" then
-		return core.requestFunction()
+		local fn = core.requestFunction()
+		if fn then
+			return fn
+		end
 	end
-	for _, name in ipairs({ "http_request", "request" }) do
+	for _, name in ipairs({ "http_request", "request", "Request" }) do
 		local fn = ENV[name]
 		if type(fn) == "function" then
 			return fn
@@ -95,14 +98,26 @@ local function requestFunction()
 	if type(syn) == "table" and type(syn.request) == "function" then
 		return syn.request
 	end
+	for _, libName in ipairs({ "Volt", "Wave", "Solara", "Solora", "Cryptic", "Xeno", "Electron" }) do
+		local lib = ENV[libName]
+		if type(lib) == "table" and type(lib.request) == "function" then
+			return lib.request
+		end
+	end
 	if type(HttpService.RequestAsync) == "function" then
 		return function(opts)
-			return HttpService:RequestAsync({
-				Url = opts.Url,
-				Method = opts.Method or "GET",
-				Headers = opts.Headers,
-				Body = opts.Body,
-			})
+			local ok, response = pcall(function()
+				return HttpService:RequestAsync({
+					Url = opts.Url,
+					Method = opts.Method or "GET",
+					Headers = opts.Headers,
+					Body = opts.Body,
+				})
+			end)
+			if ok then
+				return response
+			end
+			return { Success = false, StatusMessage = tostring(response) }
 		end
 	end
 	return nil
@@ -357,6 +372,9 @@ end
 function Telemetry:Configure(extra)
 	self._config = mergeConfig(self._config, extra)
 	self:EnsureSession()
+	if self:IsEnabled() and not self._lifecycleHooked then
+		self:HookLifecycle()
+	end
 	return self._config
 end
 
@@ -560,30 +578,55 @@ function Telemetry:_buildEmbed(payload)
 end
 
 function Telemetry:_sendRelay(payload)
-	local cfg = self._config
+	local cfg = self._config or {}
+	local relayUrl = trim(cfg.relayUrl)
+	if relayUrl == "" then
+		return false, "relayUrl missing"
+	end
+	if trim(cfg.apiKey) == "" then
+		return false, "apiKey missing"
+	end
+
+	pcall(function()
+		if HttpService.HttpEnabled == false then
+			HttpService.HttpEnabled = true
+		end
+	end)
+
 	local sender = requestFunction()
 	if not sender then
 		return false, "HTTP unavailable"
 	end
-	local headers = {
-		["Content-Type"] = "application/json",
-		["X-Alleral-Key"] = tostring(cfg.apiKey or ""),
-	}
+
+	local body = HttpService:JSONEncode(payload)
 	local ok, response = pcall(function()
 		return sender({
-			Url = cfg.relayUrl,
+			Url = relayUrl,
 			Method = "POST",
-			Headers = headers,
-			Body = HttpService:JSONEncode(payload),
+			Headers = {
+				["Content-Type"] = "application/json",
+				["X-Alleral-Key"] = tostring(cfg.apiKey or ""),
+			},
+			Body = body,
 		})
 	end)
 	if not ok then
 		return false, tostring(response)
 	end
-	local code = response and (response.StatusCode or response.Status or response.status_code)
-	if type(code) == "number" and (code < 200 or code >= 300) then
-		return false, "HTTP " .. tostring(code)
+
+	if type(response) == "table" then
+		if response.Success == false then
+			local message = response.StatusMessage or response.Body or response.body or "request failed"
+			return false, tostring(message)
+		end
+		local code = response.StatusCode or response.Status or response.status_code
+		if type(code) == "number" and (code < 200 or code >= 300) then
+			local message = response.Body or response.body or ""
+			return false, "HTTP " .. tostring(code) .. (message ~= "" and (": " .. tostring(message):sub(1, 120)) or "")
+		end
+		return true, nil
 	end
+
 	return true, nil
 end
 
@@ -593,7 +636,11 @@ function Telemetry:_send(event, contextExtra, errorInfo, notes)
 	end
 	self:_appendLog(event, notes or event, errorInfo and errorInfo.message or nil)
 	local payload = self:_buildPayload(event, contextExtra, errorInfo, notes)
-	return self:_sendRelay(payload)
+	local ok, err = self:_sendRelay(payload)
+	if not ok and ENV.Alleral_TelemetryDebug == true then
+		warn("[Alleral Telemetry] " .. tostring(event) .. " failed: " .. tostring(err))
+	end
+	return ok, err
 end
 
 function Telemetry:ReportSessionStart(extra)
@@ -769,5 +816,6 @@ if Telemetry:IsEnabled() then
 	Telemetry:HookLifecycle()
 end
 
-getgenv().Alleral_Telemetry = Telemetry
+local env = genv()
+env.Alleral_Telemetry = Telemetry
 return Telemetry

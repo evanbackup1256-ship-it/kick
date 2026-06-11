@@ -135,15 +135,15 @@ if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
 end
 
-local starlight
+local rayfield
 local bootErr
 local bootApi = getgenv().Alleral_Core
 if not bootApi or not bootApi.prepareGame then
 	warn("[Alleral] Core missing — run loader.luau first")
 	return
 end
-Core, starlight, bootErr = bootApi.prepareGame(state)
-if not Core or not starlight then
+Core, rayfield, bootErr = bootApi.prepareGame(state)
+if not Core or not rayfield then
 	warn("[Alleral] Boot failed: " .. tostring(bootErr))
 	return
 end
@@ -715,8 +715,8 @@ Core.makeSupervisor(state, loops, loopControllers, "autoRebirth", 0.5, function(
 	end
 end)
 
--- Starlight UI
-local window = starlight:CreateWindow({{
+-- Rayfield UI
+local window = Core.buildRayfieldWindow(rayfield, {{
 	Name = "Alleral",
 	Subtitle = "Speed Keyboard Escape · v" .. VERSION,
 	Icon = 10723407389,
@@ -735,12 +735,12 @@ local equipGroup = autoTab:CreateGroupbox({{ Name = "Equip", Column = 2 }}, "equ
 local shopGroup = shopTab:CreateGroupbox({{ Name = "Items", Column = 1 }}, "shop_items")
 local utilGroup = miscTab:CreateGroupbox({{ Name = "Utilities", Column = 1 }}, "utils")
 
-local farm = Core.wrapStarlightGroup(farmGroup, function() end)
-local tween = Core.wrapStarlightGroup(tweenGroup, function() end)
-local aura = Core.wrapStarlightGroup(auraGroup, function() end)
-local equip = Core.wrapStarlightGroup(equipGroup, function() end)
-local shop = Core.wrapStarlightGroup(shopGroup, function() end)
-local util = Core.wrapStarlightGroup(utilGroup, function() end)
+local farm = Core.wrapUiGroup(farmGroup, function() end)
+local tween = Core.wrapUiGroup(tweenGroup, function() end)
+local aura = Core.wrapUiGroup(auraGroup, function() end)
+local equip = Core.wrapUiGroup(equipGroup, function() end)
+local shop = Core.wrapUiGroup(shopGroup, function() end)
+local util = Core.wrapUiGroup(utilGroup, function() end)
 
 local winTargetsW1 = {{ "Win 1", "Win 3", "Win 10", "Win 20", "Win 50", "Win 100", "Win 150", "Win 300", "Win 500", "Win 1000", "Win 2500" }}
 local winTargetsW2 = {{ "Win 250k", "Win 400k", "Win 600k", "Win 1M", "Win 1.5M", "Win 2.5M" }}

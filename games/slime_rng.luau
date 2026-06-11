@@ -17,7 +17,7 @@ if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
 end
 
-local starlight
+local rayfield
 local bootErr
 local bootApi = getgenv().Alleral_Core
 if not bootApi or not bootApi.prepareGame then
@@ -26,8 +26,8 @@ if not bootApi or not bootApi.prepareGame then
 	warn("[Alleral] " .. msg)
 	return
 end
-Core, starlight, bootErr = bootApi.prepareGame(state)
-if not Core or not starlight then
+Core, rayfield, bootErr = bootApi.prepareGame(state)
+if not Core or not rayfield then
 	local msg = "Boot failed: " .. tostring(bootErr)
 	getgenv().Alleral_StartupFailed = msg
 	warn("[Alleral] " .. msg)
@@ -1474,30 +1474,30 @@ Core.makeSupervisor(state, loops, loopControllers, "Freecam", 0.5, function()
 	end
 end)
 
-local window = Core.buildStarlightWindow(starlight, {
+local window = Core.buildRayfieldWindow(rayfield, {
 	Subtitle = "Slime RNG · v" .. VERSION,
 })
-local section = Core.buildStarlightSection(window)
-local mainTab = Core.buildStarlightTab(section, "Main", 10723407389, 2, "main")
-local autoTab = Core.buildStarlightTab(section, "Auto", 10734923214, 2, "auto")
-local inventoryTab = Core.buildStarlightTab(section, "Inventory", 10709769841, 2, "inventory")
-local miscTab = Core.buildStarlightTab(section, "Misc", 10734950020, 2, "misc")
-local settingsTab = Core.buildStarlightTab(section, "Settings", 10734950309, 1, "settings")
+local section = Core.buildRayfieldSection(window)
+local mainTab = Core.buildRayfieldTab(section, "Main", 10723407389, 2, "main")
+local autoTab = Core.buildRayfieldTab(section, "Auto", 10734923214, 2, "auto")
+local inventoryTab = Core.buildRayfieldTab(section, "Inventory", 10709769841, 2, "inventory")
+local miscTab = Core.buildRayfieldTab(section, "Misc", 10734950020, 2, "misc")
+local settingsTab = Core.buildRayfieldTab(section, "Settings", 10734950309, 1, "settings")
 
-local saveWrap = Core.onStarlightSave(saveSettings)
-local zone = Core.buildStarlightGroup(mainTab, "Zones", 1, saveWrap, nil, "zone")
-local roll = Core.buildStarlightGroup(mainTab, "Rolling", 2, saveWrap, nil, "roll")
-local gun = Core.buildStarlightGroup(mainTab, "Combat", 1, saveWrap, nil, "gun")
-local tree = Core.buildStarlightGroup(autoTab, "Skill tree", 1, saveWrap, nil, "tree")
-local craft = Core.buildStarlightGroup(autoTab, "Crafting", 2, saveWrap, nil, "craft")
-local loot = Core.buildStarlightGroup(autoTab, "Loot & index", 1, saveWrap, nil, "loot")
-local pet = Core.buildStarlightGroup(inventoryTab, "Feeding", 1, saveWrap, nil, "feed")
-local potion = Core.buildStarlightGroup(inventoryTab, "Potions", 2, saveWrap, nil, "potions")
-local fruit = Core.buildStarlightGroup(inventoryTab, "Fruit tree", 1, saveWrap, nil, "fruit")
-local movement = Core.buildStarlightGroup(miscTab, "Movement", 1, saveWrap, nil, "movement")
-local performance = Core.buildStarlightGroup(miscTab, "Lag fixes", 2, saveWrap, nil, "performance")
-local visuals = Core.buildStarlightGroup(miscTab, "Camera", 1, saveWrap, nil, "visuals")
-local config = Core.buildStarlightGroup(miscTab, "Save / reset", 2, nil, nil, "config")
+local saveWrap = Core.onUiSave(saveSettings)
+local zone = Core.buildRayfieldGroup(mainTab, "Zones", 1, saveWrap, nil, "zone")
+local roll = Core.buildRayfieldGroup(mainTab, "Rolling", 2, saveWrap, nil, "roll")
+local gun = Core.buildRayfieldGroup(mainTab, "Combat", 1, saveWrap, nil, "gun")
+local tree = Core.buildRayfieldGroup(autoTab, "Skill tree", 1, saveWrap, nil, "tree")
+local craft = Core.buildRayfieldGroup(autoTab, "Crafting", 2, saveWrap, nil, "craft")
+local loot = Core.buildRayfieldGroup(autoTab, "Loot & index", 1, saveWrap, nil, "loot")
+local pet = Core.buildRayfieldGroup(inventoryTab, "Feeding", 1, saveWrap, nil, "feed")
+local potion = Core.buildRayfieldGroup(inventoryTab, "Potions", 2, saveWrap, nil, "potions")
+local fruit = Core.buildRayfieldGroup(inventoryTab, "Fruit tree", 1, saveWrap, nil, "fruit")
+local movement = Core.buildRayfieldGroup(miscTab, "Movement", 1, saveWrap, nil, "movement")
+local performance = Core.buildRayfieldGroup(miscTab, "Lag fixes", 2, saveWrap, nil, "performance")
+local visuals = Core.buildRayfieldGroup(miscTab, "Camera", 1, saveWrap, nil, "visuals")
+local config = Core.buildRayfieldGroup(miscTab, "Save / reset", 2, nil, nil, "config")
 
 local function addMultiDropdown(group, name, label, values, default, callback)
 	group:AddDropdown(name, {
@@ -1659,6 +1659,7 @@ end)
 
 settingsTab:BuildThemeGroupbox(1)
 Core.buildScriptStatusGroupbox(settingsTab, 1, "slime_rng", VERSION)
+Core.buildRoScriptsSearch(settingsTab, 2, rayfield)
 
 state.Alleral_Unload = function()
 	Core.stopAutomation(state, connections, loopControllers, loops, function()

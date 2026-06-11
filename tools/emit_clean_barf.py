@@ -27,15 +27,15 @@ if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
 end
 
-local starlight
+local rayfield
 local bootErr
 local bootApi = getgenv().Alleral_Core
 if not bootApi or not bootApi.prepareGame then
 	warn("[Alleral] Core missing — run loader.luau first")
 	return
 end
-Core, starlight, bootErr = bootApi.prepareGame(state)
-if not Core or not starlight then
+Core, rayfield, bootErr = bootApi.prepareGame(state)
+if not Core or not rayfield then
 	warn("[Alleral] Boot failed: " .. tostring(bootErr))
 	return
 end

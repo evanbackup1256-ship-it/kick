@@ -1,21 +1,5 @@
-# Internal sources (readable)
+# Internal core modules
 
-Edit these files, then regenerate protected distribution copies:
+Analytics and telemetry live alongside `alleral_core.luau`. The UI layer uses [Rayfield](https://docs.sirius.menu/rayfield), loaded at runtime from the Sirius GitHub source.
 
-```bash
-python tools/obfuscate_critical.py
-```
-
-For Starlight UI, edit `vendor/starlight/lib/` then:
-
-```bash
-python vendor/starlight/bundle.py
-```
-
-| Readable source | Protected output (loaded by loader / executors) |
-|-----------------|--------------------------------------------------|
-| `core/internal/telemetry.luau` | `core/telemetry.luau` |
-| `core/internal/analytics.luau` | `core/analytics.luau` |
-| `vendor/starlight/Source.plain.lua` | `vendor/starlight/Source.lua` |
-
-Do **not** edit the protected outputs directly — changes will be overwritten on the next obfuscation run.
+RoScripts discovery uses the public rscripts.net API (RoScripts.io ecosystem).

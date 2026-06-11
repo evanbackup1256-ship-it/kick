@@ -18,7 +18,7 @@ if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
 end
 
-local starlight
+local rayfield
 local bootErr
 if not Core or not Core.prepareGame then
 	local msg = "Core missing, run loader.luau first"
@@ -26,8 +26,8 @@ if not Core or not Core.prepareGame then
 	warn("[Alleral] " .. msg)
 	return
 end
-Core, starlight, bootErr = Core.prepareGame(state)
-if not Core or not starlight then
+Core, rayfield, bootErr = Core.prepareGame(state)
+if not Core or not rayfield then
 	local msg = "Boot failed: " .. tostring(bootErr)
 	getgenv().Alleral_StartupFailed = msg
 	warn("[Alleral] " .. msg)
@@ -644,30 +644,30 @@ track(LocalPlayer.CharacterAdded:Connect(function(character)
 	end
 end))
 
-local window = Core.buildStarlightWindow(starlight, {
+local window = Core.buildRayfieldWindow(rayfield, {
 	Subtitle = "Survive a Zombie Arena · v" .. VERSION,
 })
-local section = Core.buildStarlightSection(window)
-local farmTab = Core.buildStarlightTab(section, "Farm", 10734923214, 2, "farm")
-local combatTab = Core.buildStarlightTab(section, "Combat", 10723407389, 2, "combat")
-local playerTab = Core.buildStarlightTab(section, "Player", 10734950020, 2, "player")
-local visualTab = Core.buildStarlightTab(section, "Visual", 10709819303, 1, "visual")
-local miscTab = Core.buildStarlightTab(section, "Misc", 10747374131, 1, "misc")
-local settingsTab = Core.buildStarlightTab(section, "Settings", 10734950309, 1, "settings")
+local section = Core.buildRayfieldSection(window)
+local farmTab = Core.buildRayfieldTab(section, "Farm", 10734923214, 2, "farm")
+local combatTab = Core.buildRayfieldTab(section, "Combat", 10723407389, 2, "combat")
+local playerTab = Core.buildRayfieldTab(section, "Player", 10734950020, 2, "player")
+local visualTab = Core.buildRayfieldTab(section, "Visual", 10709819303, 1, "visual")
+local miscTab = Core.buildRayfieldTab(section, "Misc", 10747374131, 1, "misc")
+local settingsTab = Core.buildRayfieldTab(section, "Settings", 10734950309, 1, "settings")
 
-local saveWrap = Core.onStarlightSave(saveSettings)
-local preset = Core.buildStarlightGroup(farmTab, "Auto farm", 1, saveWrap, nil, "preset")
-local wave = Core.buildStarlightGroup(farmTab, "Waves", 2, saveWrap, nil, "waves")
-local loot = Core.buildStarlightGroup(farmTab, "Loot & shop", 1, saveWrap, nil, "loot")
-local mine = Core.buildStarlightGroup(farmTab, "Defense", 2, saveWrap, nil, "mine")
-local aura = Core.buildStarlightGroup(combatTab, "Kill aura", 1, saveWrap, nil, "aura")
-local shoot = Core.buildStarlightGroup(combatTab, "Weapons", 2, saveWrap, nil, "shoot")
-local defense = Core.buildStarlightGroup(combatTab, "Defense", 1, saveWrap, nil, "defense")
-local aim = Core.buildStarlightGroup(combatTab, "Aim", 2, saveWrap, nil, "aim")
-local move = Core.buildStarlightGroup(playerTab, "Movement", 1, saveWrap, nil, "move")
-local safe = Core.buildStarlightGroup(playerTab, "Safe zone", 2, saveWrap, nil, "safe")
-local esp = Core.buildStarlightGroup(visualTab, "ESP", 1, saveWrap, nil, "esp")
-local util = Core.buildStarlightGroup(miscTab, "Utilities", 1, saveWrap, nil, "util")
+local saveWrap = Core.onUiSave(saveSettings)
+local preset = Core.buildRayfieldGroup(farmTab, "Auto farm", 1, saveWrap, nil, "preset")
+local wave = Core.buildRayfieldGroup(farmTab, "Waves", 2, saveWrap, nil, "waves")
+local loot = Core.buildRayfieldGroup(farmTab, "Loot & shop", 1, saveWrap, nil, "loot")
+local mine = Core.buildRayfieldGroup(farmTab, "Defense", 2, saveWrap, nil, "mine")
+local aura = Core.buildRayfieldGroup(combatTab, "Kill aura", 1, saveWrap, nil, "aura")
+local shoot = Core.buildRayfieldGroup(combatTab, "Weapons", 2, saveWrap, nil, "shoot")
+local defense = Core.buildRayfieldGroup(combatTab, "Defense", 1, saveWrap, nil, "defense")
+local aim = Core.buildRayfieldGroup(combatTab, "Aim", 2, saveWrap, nil, "aim")
+local move = Core.buildRayfieldGroup(playerTab, "Movement", 1, saveWrap, nil, "move")
+local safe = Core.buildRayfieldGroup(playerTab, "Safe zone", 2, saveWrap, nil, "safe")
+local esp = Core.buildRayfieldGroup(visualTab, "ESP", 1, saveWrap, nil, "esp")
+local util = Core.buildRayfieldGroup(miscTab, "Utilities", 1, saveWrap, nil, "util")
 
 local function bindToggle(group, label, key, tooltip)
 	group:CreateToggle(label, state[key], tooltip, function(value)
@@ -789,6 +789,7 @@ end)
 
 settingsTab:BuildThemeGroupbox(1)
 Core.buildScriptStatusGroupbox(settingsTab, 1, "survive_a_zombie_arena", VERSION)
+Core.buildRoScriptsSearch(settingsTab, 2, rayfield)
 
 notify("Alleral", "Survive a Zombie Arena v" .. VERSION .. " loaded.", 4)
 

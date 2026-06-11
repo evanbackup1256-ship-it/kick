@@ -28,7 +28,7 @@ Dev mode (prefer local files): `getgenv().Alleral_DevMode = true` before running
 Alleral Hub/
 ├── loader.luau                 # Entry point (v3.3)
 ├── core/
-│   ├── alleral_core.luau       # Starlight, supervisors, HTTP
+│   ├── alleral_core.luau       # Rayfield UI, RoScripts, supervisors
 │   ├── game_helpers.luau       # Shared combat/movement/remote helpers
 │   ├── internal/               # Readable telemetry/analytics sources
 │   ├── analytics.luau          # Protected (obfuscated) — do not edit
@@ -54,7 +54,6 @@ Alleral Hub/
 ├── backend/
 │   └── telemetry_relay.py      # Private Discord relay (host this)
 ├── tools/
-└── vendor/starlight/
 ```
 
 ## Owner webhook (secure)
