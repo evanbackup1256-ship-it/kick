@@ -1,6 +1,7 @@
 ﻿--[[
-	Alleral bootstrap - single entry point for players.
-	Bundled loader is always available; remote mirrors may upgrade when newer.
+	Alleral â€” self-contained loader (paste.luau / load.luau).
+	Copy this ENTIRE file into your executor and click Execute.
+	Do not use loadstring(game:HttpGet(...))() one-liners â€” they fail on Volt.
 ]]
 local GITHUB_REPO = "evanbackup1256-ship-it/kick"
 local REPO_BRANCH = "main"

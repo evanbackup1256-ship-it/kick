@@ -9,6 +9,7 @@ $launchPath = Join-Path $root "launch.luau"
 $loadPath = Join-Path $root "load.luau"
 $runPath = Join-Path $root "run.luau"
 $bootstrapPath = Join-Path $root "bootstrap.luau"
+$pastePath = Join-Path $root "paste.luau"
 $templatePath = Join-Path $root "launch.template.luau"
 
 if (-not (Test-Path $loaderPath)) {
@@ -49,8 +50,8 @@ if ($template -notmatch '--EMBED_LOADER_HERE--') {
 
 $launch = $template.Replace("--EMBED_LOADER_HERE--", $embedded.TrimEnd())
 Set-Content -Path $launchPath -Value $launch -Encoding UTF8 -NoNewline
-foreach ($dest in @($loadPath, $runPath, $bootstrapPath)) {
+foreach ($dest in @($loadPath, $runPath, $bootstrapPath, $pastePath)) {
     Copy-Item -Path $launchPath -Destination $dest -Force
 }
 Write-Host "[ok] Bundled loader v$version into launch.luau ($($launch.Length) bytes)"
-Write-Host "[ok] Copied launch.luau -> load.luau, run.luau, bootstrap.luau"
+Write-Host "[ok] Copied launch.luau -> load.luau, run.luau, bootstrap.luau, paste.luau"
