@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import time
+from pathlib import Path
 from typing import Any
 
 try:
@@ -12,11 +15,13 @@ except ImportError:
     requests = None  # type: ignore
 
 WEAO_USER_AGENT = "WEAO-3PService"
-WEAO_BASES = (
+_DEFAULT_BASES = (
     "https://weao.xyz",
     "https://api.weao.xyz",
     "https://whatexpsare.online",
     "https://api.whatexpsare.online",
+    "https://whatexploitsaretra.sh",
+    "https://api.whatexploitsaretra.sh",
 )
 WEAO_PATH = "/api/status/exploits"
 _CACHE: dict[str, tuple[float, list[dict[str, Any]]]] = {}
@@ -25,6 +30,59 @@ _LIVE_CACHE_TTL_SEC = 30
 _PREVIOUS: dict[str, dict[str, Any]] = {}
 _CHANGE_LOG: list[dict[str, Any]] = []
 _CHANGE_LOG_MAX = 40
+
+
+def _load_weao_bases() -> tuple[str, ...]:
+    bases: list[str] = []
+    seen: set[str] = set()
+
+    def add(base: str) -> None:
+        cleaned = str(base or "").strip().rstrip("/")
+        if not cleaned or cleaned in seen:
+            return
+        seen.add(cleaned)
+        bases.append(cleaned)
+
+    proxy = os.environ.get("WEAO_PROXY_URL", "").strip()
+    if proxy:
+        add(proxy)
+
+    for raw in os.environ.get("WEAO_BASES", "").split(","):
+        if raw.strip():
+            add(raw)
+
+    cfg_paths = [
+        os.environ.get("WEAO_CONFIG_PATH", "").strip(),
+        "/app/weao.json",
+        str(Path(__file__).resolve().parent.parent / "cfg" / "weao.json"),
+    ]
+    for path in cfg_paths:
+        if not path:
+            continue
+        try:
+            cfg_file = Path(path)
+            if not cfg_file.is_file():
+                continue
+            data = json.loads(cfg_file.read_text(encoding="utf-8"))
+            proxy_cfg = (data.get("proxy") or {}).get("base")
+            if proxy_cfg:
+                add(str(proxy_cfg))
+            for base in data.get("bases") or []:
+                add(str(base))
+            break
+        except (OSError, json.JSONDecodeError, TypeError):
+            continue
+
+    for base in _DEFAULT_BASES:
+        add(base)
+    return tuple(bases)
+
+
+WEAO_BASES = _load_weao_bases()
+
+
+def _empty_meta(*, stale: bool = False, warning: str | None = None) -> dict[str, Any]:
+    return {"stale": stale, "warning": warning}
 
 
 def _slug_from_title(title: str) -> str:
@@ -202,7 +260,23 @@ def _format_entry(raw: dict[str, Any]) -> dict[str, Any]:
     return entry
 
 
-def fetch_all_exploits(*, force_refresh: bool = False, live: bool = False) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _store_cache(
+    cache_key: str,
+    formatted: list[dict[str, Any]],
+    *,
+    ttl: float,
+    live: bool,
+) -> None:
+    _CACHE[cache_key] = (time.time() + ttl, formatted)
+    if live:
+        _CACHE["all"] = (time.time() + min(ttl, 60), formatted)
+
+
+def fetch_all_exploits(
+    *,
+    force_refresh: bool = False,
+    live: bool = False,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     if requests is None:
         raise RuntimeError("requests is not installed")
 
@@ -213,7 +287,7 @@ def fetch_all_exploits(*, force_refresh: bool = False, live: bool = False) -> tu
         if hit and time.time() < hit[0]:
             formatted = hit[1]
             changes = diff_exploits(_PREVIOUS, formatted) if _PREVIOUS else []
-            return formatted, changes
+            return formatted, changes, _empty_meta()
 
     headers = {
         "User-Agent": WEAO_USER_AGENT,
@@ -225,13 +299,16 @@ def fetch_all_exploits(*, force_refresh: bool = False, live: bool = False) -> tu
     for base in WEAO_BASES:
         url = f"{base.rstrip('/')}{WEAO_PATH}"
         try:
-            response = requests.get(url, headers=headers, timeout=12)
+            response = requests.get(url, headers=headers, timeout=15)
             if response.status_code >= 400:
-                last_err = f"WEAO HTTP {response.status_code}"
+                last_err = f"WEAO HTTP {response.status_code} from {base}"
                 continue
             payload = response.json()
         except requests.RequestException as exc:
             last_err = str(exc)
+            continue
+        except json.JSONDecodeError:
+            last_err = f"Invalid JSON from {base}"
             continue
 
         rows: list[Any]
@@ -240,6 +317,7 @@ def fetch_all_exploits(*, force_refresh: bool = False, live: bool = False) -> tu
         elif isinstance(payload, dict):
             rows = payload.get("data") or payload.get("exploits") or []
         else:
+            last_err = f"Unexpected payload from {base}"
             continue
 
         formatted: list[dict[str, Any]] = []
@@ -261,22 +339,21 @@ def fetch_all_exploits(*, force_refresh: bool = False, live: bool = False) -> tu
             if slug:
                 _PREVIOUS[slug] = dict(entry)
         _remember_changes(changes)
-        _CACHE[cache_key] = (time.time() + ttl, formatted)
-        if live:
-            _CACHE["all"] = (time.time() + min(ttl, 60), formatted)
-        return formatted, changes
+        _store_cache(cache_key, formatted, ttl=ttl, live=live)
+        return formatted, changes, _empty_meta()
 
     cached = _CACHE.get(cache_key) or _CACHE.get("all")
     if cached:
         formatted = cached[1]
         changes = diff_exploits(_PREVIOUS, formatted) if _PREVIOUS else []
-        return formatted, changes
-    raise RuntimeError(last_err)
+        return formatted, changes, _empty_meta(stale=True, warning=last_err)
+
+    return [], [], _empty_meta(warning=last_err)
 
 
 def fetch_exploit(slug: str) -> dict[str, Any] | None:
     needle = _slug_from_title(slug)
-    exploits, _ = fetch_all_exploits()
+    exploits, _, _ = fetch_all_exploits()
     for entry in exploits:
         if entry.get("slug") == needle or _slug_from_title(entry.get("title", "")) == needle:
             return entry

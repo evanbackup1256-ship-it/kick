@@ -260,6 +260,70 @@ def cors_preflight():
 
 BAN_DB_PATH = Path(os.environ.get("BAN_DB_PATH", str(APP_DIR / "data" / "bans.db")))
 DATA_DIR = Path(os.environ.get("ALLERAL_DATA_DIR", str(APP_DIR / "data")))
+
+
+def bootstrap_runtime_keys() -> dict[str, str]:
+    """Ensure telemetry, admin, and partner REST keys exist — env overrides persisted file."""
+    global API_KEY, ADMIN_API_KEY, BAN_PARTNER_API_KEY
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    path = DATA_DIR / "runtime_secrets.json"
+    stored: dict[str, str] = {}
+    if path.is_file():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                stored = {str(k): str(v).strip() for k, v in raw.items() if str(v).strip()}
+        except (OSError, json.JSONDecodeError, TypeError):
+            stored = {}
+
+    changed = False
+    generated: list[str] = []
+
+    def resolve(name: str, preferred: str) -> str:
+        nonlocal changed
+        preferred = (preferred or "").strip()
+        if preferred and len(preferred) >= MIN_API_KEY_LEN:
+            if stored.get(name) != preferred:
+                stored[name] = preferred
+                changed = True
+            return preferred
+        existing = (stored.get(name) or "").strip()
+        if existing and len(existing) >= MIN_API_KEY_LEN:
+            return existing
+        new_key = secrets.token_urlsafe(36)
+        stored[name] = new_key
+        changed = True
+        generated.append(name)
+        return new_key
+
+    telemetry_env = os.environ.get("TELEMETRY_API_KEY", "").strip()
+    admin_env = os.environ.get("ADMIN_API_KEY", "").strip()
+    partner_env = os.environ.get("BAN_PARTNER_API_KEY", "").strip()
+
+    API_KEY = resolve("telemetryApiKey", telemetry_env or API_KEY)
+    ADMIN_API_KEY = resolve("adminApiKey", admin_env or API_KEY)
+    BAN_PARTNER_API_KEY = resolve("banPartnerApiKey", partner_env or ADMIN_API_KEY)
+
+    if changed:
+        try:
+            path.write_text(json.dumps(stored, indent=2) + "\n", encoding="utf-8")
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+            if generated:
+                print(
+                    f"[bootstrap] Auto-provisioned API keys ({', '.join(generated)}) → {path}",
+                    file=sys.stderr,
+                )
+        except OSError as exc:
+            print(f"[bootstrap] could not persist runtime secrets: {exc}", file=sys.stderr)
+
+    return stored
+
+
+bootstrap_runtime_keys()
+
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "evanbackup1256-ship-it/kick").strip()
 GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "main").strip()
 GITHUB_SYNC_SECONDS = int(os.environ.get("GITHUB_SYNC_SECONDS", "30"))
@@ -1118,19 +1182,56 @@ class RelayEngine:
 ENGINE = RelayEngine()
 
 
+def weao_module_ready() -> bool:
+    try:
+        from weao_api import fetch_all_exploits as _fetch  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def start_weao_warm_loop() -> None:
+    if not weao_module_ready():
+        return
+
+    def _loop() -> None:
+        while True:
+            try:
+                fetch_all_exploits(live=True)
+            except Exception as exc:
+                print(f"[weao] warm cache failed: {exc}", file=sys.stderr)
+            time.sleep(45)
+
+    threading.Thread(target=_loop, name="weao-warm", daemon=True).start()
+
+
+start_weao_warm_loop()
+
+
 @app.get("/health")
 def health():
     sync_meta = AUTO_SYNC.status() if AUTO_SYNC is not None else {}
     return jsonify({
         "ok": True,
-        "version": "3.7.1",
-        "gate": True,
+        "version": "3.7.2",
+        "gate": bool(API_KEY and len(API_KEY) >= MIN_API_KEY_LEN),
+        "telemetry": bool(API_KEY and len(API_KEY) >= MIN_API_KEY_LEN),
         "banApi": True,
+        "banApiV1": True,
+        "partnerApi": ban_partner_enabled(),
+        "weao": weao_module_ready(),
+        "admin": admin_enabled(),
         "site": True,
         "autoSync": sync_meta.get("enabled", False),
         "githubCommit": sync_meta.get("commit") or "",
         "lastSyncAt": sync_meta.get("lastSyncAt"),
         "bans": len(BAN_REGISTRY.list_bans()),
+        "endpoints": {
+            "ingest": "/ingest",
+            "banCheck": "/api/v1/bans/check",
+            "banDocs": "/api/v1/bans/docs",
+            "weao": "/api/weao/exploits",
+        },
         "time": utc_iso(),
     })
 
@@ -1239,7 +1340,8 @@ def build_ban_api_docs(base: str) -> dict[str, Any]:
                 "Authorization: Bearer <BAN_PARTNER_API_KEY>",
                 "X-Alleral-Key: <TELEMETRY_API_KEY> (check-only, loader compat)",
             ],
-            "env": "Set BAN_PARTNER_API_KEY on Railway for partner integrations.",
+            "env": "Partner key auto-provisions on first boot (data/runtime_secrets.json). Override with BAN_PARTNER_API_KEY.",
+            "auto": True,
         },
         "endpoints": [
             {"method": "GET", "path": "/api/v1/bans/docs", "auth": False, "desc": "This documentation JSON"},
@@ -1360,6 +1462,9 @@ def ban_api_v1_docs():
     payload["ok"] = True
     payload["activeBans"] = len(BAN_REGISTRY.list_bans())
     payload["banTypes"] = sorted(VALID_BAN_TYPES)
+    payload["partnerApi"] = ban_partner_enabled()
+    payload["autoProvisioned"] = True
+    payload["baseUrl"] = base
     return jsonify(payload)
 
 
@@ -1862,9 +1967,22 @@ def weao_exploits():
     force = str(request.args.get("refresh") or "").lower() in {"1", "true", "yes"}
     live = force or str(request.args.get("live") or "").lower() in {"1", "true", "yes"}
     try:
-        exploits, changes = fetch_all_exploits(force_refresh=force, live=live)
+        exploits, changes, meta = fetch_all_exploits(force_refresh=force, live=live)
     except RuntimeError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 502
+        return jsonify({
+            "ok": True,
+            "exploits": [],
+            "summary": summarize_exploits([]),
+            "changes": [],
+            "recentChanges": recent_changes(20),
+            "source": "weao",
+            "docs": "https://docs.weao.xyz",
+            "fetchedAt": utc_iso(),
+            "live": live,
+            "pollIntervalSec": 35 if live else 120,
+            "stale": False,
+            "warning": str(exc),
+        })
     summary = summarize_exploits(exploits)
     return jsonify({
         "ok": True,
@@ -1877,6 +1995,8 @@ def weao_exploits():
         "fetchedAt": utc_iso(),
         "live": live,
         "pollIntervalSec": 35 if live else 120,
+        "stale": bool(meta.get("stale")),
+        "warning": meta.get("warning"),
     })
 
 
@@ -2216,10 +2336,34 @@ def admin_status():
     if not admin_token_valid(token):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
     expiry = ADMIN_SESSIONS.get(token)
+    base = public_base_url()
     return jsonify({
         "ok": True,
         "expiresAt": datetime.fromtimestamp(expiry, tz=timezone.utc).replace(microsecond=0).isoformat() if expiry else None,
         "time": utc_iso(),
+        "banApi": {
+            "partnerApi": ban_partner_enabled(),
+            "docsUrl": f"{base}/api/v1/bans/docs",
+            "checkUrl": f"{base}/api/v1/bans/check",
+            "autoProvisioned": True,
+        },
+    })
+
+
+@app.get("/api/admin/ban-api/key")
+def admin_ban_api_key():
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    key = BAN_PARTNER_API_KEY
+    masked = f"{key[:6]}…{key[-4:]}" if len(key) > 12 else "••••"
+    return jsonify({
+        "ok": True,
+        "partnerApi": ban_partner_enabled(),
+        "key": key,
+        "masked": masked,
+        "header": "X-Ban-Api-Key",
+        "autoProvisioned": True,
+        "persistedAt": str(DATA_DIR / "runtime_secrets.json"),
     })
 
 

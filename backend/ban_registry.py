@@ -71,12 +71,14 @@ class BanRegistry:
                 );
                 CREATE INDEX IF NOT EXISTS idx_bans_lookup ON bans(ban_type, value, active);
                 CREATE INDEX IF NOT EXISTS idx_bans_active ON bans(active, expires_at);
-                CREATE INDEX IF NOT EXISTS idx_bans_roblox ON bans(roblox_user_id, active);
                 """
             )
             cols = {row[1] for row in conn.execute("PRAGMA table_info(bans)").fetchall()}
             if "roblox_user_id" not in cols:
                 conn.execute("ALTER TABLE bans ADD COLUMN roblox_user_id TEXT NOT NULL DEFAULT ''")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_bans_roblox ON bans(roblox_user_id, active)"
+            )
 
     def _row_to_dict(self, row: sqlite3.Row | None) -> dict[str, Any] | None:
         if row is None:

@@ -56,6 +56,196 @@
   font-weight: 600;
 }
 
+.admin-ban-subtabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.admin-ban-subtabs button {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.admin-ban-subtabs button.active {
+  border-color: rgba(41, 151, 255, 0.45);
+  background: rgba(41, 151, 255, 0.12);
+  color: var(--text);
+}
+
+.admin-partner-intro code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.85em;
+}
+
+.admin-partner-key {
+  margin-top: 16px;
+}
+
+.admin-partner-key-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-partner-key-row .field-input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.admin-partner-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.admin-ban-api-grid {
+  margin-top: 16px;
+}
+
+.ban-api-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ban-api-stat {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ban-api-stat span {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.ban-api-stat strong {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.ban-api-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 16px;
+}
+
+.ban-api-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ban-api-endpoints {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.ban-api-endpoint {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ban-api-endpoint-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.ban-api-method {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(41, 151, 255, 0.15);
+  color: #6eb6ff;
+}
+
+.ban-api-endpoint code {
+  font-size: 0.78rem;
+}
+
+.ban-api-auth {
+  margin-left: auto;
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 180, 80, 0.15);
+  color: #ffc266;
+}
+
+.ban-api-auth.public {
+  background: rgba(80, 200, 120, 0.12);
+  color: #7ddea3;
+}
+
+.ban-api-endpoint p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.ban-api-result,
+.ban-api-example {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow: auto;
+  max-height: 220px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ban-api-result.allowed {
+  border-color: rgba(80, 200, 120, 0.35);
+}
+
+.ban-api-result.banned {
+  border-color: rgba(255, 90, 90, 0.35);
+}
+
+.ban-api-subhead {
+  margin: 16px 0 8px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 900px) {
+  .ban-api-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .admin-filter-row {
   display: flex;
   gap: 8px;

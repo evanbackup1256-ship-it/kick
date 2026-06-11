@@ -27,6 +27,7 @@
   let selectedPlayer = null;
   let banTypeFilter = "all";
   let cachedBans = [];
+  let activeBanSubtab = "manage";
 
   if (localStorage.getItem(KEY_KEY)) {
     adminKey.value = localStorage.getItem(KEY_KEY);
@@ -276,6 +277,107 @@
     panel.classList.add("tab-panel-enter");
   }
 
+  function setBanSubtab(name) {
+    activeBanSubtab = name;
+    $$("[data-ban-subtab]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.banSubtab === name);
+    });
+    $$("[data-ban-subpanel]").forEach((panel) => {
+      panel.classList.toggle("hidden", panel.dataset.banSubpanel !== name);
+    });
+    if (name === "partner") void loadPartnerBanApi();
+  }
+
+  async function loadPartnerBanApi() {
+    const statusRoot = $("#partnerBanApiStatus");
+    const endpointsRoot = $("#partnerBanApiEndpoints");
+    const exampleRoot = $("#partnerBanApiExample");
+    const docsLink = $("#partnerDocsLink");
+    const keyRow = $("#partnerKeyRow");
+    const keyInput = $("#partnerApiKey");
+    const docsUrl = `${apiBase()}/api/v1/bans/docs`;
+    if (docsLink) docsLink.href = docsUrl;
+
+    if (statusRoot) statusRoot.innerHTML = `<p class="empty">Loading Ban API docs…</p>`;
+    try {
+      const res = await fetch(docsUrl, { cache: "no-store" });
+      const data = await res.json();
+      if (statusRoot) {
+        statusRoot.innerHTML = `
+          <div class="ban-api-stat"><span>Active bans</span><strong>${esc(data.activeBans ?? "—")}</strong></div>
+          <div class="ban-api-stat"><span>API version</span><strong>v${esc(data.version || "1")}</strong></div>
+          <div class="ban-api-stat"><span>Status</span><strong>${data.partnerApi ? "Auto-enabled" : "Off"}</strong></div>
+          <div class="ban-api-stat"><span>Endpoints</span><strong>${esc((data.endpoints || []).length)}</strong></div>
+        `;
+      }
+      const endpoints = data.endpoints || [];
+      if (endpointsRoot) {
+        endpointsRoot.innerHTML = endpoints.map((ep) => `
+          <article class="ban-api-endpoint">
+            <div class="ban-api-endpoint-head">
+              <span class="ban-api-method">${esc(ep.method || "GET")}</span>
+              <code>${esc(ep.path || "")}</code>
+              ${ep.auth ? `<span class="ban-api-auth">Auth</span>` : `<span class="ban-api-auth public">Public</span>`}
+            </div>
+            <p>${esc(ep.desc || "")}</p>
+          </article>
+        `).join("");
+      }
+      const example = data.checkExample || {};
+      if (exampleRoot && example.body) {
+        exampleRoot.textContent = JSON.stringify(example.body, null, 2);
+      } else if (exampleRoot) {
+        exampleRoot.textContent = "No example available.";
+      }
+    } catch (e) {
+      if (statusRoot) statusRoot.innerHTML = `<p class="empty">${esc(e.message || "Could not load Ban API docs.")}</p>`;
+    }
+
+    if (await ensureAuth(false)) {
+      try {
+        const keyRes = await fetch(`${apiBase()}/api/admin/ban-api/key`, { headers: headers() });
+        const keyData = await keyRes.json();
+        if (keyRes.ok && keyData.ok && keyInput) {
+          keyInput.value = keyData.key || "";
+          keyRow?.classList.remove("hidden");
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  async function runPartnerBanCheck() {
+    if (!(await ensureAuth())) return;
+    const out = $("#partnerBanTestResult");
+    const userId = $("#partnerBanUserId")?.value.trim() || "";
+    const username = $("#partnerBanUsername")?.value.trim() || "";
+    if (!userId && !username) {
+      flash("Enter a Roblox UserId or username", true);
+      return;
+    }
+    try {
+      const res = await fetch(`${apiBase()}/api/v1/bans/check`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          player: { userId: userId || undefined, name: username || undefined },
+        }),
+      });
+      const data = await res.json();
+      if (out) {
+        out.textContent = JSON.stringify(data, null, 2);
+        out.classList.toggle("banned", data.allowed === false);
+        out.classList.toggle("allowed", data.allowed === true);
+      }
+      if (!res.ok) flash(data.error || "Check failed", true);
+      else flash(data.allowed ? "Player allowed" : "Player banned");
+    } catch (e) {
+      if (out) out.textContent = e.message || "Request failed";
+      flash("Ban check failed", true);
+    }
+  }
+
   function setTab(name) {
     activeTab = name;
     $$(".admin-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
@@ -286,7 +388,10 @@
     });
     if (name !== "bans") errorEl.textContent = "";
     if (name === "scripts") loadScripts();
-    if (name === "bans") void loadBans();
+    if (name === "bans") {
+      if (activeBanSubtab === "partner") void loadPartnerBanApi();
+      else void loadBans();
+    }
     if (name === "stats") loadStats();
     if (name === "site") loadSiteEditor();
   }
@@ -686,6 +791,41 @@
   $("#reload")?.addEventListener("click", () => {
     authFailed = false;
     void ensureAuth(true).then(() => setTab(activeTab));
+  });
+
+  $$("[data-ban-subtab]").forEach((btn) => {
+    btn.onclick = () => setBanSubtab(btn.dataset.banSubtab || "manage");
+  });
+
+  $("#partnerBanTestBtn")?.addEventListener("click", () => void runPartnerBanCheck());
+  $("#partnerReloadDocs")?.addEventListener("click", () => void loadPartnerBanApi());
+  $("#partnerCopyDocs")?.addEventListener("click", async () => {
+    const url = `${apiBase()}/api/v1/bans/docs`;
+    try {
+      await navigator.clipboard.writeText(url);
+      flash("Docs URL copied");
+    } catch {
+      flash("Copy failed", true);
+    }
+  });
+
+  $("#partnerCopyKey")?.addEventListener("click", async () => {
+    const key = $("#partnerApiKey")?.value || "";
+    if (!key) return;
+    try {
+      await navigator.clipboard.writeText(key);
+      flash("Partner key copied");
+    } catch {
+      flash("Copy failed", true);
+    }
+  });
+
+  $("#partnerRevealKey")?.addEventListener("click", () => {
+    const input = $("#partnerApiKey");
+    if (!input) return;
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    $("#partnerRevealKey").textContent = show ? "Hide" : "Show";
   });
 
   $$(".admin-tabs button").forEach((b) => {

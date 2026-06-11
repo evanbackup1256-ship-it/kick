@@ -550,7 +550,7 @@
       const totalMembers = (credits.teams || []).reduce((n, t) => n + (t.members || []).length, 0);
       (credits.teams || []).forEach((team) => {
         const section = document.createElement("div");
-        section.className = "credits-team reveal";
+        section.className = `credits-team reveal${totalMembers <= 1 ? " solo-team" : ""}`;
         section.innerHTML = `<h3 class="credits-team-title">${escapeHtml(team.title || "Team")}</h3>`;
         const grid = document.createElement("div");
         grid.className = `credits-grid${totalMembers <= 1 ? " solo" : ""}`;
@@ -638,7 +638,8 @@
           statusRoot.innerHTML = `
           <div class="ban-api-stat"><span>Active bans</span><strong>${escapeHtml(String(data.activeBans ?? "\u2014"))}</strong></div>
           <div class="ban-api-stat"><span>API version</span><strong>v${escapeHtml(String(data.version || "1"))}</strong></div>
-          <div class="ban-api-stat"><span>Ban types</span><strong>${escapeHtml(String(data.banTypes?.length ?? 0))}</strong></div>
+          <div class="ban-api-stat"><span>Status</span><strong class="live">${data.partnerApi ? "Auto-enabled" : "Off"}</strong></div>
+          <div class="ban-api-stat"><span>Base URL</span><strong>${escapeHtml(String(data.baseUrl || base).replace(/^https?:\/\//, ""))}</strong></div>
         `;
         }
         const endpoints = data.endpoints || [];
@@ -933,6 +934,12 @@
         state.weaoPollSec = Number(data.pollIntervalSec) || (live ? 35 : 120);
         state.weaoChanges = serverChanges.length ? serverChanges : clientChanges;
         state.weaoRecentChanges = data.recentChanges || [];
+        const updated = $("#weaoUpdated");
+        if (updated) {
+          if (data.warning) {
+            updated.textContent = `${data.stale ? "Cached WEAO data" : "WEAO warning"} \xB7 ${String(data.warning)}`;
+          }
+        }
         for (const change of state.weaoChanges) {
           if (change.slug) state.weaoChangedSlugs[change.slug] = Date.now();
         }

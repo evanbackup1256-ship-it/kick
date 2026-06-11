@@ -21,7 +21,7 @@
       <div class="nav-links">
         <a href="/">Public Site</a>
         <a href="/health" target="_blank" rel="noopener">Health</a>
-        <a href="/api/ban/status" target="_blank" rel="noopener">Ban API</a>
+        <a href="/api/v1/bans/docs" target="_blank" rel="noopener">Ban API Docs</a>
       </div>
       <div class="nav-actions">
         <span id="adminStatus" class="status-pill"><span class="status-dot"></span>Ready</span>
@@ -75,6 +75,12 @@
     </section>
 
     <section data-tab-panel="bans" class="admin-panel hidden">
+      <div class="admin-ban-subtabs">
+        <button type="button" class="active" data-ban-subtab="manage">Manage bans</button>
+        <button type="button" data-ban-subtab="partner">Partner API v1</button>
+      </div>
+
+      <div data-ban-subpanel="manage">
       <div id="playerPreview" class="player-preview hidden" aria-live="polite">
         <img id="playerPreviewAvatar" src="" alt="" width="56" height="56" />
         <div class="player-preview-meta">
@@ -155,6 +161,52 @@
         <label>Search Bans<input id="banSearch" class="field-input" placeholder="Search by value, username, reason…" autocomplete="off" /></label>
       </div>
       <div id="bansGrid" class="admin-grid"></div>
+      </div>
+
+      <div data-ban-subpanel="partner" class="hidden">
+        <div class="panel admin-card admin-partner-intro">
+          <h3>Third-Party Ban API v1</h3>
+          <p class="admin-card-lead">REST endpoints for partners to check and manage Alleral bans. Your admin session can call authenticated routes — no separate partner key required in this panel.</p>
+          <p class="admin-card-lead muted-inline">Partner keys auto-provision on first boot. Copy yours below after sign-in, or set <code>BAN_PARTNER_API_KEY</code> to override. Docs: <a id="partnerDocsLink" href="/api/v1/bans/docs" target="_blank" rel="noopener">/api/v1/bans/docs</a></p>
+          <div id="partnerKeyRow" class="admin-partner-key hidden">
+            <label>Partner API Key
+              <div class="admin-partner-key-row">
+                <input id="partnerApiKey" class="field-input field-mono" type="password" readonly />
+                <button id="partnerRevealKey" class="btn btn-outline btn-sm" type="button">Show</button>
+                <button id="partnerCopyKey" class="btn btn-outline btn-sm" type="button">Copy</button>
+              </div>
+            </label>
+          </div>
+          <div class="admin-partner-actions">
+            <button id="partnerCopyDocs" class="btn btn-outline btn-sm" type="button">Copy docs URL</button>
+            <button id="partnerReloadDocs" class="btn btn-outline btn-sm" type="button">Reload docs</button>
+          </div>
+        </div>
+
+        <div id="partnerBanApiStatus" class="ban-api-stats"></div>
+
+        <div class="ban-api-grid admin-ban-api-grid">
+          <div class="panel admin-card">
+            <div class="ban-api-panel-head">
+              <h3>Endpoints</h3>
+            </div>
+            <div id="partnerBanApiEndpoints" class="ban-api-endpoints"></div>
+          </div>
+
+          <div class="panel admin-card">
+            <h3>Live ban check</h3>
+            <p class="admin-card-lead">Uses your signed-in admin token. External apps should send <code>X-Ban-Api-Key</code> instead.</p>
+            <form class="form ban-api-test-form" onsubmit="return false">
+              <label>Roblox UserId<input id="partnerBanUserId" class="field-input" placeholder="123456789" inputmode="numeric" /></label>
+              <label>Roblox Username<input id="partnerBanUsername" class="field-input" placeholder="Optional username" autocomplete="off" /></label>
+              <button id="partnerBanTestBtn" class="btn btn-fill" type="button">Run check</button>
+            </form>
+            <pre id="partnerBanTestResult" class="ban-api-result">Results appear here.</pre>
+            <h4 class="ban-api-subhead">Example request body</h4>
+            <pre id="partnerBanApiExample" class="ban-api-example field-mono">Loading…</pre>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section data-tab-panel="stats" class="admin-panel hidden">

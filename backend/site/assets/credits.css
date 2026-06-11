@@ -3,6 +3,13 @@
 #credits {
   position: relative;
   overflow: hidden;
+  padding-top: 48px;
+  padding-bottom: 64px;
+}
+
+.credits-wrap {
+  position: relative;
+  z-index: 1;
 }
 
 .credits-scene {
@@ -14,37 +21,38 @@
 
 .credits-scene-beam {
   position: absolute;
-  top: -30%;
+  top: -20%;
   left: 50%;
-  width: 480px;
-  height: 160%;
-  margin-left: -240px;
-  background: linear-gradient(180deg, rgba(41, 151, 255, 0.12), transparent 55%);
-  transform: rotate(8deg);
-  opacity: 0.6;
+  width: min(480px, 90vw);
+  height: 140%;
+  margin-left: min(-240px, -45vw);
+  background: linear-gradient(180deg, rgba(41, 151, 255, 0.1), transparent 60%);
+  transform: rotate(6deg);
+  opacity: 0.5;
 }
 
 .credits-scene-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(60px);
   animation: credits-orb-drift 16s var(--ease-drift) infinite alternate;
 }
 
 .credits-scene-orb-1 {
-  width: 320px;
-  height: 320px;
-  left: -8%;
-  top: 20%;
-  background: rgba(41, 151, 255, 0.22);
+  width: 280px;
+  height: 280px;
+  left: -6%;
+  top: 18%;
+  background: rgba(41, 151, 255, 0.16);
+  filter: blur(48px);
 }
 
 .credits-scene-orb-2 {
-  width: 280px;
-  height: 280px;
-  right: -6%;
-  bottom: 10%;
-  background: rgba(191, 90, 242, 0.18);
+  width: 240px;
+  height: 240px;
+  right: -4%;
+  bottom: 8%;
+  background: rgba(191, 90, 242, 0.12);
+  filter: blur(48px);
   animation-delay: -4s;
 }
 
@@ -54,13 +62,28 @@
 }
 
 .credits-headline {
-  max-width: 640px;
+  max-width: 720px;
   margin-inline: auto;
   text-align: center;
+  padding-top: 8px;
+}
+
+.credits-headline h2 {
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
 }
 
 .credits-team {
-  margin-top: 48px;
+  margin-top: 40px;
+}
+
+.credits-team.solo-team {
+  margin-top: 28px;
+}
+
+.credits-team.solo-team .credits-team-title {
+  display: none;
 }
 
 .credits-team-title {
@@ -361,12 +384,23 @@
 }
 
 .credits-grid.solo {
-  max-width: 420px;
+  max-width: 760px;
   margin: 0 auto;
 }
 
 .credits-grid.solo .credit-card.featured {
   grid-column: span 1;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.15fr);
+  min-height: 320px;
+}
+
+.credits-grid.solo .credit-render-stage {
+  min-height: 280px;
+}
+
+.credits-grid.solo .credit-avatar-body {
+  max-height: 260px;
 }
 
 /* ── WEAO executor matrix ── */
@@ -1076,6 +1110,9 @@ kbd {
   .credit-card.featured .credit-meta {
     border-left: none;
     border-top: 1px solid var(--border);
+  }
+  .credits-grid.solo .credit-card.featured {
+    grid-template-columns: 1fr;
   }
   .tools-grid {
     grid-template-columns: 1fr;
