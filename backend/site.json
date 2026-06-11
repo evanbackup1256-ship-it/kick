@@ -4,7 +4,7 @@
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
   "loaderVersion": "7.6.0",
-  "coreVersion": "2.7.0",
+  "coreVersion": "2.7.2",
   "uiLibrary": "WindUI",
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick()))()",

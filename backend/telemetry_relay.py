@@ -7,13 +7,12 @@ import hashlib
 import hmac
 import json
 import os
-import re
 import secrets
 import sys
 import threading
 import time
 from collections import defaultdict, deque
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from queue import Empty, PriorityQueue
 from typing import Any
@@ -2564,168 +2563,6 @@ def manage_supabase_test():
     if result.get("ok"):
         manage_audit("supabase.test", {"status": "ok"}, actor="admin")
     return jsonify(result)
-
-
-SHARED_CONFIG_DIR = DATA_DIR / "shared_configs"
-SHARED_CONFIG_MAX_BYTES = int(os.environ.get("ALLERAL_CONFIG_MAX_BYTES", "131072"))
-SHARED_CONFIG_TTL_DAYS = int(os.environ.get("ALLERAL_CONFIG_TTL_DAYS", "90"))
-
-
-def _config_code() -> str:
-    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    return "".join(secrets.choice(alphabet) for _ in range(6))
-
-
-def _config_path(code: str) -> Path:
-    safe = re.sub(r"[^A-Z0-9]", "", str(code or "").upper())[:6]
-    if len(safe) != 6:
-        raise ValueError("invalid_code")
-    return SHARED_CONFIG_DIR / f"{safe}.json"
-
-
-def _load_shared_config(code: str) -> dict | None:
-    try:
-        path = _config_path(code)
-    except ValueError:
-        return None
-    if not path.is_file():
-        return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return data if isinstance(data, dict) else None
-
-
-def _save_shared_config(code: str, record: dict) -> None:
-    SHARED_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    path = _config_path(code)
-    path.write_text(json.dumps(record, separators=(",", ":")), encoding="utf-8")
-
-
-@app.post("/api/configs/publish")
-def publish_shared_config():
-    client_ip = resolve_client_ip(request)
-    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
-        return jsonify({"ok": False, "error": "rate_limited"}), 429
-    raw = request.get_data(as_text=True) or ""
-    if len(raw.encode("utf-8")) > SHARED_CONFIG_MAX_BYTES:
-        return jsonify({"ok": False, "error": "payload_too_large"}), 413
-    body = request.get_json(silent=True)
-    if not isinstance(body, dict):
-        return jsonify({"ok": False, "error": "bad_request"}), 400
-    snapshot = body.get("data")
-    if not isinstance(snapshot, dict):
-        return jsonify({"ok": False, "error": "missing_data"}), 400
-    game_id = str(body.get("gameId") or body.get("game") or "unknown")[:64]
-    name = str(body.get("name") or "Untitled")[:80]
-    author = str(body.get("author") or "Anonymous")[:80]
-    script_version = str(body.get("scriptVersion") or body.get("version") or "?")[:32]
-    public = body.get("public") is True
-    tags = body.get("tags") if isinstance(body.get("tags"), list) else []
-    tags = [str(tag)[:32] for tag in tags[:8]]
-    now = utc_iso()
-    code = _config_code()
-    for _ in range(12):
-        if _load_shared_config(code) is None:
-            break
-        code = _config_code()
-    else:
-        return jsonify({"ok": False, "error": "code_collision"}), 503
-    record = {
-        "code": code,
-        "gameId": game_id,
-        "name": name,
-        "author": author,
-        "scriptVersion": script_version,
-        "public": public,
-        "tags": tags,
-        "downloads": 0,
-        "createdAt": now,
-        "updatedAt": now,
-        "expiresAt": (datetime.now(timezone.utc) + timedelta(days=SHARED_CONFIG_TTL_DAYS)).isoformat(),
-        "data": snapshot,
-        "dna": hashlib.sha256(json.dumps(snapshot, sort_keys=True).encode("utf-8")).hexdigest()[:12],
-    }
-    try:
-        _save_shared_config(code, record)
-    except OSError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 500
-    return jsonify({"ok": True, "code": code, "dna": record["dna"], "public": public})
-
-
-@app.get("/api/configs/<code>")
-def fetch_shared_config(code: str):
-    client_ip = resolve_client_ip(request)
-    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
-        return jsonify({"ok": False, "error": "rate_limited"}), 429
-    record = _load_shared_config(code)
-    if not record:
-        return jsonify({"ok": False, "error": "not_found"}), 404
-    record["downloads"] = int(record.get("downloads") or 0) + 1
-    record["updatedAt"] = utc_iso()
-    save_code = str(code or record.get("code") or "").strip().upper()
-    if not save_code:
-        save_code = str(code or "").strip().upper()
-    record["code"] = save_code
-    try:
-        _save_shared_config(save_code, record)
-    except (OSError, ValueError):
-        pass
-    return jsonify(
-        {
-            "ok": True,
-            "code": record.get("code"),
-            "gameId": record.get("gameId"),
-            "name": record.get("name"),
-            "author": record.get("author"),
-            "scriptVersion": record.get("scriptVersion"),
-            "public": record.get("public") is True,
-            "tags": record.get("tags") or [],
-            "downloads": record.get("downloads") or 0,
-            "createdAt": record.get("createdAt"),
-            "dna": record.get("dna"),
-            "data": record.get("data"),
-        }
-    )
-
-
-@app.get("/api/configs/browse")
-def browse_shared_configs():
-    client_ip = resolve_client_ip(request)
-    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
-        return jsonify({"ok": False, "error": "rate_limited"}), 429
-    game_id = str(request.args.get("game") or request.args.get("gameId") or "").strip().lower()
-    raw_limit = request.args.get("limit")
-    try:
-        limit = max(1, min(int(raw_limit if raw_limit not in (None, "") else 20), 50))
-    except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "invalid_limit"}), 400
-    SHARED_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    rows: list[dict[str, Any]] = []
-    for path in SHARED_CONFIG_DIR.glob("*.json"):
-        try:
-            record = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if not isinstance(record, dict) or record.get("public") is not True:
-            continue
-        if game_id and str(record.get("gameId") or "").lower() != game_id:
-            continue
-        rows.append(
-            {
-                "code": record.get("code") or path.stem,
-                "name": record.get("name") or "Untitled",
-                "author": record.get("author") or "Anonymous",
-                "gameId": record.get("gameId"),
-                "scriptVersion": record.get("scriptVersion"),
-                "downloads": int(record.get("downloads") or 0),
-                "dna": record.get("dna"),
-                "createdAt": record.get("createdAt"),
-            }
-        )
-    rows.sort(key=lambda row: (-int(row.get("downloads") or 0), str(row.get("createdAt") or "")))
-    return jsonify({"ok": True, "configs": rows[:limit]})
 
 
 def main() -> None:
