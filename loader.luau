@@ -3,7 +3,7 @@
 	Detects game, fetches core + game script, runs.
 ]]
 
-local LOADER_VERSION = "5.1.0"
+local LOADER_VERSION = "5.2.0"
 local MIN_CORE = "1.18"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
@@ -70,14 +70,285 @@ local function normalizeSlug(text)
 	local key = tostring(text or ""):lower()
 	key = key:gsub("synapse%s*z", "synapsez")
 	key = key:gsub("awp%.?gg?", "volt")
+	key = key:gsub("bunni%.?fun", "bunni")
 	key = key:gsub("vega%s*x", "vegax")
 	key = key:gsub("[^a-z0-9]", "")
 	return key
 end
 
-local function detectExecutorProfile()
+local function inferSlugFromText(text)
+	local lower = tostring(text or ""):lower()
+	for _, pair in ipairs({
+		{ "synapse z", "synapsez" },
+		{ "synapse", "synapse" },
+		{ "potassium", "potassium" },
+		{ "volt", "volt" },
+		{ "awp", "volt" },
+		{ "velocity", "velocity" },
+		{ "solara", "solara" },
+		{ "solora", "solara" },
+		{ "xeno", "xeno" },
+		{ "wave", "wave" },
+		{ "delta", "delta" },
+		{ "codex", "codex" },
+		{ "cryptic", "cryptic" },
+		{ "electron", "electron" },
+		{ "krnl", "krnl" },
+		{ "fluxus", "fluxus" },
+		{ "jjsploit", "jjsploit" },
+		{ "hydrogen", "hydrogen" },
+		{ "macsploit", "macsploit" },
+		{ "vega x", "vegax" },
+		{ "madium", "madium" },
+		{ "nihon", "nihon" },
+		{ "bunni", "bunni" },
+		{ "celery", "celery" },
+		{ "oxygen", "oxygenu" },
+		{ "comet", "comet" },
+		{ "trigon", "trigon" },
+		{ "arceus", "arceus" },
+		{ "ronix", "ronix" },
+		{ "evon", "evon" },
+		{ "krypton", "krypton" },
+		{ "sentinel", "sentinel" },
+		{ "serenity", "serenity" },
+		{ "atlantis", "atlantis" },
+		{ "zorara", "zorara" },
+	}) do
+		if lower:find(pair[1], 1, true) then
+			return pair[2]
+		end
+	end
+	return nil
+end
+
+local WEAO_API_URLS = {
+	"https://api.weao.xyz/api/status/exploits",
+	"https://api.whatexpsare.online/api/status/exploits",
+	"https://whatexpsare.online/api/status/exploits",
+	"https://api.whatexploitsaretra.sh/api/status/exploits",
+	"http://api.weao.xyz/api/status/exploits",
+}
+
+local function extractResponseBody(response)
+	if type(response) == "string" then
+		return response
+	end
+	if type(response) == "table" then
+		return response.Body or response.body or response.Data or response.data
+	end
+	return nil
+end
+
+local function requestVia(fn, url, headers)
+	if type(fn) ~= "function" then
+		return nil
+	end
+	headers = headers or { ["Cache-Control"] = "no-cache" }
+	for _, spec in ipairs({
+		{ Url = url, Method = "GET", Headers = headers },
+		{ url = url, method = "GET", headers = headers },
+	}) do
+		local ok, res = pcall(fn, spec)
+		if ok then
+			local body = extractResponseBody(res)
+			if type(body) == "string" and #body > 0 then
+				return body
+			end
+		end
+	end
+	return nil
+end
+
+local function bootstrapHttpGet(url, headers)
+	headers = headers or {}
+	local bust = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(tick())
+	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
+	local solaraLib = sharedEnv and type(sharedEnv.solara) == "table" and sharedEnv.solara or nil
+
+	local requestFns = {
+		type(ENV.Volt) == "table" and ENV.Volt.request,
+		type(ENV.syn) == "table" and ENV.syn.request,
+		type(ENV.fluxus) == "table" and ENV.fluxus.request,
+		solaraLib and solaraLib.request,
+		type(ENV.Solara) == "table" and ENV.Solara.request,
+		type(ENV.Xeno) == "table" and ENV.Xeno.request,
+		type(ENV.Wave) == "table" and ENV.Wave.request,
+		type(ENV.Electron) == "table" and ENV.Electron.request,
+		type(ENV.Potassium) == "table" and ENV.Potassium.request,
+		type(ENV.Velocity) == "table" and ENV.Velocity.request,
+		type(ENV.Codex) == "table" and ENV.Codex.request,
+		type(ENV.Hydrogen) == "table" and ENV.Hydrogen.request,
+		type(ENV.delta) == "table" and ENV.delta.request,
+		type(ENV.celery) == "table" and ENV.celery.request,
+		ENV.request,
+		ENV.http_request,
+		ENV.Request,
+	}
+
+	for _, fn in ipairs(requestFns) do
+		local body = requestVia(fn, bust, headers)
+		if body then
+			return body, "request"
+		end
+	end
+
+	if type(game.HttpGet) == "function" then
+		for _, fetchUrl in ipairs({ bust, url }) do
+			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
+			if type(body) == "string" and #body > 0 then
+				return body, "httpget"
+			end
+			ok, body = pcall(game.HttpGet, game, fetchUrl)
+			if type(body) == "string" and #body > 0 then
+				return body, "httpget"
+			end
+		end
+	end
+
+	if HttpService and type(HttpService.GetAsync) == "function" then
+		local ok, body = pcall(function()
+			return HttpService:GetAsync(bust, true)
+		end)
+		if ok and type(body) == "string" and #body > 0 then
+			return body, "httpservice"
+		end
+	end
+
+	return nil
+end
+
+local function decodeJson(body)
+	if type(body) ~= "string" or body == "" or not HttpService then
+		return nil
+	end
+	local ok, decoded = pcall(function()
+		return HttpService:JSONDecode(body)
+	end)
+	if ok and type(decoded) == "table" then
+		return decoded
+	end
+	return nil
+end
+
+local function fetchWeaoExploits()
+	local cache = ENV.Alleral_WeaoCache
+	if type(cache) == "table" and cache.fetchedAt and (tick() - cache.fetchedAt) < 300 and type(cache.data) == "table" then
+		return cache.data, cache.source
+	end
+
+	local headers = {
+		["User-Agent"] = "WEAO-3PService",
+		["Accept"] = "application/json",
+		["Cache-Control"] = "no-cache",
+	}
+
+	for _, apiUrl in ipairs(WEAO_API_URLS) do
+		local body, via = bootstrapHttpGet(apiUrl, headers)
+		local decoded = decodeJson(body)
+		if decoded then
+			ENV.Alleral_WeaoCache = { fetchedAt = tick(), data = decoded, source = apiUrl }
+			return decoded, apiUrl .. (via and (" (" .. via .. ")") or "")
+		end
+	end
+
+	if type(cache) == "table" and cache.data then
+		return cache.data, cache.source
+	end
+	return nil
+end
+
+local function formatWeaoEntry(entry)
+	if type(entry) ~= "table" then
+		return nil
+	end
+	return {
+		title = entry.title,
+		version = entry.version,
+		detected = entry.detected == true,
+		updateStatus = entry.updateStatus ~= false,
+		uncStatus = entry.uncStatus == true,
+		platform = entry.platform,
+		extype = entry.extype,
+		free = entry.free == true,
+		suncPercentage = tonumber(entry.suncPercentage),
+		uncPercentage = tonumber(entry.uncPercentage),
+	}
+end
+
+local function matchWeaoExploit(hints, exploits)
+	if type(exploits) ~= "table" then
+		return nil, 0
+	end
+
+	local keys = {}
+	local function addKey(key, weight)
+		key = normalizeSlug(key)
+		if key ~= "" then
+			keys[key] = math.max(keys[key] or 0, weight)
+		end
+	end
+
+	addKey(hints.rawName, 90)
+	addKey(hints.slug, 85)
+	addKey(inferSlugFromText(hints.rawName), 88)
+	for _, envSlug in ipairs(hints.envSlugs or {}) do
+		addKey(envSlug, 75)
+	end
+
+	local best, bestScore = nil, 0
+	for _, entry in ipairs(exploits) do
+		if type(entry) == "table" and type(entry.title) == "string" then
+			local titleKey = normalizeSlug(entry.title)
+			local score = 0
+			for key, weight in pairs(keys) do
+				if titleKey == key then
+					score = math.max(score, weight + 10)
+				elseif titleKey:find(key, 1, true) or key:find(titleKey, 1, true) then
+					score = math.max(score, weight - 10)
+				end
+			end
+			if score > bestScore then
+				bestScore = score
+				best = entry
+			end
+		end
+	end
+
+	return bestScore >= 70 and best or nil, bestScore
+end
+
+local function detectEnvSlugs()
+	local slugs = {}
+	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
+	local function add(slug, ok)
+		if ok then
+			table.insert(slugs, slug)
+		end
+	end
+
+	add("volt", type(ENV.Volt) == "table" and type(ENV.Volt.request) == "function")
+	add("synapse", type(ENV.syn) == "table" and type(ENV.syn.request) == "function")
+	add("krnl", ENV.KRNL_LOADED == true)
+	add("fluxus", type(ENV.fluxus) == "table")
+	add("xeno", type(ENV.Xeno) == "table")
+	add("wave", type(ENV.Wave) == "table")
+	add("electron", type(ENV.Electron) == "table")
+	add("solara", type(ENV.Solara) == "table" or (sharedEnv and type(sharedEnv.solara) == "table"))
+	add("potassium", type(ENV.Potassium) == "table")
+	add("velocity", type(ENV.Velocity) == "table")
+	add("codex", type(ENV.Codex) == "table")
+	add("hydrogen", type(ENV.Hydrogen) == "table")
+	add("delta", type(ENV.delta) == "table")
+	add("celery", type(ENV.celery) == "table")
+	add("jjsploit", ENV.IS_JJSLOIT == true or type(ENV.jjsploit) == "table")
+
+	return slugs
+end
+
+local function localDetectExecutor()
 	local rawName = ""
-	for _, id in ipairs({ "identifyexecutor", "getexecutorname", "whatexecutor", "getexecutor" }) do
+	for _, id in ipairs({ "identifyexecutor", "getexecutorname", "whatexecutor", "getexecutor", "getexecutorinfo" }) do
 		local fn = firstExecFunc(id)
 		if fn then
 			local ok, result, version = pcall(fn)
@@ -91,40 +362,62 @@ local function detectExecutorProfile()
 		end
 	end
 
-	local slug = normalizeSlug(rawName)
-	if slug == "" or slug == "unknown" then
-		if type(ENV.Volt) == "table" and type(ENV.Volt.request) == "function" then
-			slug = "volt"
-		elseif type(ENV.syn) == "table" and type(ENV.syn.request) == "function" then
-			slug = "synapse"
-		elseif ENV.KRNL_LOADED then
-			slug = "krnl"
-		elseif type(ENV.fluxus) == "table" then
-			slug = "fluxus"
-		elseif type(ENV.Xeno) == "table" then
-			slug = "xeno"
-		elseif type(ENV.Wave) == "table" then
-			slug = "wave"
-		elseif type(ENV.Electron) == "table" then
-			slug = "electron"
-		elseif type(ENV.Solara) == "table" or (ENV.shared and ENV.shared.solara) then
-			slug = "solara"
-		else
-			slug = "unknown"
-		end
+	local envSlugs = detectEnvSlugs()
+	local slug = inferSlugFromText(rawName) or normalizeSlug(rawName)
+	if slug == "" and #envSlugs > 0 then
+		slug = envSlugs[1]
+	end
+	if slug == "" then
+		slug = "unknown"
 	end
 
 	local display = rawName ~= "" and rawName or slug:sub(1, 1):upper() .. slug:sub(2)
-	if slug == "synapsez" then
-		display = "Synapse Z"
-	elseif slug == "volt" and display:lower():find("volt", 1, true) == nil then
-		display = "Volt"
-	end
-
-	return { slug = slug, name = display, rawName = rawName }
+	return { slug = slug, name = display, rawName = rawName, envSlugs = envSlugs }
 end
 
-local EXECUTOR = detectExecutorProfile()
+local function resolveExecutorProfile()
+	local localProfile = localDetectExecutor()
+	local exploits, weaoSource = fetchWeaoExploits()
+	local weaoEntry, weaoScore = matchWeaoExploit(localProfile, exploits)
+	local weao = formatWeaoEntry(weaoEntry)
+
+	local profile = {
+		slug = localProfile.slug,
+		name = localProfile.name,
+		rawName = localProfile.rawName,
+		envSlugs = localProfile.envSlugs,
+		weao = weao,
+		weaoSource = weaoSource,
+		weaoVerified = weao ~= nil,
+	}
+
+	if weao and weao.title then
+		profile.slug = normalizeSlug(weao.title)
+		if profile.slug == "synapse" and (localProfile.rawName:lower():find("z", 1, true) or normalizeSlug(localProfile.rawName) == "synapsez") then
+			profile.slug = "synapsez"
+		end
+		profile.name = weao.title
+		if weao.version and weao.version ~= "" then
+			profile.name = weao.title .. " " .. weao.version
+		end
+		log(string.format(
+			"Executor: %s (WEAO match %d%%, via %s)",
+			profile.name,
+			weaoScore,
+			tostring(weaoSource or "cache")
+		))
+	elseif #localProfile.envSlugs > 0 then
+		profile.slug = localProfile.envSlugs[1]
+		profile.name = profile.slug:sub(1, 1):upper() .. profile.slug:sub(2)
+		log("Executor: " .. profile.name .. " (env fingerprint, WEAO unavailable)", true)
+	else
+		log("Executor: " .. profile.name .. " (local detect, WEAO unavailable)", true)
+	end
+
+	return profile
+end
+
+local EXECUTOR = resolveExecutorProfile()
 
 -- Per-executor HTTP transport order (first = preferred for that injector)
 local HTTP_STRATEGIES = {
@@ -148,35 +441,6 @@ local HTTP_STRATEGIES = {
 	jjsploit = { "httpget", "request", "httpservice" },
 	default = { "request", "httpget", "httpservice" },
 }
-
-local function extractResponseBody(response)
-	if type(response) == "string" then
-		return response
-	end
-	if type(response) == "table" then
-		return response.Body or response.body or response.Data or response.data
-	end
-	return nil
-end
-
-local function requestVia(fn, url)
-	if type(fn) ~= "function" then
-		return nil
-	end
-	for _, spec in ipairs({
-		{ Url = url, Method = "GET", Headers = { ["Cache-Control"] = "no-cache" } },
-		{ url = url, method = "GET", headers = { ["Cache-Control"] = "no-cache" } },
-	}) do
-		local ok, res = pcall(fn, spec)
-		if ok then
-			local body = extractResponseBody(res)
-			if type(body) == "string" and #body > 0 then
-				return body
-			end
-		end
-	end
-	return nil
-end
 
 local function buildHttpTransports(slug)
 	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
@@ -289,6 +553,7 @@ local HTTP_TRANSPORTS = buildHttpTransports(EXECUTOR.slug)
 local CAPABILITIES = {
 	executor = EXECUTOR.name,
 	executorSlug = EXECUTOR.slug,
+	weaoVerified = EXECUTOR.weaoVerified == true,
 	loadstring = loadStringFn ~= nil,
 	readfile = readFile ~= nil,
 }
@@ -684,7 +949,13 @@ local function main()
 		return
 	end
 
-	log("Game: " .. profile.name .. " | executor=" .. EXECUTOR.name .. " (" .. EXECUTOR.slug .. ")")
+	log(string.format(
+		"Game: %s | executor=%s (%s)%s",
+		profile.name,
+		EXECUTOR.name,
+		EXECUTOR.slug,
+		EXECUTOR.weaoVerified and " · WEAO" or ""
+	))
 
 	if profile.preload then
 		local ready, preloadErr = profile.preload()
@@ -764,7 +1035,12 @@ ENV.Alleral_Reload = function()
 end
 
 ENV.Alleral_LoaderInfo = function()
-	return { version = LOADER_VERSION, capabilities = CAPABILITIES, games = GAMES }
+	return {
+		version = LOADER_VERSION,
+		capabilities = CAPABILITIES,
+		executor = EXECUTOR,
+		games = GAMES,
+	}
 end
 
 print("[Alleral] v" .. LOADER_VERSION .. " | PlaceId " .. tostring(game.PlaceId) .. " | executor=" .. EXECUTOR.slug)
