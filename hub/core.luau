@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "2.7.1"
+Core.VERSION = "2.7.2"
 Core.UI_LIBRARY = "Alleral"
 Core.ALLERAL_UI_VERSION = "2.0.0-alleral-v2"
 Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
@@ -4273,8 +4273,8 @@ function Core.createStubUiGroup(label)
 		for key, value in pairs(fields or {}) do
 			status.LastValues[key] = tostring(value)
 		end
-		function status:Update() end
-		function status:SetVisible() end
+		status.Update = function() end
+		status.SetVisible = function() end
 		return status
 	end
 	return stub

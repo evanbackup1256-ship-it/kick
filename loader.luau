@@ -3,13 +3,14 @@ local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 60
 local CORE_MIN_BYTES = 50000
+local CORE_EXPECTED_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
 
 local RELEASE_FALLBACK = {
 	loader = "7.6.0",
-	core = "2.7.1",
+	core = "2.7.2",
 	ui = "Alleral",
 	analytics = "1.2",
 	telemetry = "3.2",
@@ -997,33 +998,49 @@ local function coreVersionOk(v)
 	return type(v) == "string" and compareVersions(v, MIN_CORE) >= 0
 end
 
+local function compileCoreSource(src, label)
+	if type(loadStringFn) ~= "function" then
+		return true
+	end
+	local fn, err = loadStringFn(src, label or "Alleral/core-check")
+	if type(fn) == "function" then
+		return true
+	end
+	return false, err
+end
+
 local function coreValid(src)
-	if type(src) ~= "string" or #src < CORE_MIN_BYTES or not src:find("loadUi", 1, true) then
+	if type(src) ~= "string" or #src < CORE_EXPECTED_MIN_BYTES or not src:find("loadUi", 1, true) then
 		return false
 	end
 	if not src:find("buildUiGroup", 1, true) or not src:find("buildUiWindow", 1, true) then
+		return false
+	end
+	if not src:find("ENV%.Alleral_Core = Core", 1, true) then
 		return false
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
 	if not coreVersionOk(ver) then
 		return false
 	end
-	if not loadStringFn then
-		return true
-	end
-	local fn = loadStringFn(src, "Alleral/core-check")
-	return type(fn) == "function"
+	return compileCoreSource(src)
 end
 
 local function coreRejectReason(src)
 	if type(src) ~= "string" or src == "" then
 		return "empty response"
 	end
-	if #src < CORE_MIN_BYTES then
-		return tostring(#src) .. "b, need " .. tostring(CORE_MIN_BYTES) .. "b+"
+	if #src < CORE_EXPECTED_MIN_BYTES then
+		return tostring(#src) .. "b, need " .. tostring(CORE_EXPECTED_MIN_BYTES) .. "b+"
 	end
 	if not src:find("loadUi", 1, true) then
 		return "missing loadUi"
+	end
+	if not src:find("buildUiGroup", 1, true) or not src:find("buildUiWindow", 1, true) then
+		return "missing UI helpers"
+	end
+	if not src:find("ENV%.Alleral_Core = Core", 1, true) then
+		return "truncated core"
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
 	if not coreVersionOk(ver) then
@@ -1033,9 +1050,9 @@ local function coreRejectReason(src)
 		return "invalid lua"
 	end
 	if loadStringFn then
-		local fn = loadStringFn(src, "Alleral/core-check")
-		if type(fn) ~= "function" then
-			return "compile failed"
+		local ok, err = compileCoreSource(src)
+		if not ok then
+			return "compile failed: " .. tostring(err)
 		end
 	end
 	return "unknown"
@@ -1093,14 +1110,23 @@ end
 local function loadCore()
 	ENV.Alleral_Core = nil
 
-	local src, label = readLocal({ HUB .. "/core.luau", "core/alleral_core.luau", "alleral_core.luau" }, CORE_MIN_BYTES)
+	local src, path = readLocal({ HUB .. "/core.luau", "core/alleral_core.luau", "alleral_core.luau" }, CORE_EXPECTED_MIN_BYTES)
+	local label
+	if not src then
+		src, path = readLocal({ ".alleral/cache/" .. HUB .. "/core.luau" }, CORE_EXPECTED_MIN_BYTES)
+		if src then
+			label = "cache:" .. tostring(path or (".alleral/cache/" .. HUB .. "/core.luau"))
+		end
+	end
 	if src and not coreValid(src) then
-		log("Removing broken/outdated core at " .. tostring(label), true)
-		deleteWorkspaceFile(label)
+		log("Removing broken core at " .. tostring(path or label), true)
+		deleteWorkspaceFile(HUB .. "/core.luau")
+		deleteWorkspaceFile(".alleral/cache/" .. HUB .. "/core.luau")
 		src = nil
+		label = nil
 	end
 	if src and coreValid(src) then
-		label = "local:" .. label
+		label = label or ("local:" .. tostring(path or HUB .. "/core.luau"))
 	else
 		src, label = fetchCoreRemote()
 		if not src then
@@ -1116,6 +1142,8 @@ local function loadCore()
 	if not ENV.Alleral_Core or type(ENV.Alleral_Core.loadUi) ~= "function" then
 		return false, "Core did not initialize"
 	end
+	cacheRemote(HUB .. "/core.luau", src)
+	cacheRemote(".alleral/cache/" .. HUB .. "/core.luau", src)
 	log("Core v" .. tostring(ENV.Alleral_Core.VERSION) .. " from " .. label)
 	return true
 end
@@ -1958,7 +1986,24 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 		return true
 	end
 
-	return foundVersion ~= expectedVersion
+	if foundVersion ~= expectedVersion then
+		if entry.expectedKey == "core" and entry.isValid and entry.isValid(src) then
+			return false
+		end
+		if entry.expectedKey == "helpers" and type(src) == "string" and #src > 500 and src:find("return", 1, true) then
+			return false
+		end
+		if entry.gameId then
+			for _, profile in ipairs(GAMES) do
+				if profile.id == entry.gameId and gameScriptValid(src, profile) then
+					return false
+				end
+			end
+		end
+		return true
+	end
+
+	return false
 end
 
 local function isLegacyAlleralLoader(src)
@@ -2496,8 +2541,8 @@ local function main()
 	installGlobalBootstrap()
 	markSupportedPlaces()
 
-	purgeOutdatedWorkspace()
-	local expectedVersions = ENV._Alleral_ExpectedVersions or fetchExpectedVersions()
+	local expectedVersions = fetchExpectedVersions()
+	ENV._Alleral_ExpectedVersions = expectedVersions
 	if expectedVersions.minLoader and versionLt(LOADER_VERSION, expectedVersions.minLoader) then
 		local msg = "Loader v"
 			.. LOADER_VERSION
@@ -2709,6 +2754,7 @@ local function main()
 	end
 
 	wireTelemetry(profile)
+	purgeOutdatedWorkspace()
 	recordInstalledVersions()
 	checkForRemoteUpdate(profile, true)
 	startAutoUpdater(profile)
