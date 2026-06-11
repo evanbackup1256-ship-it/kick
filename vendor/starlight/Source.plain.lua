@@ -123,22 +123,50 @@ function Util.list(padding, horizontal, parent)
 	return layout
 end
 
+function Util.fontFace(weight)
+	weight = weight or Enum.FontWeight.Medium
+	local ok, font = pcall(function()
+		return Font.new("rbxassetid://12187365364", weight)
+	end)
+	if ok and font then
+		return font
+	end
+	if weight == Enum.FontWeight.SemiBold or weight == Enum.FontWeight.Bold then
+		return Enum.Font.GothamBold
+	end
+	return Enum.Font.GothamMedium
+end
+
+function Util.divider(parent, theme, layoutOrder)
+	local t = theme and theme.Transparency
+	return Util.new("Frame", {
+		BackgroundColor3 = (theme and theme.Miscellaneous.Divider) or Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = (t and t.Divider) or 0.9,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 0, 1),
+		LayoutOrder = layoutOrder,
+	}, { parent })
+end
+
 function Util.text(props)
 	local label = Util.new("TextLabel", {
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Font = props.Font or Enum.Font.GothamMedium,
+		FontFace = props.FontFace or Util.fontFace(props.FontWeight or Enum.FontWeight.Medium),
+		Font = props.Font,
 		Text = props.Text or "",
-		TextColor3 = props.TextColor3 or Color3.fromRGB(235, 235, 240),
+		TextColor3 = props.TextColor3 or Color3.fromRGB(255, 255, 255),
+		TextTransparency = props.TextTransparency or 0,
 		TextSize = props.TextSize or 14,
 		TextXAlignment = props.TextXAlignment or Enum.TextXAlignment.Left,
 		TextYAlignment = props.TextYAlignment or Enum.TextYAlignment.Center,
 		TextWrapped = props.TextWrapped == true,
+		TextTruncate = props.TextTruncate,
 		RichText = props.RichText == true,
-		TextTransparency = 0,
 		Size = props.Size or UDim2.new(1, 0, 0, 20),
 		Position = props.Position,
 		LayoutOrder = props.LayoutOrder,
+		AutomaticSize = props.AutomaticSize,
 	})
 	if props.Parent then
 		label.Parent = props.Parent
@@ -167,7 +195,7 @@ function Util.inputBox(props)
 	local box = Util.new("TextBox", {
 		AutoButtonColor = false,
 		BackgroundColor3 = props.BackgroundColor3 or Color3.fromRGB(38, 38, 48),
-		BackgroundTransparency = 0,
+		BackgroundTransparency = props.BackgroundTransparency or 0,
 		BorderSizePixel = 0,
 		ClearTextOnFocus = props.ClearTextOnFocus == true,
 		Font = props.Font or Enum.Font.Gotham,
@@ -198,33 +226,61 @@ local Util = requireModule('util')
 
 local Theme = {}
 
--- Palettes inspired by Linoria (dark flat), Rayfield (accent glow), Fluent (clean hierarchy)
+Theme.Assets = {
+	Inter = "rbxassetid://12187365364",
+	ToggleBackground = "rbxassetid://18772190202",
+	ToggleHead = "rbxassetid://18772309008",
+	ButtonArrow = "rbxassetid://10709791437",
+	MoveIcon = "rbxassetid://10734900011",
+}
+
 Theme.Palettes = {
 	Alleral = {
-		Accent = Color3.fromRGB(76, 110, 245),
-		AccentSoft = Color3.fromRGB(106, 140, 255),
+		Accent = Color3.fromRGB(255, 255, 255),
+		AccentSoft = Color3.fromRGB(200, 200, 210),
 		Backgrounds = {
-			Dark = Color3.fromRGB(18, 18, 22),
-			Medium = Color3.fromRGB(24, 24, 30),
-			Light = Color3.fromRGB(32, 32, 40),
-			Groupbox = Color3.fromRGB(28, 28, 36),
-			Highlight = Color3.fromRGB(38, 38, 48),
-			Elevated = Color3.fromRGB(34, 34, 44),
+			Dark = Color3.fromRGB(15, 15, 15),
+			Medium = Color3.fromRGB(15, 15, 15),
+			Light = Color3.fromRGB(255, 255, 255),
+			Groupbox = Color3.fromRGB(255, 255, 255),
+			Highlight = Color3.fromRGB(255, 255, 255),
+			Elevated = Color3.fromRGB(15, 15, 15),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
-			Light = Color3.fromRGB(240, 240, 245),
-			Medium = Color3.fromRGB(160, 160, 175),
-			Dark = Color3.fromRGB(100, 100, 115),
-			MediumHover = Color3.fromRGB(200, 200, 210),
-			DarkHover = Color3.fromRGB(130, 130, 145),
+			Light = Color3.fromRGB(255, 255, 255),
+			Medium = Color3.fromRGB(255, 255, 255),
+			Dark = Color3.fromRGB(255, 255, 255),
+			MediumHover = Color3.fromRGB(255, 255, 255),
+			DarkHover = Color3.fromRGB(255, 255, 255),
 		},
 		Miscellaneous = {
-			Divider = Color3.fromRGB(50, 50, 62),
+			Divider = Color3.fromRGB(255, 255, 255),
 			Shadow = Color3.fromRGB(0, 0, 0),
-			Success = Color3.fromRGB(72, 199, 142),
-			Warning = Color3.fromRGB(255, 184, 77),
-			Danger = Color3.fromRGB(255, 96, 112),
+			TrafficClose = Color3.fromRGB(250, 93, 86),
+			TrafficMinimize = Color3.fromRGB(252, 190, 57),
+			TrafficMaximize = Color3.fromRGB(119, 174, 94),
+			ToggleOff = Color3.fromRGB(61, 61, 61),
+			ToggleOn = Color3.fromRGB(87, 86, 86),
+			ToggleHeadOff = Color3.fromRGB(91, 91, 91),
+			ToggleHeadOn = Color3.fromRGB(255, 255, 255),
+			Success = Color3.fromRGB(119, 174, 94),
+			Warning = Color3.fromRGB(252, 190, 57),
+			Danger = Color3.fromRGB(250, 93, 86),
+		},
+		Transparency = {
+			Title = 0.2,
+			Subtitle = 0.7,
+			Tab = 0.4,
+			TabActive = 0.2,
+			Label = 0.5,
+			LabelHover = 0.3,
+			Divider = 0.9,
+			Stroke = 0.9,
+			Section = 0.98,
+			SectionStroke = 0.95,
+			Input = 0.95,
+			Window = 0.05,
 		},
 	},
 	Midnight = {
@@ -232,11 +288,11 @@ Theme.Palettes = {
 		AccentSoft = Color3.fromRGB(192, 132, 252),
 		Backgrounds = {
 			Dark = Color3.fromRGB(12, 10, 18),
-			Medium = Color3.fromRGB(18, 16, 26),
-			Light = Color3.fromRGB(26, 22, 36),
-			Groupbox = Color3.fromRGB(22, 18, 32),
-			Highlight = Color3.fromRGB(36, 30, 52),
-			Elevated = Color3.fromRGB(30, 26, 44),
+			Medium = Color3.fromRGB(12, 10, 18),
+			Light = Color3.fromRGB(255, 255, 255),
+			Groupbox = Color3.fromRGB(255, 255, 255),
+			Highlight = Color3.fromRGB(34, 30, 48),
+			Elevated = Color3.fromRGB(18, 16, 26),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
@@ -247,11 +303,32 @@ Theme.Palettes = {
 			DarkHover = Color3.fromRGB(124, 116, 148),
 		},
 		Miscellaneous = {
-			Divider = Color3.fromRGB(48, 42, 68),
+			Divider = Color3.fromRGB(255, 255, 255),
 			Shadow = Color3.fromRGB(0, 0, 0),
+			TrafficClose = Color3.fromRGB(250, 93, 86),
+			TrafficMinimize = Color3.fromRGB(252, 190, 57),
+			TrafficMaximize = Color3.fromRGB(119, 174, 94),
+			ToggleOff = Color3.fromRGB(61, 61, 61),
+			ToggleOn = Color3.fromRGB(124, 58, 237),
+			ToggleHeadOff = Color3.fromRGB(91, 91, 91),
+			ToggleHeadOn = Color3.fromRGB(255, 255, 255),
 			Success = Color3.fromRGB(52, 211, 153),
 			Warning = Color3.fromRGB(251, 191, 36),
 			Danger = Color3.fromRGB(248, 113, 113),
+		},
+		Transparency = {
+			Title = 0.2,
+			Subtitle = 0.7,
+			Tab = 0.4,
+			TabActive = 0.15,
+			Label = 0.5,
+			LabelHover = 0.3,
+			Divider = 0.9,
+			Stroke = 0.9,
+			Section = 0.97,
+			SectionStroke = 0.92,
+			Input = 0.95,
+			Window = 0.05,
 		},
 	},
 	Aurora = {
@@ -259,11 +336,11 @@ Theme.Palettes = {
 		AccentSoft = Color3.fromRGB(94, 234, 212),
 		Backgrounds = {
 			Dark = Color3.fromRGB(10, 16, 18),
-			Medium = Color3.fromRGB(14, 22, 26),
-			Light = Color3.fromRGB(20, 30, 36),
-			Groupbox = Color3.fromRGB(16, 26, 30),
+			Medium = Color3.fromRGB(10, 16, 18),
+			Light = Color3.fromRGB(255, 255, 255),
+			Groupbox = Color3.fromRGB(255, 255, 255),
 			Highlight = Color3.fromRGB(24, 42, 48),
-			Elevated = Color3.fromRGB(22, 36, 42),
+			Elevated = Color3.fromRGB(14, 22, 26),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
@@ -274,11 +351,32 @@ Theme.Palettes = {
 			DarkHover = Color3.fromRGB(108, 142, 136),
 		},
 		Miscellaneous = {
-			Divider = Color3.fromRGB(36, 58, 64),
+			Divider = Color3.fromRGB(255, 255, 255),
 			Shadow = Color3.fromRGB(0, 0, 0),
+			TrafficClose = Color3.fromRGB(250, 93, 86),
+			TrafficMinimize = Color3.fromRGB(252, 190, 57),
+			TrafficMaximize = Color3.fromRGB(119, 174, 94),
+			ToggleOff = Color3.fromRGB(61, 61, 61),
+			ToggleOn = Color3.fromRGB(20, 184, 166),
+			ToggleHeadOff = Color3.fromRGB(91, 91, 91),
+			ToggleHeadOn = Color3.fromRGB(255, 255, 255),
 			Success = Color3.fromRGB(52, 211, 153),
 			Warning = Color3.fromRGB(251, 191, 36),
 			Danger = Color3.fromRGB(248, 113, 113),
+		},
+		Transparency = {
+			Title = 0.2,
+			Subtitle = 0.7,
+			Tab = 0.4,
+			TabActive = 0.15,
+			Label = 0.5,
+			LabelHover = 0.3,
+			Divider = 0.9,
+			Stroke = 0.9,
+			Section = 0.97,
+			SectionStroke = 0.92,
+			Input = 0.95,
+			Window = 0.05,
 		},
 	},
 	Rose = {
@@ -286,11 +384,11 @@ Theme.Palettes = {
 		AccentSoft = Color3.fromRGB(251, 182, 206),
 		Backgrounds = {
 			Dark = Color3.fromRGB(16, 10, 14),
-			Medium = Color3.fromRGB(24, 14, 20),
-			Light = Color3.fromRGB(34, 20, 28),
-			Groupbox = Color3.fromRGB(28, 16, 24),
+			Medium = Color3.fromRGB(16, 10, 14),
+			Light = Color3.fromRGB(255, 255, 255),
+			Groupbox = Color3.fromRGB(255, 255, 255),
 			Highlight = Color3.fromRGB(48, 24, 38),
-			Elevated = Color3.fromRGB(40, 22, 32),
+			Elevated = Color3.fromRGB(24, 14, 20),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
@@ -301,11 +399,32 @@ Theme.Palettes = {
 			DarkHover = Color3.fromRGB(142, 104, 124),
 		},
 		Miscellaneous = {
-			Divider = Color3.fromRGB(64, 36, 52),
+			Divider = Color3.fromRGB(255, 255, 255),
 			Shadow = Color3.fromRGB(0, 0, 0),
+			TrafficClose = Color3.fromRGB(250, 93, 86),
+			TrafficMinimize = Color3.fromRGB(252, 190, 57),
+			TrafficMaximize = Color3.fromRGB(119, 174, 94),
+			ToggleOff = Color3.fromRGB(61, 61, 61),
+			ToggleOn = Color3.fromRGB(219, 39, 119),
+			ToggleHeadOff = Color3.fromRGB(91, 91, 91),
+			ToggleHeadOn = Color3.fromRGB(255, 255, 255),
 			Success = Color3.fromRGB(52, 211, 153),
 			Warning = Color3.fromRGB(251, 191, 36),
 			Danger = Color3.fromRGB(248, 113, 113),
+		},
+		Transparency = {
+			Title = 0.2,
+			Subtitle = 0.7,
+			Tab = 0.4,
+			TabActive = 0.15,
+			Label = 0.5,
+			LabelHover = 0.3,
+			Divider = 0.9,
+			Stroke = 0.9,
+			Section = 0.97,
+			SectionStroke = 0.92,
+			Input = 0.95,
+			Window = 0.05,
 		},
 	},
 	Starlight = {
@@ -313,11 +432,11 @@ Theme.Palettes = {
 		AccentSoft = Color3.fromRGB(72, 98, 196),
 		Backgrounds = {
 			Dark = Color3.fromRGB(14, 15, 18),
-			Medium = Color3.fromRGB(20, 22, 28),
-			Light = Color3.fromRGB(28, 30, 38),
-			Groupbox = Color3.fromRGB(24, 26, 34),
+			Medium = Color3.fromRGB(14, 15, 18),
+			Light = Color3.fromRGB(255, 255, 255),
+			Groupbox = Color3.fromRGB(255, 255, 255),
 			Highlight = Color3.fromRGB(36, 40, 52),
-			Elevated = Color3.fromRGB(32, 35, 45),
+			Elevated = Color3.fromRGB(20, 22, 28),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
@@ -328,11 +447,32 @@ Theme.Palettes = {
 			DarkHover = Color3.fromRGB(118, 124, 142),
 		},
 		Miscellaneous = {
-			Divider = Color3.fromRGB(56, 60, 72),
+			Divider = Color3.fromRGB(255, 255, 255),
 			Shadow = Color3.fromRGB(0, 0, 0),
+			TrafficClose = Color3.fromRGB(250, 93, 86),
+			TrafficMinimize = Color3.fromRGB(252, 190, 57),
+			TrafficMaximize = Color3.fromRGB(119, 174, 94),
+			ToggleOff = Color3.fromRGB(61, 61, 61),
+			ToggleOn = Color3.fromRGB(99, 132, 255),
+			ToggleHeadOff = Color3.fromRGB(91, 91, 91),
+			ToggleHeadOn = Color3.fromRGB(255, 255, 255),
 			Success = Color3.fromRGB(72, 199, 142),
 			Warning = Color3.fromRGB(255, 184, 77),
 			Danger = Color3.fromRGB(255, 96, 112),
+		},
+		Transparency = {
+			Title = 0.2,
+			Subtitle = 0.7,
+			Tab = 0.4,
+			TabActive = 0.15,
+			Label = 0.5,
+			LabelHover = 0.3,
+			Divider = 0.9,
+			Stroke = 0.9,
+			Section = 0.97,
+			SectionStroke = 0.92,
+			Input = 0.95,
+			Window = 0.05,
 		},
 	},
 }
@@ -343,19 +483,22 @@ Theme.Visual = {
 	CornerRadius = 6,
 	GroupboxRadius = 8,
 	WindowTransparency = 0,
-	GroupboxTransparency = 0,
+	GroupboxTransparency = 0.98,
 	BlurEnabled = true,
 	BlurSize = 16,
 	AnimationSpeed = 1,
 	FontScale = 1,
 	CompactMode = false,
 	ShowShadows = true,
-	SidebarWidth = 210,
+	SidebarWidth = 0.325,
 }
 
 function Theme.current()
 	local palette = Util.deepCopy(Theme.Palettes[Theme.Visual.ThemeName] or Theme.Palettes.Alleral)
 	palette.Accent = Theme.Visual.Accent
+	if not palette.Transparency then
+		palette.Transparency = Theme.Palettes.Alleral.Transparency
+	end
 	return palette
 end
 
@@ -374,17 +517,9 @@ function Theme.setTheme(name)
 	end
 end
 
-function Theme.accentGradient()
-	local palette = Theme.current()
-	return ColorSequence.new({
-		ColorSequenceKeypoint.new(0, palette.Accent),
-		ColorSequenceKeypoint.new(1, palette.AccentSoft or palette.Accent),
-	})
-end
-
 function Theme.tweenInfo(time, style, direction)
 	local speed = Theme.Visual.AnimationSpeed
-	return TweenInfo.new((time or 0.2) / speed, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out)
+	return TweenInfo.new((time or 0.2) / speed, style or Enum.EasingStyle.Sine, direction or Enum.EasingDirection.Out)
 end
 
 return Theme
@@ -618,18 +753,29 @@ local Tween = requireModule('tween')
 
 local Notification = {}
 Notification._container = nil
-Notification._library = nil
 
 function Notification.init(gui, library)
 	Notification._library = library
 	Notification._container = Util.new("Frame", {
 		Name = "Notifications",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(0, 300, 1, -40),
-		Position = UDim2.new(1, -320, 0, 20),
+		Size = UDim2.fromScale(1, 1),
 		ZIndex = 500,
 	}, { gui })
-	Util.list(8, false, Notification._container)
+
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 10)
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = Notification._container
+
+	local pad = Instance.new("UIPadding")
+	pad.PaddingBottom = UDim.new(0, 10)
+	pad.PaddingRight = UDim.new(0, 10)
+	pad.PaddingLeft = UDim.new(0, 10)
+	pad.PaddingTop = UDim.new(0, 10)
+	pad.Parent = Notification._container
 end
 
 function Notification.show(data)
@@ -637,70 +783,43 @@ function Notification.show(data)
 		return
 	end
 	local theme = Theme.current()
+	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 	data = data or {}
-	local layoutOrder = 0
-	for _, child in ipairs(Notification._container:GetChildren()) do
-		if child:IsA("GuiObject") then
-			layoutOrder += 1
-		end
-	end
 
 	local card = Util.new("Frame", {
 		Name = "Notification",
-		BackgroundColor3 = theme.Backgrounds.Elevated,
+		BackgroundColor3 = theme.Backgrounds.Dark,
 		BackgroundTransparency = 0,
-		Size = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.fromOffset(250, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		LayoutOrder = layoutOrder,
 		ZIndex = 500,
 	}, { Notification._container })
 	Util.corner(Theme.Visual.CornerRadius, card)
-	Util.stroke(theme.Miscellaneous.Divider, 1, 0.5, card)
-
-	local accent = Util.new("Frame", {
-		BackgroundColor3 = theme.Accent,
-		Size = UDim2.new(0, 3, 1, -12),
-		Position = UDim2.fromOffset(0, 6),
-	}, { card })
-	Util.corner(999, accent)
-
-	Util.padding(12, 14, 12, 18, card)
+	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, card)
+	Util.padding(14, 14, 14, 14, card)
 	Util.list(4, false, card)
 
-	local headerRow = Util.new("Frame", {
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 20),
-	}, { card })
-	Util.list(8, true, headerRow)
-
-	if not Util.isEmpty(data.Icon) then
-		Util.new("ImageLabel", {
-			BackgroundTransparency = 1,
-			Image = Util.iconAsset(data.Icon),
-			Size = UDim2.fromOffset(16, 16),
-			ImageColor3 = theme.Accent,
-			ImageTransparency = 0,
-		}, { headerRow })
-	end
-
 	Util.text({
-		Parent = headerRow,
+		Parent = card,
 		Text = data.Title or "Notification",
-		Font = Enum.Font.GothamBold,
+		FontWeight = Enum.FontWeight.SemiBold,
 		TextSize = 14 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Size = UDim2.new(1, -22, 1, 0),
+		TextTransparency = transp.Title,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
 	})
 
-	local body = Util.text({
+	Util.text({
 		Parent = card,
 		Text = data.Content or "",
 		TextWrapped = true,
 		TextSize = 13 * Theme.Visual.FontScale,
-		TextColor3 = theme.Foregrounds.Medium,
+		TextColor3 = theme.Foregrounds.Light,
+		TextTransparency = transp.Subtitle,
 		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
 	})
-	body.AutomaticSize = Enum.AutomaticSize.Y
 
 	local duration = data.Duration or math.clamp((#tostring(data.Content or "") * 0.08) + 3, 3, 12)
 	task.delay(duration, function()
@@ -741,7 +860,8 @@ function Elements.runCallback(windowSettings, label, callback, library)
 end
 
 function Elements.createRow(parent, settings, theme)
-	local height = Theme.Visual.CompactMode and 32 or 36
+	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
+	local height = Theme.Visual.CompactMode and 34 or 38
 	local row = Util.new("Frame", {
 		Name = settings.Name or "Row",
 		BackgroundTransparency = 1,
@@ -752,9 +872,15 @@ function Elements.createRow(parent, settings, theme)
 	local label = Util.text({
 		Parent = row,
 		Text = settings.Name or "",
+		FontWeight = Enum.FontWeight.Medium,
 		TextSize = 13 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Size = UDim2.new(1, -130, 1, 0),
+		TextTransparency = transp.Label,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.fromScale(0, 0.5),
+		Size = UDim2.new(1, -120, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
 	})
 	label.Name = "Header"
 
@@ -763,12 +889,12 @@ function Elements.createRow(parent, settings, theme)
 			BackgroundTransparency = 1,
 			Image = Util.iconAsset(settings.Icon),
 			Size = UDim2.fromOffset(14, 14),
-			Position = UDim2.fromOffset(0, 10),
-			ImageColor3 = theme.Accent,
-			ImageTransparency = 0,
+			Position = UDim2.fromOffset(0, 12),
+			ImageColor3 = theme.Foregrounds.Light,
+			ImageTransparency = transp.Label,
 		}, { row })
-		label.Position = UDim2.fromOffset(20, 0)
-		label.Size = UDim2.new(1, -150, 1, 0)
+		label.Position = UDim2.fromOffset(20, 0.5)
+		label.Size = UDim2.new(1, -140, 0, 0)
 	end
 
 	local slot = Util.new("Frame", {
@@ -792,48 +918,59 @@ function Elements.createRow(parent, settings, theme)
 	return row, label, slot, dropdownHolder
 end
 
+function Elements.glassBox(parent, theme, size)
+	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
+	local box = Util.new("Frame", {
+		BackgroundColor3 = theme.Backgrounds.Light,
+		BackgroundTransparency = transp.Input,
+		Size = size or UDim2.fromScale(1, 1),
+	}, { parent })
+	Util.corner(4, box)
+	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, box)
+	return box
+end
+
 function Elements.createToggle(groupbox, settings, index, windowSettings, library)
 	local theme = Theme.current()
-	local element = {
-		Class = "Toggle",
-		Values = settings,
-		NestedElements = {},
-	}
+	local element = { Class = "Toggle", Values = settings, NestedElements = {} }
 	settings.CurrentValue = settings.CurrentValue == true
 	settings.Callback = settings.Callback or function() end
 
-	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
+	local row, label = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
+	local slot = row:FindFirstChild("ElementContainer")
 
-	local track = Util.new("Frame", {
-		BackgroundColor3 = theme.Backgrounds.Highlight,
-		Size = UDim2.fromOffset(42, 22),
+	local toggleBtn = Util.new("ImageButton", {
+		AutoButtonColor = false,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.fromScale(1, 0.5),
+		Size = UDim2.fromOffset(41, 21),
+		BackgroundTransparency = 1,
+		Image = Theme.Assets.ToggleBackground,
+		ImageColor3 = theme.Miscellaneous.ToggleOff,
 	}, { slot })
-	Util.corner(999, track)
 
-	local knob = Util.new("Frame", {
-		BackgroundColor3 = theme.Foregrounds.Active,
-		Size = UDim2.fromOffset(16, 16),
-		Position = UDim2.fromOffset(3, 3),
-	}, { track })
-	Util.corner(999, knob)
+	local head = Util.new("ImageLabel", {
+		Name = "TogglerHead",
+		BackgroundTransparency = 1,
+		Image = Theme.Assets.ToggleHead,
+		ImageColor3 = theme.Miscellaneous.ToggleHeadOff,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.fromOffset(15, 15),
+		ZIndex = 2,
+	}, { toggleBtn })
 
 	local function paint(on)
-		track.BackgroundColor3 = on and theme.Accent or theme.Backgrounds.Highlight
-		knob.Position = on and UDim2.fromOffset(23, 3) or UDim2.fromOffset(3, 3)
-		Tween.play(track, { BackgroundColor3 = on and theme.Accent or theme.Backgrounds.Highlight }, nil, Theme.tweenInfo(0.12))
-		Tween.play(knob, { Position = knob.Position }, nil, Theme.tweenInfo(0.12))
+		toggleBtn.ImageColor3 = on and theme.Miscellaneous.ToggleOn or theme.Miscellaneous.ToggleOff
+		head.ImageColor3 = on and theme.Miscellaneous.ToggleHeadOn or theme.Miscellaneous.ToggleHeadOff
+		head.Position = on and UDim2.new(1, 0, 0.5, 0) or UDim2.new(0.5, 0, 0.5, 0)
+		Tween.play(toggleBtn, { ImageColor3 = toggleBtn.ImageColor3 }, nil, Theme.tweenInfo(0.2))
+		Tween.play(head, { ImageColor3 = head.ImageColor3, Position = head.Position }, nil, Theme.tweenInfo(0.2))
 	end
 	paint(settings.CurrentValue)
 
-	local button = Util.button({
-		Parent = row,
-		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundTransparency = 1,
-		Radius = 0,
-	})
-	button.ZIndex = 5
-	button.MouseButton1Click:Connect(function()
+	toggleBtn.MouseButton1Click:Connect(function()
 		settings.CurrentValue = not settings.CurrentValue
 		paint(settings.CurrentValue)
 		Elements.runCallback(windowSettings, settings.Name or "Toggle", function()
@@ -850,7 +987,6 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 		label.Text = settings.Name or label.Text
 		paint(settings.CurrentValue == true)
 	end
-
 	function element:Destroy()
 		row:Destroy()
 	end
@@ -861,6 +997,7 @@ end
 
 function Elements.createSlider(groupbox, settings, index, windowSettings, library)
 	local theme = Theme.current()
+	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 	local element = { Class = "Slider", Values = settings, NestedElements = {} }
 	local minValue = settings.Range and settings.Range[1] or 0
 	local maxValue = settings.Range and settings.Range[2] or 100
@@ -872,48 +1009,48 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		return Util.clamp(minValue + steps * increment, minValue, maxValue)
 	end
 
-	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
+	local row, label = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
+	local slot = row:FindFirstChild("ElementContainer")
 	slot.Size = UDim2.fromOffset(150, 26)
 
+	local valueBox = Util.new("TextBox", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.fromScale(1, 0.5),
+		Size = UDim2.fromOffset(41, 21),
+		BackgroundColor3 = theme.Backgrounds.Light,
+		BackgroundTransparency = transp.Input,
+		BorderSizePixel = 0,
+		FontFace = Util.fontFace(Enum.FontWeight.Medium),
+		Text = tostring(settings.CurrentValue),
+		TextColor3 = theme.Foregrounds.Light,
+		TextTransparency = 0.4,
+		TextSize = 12 * Theme.Visual.FontScale,
+		ClearTextOnFocus = false,
+	}, { slot })
+	Util.corner(4, valueBox)
+	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, valueBox)
+
 	local bar = Util.new("Frame", {
-		BackgroundColor3 = theme.Backgrounds.Highlight,
-		Size = UDim2.new(1, -40, 0, 5),
+		BackgroundColor3 = theme.Miscellaneous.ToggleOff,
+		Size = UDim2.new(1, -48, 0, 4),
 		Position = UDim2.new(0, 0, 0.5, -2),
 	}, { slot })
 	Util.corner(999, bar)
 
 	local fill = Util.new("Frame", {
-		BackgroundColor3 = theme.Accent,
+		BackgroundColor3 = theme.Foregrounds.Light,
+		BackgroundTransparency = 0.5,
 		Size = UDim2.new(0, 0, 1, 0),
 	}, { bar })
 	Util.corner(999, fill)
-
-	local thumb = Util.new("Frame", {
-		BackgroundColor3 = theme.Foregrounds.Active,
-		Size = UDim2.fromOffset(10, 10),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0, 0, 0.5, 0),
-	}, { bar })
-	Util.corner(999, thumb)
-
-	local valueLabel = Util.text({
-		Parent = slot,
-		Text = tostring(settings.CurrentValue),
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextSize = 12 * Theme.Visual.FontScale,
-		TextColor3 = theme.Foregrounds.Medium,
-		Size = UDim2.fromOffset(36, 26),
-		Position = UDim2.new(1, -36, 0, 0),
-	})
 
 	local dragging = false
 	local function setValue(raw, fire)
 		settings.CurrentValue = snapValue(raw)
 		local alpha = (settings.CurrentValue - minValue) / math.max(maxValue - minValue, increment)
 		fill.Size = UDim2.new(alpha, 0, 1, 0)
-		thumb.Position = UDim2.new(alpha, 0, 0.5, 0)
-		valueLabel.Text = tostring(settings.CurrentValue)
+		valueBox.Text = tostring(settings.CurrentValue)
 		if fire and settings.Callback then
 			Elements.runCallback(windowSettings, settings.Name or "Slider", function()
 				settings.Callback(settings.CurrentValue)
@@ -921,11 +1058,6 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		end
 	end
 	setValue(settings.CurrentValue, false)
-
-	local function updateFromInput(input)
-		local rel = Util.clamp((input.Position.X - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X, 1), 0, 1)
-		setValue(minValue + (maxValue - minValue) * rel, dragging)
-	end
 
 	local hit = Util.button({
 		Parent = bar,
@@ -952,7 +1084,8 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 			return
 		end
 		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			updateFromInput(input)
+			local rel = Util.clamp((input.Position.X - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X, 1), 0, 1)
+			setValue(minValue + (maxValue - minValue) * rel, dragging)
 		end
 	end)
 
@@ -972,7 +1105,6 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		label.Text = settings.Name or label.Text
 		setValue(settings.CurrentValue, false)
 	end
-
 	function element:Destroy()
 		row:Destroy()
 	end
@@ -983,35 +1115,56 @@ end
 
 function Elements.createButton(groupbox, settings, index, windowSettings, library)
 	local theme = Theme.current()
+	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 	local element = { Class = "Button", Values = settings, NestedElements = {} }
-	local row = Util.button({
-		Parent = groupbox.ParentingItem,
-		BackgroundColor3 = theme.Backgrounds.Highlight,
-		Size = UDim2.new(1, 0, 0, Theme.Visual.CompactMode and 30 or 34),
-		Radius = Theme.Visual.CornerRadius,
-	})
+
+	local row = Util.new("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, Theme.Visual.CompactMode and 34 or 38),
+	}, { groupbox.ParentingItem })
 	element.Instance = row
-	Util.text({
-		Parent = row,
+
+	local btn = Util.new("TextButton", {
+		AutoButtonColor = false,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		Text = "",
+	}, { row })
+
+	local label = Util.text({
+		Parent = btn,
 		Text = settings.Name or "Button",
-		TextXAlignment = Enum.TextXAlignment.Center,
+		FontWeight = Enum.FontWeight.Medium,
 		TextSize = 13 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Size = UDim2.fromScale(1, 1),
+		TextTransparency = transp.Label,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Size = UDim2.new(1, -20, 1, 0),
 	})
-	row.MouseEnter:Connect(function()
-		Tween.play(row, { BackgroundColor3 = theme.Accent }, nil, Theme.tweenInfo(0.1))
+
+	Util.new("ImageLabel", {
+		BackgroundTransparency = 1,
+		Image = Theme.Assets.ButtonArrow,
+		ImageTransparency = transp.Label,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.fromScale(1, 0.5),
+		Size = UDim2.fromOffset(15, 15),
+	}, { btn })
+
+	btn.MouseEnter:Connect(function()
+		label.TextTransparency = transp.LabelHover
 	end)
-	row.MouseLeave:Connect(function()
-		Tween.play(row, { BackgroundColor3 = theme.Backgrounds.Highlight }, nil, Theme.tweenInfo(0.1))
+	btn.MouseLeave:Connect(function()
+		label.TextTransparency = transp.Label
 	end)
-	row.MouseButton1Click:Connect(function()
+	btn.MouseButton1Click:Connect(function()
 		Elements.runCallback(windowSettings, settings.Name or "Button", settings.Callback or function() end, library)
 	end)
 
 	function element:Set(newSettings)
 		element.Values = Util.merge(element.Values, newSettings)
-		row:FindFirstChildOfClass("TextLabel").Text = element.Values.Name or "Button"
+		label.Text = element.Values.Name or "Button"
 	end
 	function element:Destroy()
 		row:Destroy()
@@ -1022,23 +1175,28 @@ end
 
 function Elements.createInput(groupbox, settings, index, windowSettings, library)
 	local theme = Theme.current()
+	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 	local element = { Class = "Input", Values = settings, NestedElements = {} }
 	settings.CurrentValue = settings.CurrentValue or settings.Placeholder or ""
 
-	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
+	local row, label = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
+	local slot = row:FindFirstChild("ElementContainer")
 	slot.Size = UDim2.fromOffset(160, 26)
 
 	local box = Util.inputBox({
 		Parent = slot,
-		BackgroundColor3 = theme.Backgrounds.Highlight,
+		BackgroundColor3 = theme.Backgrounds.Light,
+		BackgroundTransparency = transp.Input,
 		PlaceholderText = settings.PlaceholderText or settings.Placeholder or "",
 		Text = settings.CurrentValue,
 		TextColor3 = theme.Foregrounds.Light,
+		TextTransparency = 0.4,
 		TextSize = 13 * Theme.Visual.FontScale,
 		ClearTextOnFocus = settings.RemoveTextOnFocus == true,
-		Radius = 6,
+		Radius = 4,
 	})
+	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, box)
 	Util.padding(0, 8, 0, 8, box)
 
 	box.FocusLost:Connect(function()
@@ -1103,9 +1261,10 @@ end
 
 function Elements.createDivider(groupbox)
 	local theme = Theme.current()
+	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 	local line = Util.new("Frame", {
 		BackgroundColor3 = theme.Miscellaneous.Divider,
-		BackgroundTransparency = 0,
+		BackgroundTransparency = transp.Divider,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, 1),
 	}, { groupbox.ParentingItem })
@@ -1120,6 +1279,7 @@ end
 
 function Elements.createParagraph(groupbox, settings, index)
 	local theme = Theme.current()
+	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 	local element = { Class = "Paragraph", Values = settings, NestedElements = {} }
 	local frame = Util.new("Frame", {
 		BackgroundTransparency = 1,
@@ -1130,18 +1290,21 @@ function Elements.createParagraph(groupbox, settings, index)
 	Util.text({
 		Parent = frame,
 		Text = settings.Name or settings.Title or "",
-		Font = Enum.Font.GothamBold,
-		TextSize = 14 * Theme.Visual.FontScale,
+		FontWeight = Enum.FontWeight.SemiBold,
+		TextSize = 16 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
+		TextTransparency = transp.Tab,
 	})
 	Util.text({
 		Parent = frame,
 		Text = settings.Content or settings.Description or "",
 		TextWrapped = true,
 		TextSize = 13 * Theme.Visual.FontScale,
-		TextColor3 = theme.Foregrounds.Medium,
+		TextColor3 = theme.Foregrounds.Light,
+		TextTransparency = transp.Subtitle,
 		Size = UDim2.new(1, 0, 0, 0),
-	}).AutomaticSize = Enum.AutomaticSize.Y
+		AutomaticSize = Enum.AutomaticSize.Y,
+	})
 	element.Instance = frame
 	function element:Set(newSettings)
 		element.Values = Util.merge(element.Values, newSettings)
@@ -1155,6 +1318,7 @@ end
 
 function Elements.createDropdown(groupbox, settings, index, windowSettings, parentElement, holderOverride, library)
 	local theme = Theme.current()
+	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 	local element = { Class = "Dropdown", Values = settings, NestedElements = {} }
 	settings.Options = settings.Options or settings.Values or {}
 	settings.Callback = settings.Callback or function() end
@@ -1191,31 +1355,27 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 
 	local closed = Util.button({
 		Parent = parentFrame,
-		BackgroundColor3 = theme.Backgrounds.Highlight,
+		BackgroundColor3 = theme.Backgrounds.Light,
+		BackgroundTransparency = transp.Input,
 		Size = UDim2.fromScale(1, 1),
-		Radius = 6,
+		Radius = 4,
 	})
+	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, closed)
+
 	local valueText = Util.text({
 		Parent = closed,
 		Text = "",
 		TextSize = 12 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Size = UDim2.new(1, -28, 1, 0),
-	})
-	Util.text({
-		Parent = closed,
-		Text = "▼",
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextSize = 10,
-		TextColor3 = theme.Foregrounds.Medium,
-		Size = UDim2.new(1, -8, 1, 0),
+		TextTransparency = 0.4,
+		Size = UDim2.new(1, -24, 1, 0),
 	})
 	Util.padding(0, 8, 0, 8, closed)
 
 	local popupRoot = library and (library._screenGui or library._popupRoot) or parentFrame
 	local popup = Util.new("ScrollingFrame", {
 		Name = "DropdownPopup",
-		BackgroundColor3 = theme.Backgrounds.Elevated,
+		BackgroundColor3 = theme.Backgrounds.Dark,
 		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		Size = UDim2.fromOffset(200, 180),
@@ -1223,14 +1383,14 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		Visible = false,
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollBarThickness = 3,
-		ScrollBarImageColor3 = theme.Accent,
+		ScrollBarThickness = 1,
+		ScrollBarImageTransparency = 0.5,
 		ZIndex = 300,
 		ClipsDescendants = true,
 	}, { popupRoot })
 	Util.corner(6, popup)
 	local popupLayout = Util.list(2, false, popup)
-	Util.stroke(theme.Miscellaneous.Divider, 1, 0.4, popup)
+	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, popup)
 	Util.padding(4, 4, 4, 4, popup)
 
 	local openDropdowns = library and library._openDropdowns
@@ -1293,7 +1453,8 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 			local opt = Util.button({
 				Name = "Option",
 				Parent = popup,
-				BackgroundColor3 = selected and theme.Accent or theme.Backgrounds.Light,
+				BackgroundColor3 = theme.Backgrounds.Light,
+				BackgroundTransparency = selected and 0.9 or 0.98,
 				Size = UDim2.new(1, -4, 0, 28),
 				Radius = 4,
 			})
@@ -1304,16 +1465,9 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 				Text = tostring(option),
 				TextSize = 12 * Theme.Visual.FontScale,
 				TextColor3 = theme.Foregrounds.Light,
+				TextTransparency = selected and 0.2 or 0.5,
 				Size = UDim2.fromScale(1, 1),
 			})
-			opt.MouseEnter:Connect(function()
-				if not selected then
-					opt.BackgroundColor3 = theme.Backgrounds.Highlight
-				end
-			end)
-			opt.MouseLeave:Connect(function()
-				opt.BackgroundColor3 = selected and theme.Accent or theme.Backgrounds.Light
-			end)
 			opt.MouseButton1Click:Connect(function()
 				if settings.Multi then
 					local found = table.find(settings.CurrentOptions, option)
@@ -1463,21 +1617,25 @@ end
 
 function Elements.createBind(groupbox, settings, index, windowSettings, parentElement, slot)
 	local theme = Theme.current()
+	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 	local element = { Class = "Bind", Values = settings, NestedElements = {} }
 	settings.CurrentValue = settings.CurrentValue or "None"
 	local bindButton = Util.button({
 		Parent = slot or groupbox.ParentingItem,
-		BackgroundColor3 = theme.Backgrounds.Highlight,
+		BackgroundColor3 = theme.Backgrounds.Light,
+		BackgroundTransparency = transp.Input,
 		Size = UDim2.fromOffset(80, 24),
-		Radius = 6,
+		Radius = 4,
 	})
+	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, bindButton)
 	element.Instance = bindButton
 	Util.text({
 		Parent = bindButton,
 		Text = tostring(settings.CurrentValue),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextSize = 12,
-		TextColor3 = theme.Foregrounds.Medium,
+		TextColor3 = theme.Foregrounds.Light,
+		TextTransparency = 0.4,
 		Size = UDim2.fromScale(1, 1),
 	})
 	local listening = false
@@ -1582,7 +1740,6 @@ end
 local function parentGui(screenGui)
 	local coreGui = game:GetService("CoreGui")
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-
 	protectGui(screenGui)
 	local ok = pcall(function()
 		screenGui.Parent = coreGui
@@ -1590,19 +1747,33 @@ local function parentGui(screenGui)
 	if ok and screenGui.Parent then
 		return
 	end
-
-	ok = pcall(function()
+	pcall(function()
 		screenGui.Parent = playerGui
 	end)
-	if ok and screenGui.Parent then
-		return
-	end
-
-	if typeof(gethui) == "function" then
+	if not screenGui.Parent and typeof(gethui) == "function" then
 		pcall(function()
 			screenGui.Parent = gethui()
 		end)
 	end
+end
+
+local function trafficLight(parent, color, enabled, onClick)
+	local btn = Util.new("TextButton", {
+		AutoButtonColor = false,
+		BackgroundColor3 = color,
+		BackgroundTransparency = enabled and 0 or 1,
+		BorderSizePixel = 0,
+		Size = enabled and UDim2.fromOffset(8, 8) or UDim2.fromOffset(7, 7),
+		Text = "",
+	}, { parent })
+	Util.corner(999, btn)
+	if not enabled then
+		Util.stroke(Color3.fromRGB(255, 255, 255), 1, 0.9, btn)
+	end
+	if onClick then
+		btn.MouseButton1Click:Connect(onClick)
+	end
+	return btn
 end
 
 function WindowBuilder.create(library, windowSettings)
@@ -1610,6 +1781,7 @@ function WindowBuilder.create(library, windowSettings)
 	windowSettings.NotifyOnCallbackError = windowSettings.NotifyOnCallbackError ~= false
 
 	local theme = Theme.current()
+	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 
 	if windowSettings.FileSettings then
 		library.FileSystem:BuildFolderTree(windowSettings.FileSettings)
@@ -1647,163 +1819,187 @@ function WindowBuilder.create(library, windowSettings)
 	local main = Util.new("Frame", {
 		Name = "MainWindow",
 		BackgroundColor3 = theme.Backgrounds.Medium,
-		BackgroundTransparency = 0,
+		BackgroundTransparency = Theme.Visual.BlurEnabled and transp.Window or 0,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = windowSettings.DefaultSize or UDim2.fromOffset(868, 598),
+		Size = windowSettings.DefaultSize or UDim2.fromOffset(868, 650),
 		Visible = false,
 		ClipsDescendants = true,
 	}, { screenGui })
 	Util.corner(10, main)
-	Util.stroke(theme.Miscellaneous.Divider, 1, 0.35, main)
+	Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.Stroke, main)
 
 	local sidebar = Util.new("Frame", {
 		Name = "Sidebar",
-		BackgroundColor3 = theme.Backgrounds.Dark,
-		BackgroundTransparency = 0,
-		Size = UDim2.new(0, Theme.Visual.SidebarWidth, 1, 0),
-	}, { main })
-	Util.padding(14, 12, 14, 12, sidebar)
-	Util.list(10, false, sidebar)
-
-	local brand = Util.new("Frame", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 48),
-		LayoutOrder = 0,
-	}, { sidebar })
-	Util.list(6, true, brand)
+		Size = UDim2.fromScale(Theme.Visual.SidebarWidth, 1),
+	}, { main })
 
-	if not Util.isEmpty(windowSettings.Icon) then
-		Util.new("ImageLabel", {
-			BackgroundTransparency = 1,
-			Image = Util.iconAsset(windowSettings.Icon),
-			Size = UDim2.fromOffset(24, 24),
-			ImageColor3 = theme.Accent,
-			ImageTransparency = 0,
-		}, { brand })
+	Util.new("Frame", {
+		Name = "Divider",
+		BackgroundColor3 = theme.Miscellaneous.Divider,
+		BackgroundTransparency = transp.Divider,
+		BorderSizePixel = 0,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.new(0, 1, 1, 0),
+	}, { sidebar })
+
+	local windowControls = Util.new("Frame", {
+		Name = "WindowControls",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 31),
+	}, { sidebar })
+	local controls = Util.new("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+	}, { windowControls })
+	Util.list(5, true, controls)
+	Util.padding(0, 0, 0, 11, controls)
+
+	local function setVisible(state)
+		window.Visible = state
+		main.Visible = state
+		setBlur(state)
 	end
 
-	local brandText = Util.new("Frame", {
+	trafficLight(controls, theme.Miscellaneous.TrafficClose, true, function()
+		setVisible(false)
+	end)
+	trafficLight(controls, theme.Miscellaneous.TrafficMinimize, true, function()
+		setVisible(false)
+	end)
+	trafficLight(controls, theme.Miscellaneous.TrafficMaximize, false)
+
+	Util.new("Frame", {
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		BackgroundColor3 = theme.Miscellaneous.Divider,
+		BackgroundTransparency = transp.Divider,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 0, 1),
+	}, { windowControls })
+
+	local information = Util.new("Frame", {
+		Name = "Information",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, -30, 1, 0),
-	}, { brand })
-	Util.list(2, false, brandText)
+		Position = UDim2.fromOffset(0, 31),
+		Size = UDim2.new(1, 0, 0, 60),
+	}, { sidebar })
+	Util.padding(10, 22, 10, 23, information)
 
 	Util.text({
-		Parent = brandText,
+		Parent = information,
 		Text = windowSettings.Name or "Alleral",
-		Font = Enum.Font.GothamBold,
-		TextSize = 17 * Theme.Visual.FontScale,
+		FontWeight = Enum.FontWeight.SemiBold,
+		TextSize = 20 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
+		TextTransparency = transp.Title,
+		Size = UDim2.new(1, -20, 0, 24),
 	})
 	Util.text({
-		Parent = brandText,
+		Parent = information,
 		Text = windowSettings.Subtitle or "Interface Suite",
-		TextSize = 11 * Theme.Visual.FontScale,
-		TextColor3 = theme.Foregrounds.Medium,
+		FontWeight = Enum.FontWeight.Medium,
+		TextSize = 12 * Theme.Visual.FontScale,
+		TextColor3 = theme.Foregrounds.Light,
+		TextTransparency = transp.Subtitle,
+		Position = UDim2.fromOffset(0, 26),
+		Size = UDim2.new(1, -20, 0, 18),
 	})
 
 	Util.new("Frame", {
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
 		BackgroundColor3 = theme.Miscellaneous.Divider,
+		BackgroundTransparency = transp.Divider,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, 1),
-		LayoutOrder = 1,
+	}, { information })
+
+	local sidebarGroup = Util.new("Frame", {
+		Name = "SidebarGroup",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 91),
+		Size = UDim2.new(1, 0, 1, -91),
 	}, { sidebar })
+	Util.padding(31, 10, 17, 10, sidebarGroup)
 
 	local navHolder = Util.new("ScrollingFrame", {
 		Name = "Navigation",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 1, -100),
-		LayoutOrder = 2,
+		Size = UDim2.new(1, 0, 1, -40),
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollBarThickness = 0,
+		ScrollBarThickness = 1,
+		ScrollBarImageTransparency = 0.8,
 		BorderSizePixel = 0,
-	}, { sidebar })
-	Util.list(6, false, navHolder)
+	}, { sidebarGroup })
+	Util.list(17, false, navHolder)
+	Util.padding(0, 0, 15, 0, navHolder)
 
 	Util.text({
-		Parent = sidebar,
+		Parent = sidebarGroup,
 		Text = "Press " .. (library.WindowKeybind or "K") .. " to toggle",
 		TextSize = 11 * Theme.Visual.FontScale,
-		TextColor3 = theme.Foregrounds.Dark,
+		TextColor3 = theme.Foregrounds.Light,
+		TextTransparency = 0.7,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
 		Size = UDim2.new(1, 0, 0, 16),
-		LayoutOrder = 3,
 	})
-
-	local divider = Util.new("Frame", {
-		Name = "Divider",
-		BackgroundColor3 = theme.Miscellaneous.Divider,
-		BorderSizePixel = 0,
-		Position = UDim2.new(0, Theme.Visual.SidebarWidth, 0, 0),
-		Size = UDim2.new(0, 1, 1, 0),
-	}, { main })
 
 	local content = Util.new("Frame", {
 		Name = "Content",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, Theme.Visual.SidebarWidth + 1, 0, 0),
-		Size = UDim2.new(1, -(Theme.Visual.SidebarWidth + 1), 1, 0),
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.fromScale(1 - Theme.Visual.SidebarWidth, 1),
 	}, { main })
 
 	local topBar = Util.new("Frame", {
-		Name = "TopBar",
-		BackgroundColor3 = theme.Backgrounds.Medium,
-		BackgroundTransparency = 0,
-		Size = UDim2.new(1, 0, 0, 42),
+		Name = "Topbar",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 63),
 	}, { content })
+	Util.padding(0, 20, 0, 20, topBar)
 
 	local titleLabel = Util.text({
 		Parent = topBar,
 		Text = "Home",
-		Font = Enum.Font.GothamBold,
-		TextSize = 16 * Theme.Visual.FontScale,
+		FontWeight = Enum.FontWeight.SemiBold,
+		TextSize = 15 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
-		Position = UDim2.fromOffset(16, 0),
-		Size = UDim2.new(1, -130, 1, 0),
+		TextTransparency = 0.5,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.fromScale(0, 0.5),
+		Size = UDim2.new(1, -40, 0, 20),
 	})
 
-	local controls = Util.new("Frame", {
+	local moveIcon = Util.new("ImageButton", {
+		Name = "MoveIcon",
+		Image = Theme.Assets.MoveIcon,
+		ImageTransparency = 0.5,
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -12, 0.5, 0),
-		Size = UDim2.fromOffset(72, 26),
+		Position = UDim2.fromScale(1, 0.5),
+		Size = UDim2.fromOffset(15, 15),
 	}, { topBar })
-	Util.list(6, true, controls)
-
-	local function controlButton(text, color)
-		local btn = Util.button({
-			Parent = controls,
-			Size = UDim2.fromOffset(26, 26),
-			BackgroundColor3 = theme.Backgrounds.Highlight,
-			Radius = 6,
-		})
-		Util.text({
-			Parent = btn,
-			Text = text,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextSize = 15,
-			TextColor3 = color or theme.Foregrounds.Light,
-			Size = UDim2.fromScale(1, 1),
-		})
-		return btn
-	end
-
-	local minimizeBtn = controlButton("−")
-	local closeBtn = controlButton("×", theme.Miscellaneous.Danger)
 
 	Util.new("Frame", {
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
 		BackgroundColor3 = theme.Miscellaneous.Divider,
+		BackgroundTransparency = transp.Divider,
 		BorderSizePixel = 0,
-		Position = UDim2.new(0, 0, 1, -1),
 		Size = UDim2.new(1, 0, 0, 1),
 	}, { topBar })
 
 	local pages = Util.new("Frame", {
 		Name = "Pages",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 0, 0, 42),
-		Size = UDim2.new(1, 0, 1, -42),
+		Position = UDim2.new(0, 0, 0, 63),
+		Size = UDim2.new(1, 0, 1, -63),
 	}, { content })
 
 	local window = {
@@ -1818,14 +2014,16 @@ function WindowBuilder.create(library, windowSettings)
 	local dragStart
 	local startPos
 
-	topBar.InputBegan:Connect(function(input)
+	local function onDragStart(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 			dragStart = input.Position
 			startPos = main.Position
 		end
-	end)
-	topBar.InputEnded:Connect(function(input)
+	end
+
+	moveIcon.InputBegan:Connect(onDragStart)
+	moveIcon.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = false
 		end
@@ -1844,19 +2042,6 @@ function WindowBuilder.create(library, windowSettings)
 			startPos.Y.Scale,
 			startPos.Y.Offset + delta.Y
 		)
-	end)
-
-	local function setVisible(state)
-		window.Visible = state
-		main.Visible = state
-		setBlur(state)
-	end
-
-	closeBtn.MouseButton1Click:Connect(function()
-		setVisible(false)
-	end)
-	minimizeBtn.MouseButton1Click:Connect(function()
-		setVisible(false)
 	end)
 
 	library.Minimized = false
@@ -1884,14 +2069,15 @@ function WindowBuilder.create(library, windowSettings)
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 		}, { navHolder })
-		Util.list(4, false, sectionFrame)
 
 		if name and name ~= "" then
+			Util.divider(sectionFrame, theme)
 			Util.text({
 				Parent = sectionFrame,
 				Text = string.upper(name),
 				TextSize = 10 * Theme.Visual.FontScale,
-				TextColor3 = theme.Foregrounds.Dark,
+				TextColor3 = theme.Foregrounds.Light,
+				TextTransparency = 0.6,
 				Size = UDim2.new(1, 0, 0, 14),
 			})
 		end
@@ -1902,6 +2088,7 @@ function WindowBuilder.create(library, windowSettings)
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 		}, { sectionFrame })
+		Util.list(0, false, tabsFrame)
 
 		function section:CreateTab(tabSettings, tabIndex)
 			tabSettings = tabSettings or {}
@@ -1915,26 +2102,14 @@ function WindowBuilder.create(library, windowSettings)
 
 			local navButton = Util.button({
 				Parent = tabsFrame,
-				BackgroundColor3 = theme.Backgrounds.Dark,
-				BackgroundTransparency = 0,
-				Size = UDim2.new(1, 0, 0, 32),
+				BackgroundColor3 = theme.Backgrounds.Light,
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, -21, 0, 40),
 				Radius = 6,
 			})
-
-			local indicator = Util.new("Frame", {
-				Name = "Indicator",
-				BackgroundColor3 = theme.Accent,
-				Size = UDim2.new(0, 3, 1, -10),
-				Position = UDim2.fromOffset(0, 5),
-				BackgroundTransparency = 1,
-			}, { navButton })
-
-			local navRow = Util.new("Frame", {
-				BackgroundTransparency = 1,
-				Size = UDim2.fromScale(1, 1),
-			}, { navButton })
-			Util.list(8, true, navRow)
-			Util.padding(0, 10, 0, 14, navRow)
+			local navStroke = Util.stroke(Color3.fromRGB(255, 255, 255), 1, 1, navButton)
+			Util.padding(1, 35, 0, 24, navButton)
+			Util.list(9, true, navButton)
 
 			local navIcon
 			if not Util.isEmpty(tabSettings.Icon) then
@@ -1942,17 +2117,20 @@ function WindowBuilder.create(library, windowSettings)
 					BackgroundTransparency = 1,
 					Image = Util.iconAsset(tabSettings.Icon),
 					Size = UDim2.fromOffset(16, 16),
-					ImageColor3 = theme.Foregrounds.Medium,
-					ImageTransparency = 0,
-				}, { navRow })
+					ImageColor3 = theme.Foregrounds.Light,
+					ImageTransparency = transp.Tab,
+				}, { navButton })
 			end
 
 			local navLabel = Util.text({
-				Parent = navRow,
+				Parent = navButton,
 				Text = tabSettings.Name or tabIndex,
-				TextSize = 13 * Theme.Visual.FontScale,
-				TextColor3 = theme.Foregrounds.Medium,
-				Size = UDim2.new(1, 0, 1, 0),
+				FontWeight = Enum.FontWeight.SemiBold,
+				TextSize = 16 * Theme.Visual.FontScale,
+				TextColor3 = theme.Foregrounds.Light,
+				TextTransparency = transp.Tab,
+				Size = UDim2.new(1, 0, 0, 20),
+				AutomaticSize = Enum.AutomaticSize.Y,
 			})
 
 			local page = Util.new("ScrollingFrame", {
@@ -1961,12 +2139,12 @@ function WindowBuilder.create(library, windowSettings)
 				Size = UDim2.fromScale(1, 1),
 				CanvasSize = UDim2.new(),
 				AutomaticCanvasSize = Enum.AutomaticSize.Y,
-				ScrollBarThickness = 3,
-				ScrollBarImageColor3 = theme.Accent,
+				ScrollBarThickness = 1,
+				ScrollBarImageTransparency = 0.5,
 				BorderSizePixel = 0,
 				Visible = false,
 			}, { pages })
-			Util.padding(14, 14, 14, 14, page)
+			Util.padding(5, 3, 15, 11, page)
 
 			local columns = tabSettings.Columns or 2
 			local columnsFrame = Util.new("Frame", {
@@ -1975,25 +2153,25 @@ function WindowBuilder.create(library, windowSettings)
 				Size = UDim2.new(1, 0, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 			}, { page })
-			Util.list(12, true, columnsFrame)
+			Util.list(15, true, columnsFrame)
 
 			local columnFrames = {}
 			for i = 1, columns do
 				columnFrames[i] = Util.new("Frame", {
 					Name = "Column" .. i,
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1 / columns, -6, 0, 0),
+					Size = UDim2.new(1 / columns, -10, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 				}, { columnsFrame })
-				Util.list(10, false, columnFrames[i])
+				Util.list(15, false, columnFrames[i])
 			end
 
 			local function styleNav(active)
-				indicator.BackgroundTransparency = active and 0 or 1
-				navButton.BackgroundColor3 = active and theme.Backgrounds.Highlight or theme.Backgrounds.Dark
-				navLabel.TextColor3 = active and theme.Foregrounds.Light or theme.Foregrounds.Medium
+				navButton.BackgroundTransparency = active and transp.Section or 1
+				navStroke.Transparency = active and transp.SectionStroke or 1
+				navLabel.TextTransparency = active and transp.TabActive or transp.Tab
 				if navIcon then
-					navIcon.ImageColor3 = active and theme.Accent or theme.Foregrounds.Medium
+					navIcon.ImageTransparency = active and transp.TabActive or transp.Tab
 				end
 			end
 
@@ -2047,58 +2225,35 @@ function WindowBuilder.create(library, windowSettings)
 				local box = Util.new("Frame", {
 					Name = groupIndex,
 					BackgroundColor3 = theme.Backgrounds.Groupbox,
-					BackgroundTransparency = 0,
+					BackgroundTransparency = transp.Section,
 					Size = UDim2.new(1, 0, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 				}, { holder })
 				Util.corner(Theme.Visual.GroupboxRadius, box)
-				if Theme.Visual.ShowShadows then
-					Util.stroke(theme.Miscellaneous.Divider, 1, 0.55, box)
-				end
-				Util.padding(12, 12, 12, 12, box)
-				Util.list(8, false, box)
-
-				local header = Util.new("Frame", {
-					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 0, 20),
-					LayoutOrder = 1,
-				}, { box })
-				Util.list(6, true, header)
-
-				if not Util.isEmpty(groupSettings.Icon) then
-					Util.new("ImageLabel", {
-						BackgroundTransparency = 1,
-						Image = Util.iconAsset(groupSettings.Icon),
-						Size = UDim2.fromOffset(14, 14),
-						ImageColor3 = theme.Accent,
-						ImageTransparency = 0,
-					}, { header })
-				end
+				Util.stroke(Color3.fromRGB(255, 255, 255), 1, transp.SectionStroke, box)
+				Util.padding(22, 18, 20, 20, box)
+				Util.list(10, false, box)
 
 				Util.text({
-					Parent = header,
+					Parent = box,
 					Text = groupSettings.Name or groupIndex,
-					Font = Enum.Font.GothamBold,
-					TextSize = 13 * Theme.Visual.FontScale,
-					TextColor3 = theme.Accent,
-					Size = UDim2.new(1, 0, 1, 0),
+					FontWeight = Enum.FontWeight.SemiBold,
+					TextSize = 16 * Theme.Visual.FontScale,
+					TextColor3 = theme.Foregrounds.Light,
+					TextTransparency = transp.Tab,
+					Size = UDim2.new(1, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					LayoutOrder = 1,
 				})
-
-				Util.new("Frame", {
-					BackgroundColor3 = theme.Miscellaneous.Divider,
-					BorderSizePixel = 0,
-					Size = UDim2.new(1, 0, 0, 1),
-					LayoutOrder = 2,
-				}, { box })
 
 				local parentingItem = Util.new("Frame", {
 					Name = "Elements",
 					BackgroundTransparency = 1,
 					Size = UDim2.new(1, 0, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
-					LayoutOrder = 3,
+					LayoutOrder = 2,
 				}, { box })
-				Util.list(6, false, parentingItem)
+				Util.list(10, false, parentingItem)
 
 				groupbox.Instance = box
 				groupbox.ParentingItem = parentingItem
@@ -2198,14 +2353,6 @@ function WindowBuilder.create(library, windowSettings)
 						Theme.Visual.CompactMode = value
 					end,
 				}, "Compact")
-
-				groupbox:CreateToggle({
-					Name = "Soft shadows",
-					CurrentValue = Theme.Visual.ShowShadows,
-					Callback = function(value)
-						Theme.Visual.ShowShadows = value
-					end,
-				}, "Shadows")
 
 				return themeGroup
 			end

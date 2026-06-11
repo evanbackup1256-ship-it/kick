@@ -113,22 +113,50 @@ function Util.list(padding, horizontal, parent)
 	return layout
 end
 
+function Util.fontFace(weight)
+	weight = weight or Enum.FontWeight.Medium
+	local ok, font = pcall(function()
+		return Font.new("rbxassetid://12187365364", weight)
+	end)
+	if ok and font then
+		return font
+	end
+	if weight == Enum.FontWeight.SemiBold or weight == Enum.FontWeight.Bold then
+		return Enum.Font.GothamBold
+	end
+	return Enum.Font.GothamMedium
+end
+
+function Util.divider(parent, theme, layoutOrder)
+	local t = theme and theme.Transparency
+	return Util.new("Frame", {
+		BackgroundColor3 = (theme and theme.Miscellaneous.Divider) or Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = (t and t.Divider) or 0.9,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 0, 1),
+		LayoutOrder = layoutOrder,
+	}, { parent })
+end
+
 function Util.text(props)
 	local label = Util.new("TextLabel", {
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Font = props.Font or Enum.Font.GothamMedium,
+		FontFace = props.FontFace or Util.fontFace(props.FontWeight or Enum.FontWeight.Medium),
+		Font = props.Font,
 		Text = props.Text or "",
-		TextColor3 = props.TextColor3 or Color3.fromRGB(235, 235, 240),
+		TextColor3 = props.TextColor3 or Color3.fromRGB(255, 255, 255),
+		TextTransparency = props.TextTransparency or 0,
 		TextSize = props.TextSize or 14,
 		TextXAlignment = props.TextXAlignment or Enum.TextXAlignment.Left,
 		TextYAlignment = props.TextYAlignment or Enum.TextYAlignment.Center,
 		TextWrapped = props.TextWrapped == true,
+		TextTruncate = props.TextTruncate,
 		RichText = props.RichText == true,
-		TextTransparency = 0,
 		Size = props.Size or UDim2.new(1, 0, 0, 20),
 		Position = props.Position,
 		LayoutOrder = props.LayoutOrder,
+		AutomaticSize = props.AutomaticSize,
 	})
 	if props.Parent then
 		label.Parent = props.Parent
@@ -157,7 +185,7 @@ function Util.inputBox(props)
 	local box = Util.new("TextBox", {
 		AutoButtonColor = false,
 		BackgroundColor3 = props.BackgroundColor3 or Color3.fromRGB(38, 38, 48),
-		BackgroundTransparency = 0,
+		BackgroundTransparency = props.BackgroundTransparency or 0,
 		BorderSizePixel = 0,
 		ClearTextOnFocus = props.ClearTextOnFocus == true,
 		Font = props.Font or Enum.Font.Gotham,

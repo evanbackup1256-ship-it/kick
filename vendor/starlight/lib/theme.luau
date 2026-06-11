@@ -2,33 +2,61 @@ local Util = require(script.Parent.util)
 
 local Theme = {}
 
--- Palettes inspired by Linoria (dark flat), Rayfield (accent glow), Fluent (clean hierarchy)
+Theme.Assets = {
+	Inter = "rbxassetid://12187365364",
+	ToggleBackground = "rbxassetid://18772190202",
+	ToggleHead = "rbxassetid://18772309008",
+	ButtonArrow = "rbxassetid://10709791437",
+	MoveIcon = "rbxassetid://10734900011",
+}
+
 Theme.Palettes = {
 	Alleral = {
-		Accent = Color3.fromRGB(76, 110, 245),
-		AccentSoft = Color3.fromRGB(106, 140, 255),
+		Accent = Color3.fromRGB(255, 255, 255),
+		AccentSoft = Color3.fromRGB(200, 200, 210),
 		Backgrounds = {
-			Dark = Color3.fromRGB(18, 18, 22),
-			Medium = Color3.fromRGB(24, 24, 30),
-			Light = Color3.fromRGB(32, 32, 40),
-			Groupbox = Color3.fromRGB(28, 28, 36),
-			Highlight = Color3.fromRGB(38, 38, 48),
-			Elevated = Color3.fromRGB(34, 34, 44),
+			Dark = Color3.fromRGB(15, 15, 15),
+			Medium = Color3.fromRGB(15, 15, 15),
+			Light = Color3.fromRGB(255, 255, 255),
+			Groupbox = Color3.fromRGB(255, 255, 255),
+			Highlight = Color3.fromRGB(255, 255, 255),
+			Elevated = Color3.fromRGB(15, 15, 15),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
-			Light = Color3.fromRGB(240, 240, 245),
-			Medium = Color3.fromRGB(160, 160, 175),
-			Dark = Color3.fromRGB(100, 100, 115),
-			MediumHover = Color3.fromRGB(200, 200, 210),
-			DarkHover = Color3.fromRGB(130, 130, 145),
+			Light = Color3.fromRGB(255, 255, 255),
+			Medium = Color3.fromRGB(255, 255, 255),
+			Dark = Color3.fromRGB(255, 255, 255),
+			MediumHover = Color3.fromRGB(255, 255, 255),
+			DarkHover = Color3.fromRGB(255, 255, 255),
 		},
 		Miscellaneous = {
-			Divider = Color3.fromRGB(50, 50, 62),
+			Divider = Color3.fromRGB(255, 255, 255),
 			Shadow = Color3.fromRGB(0, 0, 0),
-			Success = Color3.fromRGB(72, 199, 142),
-			Warning = Color3.fromRGB(255, 184, 77),
-			Danger = Color3.fromRGB(255, 96, 112),
+			TrafficClose = Color3.fromRGB(250, 93, 86),
+			TrafficMinimize = Color3.fromRGB(252, 190, 57),
+			TrafficMaximize = Color3.fromRGB(119, 174, 94),
+			ToggleOff = Color3.fromRGB(61, 61, 61),
+			ToggleOn = Color3.fromRGB(87, 86, 86),
+			ToggleHeadOff = Color3.fromRGB(91, 91, 91),
+			ToggleHeadOn = Color3.fromRGB(255, 255, 255),
+			Success = Color3.fromRGB(119, 174, 94),
+			Warning = Color3.fromRGB(252, 190, 57),
+			Danger = Color3.fromRGB(250, 93, 86),
+		},
+		Transparency = {
+			Title = 0.2,
+			Subtitle = 0.7,
+			Tab = 0.4,
+			TabActive = 0.2,
+			Label = 0.5,
+			LabelHover = 0.3,
+			Divider = 0.9,
+			Stroke = 0.9,
+			Section = 0.98,
+			SectionStroke = 0.95,
+			Input = 0.95,
+			Window = 0.05,
 		},
 	},
 	Midnight = {
@@ -36,11 +64,11 @@ Theme.Palettes = {
 		AccentSoft = Color3.fromRGB(192, 132, 252),
 		Backgrounds = {
 			Dark = Color3.fromRGB(12, 10, 18),
-			Medium = Color3.fromRGB(18, 16, 26),
-			Light = Color3.fromRGB(26, 22, 36),
-			Groupbox = Color3.fromRGB(22, 18, 32),
-			Highlight = Color3.fromRGB(36, 30, 52),
-			Elevated = Color3.fromRGB(30, 26, 44),
+			Medium = Color3.fromRGB(12, 10, 18),
+			Light = Color3.fromRGB(255, 255, 255),
+			Groupbox = Color3.fromRGB(255, 255, 255),
+			Highlight = Color3.fromRGB(34, 30, 48),
+			Elevated = Color3.fromRGB(18, 16, 26),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
@@ -51,11 +79,32 @@ Theme.Palettes = {
 			DarkHover = Color3.fromRGB(124, 116, 148),
 		},
 		Miscellaneous = {
-			Divider = Color3.fromRGB(48, 42, 68),
+			Divider = Color3.fromRGB(255, 255, 255),
 			Shadow = Color3.fromRGB(0, 0, 0),
+			TrafficClose = Color3.fromRGB(250, 93, 86),
+			TrafficMinimize = Color3.fromRGB(252, 190, 57),
+			TrafficMaximize = Color3.fromRGB(119, 174, 94),
+			ToggleOff = Color3.fromRGB(61, 61, 61),
+			ToggleOn = Color3.fromRGB(124, 58, 237),
+			ToggleHeadOff = Color3.fromRGB(91, 91, 91),
+			ToggleHeadOn = Color3.fromRGB(255, 255, 255),
 			Success = Color3.fromRGB(52, 211, 153),
 			Warning = Color3.fromRGB(251, 191, 36),
 			Danger = Color3.fromRGB(248, 113, 113),
+		},
+		Transparency = {
+			Title = 0.2,
+			Subtitle = 0.7,
+			Tab = 0.4,
+			TabActive = 0.15,
+			Label = 0.5,
+			LabelHover = 0.3,
+			Divider = 0.9,
+			Stroke = 0.9,
+			Section = 0.97,
+			SectionStroke = 0.92,
+			Input = 0.95,
+			Window = 0.05,
 		},
 	},
 	Aurora = {
@@ -63,11 +112,11 @@ Theme.Palettes = {
 		AccentSoft = Color3.fromRGB(94, 234, 212),
 		Backgrounds = {
 			Dark = Color3.fromRGB(10, 16, 18),
-			Medium = Color3.fromRGB(14, 22, 26),
-			Light = Color3.fromRGB(20, 30, 36),
-			Groupbox = Color3.fromRGB(16, 26, 30),
+			Medium = Color3.fromRGB(10, 16, 18),
+			Light = Color3.fromRGB(255, 255, 255),
+			Groupbox = Color3.fromRGB(255, 255, 255),
 			Highlight = Color3.fromRGB(24, 42, 48),
-			Elevated = Color3.fromRGB(22, 36, 42),
+			Elevated = Color3.fromRGB(14, 22, 26),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
@@ -78,11 +127,32 @@ Theme.Palettes = {
 			DarkHover = Color3.fromRGB(108, 142, 136),
 		},
 		Miscellaneous = {
-			Divider = Color3.fromRGB(36, 58, 64),
+			Divider = Color3.fromRGB(255, 255, 255),
 			Shadow = Color3.fromRGB(0, 0, 0),
+			TrafficClose = Color3.fromRGB(250, 93, 86),
+			TrafficMinimize = Color3.fromRGB(252, 190, 57),
+			TrafficMaximize = Color3.fromRGB(119, 174, 94),
+			ToggleOff = Color3.fromRGB(61, 61, 61),
+			ToggleOn = Color3.fromRGB(20, 184, 166),
+			ToggleHeadOff = Color3.fromRGB(91, 91, 91),
+			ToggleHeadOn = Color3.fromRGB(255, 255, 255),
 			Success = Color3.fromRGB(52, 211, 153),
 			Warning = Color3.fromRGB(251, 191, 36),
 			Danger = Color3.fromRGB(248, 113, 113),
+		},
+		Transparency = {
+			Title = 0.2,
+			Subtitle = 0.7,
+			Tab = 0.4,
+			TabActive = 0.15,
+			Label = 0.5,
+			LabelHover = 0.3,
+			Divider = 0.9,
+			Stroke = 0.9,
+			Section = 0.97,
+			SectionStroke = 0.92,
+			Input = 0.95,
+			Window = 0.05,
 		},
 	},
 	Rose = {
@@ -90,11 +160,11 @@ Theme.Palettes = {
 		AccentSoft = Color3.fromRGB(251, 182, 206),
 		Backgrounds = {
 			Dark = Color3.fromRGB(16, 10, 14),
-			Medium = Color3.fromRGB(24, 14, 20),
-			Light = Color3.fromRGB(34, 20, 28),
-			Groupbox = Color3.fromRGB(28, 16, 24),
+			Medium = Color3.fromRGB(16, 10, 14),
+			Light = Color3.fromRGB(255, 255, 255),
+			Groupbox = Color3.fromRGB(255, 255, 255),
 			Highlight = Color3.fromRGB(48, 24, 38),
-			Elevated = Color3.fromRGB(40, 22, 32),
+			Elevated = Color3.fromRGB(24, 14, 20),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
@@ -105,11 +175,32 @@ Theme.Palettes = {
 			DarkHover = Color3.fromRGB(142, 104, 124),
 		},
 		Miscellaneous = {
-			Divider = Color3.fromRGB(64, 36, 52),
+			Divider = Color3.fromRGB(255, 255, 255),
 			Shadow = Color3.fromRGB(0, 0, 0),
+			TrafficClose = Color3.fromRGB(250, 93, 86),
+			TrafficMinimize = Color3.fromRGB(252, 190, 57),
+			TrafficMaximize = Color3.fromRGB(119, 174, 94),
+			ToggleOff = Color3.fromRGB(61, 61, 61),
+			ToggleOn = Color3.fromRGB(219, 39, 119),
+			ToggleHeadOff = Color3.fromRGB(91, 91, 91),
+			ToggleHeadOn = Color3.fromRGB(255, 255, 255),
 			Success = Color3.fromRGB(52, 211, 153),
 			Warning = Color3.fromRGB(251, 191, 36),
 			Danger = Color3.fromRGB(248, 113, 113),
+		},
+		Transparency = {
+			Title = 0.2,
+			Subtitle = 0.7,
+			Tab = 0.4,
+			TabActive = 0.15,
+			Label = 0.5,
+			LabelHover = 0.3,
+			Divider = 0.9,
+			Stroke = 0.9,
+			Section = 0.97,
+			SectionStroke = 0.92,
+			Input = 0.95,
+			Window = 0.05,
 		},
 	},
 	Starlight = {
@@ -117,11 +208,11 @@ Theme.Palettes = {
 		AccentSoft = Color3.fromRGB(72, 98, 196),
 		Backgrounds = {
 			Dark = Color3.fromRGB(14, 15, 18),
-			Medium = Color3.fromRGB(20, 22, 28),
-			Light = Color3.fromRGB(28, 30, 38),
-			Groupbox = Color3.fromRGB(24, 26, 34),
+			Medium = Color3.fromRGB(14, 15, 18),
+			Light = Color3.fromRGB(255, 255, 255),
+			Groupbox = Color3.fromRGB(255, 255, 255),
 			Highlight = Color3.fromRGB(36, 40, 52),
-			Elevated = Color3.fromRGB(32, 35, 45),
+			Elevated = Color3.fromRGB(20, 22, 28),
 		},
 		Foregrounds = {
 			Active = Color3.fromRGB(255, 255, 255),
@@ -132,11 +223,32 @@ Theme.Palettes = {
 			DarkHover = Color3.fromRGB(118, 124, 142),
 		},
 		Miscellaneous = {
-			Divider = Color3.fromRGB(56, 60, 72),
+			Divider = Color3.fromRGB(255, 255, 255),
 			Shadow = Color3.fromRGB(0, 0, 0),
+			TrafficClose = Color3.fromRGB(250, 93, 86),
+			TrafficMinimize = Color3.fromRGB(252, 190, 57),
+			TrafficMaximize = Color3.fromRGB(119, 174, 94),
+			ToggleOff = Color3.fromRGB(61, 61, 61),
+			ToggleOn = Color3.fromRGB(99, 132, 255),
+			ToggleHeadOff = Color3.fromRGB(91, 91, 91),
+			ToggleHeadOn = Color3.fromRGB(255, 255, 255),
 			Success = Color3.fromRGB(72, 199, 142),
 			Warning = Color3.fromRGB(255, 184, 77),
 			Danger = Color3.fromRGB(255, 96, 112),
+		},
+		Transparency = {
+			Title = 0.2,
+			Subtitle = 0.7,
+			Tab = 0.4,
+			TabActive = 0.15,
+			Label = 0.5,
+			LabelHover = 0.3,
+			Divider = 0.9,
+			Stroke = 0.9,
+			Section = 0.97,
+			SectionStroke = 0.92,
+			Input = 0.95,
+			Window = 0.05,
 		},
 	},
 }
@@ -147,19 +259,22 @@ Theme.Visual = {
 	CornerRadius = 6,
 	GroupboxRadius = 8,
 	WindowTransparency = 0,
-	GroupboxTransparency = 0,
+	GroupboxTransparency = 0.98,
 	BlurEnabled = true,
 	BlurSize = 16,
 	AnimationSpeed = 1,
 	FontScale = 1,
 	CompactMode = false,
 	ShowShadows = true,
-	SidebarWidth = 210,
+	SidebarWidth = 0.325,
 }
 
 function Theme.current()
 	local palette = Util.deepCopy(Theme.Palettes[Theme.Visual.ThemeName] or Theme.Palettes.Alleral)
 	palette.Accent = Theme.Visual.Accent
+	if not palette.Transparency then
+		palette.Transparency = Theme.Palettes.Alleral.Transparency
+	end
 	return palette
 end
 
@@ -178,17 +293,9 @@ function Theme.setTheme(name)
 	end
 end
 
-function Theme.accentGradient()
-	local palette = Theme.current()
-	return ColorSequence.new({
-		ColorSequenceKeypoint.new(0, palette.Accent),
-		ColorSequenceKeypoint.new(1, palette.AccentSoft or palette.Accent),
-	})
-end
-
 function Theme.tweenInfo(time, style, direction)
 	local speed = Theme.Visual.AnimationSpeed
-	return TweenInfo.new((time or 0.2) / speed, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out)
+	return TweenInfo.new((time or 0.2) / speed, style or Enum.EasingStyle.Sine, direction or Enum.EasingDirection.Out)
 end
 
 return Theme
