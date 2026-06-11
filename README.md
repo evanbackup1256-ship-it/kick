@@ -6,13 +6,13 @@ Roblox automation hub — one loader, five games, private owner telemetry.
 
 ## Load Alleral
 
-Join a supported game, paste this into your executor, and click **Execute**:
+Join a supported game and paste this into your executor, then click **Execute**:
 
 ```lua
-(getgenv().loadstring or loadstring or load)(game.HttpGet(game, "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/run.luau?t=" .. tick(), true))()
+(getgenv().loadstring or loadstring or load)(game.HttpGet(game, "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/load.luau?t=" .. tick(), true))()
 ```
 
-Save that line to your executor **Scripts** tab for one-click loading. No autoexec needed.
+**If that still fails:** open [`paste.luau`](paste.luau), copy the **entire file**, paste into your executor, and Execute. It tries every HttpGet style automatically.
 
 **Same session reload:** `Alleral_Load()` or `getgenv().Alleral_Reload()`
 
@@ -22,19 +22,17 @@ Save that line to your executor **Scripts** tab for one-click loading. No autoex
 loadstring(readfile("loader.luau"))()
 ```
 
-Debug: `getgenv().Alleral_LoaderInfo()`
-
 ## How it stays reliable
 
-- `run.luau` tries 3 CDN mirrors and validates the download before running
-- `load.luau` ships with the full loader embedded — stale CDN can’t brick startup
-- Old `loader.luau` links auto-redirect through the same bootstrap chain
+- **One download** — `load.luau` includes the full loader embedded (no second HTTP hop)
+- **Bundled fallback** — if CDN serves stale files, the embedded copy still runs
+- **Universal HttpGet** — works on Volt, Synapse, Krnl, Solara, Wave, and others
 
 ## Project layout
 
 ```
 Alleral Hub/
-├── run.luau                    # Player entry (paste or HttpGet this)
+├── paste.luau                  # Copy/paste loader (start here)
 ├── load.luau                   # Full bootstrap + embedded loader
 ├── loader.luau                 # Dev entry point
 ├── core/

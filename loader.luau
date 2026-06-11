@@ -105,146 +105,6 @@ local readFile = firstExecFunc("readfile")
 local isFile = firstExecFunc("isfile")
 local loadStringFn = firstExecFunc("loadstring", "LoadString") or loadstring
 
-local LAUNCH_ENTRY_FILES = { "loader.luau", "load.luau", "launch.luau" }
-local LAUNCH_MIRROR_BASES = {
-	REPO_BASE .. "/",
-	JSDELIVR_BASE .. "/",
-	GITHUB_WEB_RAW .. "/",
-}
-
-local function bootstrapViaLaunch()
-	if rawget(_G, "__Alleral_LaunchHandled") then
-		return false
-	end
-	if type(ENV) == "table" and (ENV.Alleral_DevMode == true or ENV.Alleral_SkipLaunchBootstrap == true) then
-		return false
-	end
-
-	local function cacheBust(url)
-		local nonce = typeof(tick) == "function" and tick() or math.random()
-		return url .. (url:find("?", 1, true) and "&" or "?") .. "t=" .. tostring(nonce)
-	end
-
-	local function httpGet(url)
-		url = cacheBust(url)
-		local headers = {
-			["Cache-Control"] = "no-cache, no-store, must-revalidate",
-			["Pragma"] = "no-cache",
-		}
-		if httpRequest then
-			for _, spec in ipairs({
-				{ Url = url, Method = "GET", Headers = headers },
-				{ url = url, method = "GET", headers = headers },
-			}) do
-				local ok, res = pcall(httpRequest, spec)
-				if ok and res then
-					local status = res.StatusCode or res.status or 200
-					local body = res.Body or res.body or (type(res) == "string" and res)
-					if status >= 200 and status < 300 and type(body) == "string" and body ~= "" then
-						return body
-					end
-				end
-			end
-		end
-		if type(game.HttpGet) == "function" then
-			local ok, body = pcall(game.HttpGet, game, url, true)
-			if ok and type(body) == "string" and body ~= "" then
-				return body
-			end
-			ok, body = pcall(game.HttpGet, game, url)
-			if ok and type(body) == "string" and body ~= "" then
-				return body
-			end
-		end
-		local ok, body = pcall(function()
-			return game:HttpGet(url, true)
-		end)
-		if ok and type(body) == "string" and body ~= "" then
-			return body
-		end
-		ok, body = pcall(function()
-			return game:HttpGet(url)
-		end)
-		if ok and type(body) == "string" and body ~= "" then
-			return body
-		end
-		if HttpService and type(HttpService.GetAsync) == "function" then
-			ok, body = pcall(function()
-				return HttpService:GetAsync(url, true)
-			end)
-			if ok and type(body) == "string" and body ~= "" then
-				return body
-			end
-		end
-		return nil
-	end
-
-	local function launchBodyValid(body)
-		if type(body) ~= "string" or #body < 1000 then
-			return false
-		end
-		if body:find("404: Not Found", 1, true) then
-			return false
-		end
-		if body:find("EMBEDDED_LOADER", 1, true) and #body > 10000 then
-			return true
-		end
-		if body:find('LOADER_VERSION%s*=%s*"[%d%.]+"', 1) and body:find("loadRayfield", 1, true) then
-			return true
-		end
-		return false
-	end
-
-	if type(loadStringFn) ~= "function" then
-		warn("[Alleral Loader] This executor needs loadstring.")
-		return true
-	end
-
-	_G.__Alleral_LaunchHandled = true
-	local source = nil
-	for _, base in ipairs(LAUNCH_MIRROR_BASES) do
-		for _, file in ipairs(LAUNCH_ENTRY_FILES) do
-			for attempt = 1, 2 do
-				local body = httpGet(base .. file)
-				if launchBodyValid(body) then
-					source = body
-					break
-				end
-				if typeof(task) == "table" and type(task.wait) == "function" then
-					task.wait(0.25 * attempt)
-				end
-			end
-			if source then
-				break
-			end
-		end
-		if source then
-			break
-		end
-	end
-
-	if type(source) ~= "string" then
-		warn("[Alleral Loader] Could not download launch bootstrap.")
-		return true
-	end
-
-	local fn, compileErr = loadStringFn(source, "Alleral/launch")
-	if type(fn) ~= "function" then
-		warn("[Alleral Loader] Launch failed to compile" .. (compileErr and (": " .. tostring(compileErr)) or "."))
-		return true
-	end
-
-	local ok, runErr = pcall(fn)
-	if not ok then
-		warn("[Alleral Loader] " .. tostring(runErr))
-	end
-	return true
-end
-
-if bootstrapViaLaunch() then
-	return
-end
-
 local function notify(title, text, duration)
 	pcall(function()
 		game:GetService("StarterGui"):SetCore("SendNotification", {
@@ -629,37 +489,85 @@ local function buildMirrorUrls(relativePath)
 		table.insert(urls, "https://cdn.jsdelivr.net/gh/" .. GITHUB_REPO .. "@" .. commit .. "/" .. relativePath)
 		table.insert(urls, "https://raw.githubusercontent.com/" .. GITHUB_REPO .. "/" .. commit .. "/" .. relativePath)
 	end
+	table.insert(urls, REPO_BASE .. "/" .. relativePath)
 	table.insert(urls, JSDELIVR_BASE .. "/" .. relativePath)
 	table.insert(urls, GITHUB_WEB_RAW .. "/" .. relativePath)
-	table.insert(urls, REPO_BASE .. "/" .. relativePath)
 	return urls
 end
 
 local function httpFetchBody(url, nonce)
 	local fetchUrl = withCacheBust(url, nonce)
-	if httpRequest then
-		local ok, response = pcall(httpRequest, {
-			Url = fetchUrl,
-			Method = "GET",
-			Headers = {
-				["Cache-Control"] = "no-cache, no-store, must-revalidate",
-				["Pragma"] = "no-cache",
-			},
-		})
-		if ok and response then
-			local status = response.StatusCode or response.status or 0
-			local body = response.Body or response.body or ""
-			if status >= 200 and status < 300 and body ~= "" and not body:find("404: Not Found", 1, true) then
-				return body
-			end
-		end
+	local function accept(body)
+		return type(body) == "string"
+			and body ~= ""
+			and not body:find("404: Not Found", 1, true)
+			and not (body:find("<!DOCTYPE html>", 1, true) and not body:find("LOADER_VERSION", 1, true))
 	end
+
 	if type(game.HttpGet) == "function" then
 		local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
-		if ok and body and body ~= "" and not body:find("404: Not Found", 1, true) then
+		if ok and accept(body) then
+			return body
+		end
+		ok, body = pcall(game.HttpGet, game, fetchUrl)
+		if ok and accept(body) then
 			return body
 		end
 	end
+
+	local ok, body = pcall(function()
+		return game:HttpGet(fetchUrl, true)
+	end)
+	if ok and accept(body) then
+		return body
+	end
+
+	ok, body = pcall(function()
+		return game:HttpGet(fetchUrl)
+	end)
+	if ok and accept(body) then
+		return body
+	end
+
+	if HttpService and type(HttpService.GetAsync) == "function" then
+		ok, body = pcall(function()
+			return HttpService:GetAsync(fetchUrl, true)
+		end)
+		if ok and accept(body) then
+			return body
+		end
+	end
+
+	if httpRequest then
+		for _, spec in ipairs({
+			{
+				Url = fetchUrl,
+				Method = "GET",
+				Headers = {
+					["Cache-Control"] = "no-cache, no-store, must-revalidate",
+					["Pragma"] = "no-cache",
+				},
+			},
+			{
+				url = fetchUrl,
+				method = "GET",
+				headers = {
+					["Cache-Control"] = "no-cache, no-store, must-revalidate",
+					["Pragma"] = "no-cache",
+				},
+			},
+		}) do
+			local reqOk, response = pcall(httpRequest, spec)
+			if reqOk then
+				body = type(response) == "string" and response or (response and (response.Body or response.body))
+				local status = type(response) == "table" and (response.StatusCode or response.status or 200) or 200
+				if accept(body) and (status == 0 or (status >= 200 and status < 300)) then
+					return body
+				end
+			end
+		end
+	end
+
 	return nil
 end
 

@@ -256,51 +256,63 @@ local function fetchRemote(url)
 		["Pragma"] = "no-cache",
 		["Accept"] = "application/vnd.github.raw+json, application/json, text/plain, */*",
 	}
+	local function accept(body)
+		return type(body) == "string"
+			and body ~= ""
+			and not body:find("404: Not Found", 1, true)
+			and not (body:find("<!DOCTYPE html>", 1, true) and not body:find("LOADER_VERSION", 1, true))
+	end
+
+	if type(game.HttpGet) == "function" then
+		local ok, body = pcall(game.HttpGet, game, url, true)
+		if ok and accept(body) then
+			return body
+		end
+		ok, body = pcall(game.HttpGet, game, url)
+		if ok and accept(body) then
+			return body
+		end
+	end
+
+	local ok, body = pcall(function()
+		return game:HttpGet(url, true)
+	end)
+	if ok and accept(body) then
+		return body
+	end
+
+	ok, body = pcall(function()
+		return game:HttpGet(url)
+	end)
+	if ok and accept(body) then
+		return body
+	end
+
+	if HttpService and type(HttpService.GetAsync) == "function" then
+		ok, body = pcall(function()
+			return HttpService:GetAsync(url, true)
+		end)
+		if ok and accept(body) then
+			return body
+		end
+	end
+
 	if httpRequest then
 		for _, spec in ipairs({
 			{ Url = url, Method = "GET", Headers = headers },
 			{ url = url, method = "GET", headers = headers },
 		}) do
-			local ok, res = pcall(httpRequest, spec)
-			if ok and res then
-				local status = res.StatusCode or res.status or 200
-				local body = res.Body or res.body or (type(res) == "string" and res)
-				if status >= 200 and status < 300 and type(body) == "string" and body ~= "" then
+			local reqOk, res = pcall(httpRequest, spec)
+			if reqOk then
+				body = type(res) == "string" and res or (res and (res.Body or res.body))
+				local status = type(res) == "table" and (res.StatusCode or res.status or 200) or 200
+				if accept(body) and (status == 0 or (status >= 200 and status < 300)) then
 					return body
 				end
 			end
 		end
 	end
-	if type(game.HttpGet) == "function" then
-		local ok, body = pcall(game.HttpGet, game, url, true)
-		if ok and type(body) == "string" and body ~= "" then
-			return body
-		end
-		ok, body = pcall(game.HttpGet, game, url)
-		if ok and type(body) == "string" and body ~= "" then
-			return body
-		end
-	end
-	local ok, body = pcall(function()
-		return game:HttpGet(url, true)
-	end)
-	if ok and type(body) == "string" and body ~= "" then
-		return body
-	end
-	ok, body = pcall(function()
-		return game:HttpGet(url)
-	end)
-	if ok and type(body) == "string" and body ~= "" then
-		return body
-	end
-	if HttpService and type(HttpService.GetAsync) == "function" then
-		ok, body = pcall(function()
-			return HttpService:GetAsync(url, true)
-		end)
-		if ok and type(body) == "string" and body ~= "" then
-			return body
-		end
-	end
+
 	return nil
 end
 

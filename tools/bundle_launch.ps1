@@ -7,18 +7,15 @@ $root = Split-Path -Parent $PSScriptRoot
 $loaderPath = Join-Path $root "loader.luau"
 $launchPath = Join-Path $root "launch.luau"
 $loadPath = Join-Path $root "load.luau"
-$templatePath = Join-Path $root "launch.template.luau"
 $runPath = Join-Path $root "run.luau"
 $bootstrapPath = Join-Path $root "bootstrap.luau"
+$templatePath = Join-Path $root "launch.template.luau"
 
 if (-not (Test-Path $loaderPath)) {
     Write-Error "Missing loader.luau"
 }
 if (-not (Test-Path $templatePath)) {
     Write-Error "Missing launch.template.luau"
-}
-if (-not (Test-Path $runPath)) {
-    Write-Error "Missing run.luau"
 }
 
 $loader = Get-Content $loaderPath -Raw
@@ -52,8 +49,8 @@ if ($template -notmatch '--EMBED_LOADER_HERE--') {
 
 $launch = $template.Replace("--EMBED_LOADER_HERE--", $embedded.TrimEnd())
 Set-Content -Path $launchPath -Value $launch -Encoding UTF8 -NoNewline
-Copy-Item -Path $launchPath -Destination $loadPath -Force
-Copy-Item -Path $runPath -Destination $bootstrapPath -Force
+foreach ($dest in @($loadPath, $runPath, $bootstrapPath)) {
+    Copy-Item -Path $launchPath -Destination $dest -Force
+}
 Write-Host "[ok] Bundled loader v$version into launch.luau ($($launch.Length) bytes)"
-Write-Host "[ok] Copied launch.luau -> load.luau"
-Write-Host "[ok] Copied run.luau -> bootstrap.luau"
+Write-Host "[ok] Copied launch.luau -> load.luau, run.luau, bootstrap.luau"
