@@ -1,6 +1,6 @@
-local LOADER_VERSION = "3.5.7"
-local REQUIRED_CORE_VERSION = "1.13"
-local REQUIRED_STARLIGHT_BUILD = "Alleral-4"
+local LOADER_VERSION = "3.5.8"
+local REQUIRED_CORE_VERSION = "1.14"
+local REQUIRED_STARLIGHT_BUILD = "Alleral-5"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local SCRIPT_MANIFEST_URL = REPO_BASE .. "/config/scripts_manifest.json"
 local FETCH_RETRIES = 3
@@ -473,7 +473,7 @@ do
 		local g = getgenv()
 		if type(g) == "table" then
 			if bridge.Alleral_Starlight
-				and bridge.Alleral_Starlight.InterfaceBuild == "Alleral-4"
+				and bridge.Alleral_Starlight.InterfaceBuild == "Alleral-5"
 				and type(bridge.Alleral_Starlight.CreateWindow) == "function" then
 				g.Alleral_Starlight = bridge.Alleral_Starlight
 			end
@@ -623,7 +623,7 @@ local function preloadCore(required)
 		SHARED_CORE_FILES,
 		"core",
 		SHARED_CORE_URL,
-		'Core.STARLIGHT_BUILD = "Alleral-4"'
+		'Core.STARLIGHT_BUILD = "Alleral-5"'
 	)
 	if not source then
 		if required then

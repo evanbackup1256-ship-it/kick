@@ -4,7 +4,7 @@ do
 		local g = getgenv()
 		if type(g) == "table" then
 			if bridge.Alleral_Starlight
-				and bridge.Alleral_Starlight.InterfaceBuild == "Alleral-4"
+				and bridge.Alleral_Starlight.InterfaceBuild == "Alleral-5"
 				and type(bridge.Alleral_Starlight.CreateWindow) == "function" then
 				g.Alleral_Starlight = bridge.Alleral_Starlight
 			end

@@ -55,7 +55,9 @@ function Util.new(className, props, parentOrChildren)
 	local instance = Instance.new(className)
 	for key, value in pairs(props or {}) do
 		if key ~= "Parent" then
-			instance[key] = value
+			pcall(function()
+				instance[key] = value
+			end)
 		end
 	end
 	if props and props.Parent then
@@ -192,7 +194,6 @@ end
 
 function Util.inputBox(props)
 	local box = Util.new("TextBox", {
-		AutoButtonColor = false,
 		BackgroundColor3 = props.BackgroundColor3 or Color3.fromRGB(38, 38, 48),
 		BackgroundTransparency = props.BackgroundTransparency or 0,
 		BorderSizePixel = 0,

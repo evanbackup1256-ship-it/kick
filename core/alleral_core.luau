@@ -1,6 +1,6 @@
 local Core = {}
-Core.VERSION = "1.13"
-Core.STARLIGHT_BUILD = "Alleral-4"
+Core.VERSION = "1.14"
+Core.STARLIGHT_BUILD = "Alleral-5"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")

@@ -96,6 +96,7 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 	local element = { Class = "Toggle", Values = settings, NestedElements = {} }
 	settings.CurrentValue = settings.CurrentValue == true
 	settings.Callback = settings.Callback or function() end
+	settings.LayoutOrder = settings.LayoutOrder or index
 
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
@@ -163,6 +164,7 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 	local maxValue = settings.Range and settings.Range[2] or 100
 	local increment = settings.Increment or 1
 	settings.CurrentValue = Util.clamp(settings.CurrentValue or minValue, minValue, maxValue)
+	settings.LayoutOrder = settings.LayoutOrder or index
 
 	local function snapValue(raw)
 		local steps = math.floor((raw - minValue) / increment + 0.5)
@@ -280,16 +282,19 @@ function Elements.createButton(groupbox, settings, index, windowSettings, librar
 	local row = Util.new("Frame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0, Theme.Visual.CompactMode and 34 or 38),
+		LayoutOrder = settings.LayoutOrder or index,
 	}, { groupbox.ParentingItem })
 	element.Instance = row
 
 	local btn = Util.new("TextButton", {
 		AutoButtonColor = false,
+		BackgroundColor3 = theme.Backgrounds.Light,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 1),
 		Text = "",
 	}, { row })
+	Util.corner(6, btn)
 
 	local label = Util.text({
 		Parent = btn,
@@ -312,10 +317,18 @@ function Elements.createButton(groupbox, settings, index, windowSettings, librar
 	}, { btn })
 
 	btn.MouseEnter:Connect(function()
+		Tween.play(btn, { BackgroundTransparency = transp.Input }, nil, Theme.tweenInfo(0.15))
 		label.TextTransparency = transp.LabelHover
 	end)
 	btn.MouseLeave:Connect(function()
+		Tween.play(btn, { BackgroundTransparency = 1 }, nil, Theme.tweenInfo(0.15))
 		label.TextTransparency = transp.Label
+	end)
+	btn.MouseButton1Down:Connect(function()
+		Tween.play(btn, { Size = UDim2.new(1, -4, 1, -2) }, nil, Theme.tweenInfo(0.08))
+	end)
+	btn.MouseButton1Up:Connect(function()
+		Tween.play(btn, { Size = UDim2.fromScale(1, 1) }, nil, Theme.tweenInfo(0.12))
 	end)
 	btn.MouseButton1Click:Connect(function()
 		Elements.runCallback(windowSettings, settings.Name or "Button", settings.Callback or function() end, library)
@@ -337,6 +350,7 @@ function Elements.createInput(groupbox, settings, index, windowSettings, library
 	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 	local element = { Class = "Input", Values = settings, NestedElements = {} }
 	settings.CurrentValue = settings.CurrentValue or settings.Placeholder or ""
+	settings.LayoutOrder = settings.LayoutOrder or index
 
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
@@ -381,6 +395,7 @@ end
 function Elements.createLabel(groupbox, settings, index, windowSettings, library)
 	local theme = Theme.current()
 	local element = { Class = "Label", Values = settings, NestedElements = {} }
+	settings.LayoutOrder = settings.LayoutOrder or index
 	local row, label, slot, dropdownHolder = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
 	slot.Visible = false
@@ -481,6 +496,7 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 	settings.Options = settings.Options or settings.Values or {}
 	settings.Callback = settings.Callback or function() end
 	settings.Multi = settings.Multi == true or settings.MultiSelection == true or settings.MultipleOptions == true
+	settings.LayoutOrder = settings.LayoutOrder or index
 	settings.Placeholder = settings.Placeholder or "--"
 	if settings.Multi then
 		settings.CurrentOptions = settings.CurrentOptions or settings.CurrentOption or settings.Default or {}

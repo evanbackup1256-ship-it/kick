@@ -65,7 +65,9 @@ function Util.new(className, props, parentOrChildren)
 	local instance = Instance.new(className)
 	for key, value in pairs(props or {}) do
 		if key ~= "Parent" then
-			instance[key] = value
+			pcall(function()
+				instance[key] = value
+			end)
 		end
 	end
 	if props and props.Parent then
@@ -202,7 +204,6 @@ end
 
 function Util.inputBox(props)
 	local box = Util.new("TextBox", {
-		AutoButtonColor = false,
 		BackgroundColor3 = props.BackgroundColor3 or Color3.fromRGB(38, 38, 48),
 		BackgroundTransparency = props.BackgroundTransparency or 0,
 		BorderSizePixel = 0,
@@ -286,9 +287,9 @@ Theme.Palettes = {
 			LabelHover = 0.3,
 			Divider = 0.9,
 			Stroke = 0.9,
-			Section = 0.98,
-			SectionStroke = 0.95,
-			Input = 0.95,
+			Section = 0.94,
+			SectionStroke = 0.88,
+			Input = 0.92,
 			Window = 0.05,
 		},
 	},
@@ -561,8 +562,6 @@ function Tween.play(instance, goal, callback, info)
 		end
 		return nil
 	end
-
-	Tween.set(instance, goal)
 
 	local tween
 	local ok = pcall(function()
@@ -944,6 +943,7 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 	local element = { Class = "Toggle", Values = settings, NestedElements = {} }
 	settings.CurrentValue = settings.CurrentValue == true
 	settings.Callback = settings.Callback or function() end
+	settings.LayoutOrder = settings.LayoutOrder or index
 
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
@@ -1011,6 +1011,7 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 	local maxValue = settings.Range and settings.Range[2] or 100
 	local increment = settings.Increment or 1
 	settings.CurrentValue = Util.clamp(settings.CurrentValue or minValue, minValue, maxValue)
+	settings.LayoutOrder = settings.LayoutOrder or index
 
 	local function snapValue(raw)
 		local steps = math.floor((raw - minValue) / increment + 0.5)
@@ -1128,16 +1129,19 @@ function Elements.createButton(groupbox, settings, index, windowSettings, librar
 	local row = Util.new("Frame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0, Theme.Visual.CompactMode and 34 or 38),
+		LayoutOrder = settings.LayoutOrder or index,
 	}, { groupbox.ParentingItem })
 	element.Instance = row
 
 	local btn = Util.new("TextButton", {
 		AutoButtonColor = false,
+		BackgroundColor3 = theme.Backgrounds.Light,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 1),
 		Text = "",
 	}, { row })
+	Util.corner(6, btn)
 
 	local label = Util.text({
 		Parent = btn,
@@ -1160,10 +1164,18 @@ function Elements.createButton(groupbox, settings, index, windowSettings, librar
 	}, { btn })
 
 	btn.MouseEnter:Connect(function()
+		Tween.play(btn, { BackgroundTransparency = transp.Input }, nil, Theme.tweenInfo(0.15))
 		label.TextTransparency = transp.LabelHover
 	end)
 	btn.MouseLeave:Connect(function()
+		Tween.play(btn, { BackgroundTransparency = 1 }, nil, Theme.tweenInfo(0.15))
 		label.TextTransparency = transp.Label
+	end)
+	btn.MouseButton1Down:Connect(function()
+		Tween.play(btn, { Size = UDim2.new(1, -4, 1, -2) }, nil, Theme.tweenInfo(0.08))
+	end)
+	btn.MouseButton1Up:Connect(function()
+		Tween.play(btn, { Size = UDim2.fromScale(1, 1) }, nil, Theme.tweenInfo(0.12))
 	end)
 	btn.MouseButton1Click:Connect(function()
 		Elements.runCallback(windowSettings, settings.Name or "Button", settings.Callback or function() end, library)
@@ -1185,6 +1197,7 @@ function Elements.createInput(groupbox, settings, index, windowSettings, library
 	local transp = theme.Transparency or Theme.Palettes.Alleral.Transparency
 	local element = { Class = "Input", Values = settings, NestedElements = {} }
 	settings.CurrentValue = settings.CurrentValue or settings.Placeholder or ""
+	settings.LayoutOrder = settings.LayoutOrder or index
 
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
@@ -1229,6 +1242,7 @@ end
 function Elements.createLabel(groupbox, settings, index, windowSettings, library)
 	local theme = Theme.current()
 	local element = { Class = "Label", Values = settings, NestedElements = {} }
+	settings.LayoutOrder = settings.LayoutOrder or index
 	local row, label, slot, dropdownHolder = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
 	slot.Visible = false
@@ -1329,6 +1343,7 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 	settings.Options = settings.Options or settings.Values or {}
 	settings.Callback = settings.Callback or function() end
 	settings.Multi = settings.Multi == true or settings.MultiSelection == true or settings.MultipleOptions == true
+	settings.LayoutOrder = settings.LayoutOrder or index
 	settings.Placeholder = settings.Placeholder or "--"
 	if settings.Multi then
 		settings.CurrentOptions = settings.CurrentOptions or settings.CurrentOption or settings.Default or {}
@@ -1842,12 +1857,23 @@ function WindowBuilder.create(library, windowSettings)
 		Instance = main,
 		Visible = false,
 	}
+	local destroyed = false
+	local keybindConnection
+
+	local windowScale = Instance.new("UIScale")
+	windowScale.Scale = 1
+	windowScale.Parent = main
 
 	local function setVisible(state)
+		if destroyed or not main or not main.Parent then
+			return
+		end
 		local visible = state == true
 		window.Visible = visible
-		if main then
-			main.Visible = visible
+		main.Visible = visible
+		if visible then
+			windowScale.Scale = 0.94
+			Tween.play(windowScale, { Scale = 1 }, nil, Theme.tweenInfo(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
 		end
 		setBlur(visible)
 	end
@@ -2057,10 +2083,18 @@ function WindowBuilder.create(library, windowSettings)
 	library.Window = window
 
 	function window:Toggle()
+		if destroyed or not main or not main.Parent then
+			return
+		end
 		setVisible(not window.Visible)
 	end
 
 	function window:Destroy()
+		destroyed = true
+		if keybindConnection then
+			keybindConnection:Disconnect()
+			keybindConnection = nil
+		end
 		blur.Size = 0
 		screenGui:Destroy()
 	end
@@ -2176,15 +2210,19 @@ function WindowBuilder.create(library, windowSettings)
 			end
 
 			local function styleNav(active)
-				navButton.BackgroundTransparency = active and transp.Section or 1
-				navStroke.Transparency = active and transp.SectionStroke or 1
-				navLabel.TextTransparency = active and transp.TabActive or transp.Tab
+				local targetBg = active and transp.Section or 1
+				local targetStroke = active and transp.SectionStroke or 1
+				local targetText = active and transp.TabActive or transp.Tab
+				Tween.play(navButton, { BackgroundTransparency = targetBg }, nil, Theme.tweenInfo(0.18))
+				Tween.play(navStroke, { Transparency = targetStroke }, nil, Theme.tweenInfo(0.18))
+				Tween.play(navLabel, { TextTransparency = targetText }, nil, Theme.tweenInfo(0.18))
 				if navIcon then
-					navIcon.ImageTransparency = active and transp.TabActive or transp.Tab
+					Tween.play(navIcon, { ImageTransparency = targetText }, nil, Theme.tweenInfo(0.18))
 				end
 			end
 
 			local function activate()
+				local previousPage = window.CurrentTab and window.CurrentTab.Page
 				for _, other in pairs(self.Tabs) do
 					other.Active = false
 					if other.Page then
@@ -2196,6 +2234,15 @@ function WindowBuilder.create(library, windowSettings)
 				end
 				tab.Active = true
 				tab.Page.Visible = true
+				if previousPage ~= tab.Page then
+					tab.Page.Position = UDim2.new(0, 0, 0, 10)
+					Tween.play(
+						tab.Page,
+						{ Position = UDim2.new(0, 0, 0, 0) },
+						nil,
+						Theme.tweenInfo(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+					)
+				end
 				titleLabel.Text = tabSettings.Name or tabIndex
 				styleNav(true)
 				window.CurrentTab = tab
@@ -2206,6 +2253,20 @@ function WindowBuilder.create(library, windowSettings)
 			tab.NavLabel = navLabel
 			tab.StyleNav = styleNav
 			navButton.MouseButton1Click:Connect(activate)
+			navButton.MouseEnter:Connect(function()
+				if tab.Active then
+					return
+				end
+				Tween.play(navButton, { BackgroundTransparency = transp.Section + 0.02 }, nil, Theme.tweenInfo(0.15))
+				Tween.play(navLabel, { TextTransparency = transp.TabActive }, nil, Theme.tweenInfo(0.15))
+			end)
+			navButton.MouseLeave:Connect(function()
+				if tab.Active then
+					return
+				end
+				Tween.play(navButton, { BackgroundTransparency = 1 }, nil, Theme.tweenInfo(0.15))
+				Tween.play(navLabel, { TextTransparency = transp.Tab }, nil, Theme.tweenInfo(0.15))
+			end)
 			self.Tabs[tabIndex] = tab
 
 			if not window.CurrentTab then
@@ -2249,7 +2310,7 @@ function WindowBuilder.create(library, windowSettings)
 					FontWeight = Enum.FontWeight.SemiBold,
 					TextSize = 16 * Theme.Visual.FontScale,
 					TextColor3 = theme.Foregrounds.Light,
-					TextTransparency = transp.Tab,
+					TextTransparency = transp.Label,
 					Size = UDim2.new(1, 0, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 					LayoutOrder = 1,
@@ -2441,8 +2502,8 @@ function WindowBuilder.create(library, windowSettings)
 	end)
 
 	local keybind = library.WindowKeybind or "K"
-	UserInputService.InputBegan:Connect(function(input, processed)
-		if not toggleReady or processed then
+	keybindConnection = UserInputService.InputBegan:Connect(function(input, processed)
+		if not toggleReady or processed or destroyed then
 			return
 		end
 		if input.KeyCode == Enum.KeyCode[keybind] then
@@ -2470,7 +2531,7 @@ local WindowBuilder = requireModule('window')
 local Util = requireModule('util')
 
 local Starlight = {
-	InterfaceBuild = "Alleral-4",
+	InterfaceBuild = "Alleral-5",
 	WindowKeybind = "K",
 	Minimized = false,
 	Maximized = false,

@@ -22,8 +22,6 @@ function Tween.play(instance, goal, callback, info)
 		return nil
 	end
 
-	Tween.set(instance, goal)
-
 	local tween
 	local ok = pcall(function()
 		tween = TweenService:Create(instance, info or Theme.tweenInfo(), goal)

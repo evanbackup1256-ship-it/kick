@@ -133,12 +133,23 @@ function WindowBuilder.create(library, windowSettings)
 		Instance = main,
 		Visible = false,
 	}
+	local destroyed = false
+	local keybindConnection
+
+	local windowScale = Instance.new("UIScale")
+	windowScale.Scale = 1
+	windowScale.Parent = main
 
 	local function setVisible(state)
+		if destroyed or not main or not main.Parent then
+			return
+		end
 		local visible = state == true
 		window.Visible = visible
-		if main then
-			main.Visible = visible
+		main.Visible = visible
+		if visible then
+			windowScale.Scale = 0.94
+			Tween.play(windowScale, { Scale = 1 }, nil, Theme.tweenInfo(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
 		end
 		setBlur(visible)
 	end
@@ -348,10 +359,18 @@ function WindowBuilder.create(library, windowSettings)
 	library.Window = window
 
 	function window:Toggle()
+		if destroyed or not main or not main.Parent then
+			return
+		end
 		setVisible(not window.Visible)
 	end
 
 	function window:Destroy()
+		destroyed = true
+		if keybindConnection then
+			keybindConnection:Disconnect()
+			keybindConnection = nil
+		end
 		blur.Size = 0
 		screenGui:Destroy()
 	end
@@ -467,15 +486,19 @@ function WindowBuilder.create(library, windowSettings)
 			end
 
 			local function styleNav(active)
-				navButton.BackgroundTransparency = active and transp.Section or 1
-				navStroke.Transparency = active and transp.SectionStroke or 1
-				navLabel.TextTransparency = active and transp.TabActive or transp.Tab
+				local targetBg = active and transp.Section or 1
+				local targetStroke = active and transp.SectionStroke or 1
+				local targetText = active and transp.TabActive or transp.Tab
+				Tween.play(navButton, { BackgroundTransparency = targetBg }, nil, Theme.tweenInfo(0.18))
+				Tween.play(navStroke, { Transparency = targetStroke }, nil, Theme.tweenInfo(0.18))
+				Tween.play(navLabel, { TextTransparency = targetText }, nil, Theme.tweenInfo(0.18))
 				if navIcon then
-					navIcon.ImageTransparency = active and transp.TabActive or transp.Tab
+					Tween.play(navIcon, { ImageTransparency = targetText }, nil, Theme.tweenInfo(0.18))
 				end
 			end
 
 			local function activate()
+				local previousPage = window.CurrentTab and window.CurrentTab.Page
 				for _, other in pairs(self.Tabs) do
 					other.Active = false
 					if other.Page then
@@ -487,6 +510,15 @@ function WindowBuilder.create(library, windowSettings)
 				end
 				tab.Active = true
 				tab.Page.Visible = true
+				if previousPage ~= tab.Page then
+					tab.Page.Position = UDim2.new(0, 0, 0, 10)
+					Tween.play(
+						tab.Page,
+						{ Position = UDim2.new(0, 0, 0, 0) },
+						nil,
+						Theme.tweenInfo(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+					)
+				end
 				titleLabel.Text = tabSettings.Name or tabIndex
 				styleNav(true)
 				window.CurrentTab = tab
@@ -497,6 +529,20 @@ function WindowBuilder.create(library, windowSettings)
 			tab.NavLabel = navLabel
 			tab.StyleNav = styleNav
 			navButton.MouseButton1Click:Connect(activate)
+			navButton.MouseEnter:Connect(function()
+				if tab.Active then
+					return
+				end
+				Tween.play(navButton, { BackgroundTransparency = transp.Section + 0.02 }, nil, Theme.tweenInfo(0.15))
+				Tween.play(navLabel, { TextTransparency = transp.TabActive }, nil, Theme.tweenInfo(0.15))
+			end)
+			navButton.MouseLeave:Connect(function()
+				if tab.Active then
+					return
+				end
+				Tween.play(navButton, { BackgroundTransparency = 1 }, nil, Theme.tweenInfo(0.15))
+				Tween.play(navLabel, { TextTransparency = transp.Tab }, nil, Theme.tweenInfo(0.15))
+			end)
 			self.Tabs[tabIndex] = tab
 
 			if not window.CurrentTab then
@@ -540,7 +586,7 @@ function WindowBuilder.create(library, windowSettings)
 					FontWeight = Enum.FontWeight.SemiBold,
 					TextSize = 16 * Theme.Visual.FontScale,
 					TextColor3 = theme.Foregrounds.Light,
-					TextTransparency = transp.Tab,
+					TextTransparency = transp.Label,
 					Size = UDim2.new(1, 0, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 					LayoutOrder = 1,
@@ -732,8 +778,8 @@ function WindowBuilder.create(library, windowSettings)
 	end)
 
 	local keybind = library.WindowKeybind or "K"
-	UserInputService.InputBegan:Connect(function(input, processed)
-		if not toggleReady or processed then
+	keybindConnection = UserInputService.InputBegan:Connect(function(input, processed)
+		if not toggleReady or processed or destroyed then
 			return
 		end
 		if input.KeyCode == Enum.KeyCode[keybind] then
