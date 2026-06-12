@@ -2,7 +2,7 @@ local Core = {}
 Core.VERSION = "2.8.8"
 Core._CORE_ARTIFACT = "base"
 Core.UI_LIBRARY = "Neverlose"
-Core.NEVERLOSE_UI_VERSION = "1.5.2-kick"
+Core.NEVERLOSE_UI_VERSION = "1.5.3-kick"
 Core.ALLERAL_UI_VERSION = Core.NEVERLOSE_UI_VERSION
 Core.WINDUI_VERSION = Core.NEVERLOSE_UI_VERSION
 
@@ -24,8 +24,27 @@ local WINDUI_FILE = "main.lua"
 local WINDUI_PATCH_FILE = "arrrel.luau"
 local WINDUI_PATCH_FALLBACK = "aller.luau"
 local WINDUI_MIN_BYTES = 50000
-local ALLERAL_ACCENT = Color3.fromHex("#53fc18")
-local ALLERAL_ACCENT_ALT = Color3.fromHex("#30ff6a")
+local function safeHex(hex, fallback)
+	fallback = fallback or Color3.fromRGB(83, 252, 24)
+	if Color3.fromHex then
+		local ok, color = pcall(Color3.fromHex, hex)
+		if ok and typeof(color) == "Color3" then
+			return color
+		end
+	end
+	local raw = tostring(hex or ""):gsub("#", "")
+	if #raw >= 6 then
+		return Color3.fromRGB(
+			tonumber(raw:sub(1, 2), 16) or 255,
+			tonumber(raw:sub(3, 4), 16) or 255,
+			tonumber(raw:sub(5, 6), 16) or 255
+		)
+	end
+	return fallback
+end
+
+local ALLERAL_ACCENT = safeHex("#53fc18")
+local ALLERAL_ACCENT_ALT = safeHex("#30ff6a")
 
 -- Keep in sync with loader.luau GAMES (place/universe ids for runtime resolution).
 Core.GAME_REGISTRY = {
@@ -111,17 +130,28 @@ function Core.assertLoader()
 end
 
 function Core.boot(state)
+	local priorCore = ENV.Alleral_Core or getgenv().Alleral_Core
 	state = state or ENV.Alleral_State or getgenv().Alleral_State
 	if type(state) ~= "table" then
+		if priorCore then
+			return priorCore, nil, "state missing"
+		end
 		return nil, nil, "state missing"
 	end
 	if type(state.Alleral_Unload) == "function" then
 		pcall(state.Alleral_Unload)
 	end
 	if type(Core.prepareGame) ~= "function" then
+		if priorCore then
+			return priorCore, nil, "core missing"
+		end
 		return nil, nil, "core missing"
 	end
-	return Core.prepareGame(state)
+	local core, ui, msg = Core.prepareGame(state)
+	if not core then
+		core = priorCore or ENV.Alleral_Core or getgenv().Alleral_Core
+	end
+	return core, ui, msg
 end
 
 function Core.safeCall(scope, fn, ...)

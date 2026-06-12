@@ -15,12 +15,14 @@ return function(Core)
 		"https://github.com/evanbackup1256-ship-it/kick/main/ui/neverlose/",
 	}
 	local LIBRARY_FILE = "library.lua"
+	local EXECUTOR_COMPAT_FILE = "executor_compat.luau"
 	local SPRING_FILE = "spring.luau"
 	local SPR_FILE = "spr.luau"
 	local RIPPLE_FILE = "ripple.luau"
 	local FUSION_FILE = "fusion.luau"
 	local LOTTIE_FILE = "lottie.luau"
 	local MIN_LIBRARY_BYTES = 80000
+	local MIN_EXECUTOR_COMPAT_BYTES = 200
 	local MIN_SPRING_BYTES = 200
 	local MIN_SPR_BYTES = 8000
 	local MIN_RIPPLE_BYTES = 800
@@ -33,6 +35,7 @@ return function(Core)
 		return ok and env or {}
 	end
 	local ENV = genv()
+	local agentDebug = ENV._AlleralAgentDebug or function() end
 
 	local function readLocal(name)
 		local roots = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
@@ -59,17 +62,90 @@ return function(Core)
 		return nil
 	end
 
+	local function sanitizeLuauSource(source)
+		if type(source) ~= "string" or source == "" then
+			return source
+		end
+		source = source:gsub("\r\n", "\n")
+		local out = {}
+		for line in (source .. "\n"):gmatch("(.-)\n") do
+			if not line:match("^%-%-![%w_]+") then
+				table.insert(out, line)
+			end
+		end
+		return table.concat(out, "\n")
+	end
+
+	local ExecutorCompat
+	local function getExecutorCompat()
+		if ExecutorCompat then
+			return ExecutorCompat
+		end
+		local fallback = {
+			sanitizeLuauSource = sanitizeLuauSource,
+			looksLikeLua = function(body)
+				return type(body) == "string" and #body >= 32 and body:find("function", 1, true) ~= nil
+			end,
+		}
+		local source = readLocal(EXECUTOR_COMPAT_FILE) or fetchRemote(EXECUTOR_COMPAT_FILE, MIN_EXECUTOR_COMPAT_BYTES)
+		if type(source) == "string" then
+			local loadFn = Core.loadStringFn()
+			if loadFn then
+				local chunk = loadFn(sanitizeLuauSource(source), "@Neverlose/executor_compat")
+				if chunk then
+					local ok, factory = pcall(chunk)
+					if ok and type(factory) == "function" then
+						local okRun, compat = pcall(factory)
+						if okRun and type(compat) == "table" then
+							ExecutorCompat = compat
+							return ExecutorCompat
+						end
+					end
+				end
+			end
+		end
+		ExecutorCompat = fallback
+		return ExecutorCompat
+	end
+
 	local function compileModule(source, label)
 		local loadFn = Core.loadStringFn()
 		if not loadFn or not source then
+			-- #region agent log
+			agentDebug("H2", "neverlose_ui:compileModule", "compile unavailable", {
+				label = label,
+				hasLoadFn = loadFn ~= nil,
+				sourceBytes = type(source) == "string" and #source or 0,
+			})
+			-- #endregion
 			return nil, "compile unavailable"
 		end
-		local chunk, err = loadFn(source, label)
+		local compat = getExecutorCompat()
+		local sanitized = compat.sanitizeLuauSource and compat.sanitizeLuauSource(source) or sanitizeLuauSource(source)
+		local chunk, err = loadFn(sanitized, label)
+		if not chunk and sanitized ~= source then
+			chunk, err = loadFn(source, label)
+		end
 		if not chunk then
+			-- #region agent log
+			agentDebug("H2", "neverlose_ui:compileModule", "loadstring failed", {
+				label = label,
+				err = tostring(err),
+				sourceBytes = #source,
+				sanitized = sanitized ~= source,
+			})
+			-- #endregion
 			return nil, tostring(err)
 		end
 		local ok, result = pcall(chunk)
 		if not ok then
+			-- #region agent log
+			agentDebug("H2", "neverlose_ui:compileModule", "chunk runtime failed", {
+				label = label,
+				err = tostring(result),
+				sourceBytes = #source,
+			})
+			-- #endregion
 			return nil, tostring(result)
 		end
 		return result
@@ -111,21 +187,33 @@ return function(Core)
 	end
 
 	local function loadMotionStack()
-		local sprRaw = compileModule(readLocal(SPR_FILE) or fetchRemote(SPR_FILE, MIN_SPR_BYTES), "@Neverlose/spr")
+		local sprRaw, sprErr = compileModule(readLocal(SPR_FILE) or fetchRemote(SPR_FILE, MIN_SPR_BYTES), "@Neverlose/spr")
 		local Spr = type(sprRaw) == "table" and sprRaw or nil
 
-		local rippleFactory = compileModule(readLocal(RIPPLE_FILE) or fetchRemote(RIPPLE_FILE, MIN_RIPPLE_BYTES), "@Neverlose/ripple")
+		local rippleFactory, rippleErr = compileModule(readLocal(RIPPLE_FILE) or fetchRemote(RIPPLE_FILE, MIN_RIPPLE_BYTES), "@Neverlose/ripple")
 		local Ripple = type(rippleFactory) == "function" and rippleFactory() or nil
 
-		local fusionFactory = compileModule(readLocal(FUSION_FILE) or fetchRemote(FUSION_FILE, MIN_RIPPLE_BYTES), "@Neverlose/fusion")
+		local fusionFactory, fusionErr = compileModule(readLocal(FUSION_FILE) or fetchRemote(FUSION_FILE, MIN_RIPPLE_BYTES), "@Neverlose/fusion")
 		local Fusion = type(fusionFactory) == "function" and fusionFactory() or nil
 
-		local springFactory = compileModule(readLocal(SPRING_FILE) or fetchRemote(SPRING_FILE, MIN_SPRING_BYTES), "@Neverlose/spring")
+		local springFactory, springErr = compileModule(readLocal(SPRING_FILE) or fetchRemote(SPRING_FILE, MIN_SPRING_BYTES), "@Neverlose/spring")
 		local Spring = type(springFactory) == "function" and springFactory({
 			spr = Spr,
 			ripple = Ripple,
 			fusion = Fusion,
 		}) or nil
+
+		-- #region agent log
+		agentDebug("H4", "neverlose_ui:loadMotionStack", "motion stack compile", {
+			hasSpr = Spr ~= nil,
+			hasRipple = Ripple ~= nil,
+			hasFusion = Fusion ~= nil,
+			hasSpring = Spring ~= nil,
+			sprErr = sprErr,
+			rippleErr = rippleErr,
+			springErr = springErr,
+		})
+		-- #endregion
 
 		return Spring, Spr, Ripple, Fusion
 	end
@@ -163,8 +251,23 @@ return function(Core)
 			return nil, "library.lua missing"
 		end
 		if not librarySourceValid(libSource) then
+			-- #region agent log
+			agentDebug("H3", "neverlose_ui:loadNeverloseLibrary", "library source invalid", {
+				libPath = libPath,
+				bytes = #libSource,
+				hasLibRef = libSource:find("LibRef", 1, true) ~= nil,
+				hasEnsureGuiRoot = libSource:find("EnsureGuiRoot", 1, true) ~= nil,
+			})
+			-- #endregion
 			return nil, "stale library.lua missing LibRef/EnsureGuiRoot"
 		end
+
+		-- #region agent log
+		agentDebug("H3", "neverlose_ui:loadNeverloseLibrary", "library source ready", {
+			libPath = libPath,
+			bytes = #libSource,
+		})
+		-- #endregion
 
 		local Library, compileErr = compileLibrarySource(libSource, "@Neverlose/library")
 		if not Library and libPath and libPath:find("^local:", 1, false) == nil then
@@ -178,6 +281,12 @@ return function(Core)
 			end
 		end
 		if type(Library) ~= "table" then
+			-- #region agent log
+			agentDebug("H2", "neverlose_ui:loadNeverloseLibrary", "library compile failed final", {
+				compileErr = compileErr,
+				libPath = libPath,
+			})
+			-- #endregion
 			return nil, "invalid Neverlose library: " .. tostring(compileErr or "compile returned non-table")
 		end
 
@@ -467,7 +576,16 @@ return function(Core)
 		end
 
 		ENV._NeverloseLibrary = Library
-		pcall(Library.EnsureGuiRoot, Library)
+		local ensureOk, ensureErr = pcall(Library.EnsureGuiRoot, Library)
+		-- #region agent log
+		agentDebug("H5", "neverlose_ui:loadNeverloseLibrary", "library load complete", {
+			ensureOk = ensureOk,
+			ensureErr = ensureOk and nil or tostring(ensureErr),
+			hasHolder = Library.Holder and Library.Holder.Instance ~= nil,
+			hasLottie = type(Library.Lottie) == "table",
+			hasWindow = type(Library.Window) == "function",
+		})
+		-- #endregion
 		return Library
 	end
 
@@ -518,6 +636,10 @@ return function(Core)
 
 		local Library, err = loadNeverloseLibrary()
 		if not Library then
+			Core.logWarn("Neverlose UI load failed: " .. tostring(err or "unknown"))
+			-- #region agent log
+			agentDebug("H2", "neverlose_ui:loadUi", "loadNeverloseLibrary failed", { err = tostring(err) })
+			-- #endregion
 			return nil, err or "Neverlose UI missing"
 		end
 

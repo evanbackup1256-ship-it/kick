@@ -1,6 +1,4 @@
--- NEVERLOSE_UI_VERSION = "1.3.0-kick"
---!strict
---!native
+-- NEVERLOSE_UI_VERSION = "1.5.3-kick"
 ---------------------------------------------------------------------
 -- spr - Spring-driven motion library
 --
@@ -739,7 +737,7 @@ end)
 
 local function assertType(argNum: number, fnName: string, expectedType: string, value: unknown)
  if not expectedType:find(typeof(value)) then
- error(`bad argument #{argNum} to {fnName} ({expectedType} expected, got {typeof(value)})`, 3)
+ error(string.format("bad argument #%s to %s (%s expected, got %s)", tostring(argNum), tostring(fnName), tostring(expectedType), typeof(value)), 3)
  end
 end
 
@@ -774,7 +772,7 @@ function spr.target(instance: Instance, dampingRatio: number, frequency: number,
  local propValue = getProperty(instance, propName)
 
  if STRICT_RUNTIME_TYPES and typeof(propTarget) ~= typeof(propValue) then
- error(`bad property {propName} to spr.target ({typeof(propValue)} expected, got {typeof(propTarget)})`, 2)
+ error(string.format("bad property %s to spr.target (%s expected, got %s)", tostring(propName), typeof(propValue), typeof(propTarget)), 2)
  end
 
  -- Special case infinite frequency for an instantaneous change

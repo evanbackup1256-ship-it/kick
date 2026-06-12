@@ -18,7 +18,12 @@ Core, ui, bootErr = Core.boot(state)
 if not Core or not ui then
 	local msg = bootErr or "boot failed"
 	getgenv().Alleral_StartupFailed = msg
-	Core.logWarn(msg)
+	local coreRef = Core or getgenv().Alleral_Core
+	if coreRef and type(coreRef.logWarn) == "function" then
+		coreRef.logWarn(msg)
+	else
+		warn("[Alleral] " .. tostring(msg))
+	end
 	return
 end
 G = Core.Game or G

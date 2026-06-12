@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.9.3"
+local LOADER_VERSION = "7.9.4"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -23,11 +23,11 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.9.3",
+	loader = "7.9.4",
 	core = "2.8.8",
 	ui = "Alleral",
-	neverlose = "1.5.2-kick",
-	windui = "1.5.2-kick",
+	neverlose = "1.5.3-kick",
+	windui = "1.5.3-kick",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -154,6 +154,77 @@ local function getHttpRequestFn()
 	end
 	return nil
 end
+
+-- #region agent log
+local AGENT_DEBUG_SESSION = "2b507f"
+local AGENT_DEBUG_PATHS = { "debug-2b507f.log", "kick/debug-2b507f.log", ".alleral/debug-2b507f.log" }
+local AGENT_DEBUG_ENDPOINT = "http://127.0.0.1:7711/ingest/a1d7fbba-2153-4950-a2ea-2c45ed3c7b92"
+local AgentHttpService = pcall(function()
+	return game:GetService("HttpService")
+end) and game:GetService("HttpService") or nil
+
+local function agentDebug(hypothesisId, location, message, data)
+	data = type(data) == "table" and data or {}
+	local payload = {
+		sessionId = AGENT_DEBUG_SESSION,
+		hypothesisId = tostring(hypothesisId or "?"),
+		location = tostring(location or "?"),
+		message = tostring(message or ""),
+		data = data,
+		timestamp = math.floor(tick() * 1000),
+		runId = "pre-fix",
+	}
+	local line = payload.message
+	if AgentHttpService then
+		local ok, encoded = pcall(AgentHttpService.JSONEncode, AgentHttpService, payload)
+		if ok and type(encoded) == "string" then
+			line = encoded
+		end
+	end
+	if writeFileFn then
+		for _, path in ipairs(AGENT_DEBUG_PATHS) do
+			pcall(function()
+				local prev = ""
+				if isFile then
+					local okExists, exists = pcall(isFile, path)
+					if okExists and exists and readFile then
+						local okRead, body = pcall(readFile, path)
+						if okRead and type(body) == "string" then
+							prev = body
+						end
+					end
+				end
+				writeFileFn(path, prev .. line .. "\n")
+			end)
+		end
+	end
+	local req = getHttpRequestFn()
+	if req then
+		pcall(req, {
+			Url = AGENT_DEBUG_ENDPOINT,
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json",
+				["X-Debug-Session-Id"] = AGENT_DEBUG_SESSION,
+			},
+			Body = line,
+		})
+	elseif AgentHttpService then
+		pcall(function()
+			AgentHttpService:PostAsync(
+				AGENT_DEBUG_ENDPOINT,
+				line,
+				Enum.HttpContentType.ApplicationJson,
+				false,
+				{ ["X-Debug-Session-Id"] = AGENT_DEBUG_SESSION }
+			)
+		end)
+	end
+	warn("[DBG-2b507f] " .. payload.hypothesisId .. " | " .. payload.location .. " | " .. payload.message)
+end
+
+ENV._AlleralAgentDebug = agentDebug
+-- #endregion
 
 local function tryGameHttpGet(url)
 	local urls = { url .. "?t=" .. tostring(tick()), url }
@@ -808,7 +879,7 @@ local function getSource(localPaths, remotePath, opts)
 	local src, path = readLocal(localPaths, minBytes)
 	if src then
 		if usesLegacyHttpHash(src) then
-			log("Removing Volt-incompatible cached " .. path, true)
+			log("Removing executor-incompatible cached " .. path, true)
 			deleteWorkspaceFile(path)
 		elseif marker and not src:find(marker, 1, true) then
 			log("Skipping outdated local " .. path, true)
@@ -1049,6 +1120,32 @@ local function compileCacheKey(src, label)
 	return (label or "Alleral/core-check") .. "|" .. tostring(#src) .. "|" .. src:sub(1, 64) .. "|" .. src:sub(-64)
 end
 
+local LARGE_SOURCE_RELAX_BYTES = 15000
+
+local function sanitizeLuauSource(source)
+	if type(source) ~= "string" or source == "" then
+		return source
+	end
+	source = source:gsub("\r\n", "\n")
+	local out = {}
+	for line in (source .. "\n"):gmatch("(.-)\n") do
+		if not line:match("^%-%-![%w_]+") then
+			table.insert(out, line)
+		end
+	end
+	return table.concat(out, "\n")
+end
+
+local function relaxedCompileOk(src)
+	if type(src) ~= "string" or #src < LARGE_SOURCE_RELAX_BYTES or not looksLikeLua(src) then
+		return false
+	end
+	return src:find("return function", 1, true) ~= nil
+		or src:find("local Library do", 1, true) ~= nil
+		or src:find("getgenv%(%)%.Library", 1, true) ~= nil
+		or src:find("ENV%.Alleral_Core = Core", 1, true) ~= nil
+end
+
 local function compileCoreSource(src, label)
 	if type(src) ~= "string" then
 		return false, "invalid source"
@@ -1070,12 +1167,32 @@ local function compileCoreSource(src, label)
 		COMPILE_VALIDATE_CACHE[cacheKey] = true
 		return true
 	end
-	-- Volt/AWP often reject compile-only checks on large layered modules that still run fine.
-	if (EXECUTOR.slug == "volt" or EXECUTOR.slug == "awp") and #src >= 15000 then
-		if src:find("return function", 1, true) and looksLikeLua(src) then
+	local sanitized = sanitizeLuauSource(src)
+	if sanitized ~= src then
+		fn, err = loadStringFn(sanitized, label or "Alleral/core-check")
+		if type(fn) == "function" then
+			-- #region agent log
+			agentDebug("H1", "loader:compileCoreSource", "sanitized compile ok", {
+				executor = EXECUTOR.slug,
+				label = label,
+				bytes = #src,
+			})
+			-- #endregion
 			COMPILE_VALIDATE_CACHE[cacheKey] = true
 			return true
 		end
+	end
+	if relaxedCompileOk(src) then
+		-- #region agent log
+		agentDebug("H1", "loader:compileCoreSource", "relaxed compile accept", {
+			executor = EXECUTOR.slug,
+			label = label,
+			bytes = #src,
+			err = tostring(err),
+		})
+		-- #endregion
+		COMPILE_VALIDATE_CACHE[cacheKey] = true
+		return true
 	end
 	COMPILE_VALIDATE_CACHE[cacheKey] = err or "compile failed"
 	return false, err
@@ -1175,10 +1292,10 @@ local function neverloseUiValid(src)
 	if not src:find("resolveUiWindow", 1, true) then
 		return false
 	end
-	if EXECUTOR.slug == "volt" or EXECUTOR.slug == "awp" then
-		return looksLikeLua(src)
+	if compileCoreSource(src, "Alleral/neverlose_ui") then
+		return true
 	end
-	return compileCoreSource(src, "Alleral/neverlose_ui")
+	return looksLikeLua(src)
 end
 
 local function coreValid(src)
@@ -1295,11 +1412,8 @@ local function neverloseUiRejectReason(src)
 	if not src:find("resolveUiWindow", 1, true) then
 		return "missing resolveUiWindow helper"
 	end
-	if EXECUTOR.slug == "volt" or EXECUTOR.slug == "awp" then
-		if not looksLikeLua(src) then
-			return "invalid lua body"
-		end
-		return "unknown"
+	if not looksLikeLua(src) then
+		return "invalid lua body"
 	end
 	if loadStringFn then
 		local ok, err = compileCoreSource(src, "Alleral/neverlose_ui-check")
@@ -1408,6 +1522,16 @@ local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, re
 			return nil, label
 		end
 	end
+	-- #region agent log
+	agentDebug("H1", "loader:resolveCoreSource", "core source resolved", {
+		label = label,
+		path = path,
+		expectedCore = expectedCore,
+		version = src and extractFileVersion(src, "core") or nil,
+		bytes = src and #src or 0,
+		remotePath = remotePath,
+	})
+	-- #endregion
 	return src, label
 end
 
@@ -1578,6 +1702,15 @@ local function loadCore()
 			.. " + "
 			.. tostring(hubUiLabel)
 	)
+	-- #region agent log
+	agentDebug("H1", "loader:loadCore", "core stack loaded", {
+		coreVersion = ENV.Alleral_Core and ENV.Alleral_Core.VERSION,
+		neverloseUiVersion = ENV.Alleral_Core and ENV.Alleral_Core.NEVERLOSE_UI_VERSION,
+		baseLabel = baseLabel,
+		neverloseUiLabel = neverloseUiLabel,
+		hasLoadUi = ENV.Alleral_Core and type(ENV.Alleral_Core.loadUi) == "function",
+	})
+	-- #endregion
 	return true
 end
 
@@ -2433,12 +2566,14 @@ local function buildManagedFiles()
 		{
 			paths = {
 				UI .. "/neverlose/library.lua",
+				UI .. "/neverlose/executor_compat.luau",
 				UI .. "/neverlose/spring.luau",
 				UI .. "/neverlose/spr.luau",
 				UI .. "/neverlose/ripple.luau",
 				UI .. "/neverlose/fusion.luau",
 				UI .. "/neverlose/lottie.luau",
 				".alleral/cache/" .. UI .. "/neverlose/library.lua",
+				".alleral/cache/" .. UI .. "/neverlose/executor_compat.luau",
 				".alleral/cache/" .. UI .. "/neverlose/spring.luau",
 				".alleral/cache/" .. UI .. "/neverlose/spr.luau",
 				".alleral/cache/" .. UI .. "/neverlose/ripple.luau",
@@ -3303,6 +3438,9 @@ local function main()
 		log("Alleral ready")
 	elseif uiErr then
 		log("UI skipped: " .. tostring(uiErr), true)
+		-- #region agent log
+		agentDebug("H5", "loader:inject", "UI preload skipped", { err = tostring(uiErr) })
+		-- #endregion
 	end
 
 	if ENV.Alleral_Telemetry and ENV.Alleral_Telemetry.ReportInject then

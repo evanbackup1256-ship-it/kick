@@ -1,5 +1,5 @@
--- Neverlose UI · NEVERLOSE_UI_VERSION = "1.5.2-kick"
-local NEVERLOSE_UI_VERSION = "1.5.2-kick"
+-- Neverlose UI · NEVERLOSE_UI_VERSION = "1.5.3-kick"
+local NEVERLOSE_UI_VERSION = "1.5.3-kick"
 local Library do 
  local Workspace = game:GetService("Workspace")
  local UserInputService = game:GetService("UserInputService")
@@ -13,6 +13,39 @@ local Library do
  gethui = gethui or function()
  return CoreGui
  end
+
+ local function bindGlobal(name, fallback)
+  local fn
+  if getgenv then
+   local ok, env = pcall(getgenv)
+   if ok and type(env) == "table" then
+    fn = env[name]
+   end
+  end
+  if type(fn) ~= "function" and _G then
+   fn = _G[name]
+  end
+  if type(fn) ~= "function" then
+   return fallback
+  end
+  return fn
+ end
+
+ local isfile = bindGlobal("isfile", function()
+  return false
+ end)
+ local writefile = bindGlobal("writefile", function() end)
+ local makefolder = bindGlobal("makefolder", function() end)
+ local isfolder = bindGlobal("isfolder", function()
+  return true
+ end)
+ local listfiles = bindGlobal("listfiles", function()
+  return {}
+ end)
+ local delfile = bindGlobal("delfile", function() end)
+ local getcustomasset = bindGlobal("getcustomasset", function(path)
+  return tostring(path)
+ end)
 
  local LocalPlayer = Players.LocalPlayer
  local Camera = Workspace.CurrentCamera
@@ -1022,24 +1055,37 @@ local Library do
  -- Custom font
  local CustomFont = { } do
  function CustomFont:New(Name, Weight, Style, Data)
- if not isfile(Data.Id) then 
- writefile(Data.Id, game:HttpGet(Data.Url))
+ if type(isfile) ~= "function" or type(writefile) ~= "function" or type(getcustomasset) ~= "function" then
+  return Enum.Font.Gotham
  end
+ if type(Data) ~= "table" or type(Data.Id) ~= "string" or type(Data.Url) ~= "string" then
+  return Enum.Font.Gotham
+ end
+ local ok, assetId = pcall(function()
+  if not isfile(Data.Id) then
+   writefile(Data.Id, game:HttpGet(Data.Url))
+  end
 
- local Data = {
- name = Name,
- faces = {
- {
- name = Name,
- weight = Weight,
- style = Style,
- assetId = getcustomasset(Data.Id)
- }
- }
- }
+  local fontData = {
+   name = Name,
+   faces = {
+    {
+     name = Name,
+     weight = Weight,
+     style = Style,
+     assetId = getcustomasset(Data.Id),
+    },
+   },
+  }
 
- writefile(`{Library.Folders.Assets}/{Name}.font`, HttpService:JSONEncode(Data))
- return getcustomasset(`{Library.Folders.Assets}/{Name}.font`)
+  local fontPath = Library.Folders.Assets .. "/" .. Name .. ".font"
+  writefile(fontPath, HttpService:JSONEncode(fontData))
+  return getcustomasset(fontPath)
+ end)
+ if ok and assetId then
+  return assetId
+ end
+ return Enum.Font.Gotham
  end
 
  local SemiBold = Enum.Font.GothamMedium
@@ -1300,7 +1346,7 @@ local Library do
  end
 
  Library.ToRich = function(self, Text, Color)
- return ` {Text} `
+ return " " .. tostring(Text) .. " "
  end
 
  Library.GetConfig = function(self)
