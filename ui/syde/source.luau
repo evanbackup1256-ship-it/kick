@@ -97,6 +97,8 @@ if update then return end
 local Library =         game:GetObjects("rbxassetid://123800669522471")[1]
 local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 
+local ALLERAL_SYDE_PATCH = 3
+
 -- Alleral: tolerate Roblox template renames (Title/title, Buttons/buttons, etc.)
 local function sydeFindChild(parent, ...)
 	if not parent then
@@ -10026,5 +10028,7 @@ function syde:Init(library)
 
 
 end
+
+syde.__AlleralPatch = ALLERAL_SYDE_PATCH
 
 return syde

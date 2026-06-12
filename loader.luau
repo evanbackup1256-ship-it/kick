@@ -13,7 +13,7 @@ local CORE_ALLERAL_UI_MIN_BYTES = 12000
 local CORE_ALLERAL_UI_MAX_BYTES = 45000
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
-local SYDE_PATCH_MARKER = "sydeFindChild"
+local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
@@ -872,6 +872,7 @@ end
 local function sydeSourceValid(src)
 	return type(src) == "string"
 		and #src >= SYDE_SOURCE_MIN_BYTES
+		and src:find("sydeFindChild", 1, true)
 		and src:find(SYDE_PATCH_MARKER, 1, true)
 		and looksLikeLua(src)
 end
@@ -890,6 +891,12 @@ local function ensureSydeSource()
 		cacheRemote(SYDE_SOURCE_PATH, src)
 		cacheRemote(".alleral/cache/" .. SYDE_SOURCE_PATH, src)
 		return true, "local:" .. tostring(path)
+	end
+	for _, rel in ipairs(localPaths) do
+		deleteWorkspaceFile(rel)
+	end
+	for _, rel in ipairs(cachePaths) do
+		deleteWorkspaceFile(rel)
 	end
 	src, path = readLocal(cachePaths, SYDE_SOURCE_MIN_BYTES)
 	if src and sydeSourceValid(src) then

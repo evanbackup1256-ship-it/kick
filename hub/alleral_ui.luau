@@ -12,7 +12,9 @@ return function(Core)
 		"kick/ui/syde/source.luau",
 		"kick/kick/ui/syde/source.luau",
 	}
-	local SYDE_PATCH_MARKER = "sydeFindChild"
+	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
+	local SYDE_PATCH_VERSION = 3
+	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
 		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/syde/source.luau",
 	}
@@ -82,7 +84,58 @@ return function(Core)
 		return type(src) == "string"
 			and #src >= 5000
 			and not src:find("<!DOCTYPE", 1, true)
+			and src:find("sydeFindChild", 1, true)
 			and src:find(SYDE_PATCH_MARKER, 1, true)
+	end
+
+	local function sydeIoFn(name)
+		if type(Core.execFunction) == "function" then
+			return Core.execFunction(name)
+		end
+		return nil
+	end
+
+	local function purgeInvalidSydeFile(path)
+		local isFile = sydeIoFn("isfile")
+		local readFile = sydeIoFn("readfile")
+		local deleteFile = sydeIoFn("delfile") or sydeIoFn("deletefile")
+		if type(isFile) ~= "function" or type(readFile) ~= "function" or type(deleteFile) ~= "function" then
+			return
+		end
+		local okExists, exists = pcall(isFile, path)
+		if not (okExists and exists) then
+			return
+		end
+		local okRead, src = pcall(readFile, path)
+		if okRead and sydeSourceValid(src) then
+			return
+		end
+		pcall(deleteFile, path)
+	end
+
+	local function readSydeFileAt(path)
+		local readFile = sydeIoFn("readfile")
+		local isFile = sydeIoFn("isfile")
+		if type(readFile) ~= "function" or type(isFile) ~= "function" then
+			return Core.readFile and Core.readFile(path)
+		end
+		local okExists, exists = pcall(isFile, path)
+		if not (okExists and exists) then
+			return nil
+		end
+		local okRead, src = pcall(readFile, path)
+		return okRead and src or nil
+	end
+
+	local function tryReadSydePath(relPath)
+		for _, root in ipairs(SYDE_WORKSPACE_ROOTS) do
+			local full = root .. relPath
+			local src = readSydeFileAt(full)
+			if sydeSourceValid(src) then
+				return src, "local:" .. full
+			end
+		end
+		return nil
 	end
 
 	local function sydeRawUrls()
@@ -109,9 +162,10 @@ return function(Core)
 
 	local function readSydeSource()
 		for _, path in ipairs(SYDE_SOURCE_PATHS) do
-			local src = Core.readFile and Core.readFile(path)
-			if sydeSourceValid(src) then
-				return src, "local:" .. path
+			purgeInvalidSydeFile(path)
+			local src, label = tryReadSydePath(path)
+			if src then
+				return src, label
 			end
 		end
 
@@ -140,13 +194,24 @@ return function(Core)
 	end
 
 	local function loadSyde()
+		if type(ENV._AlleralSyde) == "table" then
+			local patch = ENV._AlleralSyde.__AlleralPatch
+			if type(patch) ~= "number" or patch < SYDE_PATCH_VERSION then
+				ENV._AlleralSyde = nil
+				ENV._AlleralSydeSourceKey = nil
+			end
+		end
+
 		local source, sourceLabel = readSydeSource()
 		if not source then
-			return nil, "Syde source missing (need patched ui/syde/source.luau)"
+			return nil, "Syde source missing (need patched ui/syde/source.luau v" .. tostring(SYDE_PATCH_VERSION) .. "+)"
 		end
 		local sourceKey = tostring(#source) .. ":" .. tostring(sourceLabel or "unknown")
 		if ENV._AlleralSydeSourceKey == sourceKey and type(ENV._AlleralSyde) == "table" and type(ENV._AlleralSyde.Init) == "function" then
-			return ENV._AlleralSyde
+			local patch = ENV._AlleralSyde.__AlleralPatch
+			if type(patch) == "number" and patch >= SYDE_PATCH_VERSION then
+				return ENV._AlleralSyde
+			end
 		end
 		ENV._AlleralSyde = nil
 		local loadFn = Core.loadStringFn()
@@ -161,8 +226,16 @@ return function(Core)
 		if not ok or type(Syde) ~= "table" or type(Syde.Init) ~= "function" then
 			return nil, tostring(Syde or "Syde runtime failed")
 		end
+		if type(Syde.__AlleralPatch) ~= "number" or Syde.__AlleralPatch < SYDE_PATCH_VERSION then
+			ENV._AlleralSyde = nil
+			ENV._AlleralSydeSourceKey = nil
+			return nil, "Syde patch outdated (need v" .. tostring(SYDE_PATCH_VERSION) .. "+)"
+		end
 		ENV._AlleralSydeSourceKey = sourceKey
 		ENV._AlleralSyde = Syde
+		if type(Core.say) == "function" then
+			Core.say("Syde patch v" .. tostring(Syde.__AlleralPatch) .. " from " .. tostring(sourceLabel or "unknown"))
+		end
 		return Syde
 	end
 
