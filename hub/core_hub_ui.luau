@@ -307,25 +307,49 @@ function Core.syncUiState(state, options)
 			if not raw and type(entry.widget) == "table" then
 				raw = entry.widget._raw
 			end
-			if entry.kind == "toggle" and raw and type(raw.Set) == "function" then
+			if entry.kind == "toggle" and raw then
 				pcall(function()
-					local prev = raw.Callback
-					raw.Callback = function() end
-					raw:Set(value == true, nil, false)
-					raw.Callback = prev
+					if type(raw.UpdateState) == "function" then
+						raw:UpdateState(value == true)
+					elseif type(raw.Set) == "function" then
+						local prev = raw.Callback
+						raw.Callback = function() end
+						raw:Set(value == true, nil, false)
+						raw.Callback = prev
+					elseif entry.widget and entry.widget.Set then
+						entry.widget:Set({ CurrentValue = value == true })
+					end
 				end)
 				synced += 1
-			elseif entry.kind == "slider" and raw and type(raw.Set) == "function" then
+			elseif entry.kind == "slider" and raw then
 				pcall(function()
-					local prev = raw.Callback
-					raw.Callback = function() end
-					raw:Set(tonumber(value) or 0)
-					raw.Callback = prev
+					local num = tonumber(value) or 0
+					if type(raw.UpdateValue) == "function" then
+						raw:UpdateValue(num)
+					elseif type(raw.Set) == "function" then
+						local prev = raw.Callback
+						raw.Callback = function() end
+						raw:Set(num)
+						raw.Callback = prev
+					elseif entry.widget and entry.widget.Set then
+						entry.widget:Set({ CurrentValue = num })
+					end
+				end)
+				synced += 1
+			elseif entry.kind == "input" and raw then
+				pcall(function()
+					if type(raw.UpdateText) == "function" then
+						raw:UpdateText(tostring(value))
+					elseif entry.widget and entry.widget.Set then
+						entry.widget:Set({ CurrentValue = tostring(value) })
+					end
 				end)
 				synced += 1
 			elseif entry.kind == "dropdown" and raw then
 				pcall(function()
-					if raw.Select then
+					if type(raw.UpdateSelection) == "function" then
+						raw:UpdateSelection(value)
+					elseif raw.Select then
 						raw:Select(value)
 					elseif raw.Set then
 						raw:Set(value)
@@ -383,6 +407,10 @@ function Core.toggleUiVisibility()
 	local raw = window._rawWindow
 	if type(raw.Toggle) == "function" then
 		pcall(raw.Toggle, raw)
+		return true
+	end
+	if type(raw.SetState) == "function" and type(raw.GetState) == "function" then
+		pcall(raw.SetState, raw, not raw:GetState())
 		return true
 	end
 	if type(raw.SetOpen) == "function" then

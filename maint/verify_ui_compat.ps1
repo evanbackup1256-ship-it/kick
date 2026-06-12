@@ -45,6 +45,24 @@ if ($alleralUi -match 'function Core\.createWindUiGroupbox') {
     Fail "alleral_ui missing createWindUiGroupbox adapter"
 }
 
+if (Test-Path (Join-Path $root "hub/ui_spr.luau")) {
+    Pass "ui_spr spring module present"
+} else {
+    Fail "hub/ui_spr.luau missing"
+}
+
+if (Test-Path (Join-Path $root "hub/ui_motion.luau")) {
+    Pass "ui_motion animation layer present"
+} else {
+    Fail "hub/ui_motion.luau missing"
+}
+
+if ($alleralUi -match 'ui_motion\.luau') {
+    Pass "alleral_ui loads ui_motion layer"
+} else {
+    Fail "alleral_ui missing ui_motion bootstrap"
+}
+
 if ($loader -match 'purgeLegacyHubUiFiles') {
     Pass "loader purges legacy hub/ui workspace files"
 } else {

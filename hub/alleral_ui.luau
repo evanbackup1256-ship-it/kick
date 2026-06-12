@@ -1,7 +1,7 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.1-maclib"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.2-maclib"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Maclib"
 
@@ -15,6 +15,52 @@ return function(Core)
 		return ok and env or {}
 	end
 	local ENV = genv()
+
+	local HUB_RAW_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/"
+
+	local function loadHubSource(filename)
+		local rel = "hub/" .. filename
+		local src = Core.readFile and Core.readFile(rel)
+		if type(src) ~= "string" or #src < 100 then
+			local url = HUB_RAW_BASE .. filename .. "?t=" .. tostring(tick())
+			if type(Core.httpGet) == "function" then
+				src = Core.httpGet(url)
+			end
+		end
+		return type(src) == "string" and #src >= 100 and src or nil
+	end
+
+	local function loadHubModule(filename)
+		local src = loadHubSource(filename)
+		if not src then
+			return nil
+		end
+		local loadFn = Core.loadStringFn()
+		if not loadFn then
+			return nil
+		end
+		local chunk, err = loadFn(src, "@Alleral/" .. filename)
+		if not chunk then
+			Core.logWarn("Hub module compile failed: " .. filename .. " " .. tostring(err))
+			return nil
+		end
+		local ok, result = pcall(chunk)
+		if not ok then
+			Core.logWarn("Hub module runtime failed: " .. filename .. " " .. tostring(result))
+			return nil
+		end
+		return result
+	end
+
+	local UiSpr = loadHubModule("ui_spr.luau")
+	local UiMotion = nil
+	if UiSpr then
+		local motionFactory = loadHubModule("ui_motion.luau")
+		if type(motionFactory) == "function" then
+			UiMotion = motionFactory(Core, UiSpr)
+		end
+	end
+	ENV.Alleral_UiMotion = UiMotion
 
 	local function iconImage(icon)
 		if type(icon) == "number" then
@@ -186,10 +232,13 @@ return function(Core)
 
 		function Library:RepairWindow(window)
 			window = window or activeWindow or Library.Window
-			if window and type(window.Toggle) == "function" then
-				return pcall(window.Toggle, window) == true
+			if UiMotion and window and type(UiMotion.repair) == "function" then
+				pcall(UiMotion.repair, window)
 			end
-			return false
+			if window and type(window.Toggle) == "function" then
+				pcall(window.Toggle, window)
+			end
+			return true
 		end
 
 		function Library:ListThemeNames()
@@ -227,6 +276,22 @@ return function(Core)
 
 		function Library:SetMotionProfile(name)
 			motionProfile = tostring(name or motionProfile)
+			ENV.Alleral_MotionProfile = motionProfile
+			if UiMotion and type(UiMotion.setProfile) == "function" then
+				pcall(UiMotion.setProfile, motionProfile)
+			end
+		end
+
+		function Library:SetSpringMotion(enabled)
+			ENV.Alleral_UiSpringMotion = enabled ~= false
+		end
+
+		function Library:SetReducedMotion(enabled)
+			ENV.Alleral_UiReducedMotion = enabled == true
+		end
+
+		function Library:GetSpringMotion()
+			return ENV.Alleral_UiSpringMotion ~= false
 		end
 
 		function Library:ListProfiles()
@@ -355,6 +420,11 @@ return function(Core)
 			end
 
 			flushPendingNotifies(window)
+			if UiMotion and type(UiMotion.attachWindow) == "function" then
+				task.defer(function()
+					pcall(UiMotion.attachWindow, window)
+				end)
+			end
 			return window
 		end
 
@@ -481,8 +551,14 @@ return function(Core)
 				Callback = settings.Callback or function() end,
 			}, nextFlag(settings.Name, id))
 			return wrapElement(function(nextSettings)
-				if nextSettings.CurrentValue ~= nil and handle and handle.Set then
-					pcall(handle.Set, handle, nextSettings.CurrentValue == true)
+				if nextSettings.CurrentValue == nil or not handle then
+					return
+				end
+				local value = nextSettings.CurrentValue == true
+				if type(handle.UpdateState) == "function" then
+					pcall(handle.UpdateState, handle, value)
+				elseif handle.Set then
+					pcall(handle.Set, handle, value)
 				end
 			end, {
 				raw = handle,
@@ -511,8 +587,14 @@ return function(Core)
 				Callback = settings.Callback or function() end,
 			}, nextFlag(settings.Name, id))
 			return wrapElement(function(nextSettings)
-				if nextSettings.CurrentValue ~= nil and handle and handle.Set then
-					pcall(handle.Set, handle, tonumber(nextSettings.CurrentValue) or minValue)
+				if nextSettings.CurrentValue == nil or not handle then
+					return
+				end
+				local value = tonumber(nextSettings.CurrentValue) or minValue
+				if type(handle.UpdateValue) == "function" then
+					pcall(handle.UpdateValue, handle, value)
+				elseif handle.Set then
+					pcall(handle.Set, handle, value)
 				end
 			end, {
 				raw = handle,
@@ -522,24 +604,42 @@ return function(Core)
 		end
 
 		function groupbox:CreateButton(settings, id)
-			rawSection:Button({
+			local handle = rawSection:Button({
 				Name = settings.Name,
 				Callback = settings.Callback or function() end,
+			}, nextFlag(settings.Name, id))
+			return wrapElement(function(nextSettings)
+				if nextSettings.Name and handle and type(handle.UpdateName) == "function" then
+					pcall(handle.UpdateName, handle, nextSettings.Name)
+				end
+			end, {
+				raw = handle,
 			})
-			return { Set = function() end }
 		end
 
 		function groupbox:CreateInput(settings, id)
 			local handle = rawSection:Input({
 				Name = settings.Name,
 				Placeholder = settings.PlaceholderText or settings.Placeholder or "",
+				Default = settings.CurrentValue or settings.Default or "",
+				AcceptedCharacters = settings.AcceptedCharacters or "All",
 				Callback = settings.Callback or function() end,
+				onChanged = settings.onChanged,
 			}, nextFlag(settings.Name, id))
 			return wrapElement(function(nextSettings)
-				if nextSettings.CurrentValue ~= nil and handle and handle.Set then
+				if nextSettings.CurrentValue == nil then
+					return
+				end
+				if handle and type(handle.UpdateText) == "function" then
+					pcall(handle.UpdateText, handle, tostring(nextSettings.CurrentValue))
+				elseif handle and handle.Set then
 					pcall(handle.Set, handle, tostring(nextSettings.CurrentValue))
 				end
-			end)
+			end, {
+				raw = handle,
+				bindKey = settings.BindKey or settings.StateKey,
+				kind = "input",
+			})
 		end
 
 		function groupbox:CreateDropdown(settings, id)
@@ -578,7 +678,7 @@ return function(Core)
 				if pick == nil then
 					return
 				end
-				if handle.UpdateSelection then
+				if type(handle.UpdateSelection) == "function" then
 					pcall(handle.UpdateSelection, handle, pick)
 				elseif handle.Set then
 					pcall(handle.Set, handle, pick)
