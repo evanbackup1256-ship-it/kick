@@ -3,6 +3,14 @@
   let siteKey = null;
   let loadPromise = null;
 
+  function isVisible(el) {
+    if (!el?.isConnected) return false;
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
   async function resolveSiteKey() {
     if (siteKey) return siteKey;
     const cfg = window.ALLERAL_CONFIG || {};
@@ -68,7 +76,7 @@
   async function renderWidget(mount) {
     const id = mount.dataset.turnstile;
     if (!id || mount.dataset.rendered === "1") return;
-    if (!mount.isConnected || mount.closest(".hidden")) return;
+    if (!isVisible(mount) || mount.closest(".hidden")) return;
 
     if (widgets.has(id)) unmountWidget(id);
 
@@ -76,13 +84,19 @@
     const key = await resolveSiteKey();
     if (!window.turnstile) return;
 
+    mount.innerHTML = "";
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    if (!mount.isConnected || !isVisible(mount)) return;
+
     mount.dataset.rendered = "1";
     const entry = { mount, token: "", widgetId: null };
     entry.widgetId = window.turnstile.render(mount, {
       sitekey: key,
       theme: "dark",
-      size: "flexible",
+      size: "normal",
       appearance: "always",
+      retry: "auto",
+      "refresh-expired": "auto",
       callback: (token) => {
         entry.token = token;
       },
@@ -91,6 +105,14 @@
       },
       "error-callback": () => {
         entry.token = "";
+        unmountWidget(id);
+        mount.dataset.rendered = "";
+        window.setTimeout(() => {
+          if (isVisible(mount) && !mount.closest(".hidden")) void renderWidget(mount);
+        }, 600);
+      },
+      "timeout-callback": () => {
+        entry.token = "";
       },
     });
     widgets.set(id, entry);
@@ -98,9 +120,9 @@
 
   window.AlleralTurnstile = {
     async mountVisible() {
-      document.querySelectorAll(".form-turnstile:not([data-rendered])").forEach((el) => {
-        if (!el.closest(".hidden")) void renderWidget(el);
-      });
+      for (const el of document.querySelectorAll(".form-turnstile:not([data-rendered])")) {
+        if (!el.closest(".hidden") && isVisible(el)) await renderWidget(el);
+      }
     },
 
     async getToken(formId) {

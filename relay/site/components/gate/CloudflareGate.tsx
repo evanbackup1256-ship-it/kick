@@ -1,118 +1,179 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { API_BASE, TURNSTILE_SITE_KEY } from "@/lib/config";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { mountTurnstileWidget, resolveTurnstileSiteKey, verifyGateToken } from "@/lib/turnstile";
 
 const STORAGE_KEY = "alleral_gate_ok";
 const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
 
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (el: HTMLElement, opts: Record<string, unknown>) => string;
-      remove: (id: string) => void;
-    };
-    onTurnstileLoad?: () => void;
+function readSessionPassed(): boolean {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    if (raw === "1") return true;
+    const data = JSON.parse(raw) as { until?: number };
+    return Boolean(data?.until && Date.now() < data.until);
+  } catch {
+    return sessionStorage.getItem(STORAGE_KEY) === "1";
   }
 }
 
+function markSessionPassed() {
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ until: Date.now() + SESSION_TTL_MS }));
+}
+
 export function CloudflareGate({ children }: { children: React.ReactNode }) {
-  const [passed, setPassed] = useState(false);
-  const [checking, setChecking] = useState(true);
+  const [passed, setPassed] = useState<boolean | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [retry, setRetry] = useState(0);
+  const mountRef = useRef<HTMLDivElement>(null);
+  const widgetRef = useRef<{ remove: () => void; reset: () => void } | null>(null);
+  const verifiedRef = useRef(false);
 
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const data = raw === "1" ? { until: Date.now() + SESSION_TTL_MS } : JSON.parse(raw);
-        if (data?.until && Date.now() < data.until) {
-          setPassed(true);
-          setChecking(false);
-          return;
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-    setChecking(false);
+    setPassed(readSessionPassed());
   }, []);
 
+  const unlock = useCallback(() => {
+    document.documentElement.classList.remove("cf-gate-lock");
+    document.body.classList.remove("cf-gate-lock", "cf-gate-active");
+  }, []);
+
+  const finish = useCallback(() => {
+    markSessionPassed();
+    unlock();
+    window.dispatchEvent(new CustomEvent("alleral:gate-passed"));
+    setPassed(true);
+  }, [unlock]);
+
   useEffect(() => {
-    if (passed || checking) return;
+    if (passed !== false) {
+      if (passed === true) unlock();
+      return;
+    }
 
     document.documentElement.classList.add("cf-gate-lock");
     document.body.classList.add("cf-gate-lock", "cf-gate-active");
 
-    const backdrop = document.createElement("div");
-    backdrop.className = "cf-gate-backdrop";
-    backdrop.innerHTML = `
-      <div class="cf-gate-card glass">
-        <p class="text-sm text-muted mb-2">Alleral Hub</p>
-        <h2 class="text-xl font-semibold mb-2">Verify you're human</h2>
-        <p class="text-sm text-muted mb-4">Quick check before loading the hub.</p>
-        <div id="cfTurnstileHost" class="flex justify-center min-h-[65px]"></div>
-        <p id="cfGateError" class="text-sm text-red-400 mt-3 hidden"></p>
-      </div>
-    `;
-    document.body.appendChild(backdrop);
-
-    const finish = () => {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ until: Date.now() + SESSION_TTL_MS }));
-      document.documentElement.classList.remove("cf-gate-lock");
-      document.body.classList.remove("cf-gate-lock", "cf-gate-active");
-      backdrop.remove();
-      setPassed(true);
+    return () => {
+      unlock();
+      widgetRef.current?.remove();
+      widgetRef.current = null;
     };
+  }, [passed, unlock]);
 
-    const mountTurnstile = async () => {
-      let siteKey = TURNSTILE_SITE_KEY;
-      if (!siteKey) {
-        try {
-          const res = await fetch(`${API_BASE}/api/gate/config`, { cache: "no-store" });
-          const data = await res.json();
-          siteKey = data.siteKey || "";
-        } catch {
-          finish();
-          return;
-        }
-      }
+  useEffect(() => {
+    if (passed !== false) return;
+
+    const el = mountRef.current;
+    if (!el) return;
+
+    let cancelled = false;
+    verifiedRef.current = false;
+    setLoading(true);
+    setError("");
+
+    const boot = async () => {
+      widgetRef.current?.remove();
+      widgetRef.current = null;
+
+      const siteKey = await resolveTurnstileSiteKey();
       if (!siteKey) {
         finish();
         return;
       }
 
-      const script = document.createElement("script");
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad";
-      script.async = true;
-      window.onTurnstileLoad = () => {
-        const host = document.getElementById("cfTurnstileHost");
-        if (!host || !window.turnstile) return;
-        window.turnstile.render(host, {
-          sitekey: siteKey,
-          theme: "dark",
-          callback: () => finish(),
-          "error-callback": () => {
-            const err = document.getElementById("cfGateError");
-            if (err) {
-              err.textContent = "Verification failed — refresh and try again.";
-              err.classList.remove("hidden");
+      try {
+        const handle = await mountTurnstileWidget(el, {
+          onBeforeInteractive: () => {
+            if (!cancelled) setLoading(false);
+          },
+          onToken: async (token) => {
+            if (verifiedRef.current || cancelled) return;
+            verifiedRef.current = true;
+            const ok = await verifyGateToken(token);
+            if (cancelled) return;
+            if (!ok) {
+              verifiedRef.current = false;
+              setError("Verification failed. Try the challenge again.");
+              widgetRef.current?.reset();
+              return;
+            }
+            finish();
+          },
+          onError: () => {
+            if (!cancelled) {
+              setLoading(false);
+              setError("Challenge error. Click Try Again.");
+            }
+          },
+          onExpire: () => {
+            verifiedRef.current = false;
+            if (!cancelled) setError("Challenge expired. Complete it again.");
+          },
+          onTimeout: () => {
+            if (!cancelled) {
+              setLoading(false);
+              setError("Challenge timed out. Click Try Again.");
             }
           },
         });
-      };
-      document.head.appendChild(script);
+
+        if (cancelled) {
+          handle.remove();
+          return;
+        }
+
+        widgetRef.current = handle;
+        setLoading(false);
+      } catch {
+        if (!cancelled) {
+          setLoading(false);
+          setError("Could not load Cloudflare Turnstile. Check your connection.");
+        }
+      }
     };
 
-    void mountTurnstile();
+    void boot();
 
     return () => {
-      backdrop.remove();
-      document.documentElement.classList.remove("cf-gate-lock");
-      document.body.classList.remove("cf-gate-lock", "cf-gate-active");
+      cancelled = true;
+      widgetRef.current?.remove();
+      widgetRef.current = null;
     };
-  }, [passed, checking]);
+  }, [passed, retry, finish]);
 
-  if (checking) return null;
-  if (!passed) return null;
+  if (passed === null) return null;
+
+  if (passed === false) {
+    return (
+      <div className="cf-gate-backdrop" role="dialog" aria-modal="true" aria-label="Security check">
+        <div className="cf-gate-card glass">
+          <p className="text-sm text-muted mb-2">Alleral Hub</p>
+          <h2 className="text-xl font-semibold mb-2">Verify you&apos;re human</h2>
+          <p className="text-sm text-muted mb-4">Quick check before loading the hub.</p>
+          {loading ? <p className="mb-3 text-xs text-muted-2">Loading security widget…</p> : null}
+          <div ref={mountRef} id="cfTurnstileHost" className="flex justify-center min-h-[65px]" />
+          {error ? (
+            <div className="mt-3 grid gap-2">
+              <p className="text-sm text-red-400">{error}</p>
+              <button
+                type="button"
+                className="mx-auto rounded-full border border-border px-4 py-2 text-sm text-muted hover:text-text"
+                onClick={() => {
+                  verifiedRef.current = false;
+                  setRetry((n) => n + 1);
+                }}
+              >
+                Try Again
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return <>{children}</>;
 }

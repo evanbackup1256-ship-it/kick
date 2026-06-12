@@ -1,21 +1,35 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/config";
 import type { SitePayload } from "@/lib/types";
 import { SectionHeader } from "@/components/layout/SiteChrome";
 import { BlurFadeIn, GlowButton, SpotlightCard } from "@/components/ui/premium";
+import { FormTurnstile } from "@/components/turnstile/FormTurnstile";
 
 export function SupportSection({ site }: { site: SitePayload }) {
   const [tab, setTab] = useState<"bug" | "feature" | "support">("bug");
   const [error, setError] = useState("");
   const [ok, setOk] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/gate/config`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => setCaptchaRequired(Boolean(data.serverVerify && data.siteKey)))
+      .catch(() => setCaptchaRequired(false));
+  }, []);
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
     setOk(false);
+    if (captchaRequired && !turnstileToken) {
+      setError("Complete the captcha first.");
+      return;
+    }
     const form = new FormData(e.currentTarget);
     const path = tab === "bug" ? "/api/bug-report" : tab === "feature" ? "/api/feature-request" : "/api/support";
     const payload: Record<string, string> = Object.fromEntries(
@@ -33,6 +47,7 @@ export function SupportSection({ site }: { site: SitePayload }) {
       payload.pageUrl = `${location.pathname}${location.hash}`;
       payload.userAgent = navigator.userAgent;
     }
+    if (turnstileToken) payload.turnstileToken = turnstileToken;
     try {
       const res = await fetch(`${API_BASE}${path}`, {
         method: "POST",
@@ -42,6 +57,7 @@ export function SupportSection({ site }: { site: SitePayload }) {
       const data = await res.json();
       if (!res.ok || data.ok === false) throw new Error(data.error || "Submit failed");
       setOk(true);
+      setTurnstileToken("");
       e.currentTarget.reset();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");
@@ -64,7 +80,12 @@ export function SupportSection({ site }: { site: SitePayload }) {
             <button
               key={id}
               type="button"
-              onClick={() => setTab(id)}
+              onClick={() => {
+                setTab(id);
+                setTurnstileToken("");
+                setError("");
+                setOk(false);
+              }}
               className={`rounded-full border px-4 py-2 text-sm transition ${tab === id ? "border-cyan-400/40 bg-cyan-400/10 text-text" : "border-border text-muted"}`}
             >
               {label}
@@ -114,6 +135,7 @@ export function SupportSection({ site }: { site: SitePayload }) {
           ) : null}
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
           {ok ? <p className="text-sm text-green-400">Sent — thanks!</p> : null}
+          {captchaRequired ? <FormTurnstile formId={tab} onToken={setTurnstileToken} /> : null}
           <GlowButton type="submit">Submit</GlowButton>
         </motion.form>
         </SpotlightCard>
