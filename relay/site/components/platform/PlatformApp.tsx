@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -13,7 +12,7 @@ import { CommandPalette } from "@/components/platform/CommandPalette";
 import { Sidebar } from "@/components/platform/Sidebar";
 import { TopBar } from "@/components/platform/TopBar";
 import { QueryProvider } from "@/components/providers/QueryProvider";
-import { LenisProvider, ScrollContent } from "@/components/providers/LenisProvider";
+import { MainScroll, ScrollContent } from "@/components/providers/MainScroll";
 import { OverviewView } from "@/components/views/OverviewView";
 import { GamesView } from "@/components/views/GamesView";
 import { ToolsView } from "@/components/views/ToolsView";
@@ -67,7 +66,7 @@ function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }
         <Sidebar online={online} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TopBar online={online} workspace={workspace} dataUpdatedAt={dataUpdatedAt} />
-          <LenisProvider>
+          <MainScroll>
             <ScrollContent className={`mx-auto w-full max-w-[1520px] ${mainPad} ${workspace === "wide" ? "max-w-[1680px]" : ""}`}>
               <div key={activeView} className="view-enter">
                 {activeView === "overview" ? <OverviewView site={site} online={online} onCopy={() => void copyLoadstring()} /> : null}
@@ -79,7 +78,7 @@ function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }
                 {activeView === "credits" ? <CreditsView site={site} /> : null}
               </div>
             </ScrollContent>
-          </LenisProvider>
+          </MainScroll>
         </div>
       </div>
       <CommandPalette

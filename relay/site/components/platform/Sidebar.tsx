@@ -47,7 +47,7 @@ function SidebarNav({ online, collapsed }: { online?: boolean; collapsed: boolea
         ) : null}
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto p-2" data-lenis-prevent>
+      <nav className="flex-1 space-y-1 overflow-y-auto p-2">
         {(Object.keys(VIEW_META) as PlatformView[]).map((view) => {
           const active = activeView === view;
           const Icon = ICONS[view];

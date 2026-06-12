@@ -247,6 +247,21 @@
     z-index: 1;
   }
 
+  /* Mission Control: fixed viewport height so panels + charts don't blow out the page */
+  .command-center-grid {
+    height: calc(100dvh - 13rem);
+    min-height: 420px;
+    max-height: calc(100dvh - 13rem);
+  }
+
+  @media (max-width: 767px) {
+    .command-center-grid {
+      height: auto;
+      min-height: 0;
+      max-height: none;
+    }
+  }
+
   .nav-rail-item {
     position: relative;
     display: flex;

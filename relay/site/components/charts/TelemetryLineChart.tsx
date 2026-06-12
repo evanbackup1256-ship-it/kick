@@ -152,7 +152,9 @@ export const TelemetryLineChart = memo(function TelemetryLineChart({
 
   return (
     <div className={className}>
-      <ParentSize>{({ width, height }) => (width > 0 && height > 0 ? <InnerChart width={width} height={height} data={data} secondary={sec} /> : null)}</ParentSize>
+      <ParentSize className="h-full w-full" debounceTime={10}>
+        {({ width, height }) => (width > 0 && height > 0 ? <InnerChart width={width} height={height} data={data} secondary={sec} /> : null)}
+      </ParentSize>
     </div>
   );
 });

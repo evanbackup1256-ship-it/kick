@@ -1,6 +1,5 @@
 "use client";
 
-import clsx from "clsx";
 import { memo, useMemo } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Activity, Gamepad2, Layers, Radio } from "lucide-react";
@@ -19,6 +18,8 @@ import { StatusHeatmap } from "@/components/charts/StatusHeatmap";
 import { EventTimeline, GameStatusStream } from "@/components/charts/EventTimeline";
 import { ServiceGraph } from "@/components/charts/ServiceGraph";
 import { SmoothScroll } from "@/components/ui/SmoothScroll";
+
+const PANEL_CLASS = "flex min-h-0 flex-col overflow-hidden";
 
 function MetricsColumn({
   healthPct,
@@ -57,7 +58,7 @@ function MetricsColumn({
 
 function ChartBlock({ chartData }: { chartData: { value: number; label: string }[] }) {
   return (
-    <div className="obs-panel obs-panel-chart flex min-h-[280px] flex-col md:min-h-0 md:h-full">
+    <div className="obs-panel obs-panel-chart flex h-full min-h-0 flex-col overflow-hidden">
       <div className="obs-panel-head shrink-0">
         <div>
           <p className="obs-kicker">Throughput</p>
@@ -65,7 +66,9 @@ function ChartBlock({ chartData }: { chartData: { value: number; label: string }
         </div>
         <Activity className="h-4 w-4 shrink-0 text-cyan-400" strokeWidth={1.75} />
       </div>
-      <TelemetryLineChart series={chartData} className="mt-2 min-h-[200px] flex-1" />
+      <div className="relative mt-2 min-h-0 flex-1 overflow-hidden">
+        <TelemetryLineChart series={chartData} className="absolute inset-0" />
+      </div>
     </div>
   );
 }
@@ -144,33 +147,41 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
       {isMobile ? (
         <div className="flex flex-col gap-3 pb-4">
           <MetricsColumn healthPct={healthPct} working={working} total={total} history={history} sync={data?.sync} online={online} dataUpdatedAt={dataUpdatedAt} />
-          <ChartBlock chartData={chartData} />
+          <div className="obs-panel obs-panel-chart overflow-hidden">
+            <div className="obs-panel-head">
+              <div>
+                <p className="obs-kicker">Throughput</p>
+                <h3 className="obs-title-sm">Working scripts · rolling window</h3>
+              </div>
+            </div>
+            <TelemetryLineChart series={chartData} className="relative mt-2 h-[220px] w-full" />
+          </div>
           <StatusHeatmap games={games} className="min-h-[220px]" />
           <ServiceGraph games={games} className="min-h-[220px]" />
           <GameStatusStream games={games} className="min-h-[280px]" />
           <EventTimeline events={timeline} className="min-h-[280px]" />
         </div>
       ) : (
-        <div className="min-h-[640px] flex-1">
-          <Group orientation="horizontal" className="h-full min-h-[640px] gap-2">
-            <Panel defaultSize={20} minSize={18} maxSize={28}>
-              <SmoothScroll className="h-full pr-1" flex>
+        <div className="command-center-grid min-h-0 shrink-0 overflow-hidden">
+          <Group orientation="horizontal" className="h-full w-full gap-2">
+            <Panel defaultSize={20} minSize={18} maxSize={28} className={PANEL_CLASS}>
+              <SmoothScroll className="h-full min-h-0 pr-1" flex>
                 <MetricsColumn healthPct={healthPct} working={working} total={total} history={history} sync={data?.sync} online={online} dataUpdatedAt={dataUpdatedAt} />
               </SmoothScroll>
             </Panel>
 
             <Separator className="obs-separator" />
 
-            <Panel defaultSize={52} minSize={36}>
+            <Panel defaultSize={52} minSize={36} className={PANEL_CLASS}>
               <Group orientation="vertical" className="h-full min-h-0 gap-2">
-                <Panel defaultSize={58} minSize={35}>
+                <Panel defaultSize={58} minSize={35} className={PANEL_CLASS}>
                   <ChartBlock chartData={chartData} />
                 </Panel>
                 <Separator className="obs-separator horizontal" />
-                <Panel defaultSize={42} minSize={28}>
-                  <div className="grid h-full min-h-0 grid-cols-1 gap-2 xl:grid-cols-2">
-                    <StatusHeatmap games={games} className="min-h-[220px]" />
-                    <ServiceGraph games={games} className="min-h-[220px]" />
+                <Panel defaultSize={42} minSize={28} className={PANEL_CLASS}>
+                  <div className="grid h-full min-h-0 grid-cols-1 gap-2 overflow-hidden xl:grid-cols-2">
+                    <StatusHeatmap games={games} className="min-h-0 overflow-hidden" />
+                    <ServiceGraph games={games} className="min-h-0 overflow-hidden" />
                   </div>
                 </Panel>
               </Group>
@@ -178,14 +189,14 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
 
             <Separator className="obs-separator" />
 
-            <Panel defaultSize={28} minSize={22} maxSize={36}>
+            <Panel defaultSize={28} minSize={22} maxSize={36} className={PANEL_CLASS}>
               <Group orientation="vertical" className="h-full min-h-0 gap-2 pl-1">
-                <Panel defaultSize={55} minSize={30}>
-                  <GameStatusStream games={games} className="h-full" />
+                <Panel defaultSize={55} minSize={30} className={PANEL_CLASS}>
+                  <GameStatusStream games={games} className="h-full min-h-0" />
                 </Panel>
                 <Separator className="obs-separator horizontal" />
-                <Panel defaultSize={45} minSize={25}>
-                  <EventTimeline events={timeline} className="h-full" />
+                <Panel defaultSize={45} minSize={25} className={PANEL_CLASS}>
+                  <EventTimeline events={timeline} className="h-full min-h-0" />
                 </Panel>
               </Group>
             </Panel>

@@ -21,7 +21,7 @@ export function SmoothScroll({ children, className, flex }: SmoothScrollProps) {
       }}
       defer
     >
-      <div data-lenis-prevent className={clsx(flex && "flex min-h-0 flex-1 flex-col")}>
+      <div data-scroll-lock className={clsx(flex && "flex min-h-0 flex-1 flex-col")}>
         {children}
       </div>
     </OverlayScrollbarsComponent>

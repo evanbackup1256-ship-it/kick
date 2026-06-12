@@ -35,7 +35,7 @@ function VirtualList<T>({
   }
 
   return (
-    <div ref={parentRef} className={clsx("min-h-0 flex-1 overflow-y-auto overscroll-contain", className)} data-lenis-prevent>
+    <div ref={parentRef} className={clsx("min-h-0 flex-1 overflow-y-auto overscroll-contain", className)}>
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {virtualizer.getVirtualItems().map((row) => (
           <div
