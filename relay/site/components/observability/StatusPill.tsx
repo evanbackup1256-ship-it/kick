@@ -20,9 +20,11 @@ export function StatusPill({
 }) {
   const meta = status[kind];
   const text = label ?? meta.label;
+  const showPulse = pulse && (kind === "syncing" || kind === "online");
 
   return (
     <motion.span
+      layout={false}
       transition={spring.status}
       className={clsx(
         "inline-flex items-center gap-2 rounded-full border font-medium",
@@ -30,22 +32,15 @@ export function StatusPill({
         className
       )}
       style={{
-        borderColor: `${meta.color}44`,
-        background: `linear-gradient(135deg, ${meta.color}18, ${meta.color}08)`,
-        boxShadow: `0 0 20px ${meta.glow}, inset 0 1px 0 rgba(255,255,255,0.06)`,
+        borderColor: `${meta.color}33`,
+        background: `linear-gradient(135deg, ${meta.color}14, ${meta.color}06)`,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.05)`,
         color: meta.color,
       }}
     >
-      <span className="relative flex h-2 w-2">
-        {pulse ? (
-          <motion.span
-            className="absolute inset-0 rounded-full"
-            style={{ background: meta.color }}
-            animate={{ scale: [1, 1.8, 1], opacity: [0.9, 0.2, 0.9] }}
-            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-          />
-        ) : null}
-        <span className="relative h-2 w-2 rounded-full" style={{ background: meta.color, boxShadow: `0 0 8px ${meta.glow}` }} />
+      <span className="relative flex h-2 w-2 shrink-0">
+        {showPulse ? <span className="status-live-pulse absolute inset-0 rounded-full" style={{ background: meta.color }} /> : null}
+        <span className="relative h-2 w-2 rounded-full" style={{ background: meta.color, boxShadow: `0 0 6px ${meta.glow}` }} />
       </span>
       {text}
     </motion.span>

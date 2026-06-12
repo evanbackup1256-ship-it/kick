@@ -18,6 +18,7 @@ import { StatusHeatmap } from "@/components/charts/StatusHeatmap";
 import { EventTimeline, GameStatusStream } from "@/components/charts/EventTimeline";
 import { ServiceGraph } from "@/components/charts/ServiceGraph";
 import { SmoothScroll } from "@/components/ui/SmoothScroll";
+import { Reveal, Stagger, StaggerItem } from "@/components/motion/Reveal";
 
 const PANEL_CLASS = "flex min-h-0 flex-col overflow-hidden";
 
@@ -133,7 +134,7 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
 
   return (
     <div className="command-center flex min-h-0 flex-col">
-      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
+      <Reveal className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
           <p className="obs-kicker">Observability</p>
           <h2 className="obs-title">Mission control</h2>
@@ -142,7 +143,7 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
           <StatusPill kind={relayKind} pulse={online} />
           <FreshnessChip dataUpdatedAt={dataUpdatedAt} live={!loading} />
         </div>
-      </div>
+      </Reveal>
 
       {isMobile ? (
         <div className="flex flex-col gap-3 pb-4">

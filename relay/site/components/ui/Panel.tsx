@@ -23,9 +23,11 @@ export function Panel({
   return (
     <motion.div
       style={style}
-      whileHover={hover ? { y: -3, boxShadow: "0 24px 60px rgba(0,0,0,0.45)" } : undefined}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={spring.soft}
-      className={clsx("glass-panel rounded-2xl", glow && "accent-glow", pad, className)}
+      whileHover={hover ? { y: -2 } : undefined}
+      className={clsx("glass-panel rounded-2xl transition-shadow duration-500", glow && "accent-glow", pad, className)}
     >
       {children}
     </motion.div>

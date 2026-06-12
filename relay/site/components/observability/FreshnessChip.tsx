@@ -15,23 +15,22 @@ export function FreshnessChip({
   live?: boolean;
   className?: string;
 }) {
-  const tickSeconds = useSecondsSince(dataUpdatedAt ?? null);
+  const tickSeconds = useSecondsSince(dataUpdatedAt ?? null, 5000);
   const secondsAgo = secondsAgoProp ?? tickSeconds;
-  const fresh = secondsAgo != null && secondsAgo < 20;
+  const fresh = secondsAgo != null && secondsAgo < 30;
 
   return (
     <span
       className={clsx(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px]",
-        fresh ? "border-cyan-400/30 text-cyan-200" : "border-border text-muted",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] transition-colors duration-500",
+        fresh ? "border-cyan-400/25 text-cyan-200/90" : "border-border text-muted",
         className
       )}
       style={{
-        background: fresh ? "rgba(34,211,238,0.08)" : "rgba(255,255,255,0.03)",
-        boxShadow: fresh ? "0 0 16px rgba(34,211,238,0.15)" : undefined,
+        background: fresh ? "rgba(34,211,238,0.06)" : "rgba(255,255,255,0.03)",
       }}
     >
-      {live && fresh ? <span className="freshness-pulse h-1.5 w-1.5 rounded-full bg-cyan-400" /> : null}
+      {live && fresh ? <span className="status-live-pulse h-1.5 w-1.5 rounded-full bg-cyan-400/90" /> : null}
       {formatFreshness(secondsAgo)}
     </span>
   );

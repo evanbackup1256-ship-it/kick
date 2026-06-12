@@ -3,6 +3,10 @@
 @source "../components/**/*.{ts,tsx}";
 
 @theme {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-drift: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-hover: 0.55s;
+  --motion-reveal: 0.65s;
   --color-bg-0: #020204;
   --color-bg-1: #05070c;
   --color-bg-2: #0a0e16;
@@ -147,6 +151,14 @@
     box-shadow: var(--shadow-panel);
     backdrop-filter: blur(12px) saturate(125%);
     contain: layout paint;
+    transition:
+      border-color var(--motion-hover) var(--ease-out),
+      box-shadow var(--motion-hover) var(--ease-out),
+      transform var(--motion-hover) var(--ease-out);
+  }
+
+  .obs-panel:hover {
+    border-color: rgba(255, 255, 255, 0.08);
   }
 
   @media (min-width: 768px) {
@@ -249,9 +261,9 @@
 
   /* Mission Control: fixed viewport height so panels + charts don't blow out the page */
   .command-center-grid {
-    height: calc(100dvh - 13rem);
-    min-height: 420px;
-    max-height: calc(100dvh - 13rem);
+    height: calc(100dvh - 12rem);
+    min-height: 460px;
+    max-height: calc(100dvh - 12rem);
   }
 
   @media (max-width: 767px) {
@@ -375,13 +387,13 @@ html.cf-gate-lock body {
 }
 
 .view-enter {
-  animation: view-enter 0.28s ease-out both;
+  animation: view-enter var(--motion-reveal) var(--ease-out) both;
 }
 
 @keyframes view-enter {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -389,13 +401,51 @@ html.cf-gate-lock body {
   }
 }
 
-.freshness-pulse {
-  animation: freshness-pulse 1.5s ease-in-out infinite;
+/* Slow live indicator — matches public site ambient pulse cadence */
+.status-live-pulse {
+  animation: status-live-pulse 3.5s var(--ease-drift) infinite;
 }
 
-@keyframes freshness-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+@keyframes status-live-pulse {
+  0%, 100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(1.35);
+  }
+}
+
+.scroll-progress {
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--color-cyan), var(--color-accent-bright), var(--color-cyan));
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.45);
+  transition: transform 0.12s var(--ease-out);
+}
+
+.error-reveal {
+  animation: error-reveal 0.4s var(--ease-out) both;
+}
+
+@keyframes error-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ambient-orb {
+  animation: ambient-drift 22s var(--ease-drift) infinite alternate;
+}
+
+@keyframes ambient-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(24px, -18px, 0) scale(1.06); }
 }
 
 @media (prefers-reduced-motion: reduce) {

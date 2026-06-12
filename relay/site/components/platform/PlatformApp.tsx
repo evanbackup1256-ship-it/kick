@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence } from "motion/react";
 import { useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -13,6 +14,8 @@ import { Sidebar } from "@/components/platform/Sidebar";
 import { TopBar } from "@/components/platform/TopBar";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { MainScroll, ScrollContent } from "@/components/providers/MainScroll";
+import { PageTransition } from "@/components/motion/Reveal";
+import { ScrollProgress } from "@/components/ui/ScrollProgress";
 import { OverviewView } from "@/components/views/OverviewView";
 import { GamesView } from "@/components/views/GamesView";
 import { ToolsView } from "@/components/views/ToolsView";
@@ -58,6 +61,7 @@ function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }
 
   return (
     <>
+      <ScrollProgress />
       <div className="noise-overlay" aria-hidden />
       <div className="ambient-orb left-[-10%] top-[-20%] h-[420px] w-[420px] bg-indigo-500/15" aria-hidden />
       <div className="ambient-orb right-[-5%] top-[10%] h-[360px] w-[360px] bg-cyan-400/10" aria-hidden />
@@ -68,15 +72,17 @@ function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }
           <TopBar online={online} workspace={workspace} dataUpdatedAt={dataUpdatedAt} />
           <MainScroll>
             <ScrollContent className={`mx-auto w-full max-w-[1520px] ${mainPad} ${workspace === "wide" ? "max-w-[1680px]" : ""}`}>
-              <div key={activeView} className="view-enter">
-                {activeView === "overview" ? <OverviewView site={site} online={online} onCopy={() => void copyLoadstring()} /> : null}
-                {activeView === "status" ? <StatusView site={site} /> : null}
-                {activeView === "games" ? <GamesView site={site} /> : null}
-                {activeView === "tools" ? <ToolsView site={site} /> : null}
-                {activeView === "changelog" ? <ChangelogView site={site} /> : null}
-                {activeView === "support" ? <SupportView site={site} /> : null}
-                {activeView === "credits" ? <CreditsView site={site} /> : null}
-              </div>
+              <AnimatePresence mode="wait">
+                <PageTransition key={activeView}>
+                  {activeView === "overview" ? <OverviewView site={site} online={online} onCopy={() => void copyLoadstring()} /> : null}
+                  {activeView === "status" ? <StatusView site={site} /> : null}
+                  {activeView === "games" ? <GamesView site={site} /> : null}
+                  {activeView === "tools" ? <ToolsView site={site} /> : null}
+                  {activeView === "changelog" ? <ChangelogView site={site} /> : null}
+                  {activeView === "support" ? <SupportView site={site} /> : null}
+                  {activeView === "credits" ? <CreditsView site={site} /> : null}
+                </PageTransition>
+              </AnimatePresence>
             </ScrollContent>
           </MainScroll>
         </div>

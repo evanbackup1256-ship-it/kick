@@ -2,13 +2,14 @@
 
 import clsx from "clsx";
 import type { ReactNode } from "react";
+import { SmoothScroll } from "@/components/ui/SmoothScroll";
 
-/** Native main scroll — avoids Lenis fighting nested panel scrollers. */
+/** Main app scroll — uses OverlayScrollbars smooth scroll module. */
 export function MainScroll({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={clsx("min-h-0 flex-1 overflow-y-auto overscroll-y-contain", className)} id="main-scroll">
+    <SmoothScroll id="main-scroll" className={clsx("min-h-0 flex-1", className)} flex>
       {children}
-    </div>
+    </SmoothScroll>
   );
 }
 

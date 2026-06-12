@@ -36,8 +36,10 @@ export function MetricCard({
 
   return (
     <motion.div
-      whileHover={{ y: -2 }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={spring.soft}
+      whileHover={{ y: -2 }}
       className={clsx("obs-metric relative overflow-hidden", className)}
     >
       <div className={clsx("pointer-events-none absolute inset-0 bg-gradient-to-br opacity-80", accents[accent])} />
