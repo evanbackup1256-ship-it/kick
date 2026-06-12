@@ -54,6 +54,15 @@
   "changelog": [
     {
       "date": "2026-06-12",
+      "title": "Loader 8.2.19 — register limit fix + commit-pinned bootstrap",
+      "items": [
+        "Loader 8.2.19 — teleport/relaunch hooks moved to hub/loader_relaunch.luau to stay under Luau register cap",
+        "Bootstrap v1.0.1 fetches cfg/release.json first and pins loader.luau to the release commit",
+        "Bootstrap rejects stale CDN copies when loader version does not match release.json"
+      ]
+    },
+    {
+      "date": "2026-06-12",
       "title": "Eternal bootstrap loadstring + Syde patch v17",
       "items": [
         "Loader 8.2.18 — save the bootstrap loadstring once; updates pull from GitHub automatically",

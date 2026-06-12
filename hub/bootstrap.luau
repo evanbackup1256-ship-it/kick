@@ -1,12 +1,13 @@
--- Alleral Bootstrap v1.0.0
+-- Alleral Bootstrap v1.0.1
 -- Save this loadstring once in your executor — it always fetches the latest loader from GitHub.
 -- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=" .. tick(), true))()
 
-local BOOTSTRAP_VERSION = "1.0.0"
+local BOOTSTRAP_VERSION = "1.0.1"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
 local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
-local LOADER_URL = GITHUB_RAW .. "/loader.luau"
+local JSDELIVR = "https://cdn.jsdelivr.net/gh/" .. REPO
+local RELEASE_URL = GITHUB_RAW .. "/cfg/release.json"
 
 local function genv()
 	local ok, env = pcall(function()
@@ -110,6 +111,35 @@ local function loaderVersionFromSource(src)
 		return nil
 	end
 	return src:match('LOADER_VERSION%s*=%s*"([%d%.]+)"')
+end
+
+local function parseReleaseJson(src)
+	if type(src) ~= "string" then
+		return nil
+	end
+	return {
+		loader = src:match('"loader"%s*:%s*"([^"]+)"'),
+		commit = src:match('"commit"%s*:%s*"([^"]+)"'),
+	}
+end
+
+local function fetchReleaseMeta()
+	local src, via = httpGet(RELEASE_URL, 40)
+	local meta = parseReleaseJson(src)
+	if meta and meta.loader and meta.commit then
+		return meta, via
+	end
+	return { loader = nil, commit = BRANCH }, via or "release-unavailable"
+end
+
+local function buildLoaderUrls(meta)
+	local commit = (meta and meta.commit) or BRANCH
+	local bust = "?t=" .. tostring(tick())
+	return {
+		"https://raw.githubusercontent.com/" .. REPO .. "/" .. commit .. "/loader.luau" .. bust,
+		JSDELIVR .. "@" .. commit .. "/loader.luau" .. bust,
+		GITHUB_RAW .. "/loader.luau" .. bust,
+	}
 end
 
 local PURGE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
@@ -228,7 +258,20 @@ local function Alleral_Bootstrap(reason)
 		print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Purged " .. tostring(purged) .. " cached workspace file(s)")
 	end
 
-	local src, via = httpGet(LOADER_URL, 500)
+	local meta, metaVia = fetchReleaseMeta()
+	local expectedLoader = meta.loader
+	local urls = buildLoaderUrls(meta)
+	local src, via = nil, metaVia
+	for _, url in ipairs(urls) do
+		local body, transport = httpGet(url, 500)
+		if type(body) == "string" and #body >= 500 then
+			local remoteVer = loaderVersionFromSource(body)
+			if not expectedLoader or not remoteVer or remoteVer == expectedLoader then
+				src, via = body, transport
+				break
+			end
+		end
+	end
 	if type(src) ~= "string" or #src < 500 then
 		ENV._Alleral_BootstrapRunning = false
 		return false, "remote loader failed (" .. tostring(via) .. ")"
@@ -240,6 +283,8 @@ local function Alleral_Bootstrap(reason)
 			.. BOOTSTRAP_VERSION
 			.. "] Loading loader v"
 			.. remoteVer
+			.. " @ "
+			.. tostring(meta.commit or BRANCH)
 			.. " from GitHub ("
 			.. tostring(via)
 			.. ", "

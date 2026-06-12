@@ -37,6 +37,10 @@ if ($release.commit -eq $head) {
 }
 
 $commit = $release.commit
+$loaderPath = Join-Path $root "loader.luau"
+$loaderRaw = Get-Content $loaderPath -Raw -Encoding UTF8
+$loaderRaw = [regex]::Replace($loaderRaw, 'local LOADER_VERSION = "[^"]+"', ('local LOADER_VERSION = "' + $release.loader + '"'))
+$loaderRaw = [regex]::Replace($loaderRaw, '(?m)^\tloader = "[^"]+"', ("`tloader = `"$($release.loader)`""), 1)
 if ($hashBumpNeeded) {
     $commit = $head
     $release.commit = $commit
@@ -44,15 +48,14 @@ if ($hashBumpNeeded) {
     Write-Utf8NoBom $releasePath (($release | ConvertTo-Json -Depth 6) + "`n")
     Write-Host "release.json -> commit=$commit updatedAt=$updatedAt"
 
-    $loaderPath = Join-Path $root "loader.luau"
-    $loaderRaw = Get-Content $loaderPath -Raw -Encoding UTF8
     $commitRx = [regex]::new('(?m)^\tcommit = "[^"]+"')
     $loaderRaw = $commitRx.Replace($loaderRaw, ("`tcommit = `"$commit`""), 1)
-    Write-Utf8NoBom $loaderPath $loaderRaw
     Write-Host "loader.luau RELEASE_FALLBACK.commit -> $commit"
 } else {
     Write-Host "release.json commit remains $commit"
 }
+Write-Utf8NoBom $loaderPath $loaderRaw
+Write-Host "loader.luau LOADER_VERSION -> $($release.loader)"
 
 $manifestSrc = Join-Path $root "cfg/scripts_manifest.json"
 $siteSrc = Join-Path $root "cfg/site.json"
