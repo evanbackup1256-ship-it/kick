@@ -1,8 +1,8 @@
 local Core = {}
-Core.VERSION = "2.9.0"
+Core.VERSION = "2.9.1"
 Core._CORE_ARTIFACT = "base"
 Core.UI_LIBRARY = "Alleral"
-Core.ALLERAL_UI_VERSION = "3.0.0-maclib"
+Core.ALLERAL_UI_VERSION = "3.0.1-maclib"
 Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")
@@ -277,12 +277,23 @@ end
 
 function Core.notifyWindUi(payload)
 	local windUi = Core.getWindUi()
-	if not windUi or type(windUi.Notify) ~= "function" then
+	if not windUi then
 		return false
 	end
-	local ok = pcall(function()
-		windUi:Notify(payload)
-	end)
+	local notifyPayload = type(payload) == "table" and payload or { Description = tostring(payload) }
+	if notifyPayload.Content and not notifyPayload.Description then
+		notifyPayload.Description = notifyPayload.Content
+	end
+	if notifyPayload.Duration and not notifyPayload.Lifetime then
+		notifyPayload.Lifetime = notifyPayload.Duration
+	end
+	local ok = false
+	if type(windUi.Notify) == "function" then
+		ok = pcall(windUi.Notify, windUi, notifyPayload)
+	end
+	if not ok and type(windUi.Notification) == "function" then
+		ok = pcall(windUi.Notification, windUi, notifyPayload)
+	end
 	return ok == true
 end
 
@@ -321,7 +332,14 @@ function Core.notifyBootReady(settings)
 	elseif loaderVer then
 		table.insert(lines, "Loader v" .. tostring(loaderVer))
 	end
-	table.insert(lines, profile.displayName .. " ready · tabs on the left")
+	local keyHint = "Insert"
+	if Core.UI_LIBRARY == "Maclib" then
+		local key = ENV.Alleral_UiKeybind or ENV.Alleral_MaclibKeybind or Enum.KeyCode.RightControl
+		if type(key) == "userdata" and key.Name then
+			keyHint = key.Name
+		end
+	end
+	table.insert(lines, profile.displayName .. " ready · " .. keyHint .. " toggles UI · Insert backup toggle")
 	Core.notify(settings.Name or "Alleral", table.concat(lines, "\n"), 5, "success")
 end
 

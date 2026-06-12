@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.0"
+local LOADER_VERSION = "8.2.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -23,11 +23,11 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.0",
-	core = "2.9.0",
+	loader = "8.2.1",
+	core = "2.9.1",
 	ui = "Maclib",
-	windui = "3.0.0-maclib",
-	alleral = "3.0.0-maclib",
+	windui = "3.0.1-maclib",
+	alleral = "3.0.1-maclib",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",

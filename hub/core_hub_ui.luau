@@ -1035,6 +1035,7 @@ function Core.setupHubKeybinds(options)
 	local panicKey = options.panicKey or Enum.KeyCode.Delete
 	local uiKey = options.uiKey or Enum.KeyCode.RightControl
 	local insertKey = options.insertKey or Enum.KeyCode.Insert
+	local maclibUi = Core.UI_LIBRARY == "Maclib"
 	ENV._Alleral_KeybindConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or input.UserInputType ~= Enum.UserInputType.Keyboard then
 			return
@@ -1042,7 +1043,7 @@ function Core.setupHubKeybinds(options)
 		if input.KeyCode == panicKey then
 			Core.stateHubStop()
 			Core.notify("Alleral", "everything stopped", 4)
-		elseif input.KeyCode == uiKey or input.KeyCode == insertKey then
+		elseif input.KeyCode == insertKey or (not maclibUi and input.KeyCode == uiKey) then
 			if Core.toggleUiVisibility() then
 				Core.notify("Alleral", "UI toggled.", 2)
 			end

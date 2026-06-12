@@ -1,7 +1,7 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.0-maclib"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.1-maclib"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Maclib"
 
@@ -102,6 +102,8 @@ return function(Core)
 		local tabAurora = true
 		local sectionLift = true
 		local activeWindow = nil
+		local notificationsEnabled = true
+		local notifyLower = false
 
 		local Library = {
 			MacLib = MacLib,
@@ -109,7 +111,41 @@ return function(Core)
 			Window = nil,
 			Version = Core.ALLERAL_UI_VERSION,
 			ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION,
+			_pendingNotifies = {},
+			CommandPalette = {
+				register = function() end,
+				toggle = function() end,
+			},
 		}
+
+		local function flushPendingNotifies(targetWindow)
+			targetWindow = targetWindow or activeWindow or Library.Window
+			if not targetWindow or type(targetWindow.Notify) ~= "function" then
+				return
+			end
+			while #Library._pendingNotifies > 0 do
+				local payload = table.remove(Library._pendingNotifies, 1)
+				pcall(targetWindow.Notify, targetWindow, payload)
+			end
+		end
+
+		local function pushNotification(info)
+			info = type(info) == "table" and info or { Description = tostring(info) }
+			local payload = {
+				Title = info.Title or "Alleral",
+				Description = info.Description or info.Content or info.Text or "",
+				Lifetime = info.Lifetime or info.Duration or info.Time or 4,
+			}
+			local win = activeWindow or Library.Window
+			if win and type(win.Notify) == "function" and notificationsEnabled then
+				if type(win.GetNotificationsState) == "function" and not win:GetNotificationsState() then
+					return
+				end
+				pcall(win.Notify, win, payload)
+				return
+			end
+			table.insert(Library._pendingNotifies, payload)
+		end
 
 		function Library:GetAlleralVersion()
 			return Core.ALLERAL_UI_VERSION
@@ -124,15 +160,36 @@ return function(Core)
 		end
 
 		function Library:Notification(info)
-			info = type(info) == "table" and info or { Description = tostring(info) }
-			local win = activeWindow
-			if win and type(win.Notify) == "function" then
-				pcall(win.Notify, win, {
-					Title = info.Title or "Alleral",
-					Description = info.Description or info.Content or info.Text or "",
-					Lifetime = info.Duration or info.Time or 4,
-				})
+			pushNotification(info)
+		end
+
+		function Library:Notify(info)
+			pushNotification(info)
+		end
+
+		function Library:ClearNotifications()
+			local win = activeWindow or Library.Window
+			if win and type(win.ClearNotifications) == "function" then
+				local ok, cleared = pcall(win.ClearNotifications, win)
+				if ok and type(cleared) == "number" then
+					return cleared
+				end
 			end
+			Library._pendingNotifies = {}
+			return 0
+		end
+
+		function Library:SetNotificationLower(enabled)
+			notifyLower = enabled == true
+			ENV.Alleral_NotifyLower = notifyLower
+		end
+
+		function Library:RepairWindow(window)
+			window = window or activeWindow or Library.Window
+			if window and type(window.Toggle) == "function" then
+				return pcall(window.Toggle, window) == true
+			end
+			return false
 		end
 
 		function Library:ListThemeNames()
@@ -242,19 +299,62 @@ return function(Core)
 			local Players = game:GetService("Players")
 			local lp = Players.LocalPlayer
 			local playerLabel = lp and ((lp.DisplayName ~= "" and lp.DisplayName) or lp.Name) or ""
+			local menuKey = settings.Keybind or ENV.Alleral_UiKeybind or Enum.KeyCode.RightControl
+			ENV.Alleral_UiKeybind = menuKey
 			local window = MacLib:Window({
 				Title = settings.Title or settings.Name or "Alleral",
 				Subtitle = settings.Subtitle or settings.SubName or playerLabel,
 				Size = settings.Size or UDim2.fromOffset(868, 650),
 				DragStyle = 1,
 				ShowUserInfo = true,
-				Keybind = Enum.KeyCode.RightControl,
+				Keybind = menuKey,
 				AcrylicBlur = settings.Acrylic ~= false,
 			})
 			activeWindow = window
 			Library.Window = window
 			window._macTabGroup = window:TabGroup()
 			window._macTabs = {}
+
+			if type(window.GlobalSetting) == "function" then
+				pcall(function()
+					window:GlobalSetting({
+						Name = "UI Blur",
+						Default = type(window.GetAcrylicBlurState) == "function" and window:GetAcrylicBlurState()
+							or settings.Acrylic ~= false,
+						Callback = function(enabled)
+							if type(window.SetAcrylicBlurState) == "function" then
+								window:SetAcrylicBlurState(enabled == true)
+							end
+						end,
+					})
+				end)
+				pcall(function()
+					window:GlobalSetting({
+						Name = "Notifications",
+						Default = type(window.GetNotificationsState) == "function" and window:GetNotificationsState()
+							or true,
+						Callback = function(enabled)
+							notificationsEnabled = enabled == true
+							if type(window.SetNotificationsState) == "function" then
+								window:SetNotificationsState(enabled == true)
+							end
+						end,
+					})
+				end)
+				pcall(function()
+					window:GlobalSetting({
+						Name = "Show User Info",
+						Default = type(window.GetUserInfoState) == "function" and window:GetUserInfoState() or true,
+						Callback = function(enabled)
+							if type(window.SetUserInfoState) == "function" then
+								window:SetUserInfoState(enabled == true)
+							end
+						end,
+					})
+				end)
+			end
+
+			flushPendingNotifies(window)
 			return window
 		end
 
@@ -394,11 +494,20 @@ return function(Core)
 		function groupbox:CreateSlider(settings, id)
 			local range = settings.Range or { 0, 100 }
 			local minValue, maxValue = range[1], range[2]
+			local increment = tonumber(settings.Increment) or Core.sliderIncrement(minValue, maxValue, settings.Increment)
+			local precision = 0
+			if increment and increment < 1 then
+				local text = tostring(increment)
+				local dot = text:find("%.")
+				precision = dot and (#text - dot) or 1
+			end
 			local handle = rawSection:Slider({
 				Name = settings.Name,
 				Default = tonumber(settings.CurrentValue) or minValue,
 				Minimum = minValue,
 				Maximum = maxValue,
+				Precision = precision,
+				DisplayMethod = "Value",
 				Callback = settings.Callback or function() end,
 			}, nextFlag(settings.Name, id))
 			return wrapElement(function(nextSettings)
@@ -627,6 +736,7 @@ return function(Core)
 		}
 		Core.registerUiWindow(window)
 		Core.flushPendingNotifications()
+		ENV.Alleral_MaclibKeybind = ENV.Alleral_UiKeybind or Enum.KeyCode.RightControl
 		function window:AddTab(name, icon)
 			if not self._tabGroup or type(self._tabGroup.Tab) ~= "function" then
 				return nil
@@ -696,6 +806,13 @@ return function(Core)
 					end
 				end)
 			end)
+		end
+		if type(Core.setupHubKeybinds) == "function" then
+			pcall(Core.setupHubKeybinds, {
+				window = window,
+				ui = ui or window._ui or ENV.Alleral_UI,
+				uiKey = ENV.Alleral_UiKeybind or ENV.Alleral_MaclibKeybind,
+			})
 		end
 		if type(Core.registerExploitCommandPalette) == "function" then
 			pcall(Core.registerExploitCommandPalette, window, ui)
