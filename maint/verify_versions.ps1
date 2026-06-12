@@ -176,6 +176,11 @@ if ($site.coreVersion -ne $release.core) {
 } else {
     Pass "site coreVersion $($site.coreVersion)"
 }
+if ($release.sydePatch -and $site.sydePatch -ne $release.sydePatch) {
+    Fail "site.json sydePatch ($($site.sydePatch)) != release.json ($($release.sydePatch))"
+} elseif ($release.sydePatch) {
+    Pass "site sydePatch $($site.sydePatch)"
+}
 
 $analyticsPath = Join-Path $root "hub/analytics.luau"
 $analytics = Get-Content $analyticsPath -Raw

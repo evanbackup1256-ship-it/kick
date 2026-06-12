@@ -167,7 +167,13 @@
       if (coreMeta) {
         const bits = [];
         if (site.coreVersion) bits.push(`core ${site.coreVersion}`);
-        if (site.uiLibrary) bits.push(site.uiLibrary);
+        if (site.uiLibrary) {
+          const uiLabel = site.uiVersion
+            ? `${site.uiLibrary} ${site.uiVersion}`
+            : site.uiLibrary;
+          bits.push(uiLabel);
+        }
+        if (site.sydePatch) bits.push(`patch v${site.sydePatch}`);
         coreMeta.textContent = bits.length ? ` \u00b7 ${bits.join(" \u00b7 ")}` : "";
       }
       if (su) su.textContent = site.scriptsUpdatedAt || "\u2014";

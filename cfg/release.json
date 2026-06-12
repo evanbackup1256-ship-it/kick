@@ -15,5 +15,6 @@
     "telemetry":  "3.2",
     "helpers":  "1.0",
     "security":  "1.3",
-    "access":  "1.0"
+    "access":  "1.0",
+    "sydePatch":  17
 }

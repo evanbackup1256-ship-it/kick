@@ -546,6 +546,8 @@ def build_public_site_payload() -> dict[str, Any]:
         "loaderVersion": site.get("loaderVersion") or "",
         "coreVersion": site.get("coreVersion") or "",
         "uiLibrary": site.get("uiLibrary") or "",
+        "uiVersion": site.get("uiVersion") or "",
+        "sydePatch": site.get("sydePatch") or 0,
         "loadstring": site.get("loadstring") or "",
         "features": site.get("features") or [],
         "faq": site.get("faq") or [],

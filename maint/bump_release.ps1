@@ -56,13 +56,20 @@ if ($hashBumpNeeded) {
 
 $manifestSrc = Join-Path $root "cfg/scripts_manifest.json"
 $siteSrc = Join-Path $root "cfg/site.json"
-if ($hashBumpNeeded) {
-    $siteRaw = Get-Content $siteSrc -Raw -Encoding UTF8
-    $siteRaw = [regex]::Replace($siteRaw, '"loaderVersion"\s*:\s*"[^"]*"', ('"loaderVersion": "' + $release.loader + '"'))
-    $siteRaw = [regex]::Replace($siteRaw, '"coreVersion"\s*:\s*"[^"]*"', ('"coreVersion": "' + $release.core + '"'))
-    $siteRaw = [regex]::Replace($siteRaw, '"updatedAt"\s*:\s*"[^"]*"', ('"updatedAt": "' + $updatedAt + '"'))
-    Write-Utf8NoBom $siteSrc $siteRaw
+$siteRaw = Get-Content $siteSrc -Raw -Encoding UTF8
+$siteRaw = [regex]::Replace($siteRaw, '"loaderVersion"\s*:\s*"[^"]*"', ('"loaderVersion": "' + $release.loader + '"'))
+$siteRaw = [regex]::Replace($siteRaw, '"coreVersion"\s*:\s*"[^"]*"', ('"coreVersion": "' + $release.core + '"'))
+$uiLibrary = if ($release.ui) { $release.ui } else { "Syde" }
+$siteRaw = [regex]::Replace($siteRaw, '"uiLibrary"\s*:\s*"[^"]*"', ('"uiLibrary": "' + $uiLibrary + '"'))
+$uiVersion = if ($release.alleral) { $release.alleral } elseif ($release.windui) { $release.windui } else { "4.0.0-syde" }
+$siteRaw = [regex]::Replace($siteRaw, '"uiVersion"\s*:\s*"[^"]*"', ('"uiVersion": "' + $uiVersion + '"'))
+if ($release.sydePatch) {
+    $siteRaw = [regex]::Replace($siteRaw, '"sydePatch"\s*:\s*\d+', ('"sydePatch": ' + [int]$release.sydePatch))
 }
+if ($hashBumpNeeded) {
+    $siteRaw = [regex]::Replace($siteRaw, '"updatedAt"\s*:\s*"[^"]*"', ('"updatedAt": "' + $updatedAt + '"'))
+}
+Write-Utf8NoBom $siteSrc $siteRaw
 
 Copy-IfChanged $manifestSrc (Join-Path $root "relay/scripts_manifest.json")
 Copy-IfChanged $siteSrc (Join-Path $root "relay/site.json")

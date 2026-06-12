@@ -3987,9 +3987,10 @@ local function main()
 
 	wireTelemetry(profile)
 	recordInstalledVersions()
+	ensureAutoexecLoader()
+	wireTeleportRelaunch()
 	task.defer(function()
 		pcall(purgeAlleralWorkspace, { reason = "post-boot", quiet = true })
-		pcall(ensureAutoexecLoader)
 		pcall(armAutoUpdateFingerprint, profile, true)
 	end)
 	startAutoUpdater(profile)
@@ -3997,7 +3998,6 @@ local function main()
 	ENV._Alleral_LastPlaceId = game.PlaceId
 	ENV._Alleral_LastJobId = game.JobId
 	ENV._Alleral_PendingRelaunch = nil
-	wireTeleportRelaunch()
 	notify("Alleral", profile.name .. " loaded", 4)
 	log("ready")
 end
