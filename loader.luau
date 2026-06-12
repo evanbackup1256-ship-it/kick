@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.8"
+local LOADER_VERSION = "8.2.9"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -22,7 +22,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.8",
+	loader = "8.2.9",
 	core = "2.9.4",
 	ui = "Maclib",
 	windui = "3.0.5-premium",
@@ -899,11 +899,19 @@ local function getSource(localPaths, remotePath, opts)
 	return nil, path or ("Could not load " .. remotePath)
 end
 
-local function gameScriptValid(body, profile)
+local function gameScriptExpectedVersion(profile, expectedVersion)
+	if type(expectedVersion) == "string" and expectedVersion ~= "" then
+		return expectedVersion
+	end
+	return profile.version
+end
+
+local function gameScriptValid(body, profile, expectedVersion)
 	if type(body) ~= "string" then
 		return false
 	end
 	local minBytes = profile.minBytes or 40000
+	local version = gameScriptExpectedVersion(profile, expectedVersion)
 	if #body < minBytes then
 		return false
 	end
@@ -916,17 +924,18 @@ local function gameScriptValid(body, profile)
 	if profile.sourceMarker and not body:find(profile.sourceMarker, 1, true) then
 		return false
 	end
-	if profile.version and not body:find('local VERSION = "' .. profile.version .. '"', 1, true) then
+	if version and not body:find('local VERSION = "' .. version .. '"', 1, true) then
 		return false
 	end
 	return true
 end
 
-local function gameScriptRejectReason(body, profile)
+local function gameScriptRejectReason(body, profile, expectedVersion)
 	if type(body) ~= "string" or body == "" then
 		return "empty response"
 	end
 	local minBytes = profile.minBytes or 40000
+	local version = gameScriptExpectedVersion(profile, expectedVersion)
 	if #body < minBytes then
 		return tostring(#body) .. "b, need " .. tostring(minBytes) .. "b+"
 	end
@@ -939,8 +948,8 @@ local function gameScriptRejectReason(body, profile)
 	if profile.sourceMarker and not body:find(profile.sourceMarker, 1, true) then
 		return "missing " .. profile.sourceMarker
 	end
-	if profile.version and not body:find('local VERSION = "' .. profile.version .. '"', 1, true) then
-		return "missing VERSION " .. profile.version
+	if version and not body:find('local VERSION = "' .. version .. '"', 1, true) then
+		return "missing VERSION " .. version
 	end
 	return "unknown"
 end
@@ -954,31 +963,6 @@ local function expectedGameVersion(profile)
 		end
 	end
 	return profile.version
-end
-
-local function fetchGameScript(profile)
-	local minBytes = profile.minBytes or 40000
-	local gameVersion = expectedGameVersion(profile)
-
-	local src, path = readLocal(profile.scriptFiles, minBytes)
-	if src and gameScriptValid(src, profile) then
-		if not sourceVersionStale(src, "game", gameVersion) then
-			return src, "local:" .. path
-		end
-	end
-	if src and path then
-		deleteWorkspaceFile(path)
-	end
-
-	for _, base in ipairs(REMOTE_BASES) do
-		local body, via = httpGet(base .. "/" .. profile.scriptUrl, minBytes)
-		if body and gameScriptValid(body, profile) then
-			cacheRemote(profile.scriptUrl, body)
-			return body, base .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
-		end
-	end
-
-	return nil, "all transports failed"
 end
 
 local function syncWorkspaceLoaderFromRemote()
@@ -1435,6 +1419,46 @@ local function sourceVersionStale(src, kind, expectedVersion)
 	return type(found) == "string" and found ~= expectedVersion
 end
 
+local function fetchGameScript(profile)
+	local minBytes = profile.minBytes or 40000
+	local gameVersion = expectedGameVersion(profile)
+	local lastReason = "no local or remote game script"
+
+	local src, path = readLocal(profile.scriptFiles, minBytes)
+	if src then
+		if not gameScriptValid(src, profile, gameVersion) then
+			lastReason = "invalid local: " .. gameScriptRejectReason(src, profile, gameVersion)
+			if path then
+				deleteWorkspaceFile(path)
+			end
+			src = nil
+		elseif sourceVersionStale(src, "game", gameVersion) then
+			lastReason = "stale local game script (need v" .. tostring(gameVersion) .. ")"
+			if path then
+				deleteWorkspaceFile(path)
+			end
+			src = nil
+		else
+			return src, "local:" .. tostring(path)
+		end
+	end
+
+	for _, base in ipairs(REMOTE_BASES) do
+		local body, via = httpGet(base .. "/" .. profile.scriptUrl, minBytes)
+		if type(body) == "string" then
+			if gameScriptValid(body, profile, gameVersion) then
+				cacheRemote(profile.scriptUrl, body)
+				return body, base .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
+			end
+			lastReason = gameScriptRejectReason(body, profile, gameVersion) .. " via " .. tostring(via)
+		else
+			lastReason = tostring(via or "http failed")
+		end
+	end
+
+	return nil, lastReason
+end
+
 local function deleteListedWorkspaceFiles(paths)
 	for _, path in ipairs(paths or {}) do
 		deleteWorkspaceFile(path)
@@ -1485,6 +1509,11 @@ local function runParallel(tasks)
 	end
 	while remaining > 0 do
 		RunService.Heartbeat:Wait()
+	end
+	for index, packed in ipairs(results) do
+		if type(packed) == "table" and packed[1] == false then
+			log("Startup task " .. tostring(index) .. " failed: " .. tostring(packed[2]), true)
+		end
 	end
 	return results
 end
@@ -3554,8 +3583,8 @@ local function main()
 		end
 	end
 
-	local uiBundle, uiErr, gameSrc, gameLabel
-	local critical = runParallel({
+	local uiBundle, uiErr
+	runParallel({
 		function()
 			loadModule({ HUB .. "/security.luau" }, HUB .. "/security.luau", "Alleral_Security", "Alleral/security")
 		end,
@@ -3575,10 +3604,8 @@ local function main()
 				uiBundle, uiErr = ENV.Alleral_Core.loadUi()
 			end
 		end,
-		function()
-			gameSrc, gameLabel = fetchGameScript(profile)
-		end,
 	})
+	local gameSrc, gameLabel = fetchGameScript(profile)
 	ensureTelemetryLoaded()
 
 	grantPublicAccess()
