@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-12T19:01:40Z",
+  "updatedAt": "2026-06-12T19:03:08Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
-  "loaderVersion": "8.2.17",
+  "loaderVersion": "8.2.18",
   "coreVersion": "2.9.4",
   "uiLibrary": "Syde",
   "uiVersion": "4.0.0-syde",
   "announcement": "",
-  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick(), true))()",
+  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
   "branch": "main",
   "features": [
@@ -27,7 +27,7 @@
     },
     {
       "q": "How do I load Alleral?",
-      "a": "Copy the loadstring from the homepage, paste it into your executor, and run it in a supported game. It downloads from GitHub on its own."
+      "a": "Copy the bootstrap loadstring from the homepage once, save it in your executor, and run it in a supported game. It always pulls the latest loader and scripts from GitHub — you never replace the saved script after updates."
     },
     {
       "q": "Which games are supported?",
