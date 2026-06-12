@@ -1,24 +1,33 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useLenis } from "@/lib/lenis-context";
 
 export function ScrollProgress() {
   const ref = useRef<HTMLDivElement>(null);
+  const lenis = useLenis();
 
   useEffect(() => {
     const bar = ref.current;
     if (!bar || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    const onScroll = () => {
+    const update = () => {
       const max = document.documentElement.scrollHeight - window.innerHeight;
-      const p = max > 0 ? window.scrollY / max : 0;
-      bar.style.transform = `scaleX(${p})`;
+      const scrollY = lenis?.scroll ?? window.scrollY;
+      const p = max > 0 ? scrollY / max : 0;
+      bar.style.transform = `scaleX(${Math.min(1, Math.max(0, p))})`;
     };
 
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    if (lenis) {
+      lenis.on("scroll", update);
+      update();
+      return () => lenis.off("scroll", update);
+    }
+
+    window.addEventListener("scroll", update, { passive: true });
+    update();
+    return () => window.removeEventListener("scroll", update);
+  }, [lenis]);
 
   return (
     <div

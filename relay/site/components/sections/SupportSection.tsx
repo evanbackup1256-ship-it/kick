@@ -1,11 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { API_BASE } from "@/lib/config";
 import type { SitePayload } from "@/lib/types";
 import { SectionHeader } from "@/components/layout/SiteChrome";
 import { BlurFadeIn, GlowButton, SpotlightCard } from "@/components/ui/premium";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import { FormTurnstile } from "@/components/turnstile/FormTurnstile";
 
 export function SupportSection({ site }: { site: SitePayload }) {
@@ -21,6 +22,21 @@ export function SupportSection({ site }: { site: SitePayload }) {
       .then((data) => setCaptchaRequired(Boolean(data.serverVerify && data.siteKey)))
       .catch(() => setCaptchaRequired(false));
   }, []);
+
+  const gameOptions = useMemo(
+    () => [
+      { value: "", label: "Select a game" },
+      ...Object.values(site.games || {}).map((g) => ({
+        value: g.name || g.id || "",
+        label: g.name || g.id || "Unknown",
+      })),
+    ],
+    [site.games]
+  );
+
+  const categoryOptions = site.bugCategories || ["UI", "Script", "Loader", "Other"];
+  const severityOptions = ["low", "normal", "high", "critical"];
+  const topicOptions = ["Loading", "Games", "Executor", "Other"];
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -103,9 +119,9 @@ export function SupportSection({ site }: { site: SitePayload }) {
         >
           {tab === "bug" ? (
             <>
-              <Field name="category" label="Category" select options={site.bugCategories || ["UI", "Script", "Loader", "Other"]} />
-              <Field name="severity" label="Severity" select options={["low", "normal", "high", "critical"]} />
-              <Field name="game" label="Game" />
+              <Field name="category" label="Category" options={categoryOptions} defaultValue={categoryOptions[0]} />
+              <Field name="severity" label="Severity" options={severityOptions} defaultValue="normal" />
+              <Field name="game" label="Game" options={gameOptions} />
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field name="username" label="Username" />
                 <Field name="executor" label="Executor" />
@@ -125,7 +141,7 @@ export function SupportSection({ site }: { site: SitePayload }) {
           ) : null}
           {tab === "support" ? (
             <>
-              <Field name="topic" label="Topic" select options={["Loading", "Games", "Executor", "Other"]} />
+              <Field name="topic" label="Topic" options={topicOptions} defaultValue="Loading" />
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field name="username" label="Username" />
                 <Field name="contact" label="Contact (optional)" />
@@ -149,31 +165,23 @@ function Field({
   label,
   textarea,
   required,
-  select,
   options,
+  defaultValue,
 }: {
   name: string;
   label: string;
   textarea?: boolean;
   required?: boolean;
-  select?: boolean;
-  options?: string[];
+  options?: string[] | { value: string; label: string }[];
+  defaultValue?: string;
 }) {
   const className =
     "w-full rounded-xl border border-border bg-black/30 px-3.5 py-3 text-sm outline-none focus:border-cyan-400/40 focus:shadow-[0_0_0_3px_rgba(34,211,238,0.12)]";
   return (
     <label className="grid gap-2 text-sm text-muted">
       {label}
-      {select ? (
-        <div className="relative">
-          <select name={name} className={className} required={required}>
-            {(options || []).map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </div>
+      {options ? (
+        <CustomSelect name={name} options={options} defaultValue={defaultValue} required={required} />
       ) : textarea ? (
         <textarea name={name} className={`${className} min-h-[100px]`} required={required} />
       ) : (

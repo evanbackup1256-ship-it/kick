@@ -155,3 +155,160 @@ html.cf-gate-lock body {
   color: transparent;
   animation: shimmer-line 8s linear infinite;
 }
+
+@keyframes orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.orbit-spin-22 {
+  animation: orbit-spin 22s linear infinite;
+}
+
+.orbit-spin-22-reverse {
+  animation: orbit-spin 22s linear infinite reverse;
+}
+
+.orbit-spin-28-reverse {
+  animation: orbit-spin 28s linear infinite reverse;
+}
+
+.orbit-spin-28 {
+  animation: orbit-spin 28s linear infinite;
+}
+
+.orbit-spin-18 {
+  animation: orbit-spin 18s linear infinite;
+}
+
+/* Custom select dropdown (React + legacy admin) */
+.select-wrap-enhanced {
+  position: relative;
+}
+
+.custom-select {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-trigger {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--color-text);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 12px 40px 12px 14px;
+  cursor: pointer;
+  position: relative;
+  transition:
+    border-color 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.custom-select-trigger::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-muted);
+  border-bottom: 2px solid var(--color-muted);
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s ease;
+}
+
+.custom-select.open .custom-select-trigger {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.14);
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.custom-select.open .custom-select-trigger::after {
+  transform: translateY(-30%) rotate(225deg);
+  border-color: var(--color-accent);
+}
+
+.custom-select-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.custom-select-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: rgba(22, 22, 24, 0.96);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px) scale(0.98);
+  transform-origin: top center;
+  transition:
+    opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0.35s;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.custom-select.open .custom-select-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+.custom-select-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--color-muted);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition:
+    background 0.35s ease,
+    color 0.35s ease,
+    transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.custom-select-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text);
+  transform: translateX(3px);
+}
+
+.custom-select-option.selected {
+  background: rgba(34, 211, 238, 0.12);
+  color: #9fd0ff;
+  font-weight: 500;
+}
+
+.card-lift {
+  transition:
+    transform 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.45s ease;
+}
+
+.card-lift:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+  border-color: rgba(255, 255, 255, 0.12);
+}

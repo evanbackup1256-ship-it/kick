@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchThumbnails } from "@/lib/api";
 import type { GameEntry, SitePayload } from "@/lib/types";
 import { SectionHeader } from "@/components/layout/SiteChrome";
-import { SpotlightCard } from "@/components/ui/premium";
+import { BlurFadeIn, SpotlightCard } from "@/components/ui/premium";
 
 const STATUSES = ["all", "working", "testing", "maintenance", "broken"] as const;
 
@@ -80,19 +80,12 @@ export function GamesSection({ site }: { site: SitePayload }) {
           const placeId = game.placeIds?.[0] ? String(game.placeIds[0]) : null;
           const thumb = placeId ? thumbs[placeId] : null;
           return (
-            <motion.div
-              key={game.id}
-              layout
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-5%" }}
-              transition={{ delay: Math.min(i * 0.04, 0.3) }}
-            >
+            <BlurFadeIn key={game.id} delay={Math.min(i * 0.05, 0.35)}>
               <SpotlightCard
                 as="button"
                 type="button"
                 onClick={() => setModal({ id: game.id, game })}
-                className="w-full text-left"
+                className="card-lift w-full text-left"
                 spotlight="rgba(34,211,238,0.11)"
               >
                 <div className="relative h-40 overflow-hidden rounded-t-[27px]">
@@ -112,7 +105,7 @@ export function GamesSection({ site }: { site: SitePayload }) {
                   <p className="line-clamp-2 text-sm text-muted">{game.description || game.message || "No description."}</p>
                 </div>
               </SpotlightCard>
-            </motion.div>
+            </BlurFadeIn>
           );
         })}
       </div>

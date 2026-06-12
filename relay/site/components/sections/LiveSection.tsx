@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchLiveStatus } from "@/lib/api";
 import type { LiveStatusPayload } from "@/lib/types";
 import { SectionHeader } from "@/components/layout/SiteChrome";
-import { SpotlightCard } from "@/components/ui/premium";
+import { BlurFadeIn, SpotlightCard } from "@/components/ui/premium";
 
 export function LiveSection() {
   const [data, setData] = useState<LiveStatusPayload | null>(null);
@@ -54,6 +54,7 @@ export function LiveSection() {
         desc="Versions, GitHub sync, inject health, and changelog — streaming every 15 seconds."
       />
 
+      <BlurFadeIn>
       <SpotlightCard spotlight="rgba(34,211,238,0.1)">
         <div className="p-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -104,6 +105,7 @@ export function LiveSection() {
         </div>
         </div>
       </SpotlightCard>
+      </BlurFadeIn>
     </section>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { fetchSite, postHubVisit } from "@/lib/api";
 import { PUBLIC_URL, MIRROR_URL } from "@/lib/config";
 import type { SitePayload } from "@/lib/types";
@@ -14,6 +16,8 @@ import { GamesSection } from "@/components/sections/GamesSection";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { LiveSection } from "@/components/sections/LiveSection";
 import { ToolsSection } from "@/components/sections/ToolsSection";
+
+gsap.registerPlugin(ScrollTrigger);
 
 export function HomePage() {
   const [site, setSite] = useState<SitePayload | null>(null);
@@ -42,6 +46,12 @@ export function HomePage() {
     const t = setTimeout(() => setToast(null), 2800);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    if (!site) return;
+    const id = requestAnimationFrame(() => ScrollTrigger.refresh());
+    return () => cancelAnimationFrame(id);
+  }, [site]);
 
   const flash = (text: string, error = false) => setToast({ text, error });
 

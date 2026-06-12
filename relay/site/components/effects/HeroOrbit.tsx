@@ -109,12 +109,11 @@ export function HeroOrbit({ loaderVersion, sydePatch }: { loaderVersion?: string
           </div>
         </motion.div>
 
-        <OrbitCard label="loader" value={loaderVersion || "8.2.x"} className="animate-[spin_22s_linear_infinite]" radius={165} />
-        <OrbitCard label="Syde UI" value={`patch ${sydePatch || 18}`} className="animate-[spin_28s_linear_infinite_reverse]" radius={190} offset={120} />
+        <OrbitCard label="loader" value={loaderVersion || "8.2.x"} spinClass="orbit-spin-22" counterClass="orbit-spin-22-reverse" radius={165} />
+        <OrbitCard label="Syde UI" value={`patch ${sydePatch || 18}`} spinClass="orbit-spin-28-reverse" counterClass="orbit-spin-28" radius={190} offset={120} />
         <motion.div
-          className="absolute left-1/2 top-1/2"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+          className="absolute left-1/2 top-1/2 orbit-spin-18"
+          style={{ transformOrigin: "center center" }}
         >
           <div
             className="absolute flex items-center gap-2 rounded-xl border border-green-400/30 bg-[rgba(8,12,18,0.78)] px-3 py-2 text-xs text-green-400 backdrop-blur-xl"
@@ -132,22 +131,28 @@ export function HeroOrbit({ loaderVersion, sydePatch }: { loaderVersion?: string
 function OrbitCard({
   label,
   value,
-  className,
+  spinClass,
+  counterClass,
   radius,
   offset = 0,
 }: {
   label: string;
   value: string;
-  className?: string;
+  spinClass: string;
+  counterClass: string;
   radius: number;
   offset?: number;
 }) {
   return (
-    <div className={`absolute left-1/2 top-1/2 ${className}`} style={{ transform: `rotate(${offset}deg)` }}>
-      <div style={{ transform: `translateX(${radius}px) rotate(-${offset}deg)` }}>
-        <div className="flex min-w-[120px] -translate-x-1/2 -translate-y-1/2 flex-col gap-1 rounded-xl border border-white/15 bg-[rgba(8,12,18,0.78)] px-3.5 py-2.5 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.45)]">
-          <span className="text-[0.62rem] uppercase tracking-[0.08em] text-muted-2">{label}</span>
-          <code className="font-mono text-xs text-cyan-300">{value}</code>
+    <div className="absolute left-1/2 top-1/2" style={{ transform: `rotate(${offset}deg)` }}>
+      <div className={spinClass} style={{ transformOrigin: "center center" }}>
+        <div style={{ transform: `translateX(${radius}px)` }}>
+          <div className={counterClass} style={{ transformOrigin: "center center" }}>
+            <div className="flex min-w-[120px] -translate-x-1/2 -translate-y-1/2 flex-col gap-1 rounded-xl border border-white/15 bg-[rgba(8,12,18,0.78)] px-3.5 py-2.5 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.45)]">
+              <span className="text-[0.62rem] uppercase tracking-[0.08em] text-muted-2">{label}</span>
+              <code className="font-mono text-xs text-cyan-300">{value}</code>
+            </div>
+          </div>
         </div>
       </div>
     </div>

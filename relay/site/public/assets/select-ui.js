@@ -27,6 +27,7 @@
 
     select.classList.add("custom-select-native");
     select.tabIndex = -1;
+    select.style.cssText = "position:absolute;opacity:0;pointer-events:none;width:0;height:0;overflow:hidden;";
 
     function labelFor(value) {
       const opt = [...select.options].find((o) => o.value === value);
