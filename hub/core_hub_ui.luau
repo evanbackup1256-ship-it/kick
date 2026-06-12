@@ -847,7 +847,9 @@ function Core.buildSessionStatsGroup(tab, column)
 		Players = "--",
 		Uptime = "0s",
 		Memory = "--",
+		Summary = "warming up...",
 	})
+	local fpsHistory = {}
 	task.spawn(function()
 		local lastTick = tick()
 		while ENV.Alleral_State and ENV.Alleral_State.HubRunning ~= false do
@@ -873,6 +875,17 @@ function Core.buildSessionStatsGroup(tab, column)
 			status:Update("Players", tostring(#Players:GetPlayers()))
 			status:Update("Uptime", uptime .. "s")
 			status:Update("Memory", memory)
+			table.insert(fpsHistory, fps)
+			while #fpsHistory > 24 do
+				table.remove(fpsHistory, 1)
+			end
+			local spark = ""
+			for _, sample in ipairs(fpsHistory) do
+				local bars = math.clamp(math.floor((tonumber(sample) or 0) / 12), 1, 8)
+				spark = spark .. string.rep("|", bars) .. " "
+			end
+			status:Update("Summary", spark ~= "" and spark or "warming up...")
+			ENV._Alleral_FpsHistory = fpsHistory
 			task.wait(2)
 		end
 		if frameConn then
@@ -1142,6 +1155,26 @@ function Core.buildUiPreferencesGroup(tab, options)
 		end
 	)
 
+	group:CreateToggle(
+		"Window snap zones",
+		ENV.Alleral_WindowSnap ~= false,
+		"Snap hub to screen edges when dragging.",
+		function(value)
+			ENV.Alleral_WindowSnap = value ~= false
+		end
+	)
+
+	group:CreateButton("Open notification center", function()
+		local premium = ENV.Alleral_UiPremium
+		if premium and type(premium.attachWindow) == "function" then
+			local win = options.window and options.window._rawWindow
+			if win then
+				pcall(premium.attachWindow, win, win._alleralGui, win._alleralBase)
+			end
+		end
+		Core.notify("Alleral", "Use the Inbox chip on the hub header.", 3, "info")
+	end, "Slide-in history panel for toasts.")
+
 	return group
 end
 
@@ -1223,17 +1256,21 @@ function Core.hsvToColor(h, s, v)
 end
 
 function Core.applyThemeAccent(windUi, color)
-	if type(windUi) ~= "table" or typeof(color) ~= "Color3" then
+	if typeof(color) ~= "Color3" then
 		return false
 	end
-	if type(windUi.SetAccentColor) == "function" then
-		pcall(function()
+	if type(windUi) == "table" and type(windUi.SetAccentColor) == "function" then
+		local ok = pcall(function()
 			windUi:SetAccentColor(color)
 			if type(windUi.FlashAccent) == "function" then
 				windUi:FlashAccent()
 			end
 		end)
-		return true
+		return ok == true
+	end
+	local premium = ENV.Alleral_UiPremium
+	if premium and type(premium.setAccentColor) == "function" then
+		return pcall(premium.setAccentColor, color) == true
 	end
 	return false
 end

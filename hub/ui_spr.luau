@@ -1,5 +1,3 @@
---!strict
---!native
 ---------------------------------------------------------------------
 -- spr - Spring-driven motion library
 --
@@ -31,7 +29,7 @@
 -- Visualizer: https://www.desmos.com/calculator/rzvw27ljh9
 ---------------------------------------------------------------------
 
-local STRICT_RUNTIME_TYPES = true -- assert on parameter and property type mismatch
+local STRICT_RUNTIME_TYPES = false -- keep permissive in executor loadstring environments
 local SLEEP_OFFSET_SQ_LIMIT = (1/3840)^2 -- square of the offset sleep limit
 local SLEEP_VELOCITY_SQ_LIMIT = 1e-2^2 -- square of the velocity sleep limit
 local SLEEP_ROTATION_DIFF = math.rad(0.01) -- rad
@@ -728,13 +726,23 @@ local function processSprings(springStates: typeof(springStates_other), dt: numb
 	end
 end
 
-RunService.PreSimulation:Connect(function(dt)
+local function stepSprings(dt)
 	processSprings(springStates_other, dt)
-end)
-
-RunService.PostSimulation:Connect(function(dt)
 	processSprings(springStates_render, dt)
-end)
+end
+
+if RunService.PreSimulation then
+	RunService.PreSimulation:Connect(function(dt)
+		processSprings(springStates_other, dt)
+	end)
+	if RunService.PostSimulation then
+		RunService.PostSimulation:Connect(function(dt)
+			processSprings(springStates_render, dt)
+		end)
+	end
+else
+	RunService.Heartbeat:Connect(stepSprings)
+end
 
 local function assertType(argNum: number, fnName: string, expectedType: string, value: unknown)
 	if not expectedType:find(typeof(value)) then

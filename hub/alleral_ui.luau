@@ -1,7 +1,7 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.3-maclib"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.5-premium"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Maclib"
 
@@ -61,6 +61,15 @@ return function(Core)
 		end
 	end
 	ENV.Alleral_UiMotion = UiMotion
+
+	local UiPremium = nil
+	if UiMotion then
+		local premiumFactory = loadHubModule("ui_premium.luau")
+		if type(premiumFactory) == "function" then
+			UiPremium = premiumFactory(Core, UiSpr, UiMotion)
+		end
+	end
+	ENV.Alleral_UiPremium = UiPremium
 
 	local function iconImage(icon)
 		if type(icon) == "number" then
@@ -135,7 +144,23 @@ return function(Core)
 	end
 
 	local function wrapLibrary(MacLib)
-		local themes = { "Maclib", "Default", "Dark", "Light" }
+		local themes = {
+			"Maclib",
+			"Default",
+			"Dark",
+			"Light",
+			"Arrrel",
+			"ArrrelNeon",
+			"ArrrelMidnight",
+			"ArrrelAurora",
+			"ArrrelObsidian",
+			"ArrrelSynth",
+			"ArrrelOcean",
+			"ArrrelEmber",
+			"ArrrelStealth",
+			"ArrrelPaper",
+			"ArrrelVoid",
+		}
 		local motionProfiles = { "fluid", "snappy", "bouncy", "cinematic", "reduced" }
 		local layoutProfiles = { "auto", "desktop", "mobile", "compact" }
 		local activeTheme = "Maclib"
@@ -181,7 +206,11 @@ return function(Core)
 				Title = info.Title or "Alleral",
 				Description = info.Description or info.Content or info.Text or "",
 				Lifetime = info.Lifetime or info.Duration or info.Time or 4,
+				Type = info.Type,
 			}
+			if UiPremium and type(UiPremium.pushNotification) == "function" then
+				pcall(UiPremium.pushNotification, payload)
+			end
 			local win = activeWindow or Library.Window
 			if win and type(win.Notify) == "function" and notificationsEnabled then
 				if type(win.GetNotificationsState) == "function" and not win:GetNotificationsState() then
@@ -228,15 +257,92 @@ return function(Core)
 		function Library:SetNotificationLower(enabled)
 			notifyLower = enabled == true
 			ENV.Alleral_NotifyLower = notifyLower
+			if UiPremium and type(UiPremium.setNotificationLower) == "function" then
+				pcall(UiPremium.setNotificationLower, notifyLower)
+			end
+		end
+
+		function Library:SetNotificationCompact(enabled)
+			ENV.Alleral_NotifyCompact = enabled == true
+		end
+
+		function Library:SetNotifyDedupe(enabled)
+			ENV.Alleral_NotifyDedupe = enabled ~= false
+		end
+
+		function Library:SetAccentColor(color)
+			if typeof(color) ~= "Color3" then
+				return false
+			end
+			if UiPremium and type(UiPremium.setAccentColor) == "function" then
+				pcall(UiPremium.setAccentColor, color)
+			end
+			if type(Core.applyThemeAccent) == "function" then
+				pcall(Core.applyThemeAccent, Library, color)
+			end
+			return true
+		end
+
+		function Library:GetAccentColor()
+			if UiPremium and type(UiPremium.getAccentColor) == "function" then
+				local ok, color = pcall(UiPremium.getAccentColor)
+				if ok and typeof(color) == "Color3" then
+					return color
+				end
+			end
+			return Color3.fromHex("#53fc18")
+		end
+
+		function Library:GetCurrentTheme()
+			return ENV.Alleral_ActiveTheme or activeTheme
+		end
+
+		function Library:CycleV2Theme(step)
+			if UiPremium and type(UiPremium.cycleV2Theme) == "function" then
+				local ok, name = pcall(UiPremium.cycleV2Theme, step, activeWindow)
+				if ok and name then
+					activeTheme = tostring(name)
+					return name
+				end
+			end
+			return Library:CycleTheme(step)
+		end
+
+		function Library:ExportCustomization()
+			if UiPremium and type(UiPremium.exportCustomization) == "function" then
+				local ok, data = pcall(UiPremium.exportCustomization)
+				if ok and type(data) == "table" then
+					return data
+				end
+			end
+			return {}
+		end
+
+		function Library:ImportCustomization(data)
+			if UiPremium and type(UiPremium.importCustomization) == "function" then
+				return pcall(UiPremium.importCustomization, data, activeWindow) == true
+			end
+			return false
 		end
 
 		function Library:RepairWindow(window)
 			window = window or activeWindow or Library.Window
+			if UiMotion and window and type(UiMotion.attachWindow) == "function" then
+				pcall(UiMotion.attachWindow, window)
+			end
 			if UiMotion and window and type(UiMotion.repair) == "function" then
 				pcall(UiMotion.repair, window)
 			end
-			if window and type(window.Toggle) == "function" then
-				pcall(window.Toggle, window)
+			if UiPremium and window and type(UiPremium.attachWindow) == "function" then
+				pcall(
+					UiPremium.attachWindow,
+					window,
+					window._alleralGui,
+					window._alleralBase
+				)
+			end
+			if UiPremium and window and type(UiPremium.repair) == "function" then
+				pcall(UiPremium.repair, window)
 			end
 			return true
 		end
@@ -247,7 +353,10 @@ return function(Core)
 
 		function Library:SetTheme(name)
 			activeTheme = tostring(name or activeTheme)
-			if activeWindow and type(activeWindow.SetTheme) == "function" then
+			ENV.Alleral_ActiveTheme = activeTheme
+			if UiPremium and type(UiPremium.applyV2Theme) == "function" and activeTheme:find("Arrrel", 1, true) then
+				pcall(UiPremium.applyV2Theme, activeTheme, activeWindow)
+			elseif activeWindow and type(activeWindow.SetTheme) == "function" then
 				pcall(activeWindow.SetTheme, activeWindow, activeTheme)
 			end
 		end
@@ -290,6 +399,10 @@ return function(Core)
 			ENV.Alleral_UiReducedMotion = enabled == true
 		end
 
+		function Library:SetStartupEffect(enabled)
+			ENV.Alleral_UiStartup = enabled ~= false
+		end
+
 		function Library:GetSpringMotion()
 			return ENV.Alleral_UiSpringMotion ~= false
 		end
@@ -308,6 +421,10 @@ return function(Core)
 
 		function Library:SetGlassIntensity(value)
 			glassIntensity = tonumber(value) or glassIntensity
+			ENV.Alleral_GlassIntensity = glassIntensity
+			if UiPremium and type(UiPremium.setGlassIntensity) == "function" then
+				pcall(UiPremium.setGlassIntensity, glassIntensity)
+			end
 			if activeWindow and type(activeWindow.SetAcrylicBlurState) == "function" then
 				pcall(activeWindow.SetAcrylicBlurState, activeWindow, glassIntensity > 0.2)
 			end
@@ -337,11 +454,17 @@ return function(Core)
 		function Library:SetAmbientGlow(enabled)
 			ambientGlow = enabled == true
 			ENV.Alleral_AmbientGlow = ambientGlow
+			if activeWindow and UiPremium and type(UiPremium.attachWindow) == "function" then
+				pcall(UiPremium.attachWindow, activeWindow, activeWindow._alleralGui, activeWindow._alleralBase)
+			end
 		end
 
 		function Library:SetTabAurora(enabled)
 			tabAurora = enabled == true
 			ENV.Alleral_TabAurora = tabAurora
+			if activeWindow and UiPremium and type(UiPremium.repair) == "function" then
+				pcall(UiPremium.repair, activeWindow)
+			end
 		end
 
 		function Library:SetSectionLift(enabled)
@@ -422,7 +545,19 @@ return function(Core)
 			flushPendingNotifies(window)
 			if UiMotion and type(UiMotion.attachWindow) == "function" then
 				task.defer(function()
-					pcall(UiMotion.attachWindow, window)
+					local ok = pcall(UiMotion.attachWindow, window)
+					if ok and UiPremium and type(UiPremium.attachWindow) == "function" then
+						pcall(
+							UiPremium.attachWindow,
+							window,
+							window._alleralGui,
+							window._alleralBase
+						)
+					end
+				end)
+			elseif UiPremium and type(UiPremium.attachWindow) == "function" then
+				task.defer(function()
+					pcall(UiPremium.attachWindow, window)
 				end)
 			end
 			return window
@@ -571,7 +706,7 @@ return function(Core)
 			local range = settings.Range or { 0, 100 }
 			local minValue, maxValue = range[1], range[2]
 			local increment = tonumber(settings.Increment) or Core.sliderIncrement(minValue, maxValue, settings.Increment)
-			local precision = 0
+			local precision = nil
 			if increment and increment < 1 then
 				local text = tostring(increment)
 				local dot = text:find("%.")
@@ -583,7 +718,7 @@ return function(Core)
 				Minimum = minValue,
 				Maximum = maxValue,
 				Precision = precision,
-				DisplayMethod = "Value",
+				DisplayMethod = precision and "Value" or "Round",
 				Callback = settings.Callback or function() end,
 			}, nextFlag(settings.Name, id))
 			return wrapElement(function(nextSettings)
@@ -623,6 +758,7 @@ return function(Core)
 				Placeholder = settings.PlaceholderText or settings.Placeholder or "",
 				Default = settings.CurrentValue or settings.Default or "",
 				AcceptedCharacters = settings.AcceptedCharacters or "All",
+				CharacterLimit = settings.CharacterLimit,
 				Callback = settings.Callback or function() end,
 				onChanged = settings.onChanged,
 			}, nextFlag(settings.Name, id))
@@ -930,6 +1066,9 @@ return function(Core)
 				uiKey = ENV.Alleral_UiKeybind or ENV.Alleral_MaclibKeybind,
 			})
 		end
+		task.defer(function()
+			Core.repairUiWindow(window)
+		end)
 		if type(Core.registerExploitCommandPalette) == "function" then
 			pcall(Core.registerExploitCommandPalette, window, ui)
 		end
@@ -942,8 +1081,19 @@ return function(Core)
 		return window
 	end
 
-	function Core.repairUiWindow(_window)
-		return true
+	function Core.repairUiWindow(window)
+		window = window or ENV.Alleral_UiWindow
+		if type(window) ~= "table" or not window._rawWindow then
+			return false
+		end
+		local lib = window._library or (ENV.Alleral_UI and ENV.Alleral_UI.Library)
+		if lib and type(lib.RepairWindow) == "function" then
+			local ok = pcall(function()
+				lib:RepairWindow(window._rawWindow)
+			end)
+			return ok == true
+		end
+		return false
 	end
 
 	function Core.refreshAllTabColumns()
@@ -955,5 +1105,25 @@ return function(Core)
 		if ui and type(ui.Notify) == "function" then
 			pcall(ui.Notify, ui, info)
 		end
+	end
+
+	function Core.createSparklineChart(parent, values, color)
+		if UiPremium and type(UiPremium.createSparkline) == "function" then
+			local ok, chart = pcall(UiPremium.createSparkline, parent, values, color)
+			if ok then
+				return chart
+			end
+		end
+		return nil
+	end
+
+	function Core.createBarChart(parent, labels, values, color)
+		if UiPremium and type(UiPremium.createBarChart) == "function" then
+			local ok, chart = pcall(UiPremium.createBarChart, parent, labels, values, color)
+			if ok then
+				return chart
+			end
+		end
+		return nil
 	end
 end

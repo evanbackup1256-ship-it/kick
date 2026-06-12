@@ -63,6 +63,18 @@ if ($alleralUi -match 'ui_motion\.luau') {
     Fail "alleral_ui missing ui_motion bootstrap"
 }
 
+if (Test-Path (Join-Path $root "hub/ui_premium.luau")) {
+    Pass "ui_premium chrome layer present"
+} else {
+    Fail "hub/ui_premium.luau missing"
+}
+
+if ($alleralUi -match 'ui_premium\.luau') {
+    Pass "alleral_ui loads ui_premium layer"
+} else {
+    Fail "alleral_ui missing ui_premium bootstrap"
+}
+
 if ($loader -match 'purgeLegacyHubUiFiles') {
     Pass "loader purges legacy hub/ui workspace files"
 } else {

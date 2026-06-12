@@ -1,9 +1,8 @@
-local LOADER_VERSION = "8.2.4"
+local LOADER_VERSION = "8.2.5"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
 local COMPILE_VALIDATE_CACHE = {}
-local CORE_MIN_BYTES = 50000
 local CORE_BASE_MIN_BYTES = 30000
 local CORE_BASE_MAX_BYTES = 45000
 local CORE_UI_MIN_BYTES = 50000
@@ -23,11 +22,11 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.4",
+	loader = "8.2.5",
 	core = "2.9.4",
 	ui = "Maclib",
-	windui = "3.0.2-maclib",
-	alleral = "3.0.2-maclib",
+	windui = "3.0.5-premium",
+	alleral = "3.0.5-premium",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -316,6 +315,8 @@ local function requestVia(fn, url, headers)
 	return nil
 end
 
+local HTTP_TRANSPORTS
+
 local function httpFetch(url, headers)
 	headers = headers or {}
 	local bust = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(tick())
@@ -325,23 +326,18 @@ local function httpFetch(url, headers)
 		return body, via
 	end
 
-	local req = getHttpRequestFn()
-	if req then
-		body = requestVia(req, bust, headers)
-		if body then
-			return body, "request"
+	if HTTP_TRANSPORTS then
+		for _, transport in ipairs(HTTP_TRANSPORTS) do
+			body = transport.fetch(bust)
+			if type(body) == "string" and #body > 0 then
+				return body, transport.id
+			end
 		end
 	end
 
-	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
-	local solaraLib = sharedEnv and type(sharedEnv.solara) == "table" and sharedEnv.solara or nil
-	for _, fn in ipairs({
-		type(ENV.fluxus) == "table" and ENV.fluxus.request,
-		solaraLib and solaraLib.request,
-		type(ENV.Xeno) == "table" and ENV.Xeno.request,
-		type(ENV.Wave) == "table" and ENV.Wave.request,
-	}) do
-		body = requestVia(fn, bust, headers)
+	local req = getHttpRequestFn()
+	if req then
+		body = requestVia(req, bust, headers)
 		if body then
 			return body, "request"
 		end
@@ -667,7 +663,7 @@ local function buildHttpTransports(slug)
 	return list
 end
 
-local HTTP_TRANSPORTS = buildHttpTransports(EXECUTOR.slug)
+HTTP_TRANSPORTS = buildHttpTransports(EXECUTOR.slug)
 
 local CAPABILITIES = {
 	executor = EXECUTOR.name,
@@ -718,20 +714,6 @@ local function looksLikeLua(body)
 		return body:find("function", 1, true) ~= nil or body:find("local ", 1, true) ~= nil
 	end
 	return true
-end
-
-local function uiModuleSourceValid(src, minBytes)
-	minBytes = minBytes or 50
-	if type(src) ~= "string" or #src < minBytes then
-		return false
-	end
-	if #src <= 8192 and src:find("404: Not Found", 1, true) then
-		return false
-	end
-	if src:find("<!DOCTYPE", 1, true) or src:find("<html", 1, true) then
-		return false
-	end
-	return src:find("return", 1, true) ~= nil or src:find("function", 1, true) ~= nil
 end
 
 local function isRobloxHttp404(body)
@@ -895,82 +877,6 @@ local function gameScriptRejectReason(body, profile)
 		return "missing VERSION " .. profile.version
 	end
 	return "unknown"
-end
-
-local function collectHttpBodies(url)
-	local results = {}
-	local seen = {}
-	local function add(body, via)
-		if type(body) ~= "string" or #body == 0 or seen[via] then
-			return
-		end
-		seen[via] = true
-		table.insert(results, { body = body, via = via, len = #body })
-	end
-
-	if ENV.Alleral_Core and type(ENV.Alleral_Core.httpGet) == "function" then
-		add(ENV.Alleral_Core.httpGet(url), "core")
-	end
-
-	add(select(1, tryGameHttpGet(url)), "httpget")
-
-	local req = getHttpRequestFn()
-	if req then
-		add(requestVia(req, url .. "?t=" .. tick()), "request")
-	end
-
-	for _, transport in ipairs(HTTP_TRANSPORTS) do
-		add(transport.fetch(url), transport.id)
-		add(transport.fetch(url .. "?t=" .. tick()), transport.id)
-	end
-
-	add(select(1, httpFetch(url)), "httpfetch")
-	return results
-end
-
-local function collectCoreHttpBodies(url)
-	local results = {}
-	local seen = {}
-	local function add(body, via)
-		if type(body) ~= "string" or #body == 0 or seen[via] then
-			return
-		end
-		seen[via] = true
-		table.insert(results, { body = body, via = via, len = #body })
-	end
-
-	local bustUrl = url .. (url:find("?", 1, true) and "&" or "?") .. "alleral=" .. LOADER_VERSION .. "&t=" .. tick()
-
-	for _, transport in ipairs(HTTP_TRANSPORTS) do
-		if transport.id == "httpget" then
-			add(transport.fetch(bustUrl), "httpget")
-			add(transport.fetch(url), "httpget-plain")
-		end
-	end
-	add(select(1, tryGameHttpGet(bustUrl)), "httpget-fallback")
-
-	if HttpService and type(HttpService.GetAsync) == "function" then
-		local ok, body = pcall(function()
-			return HttpService:GetAsync(bustUrl, true)
-		end)
-		if ok then
-			add(body, "httpservice")
-		end
-	end
-
-	for _, transport in ipairs(HTTP_TRANSPORTS) do
-		if transport.id ~= "httpget" and transport.id ~= "request" then
-			add(transport.fetch(bustUrl), transport.id)
-		end
-	end
-
-	add(select(1, httpFetch(bustUrl)), "httpfetch")
-
-	local req = getHttpRequestFn()
-	if req then
-		add(requestVia(req, bustUrl), "request")
-	end
-	return results
 end
 
 local function fetchGameScript(profile)
@@ -1240,26 +1146,6 @@ local function alleralUiValid(src)
 	return looksLikeLua(src)
 end
 
-local function alleralLibraryValid(src)
-	if type(src) ~= "string" or #src < 3000 then
-		return false
-	end
-	if not src:find("LibRef", 1, true) or not src:find("EnsureGuiRoot", 1, true) then
-		return false
-	end
-	if not src:find("ALLERAL_UI_VERSION", 1, true) then
-		return false
-	end
-	local libVer = src:match('ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
-	if not libVer or libVer == "" then
-		return false
-	end
-	if src:find("writefile(`", 1, true) or src:find("return `", 1, true) then
-		return false
-	end
-	return true
-end
-
 local function coreValid(src)
 	return coreMonolithValid(src) or coreBaseValid(src)
 end
@@ -1472,14 +1358,6 @@ local function fetchRemoteCoreFile(relativePath, validFn, rejectReasonFn, minByt
 	return nil, relativePath .. ": " .. lastReason
 end
 
-local function fetchCoreRemote()
-	return fetchRemoteCoreFile(CORE_BASE_PATH, coreValid, coreRejectReason)
-end
-
-local function fetchCoreUiRemote()
-	return fetchRemoteCoreFile(CORE_UI_PATH, coreUiValid, coreUiRejectReason)
-end
-
 local function runParallel(tasks)
 	local remaining = #tasks
 	local results = table.create(#tasks)
@@ -1644,9 +1522,11 @@ local LEGACY_HUB_UI_FILES = {
 local function purgeLegacyHubUiFiles()
 	local removed = 0
 	for _, rel in ipairs(LEGACY_HUB_UI_FILES) do
-		for _, path in ipairs({ rel, ".alleral/cache/" .. rel, "kick/" .. rel, "kick/kick/" .. rel }) do
-			if deleteWorkspaceFile(path) then
-				removed += 1
+		for _, root in ipairs(WORKSPACE_ROOTS) do
+			for _, prefix in ipairs({ "", ".alleral/cache/" }) do
+				if deleteWorkspaceFile(prefix .. root .. rel) then
+					removed += 1
+				end
 			end
 		end
 	end
@@ -3422,13 +3302,20 @@ local function main()
 	end)
 
 	if type(PREVIOUS_LOADER_VERSION) == "string" and versionLt(PREVIOUS_LOADER_VERSION, "5.0") then
+		local savedScriptsHint = EXECUTOR.name .. " saved scripts"
 		log(
 			"Old loader v"
 				.. PREVIOUS_LOADER_VERSION
-				.. " ran before this script — check Volt Saved Scripts / workspace files",
+				.. " ran before this script — check "
+				.. savedScriptsHint
+				.. " and workspace loader files",
 			true
 		)
-		notify("Alleral", "v3.x ran earlier. Check Saved Scripts tab and workspace loader.luau.", 15)
+		notify(
+			"Alleral",
+			"v3.x ran earlier. Check " .. savedScriptsHint .. " and workspace loader.luau.",
+			15
+		)
 	end
 
 	ENV.Alleral_ScriptManifestUrl = GITHUB_RAW .. "/" .. CFG .. "/scripts_manifest.json"

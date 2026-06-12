@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-12T02:57:36Z",
+  "updatedAt": "2026-06-12T03:18:49Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
-  "loaderVersion": "8.2.4",
+  "loaderVersion": "8.2.5",
   "coreVersion": "2.9.4",
   "uiLibrary": "Maclib",
   "uiVersion": "3.0.2-maclib",

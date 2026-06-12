@@ -46,10 +46,26 @@ return function(Core, spr)
 
 	local function springTarget(instance, properties, boost)
 		if not instance or not properties then
-			return
+			return false
 		end
 		local damping, frequency = springParams(boost)
-		pcall(spr.target, instance, damping, frequency, properties)
+		if frequency == math.huge then
+			for propName, propValue in pairs(properties) do
+				pcall(function()
+					instance[propName] = propValue
+				end)
+			end
+			return true
+		end
+		local ok = pcall(spr.target, instance, damping, frequency, properties)
+		if not ok then
+			for propName, propValue in pairs(properties) do
+				pcall(function()
+					instance[propName] = propValue
+				end)
+			end
+		end
+		return ok == true
 	end
 
 	local function springStop(instance, property)
@@ -118,28 +134,47 @@ return function(Core, spr)
 		end
 	end
 
-	local function findMaclibRoot()
-		local roots = {}
-		local Players = game:GetService("Players")
-		local lp = Players.LocalPlayer
-		if lp and lp:FindFirstChildOfClass("PlayerGui") then
-			table.insert(roots, lp:FindFirstChildOfClass("PlayerGui"))
+	local function findMaclibRoot(preferredGui)
+		if preferredGui and preferredGui:IsA("ScreenGui") then
+			for _, desc in ipairs(preferredGui:GetDescendants()) do
+				if desc.Name == "Base" and desc:IsA("Frame") and desc:FindFirstChild("Sidebar") then
+					return preferredGui, desc
+				end
+			end
 		end
+
+		local roots = {}
 		if gethui then
 			pcall(function()
 				table.insert(roots, gethui())
 			end)
 		end
+		local Players = game:GetService("Players")
+		local lp = Players.LocalPlayer
+		if lp and lp:FindFirstChildOfClass("PlayerGui") then
+			table.insert(roots, lp:FindFirstChildOfClass("PlayerGui"))
+		end
 		for _, root in ipairs(roots) do
 			if root then
 				for _, desc in ipairs(root:GetDescendants()) do
 					if desc.Name == "Base" and desc:IsA("Frame") and desc:FindFirstChild("Sidebar") then
-						return desc.Parent, desc
+						local gui = desc
+						while gui and not gui:IsA("ScreenGui") do
+							gui = gui.Parent
+						end
+						return gui, desc
 					end
 				end
 			end
 		end
 		return nil, nil
+	end
+
+	local function resolveWindowGui(window)
+		if type(window) == "table" and window._alleralGui and window._alleralBase then
+			return window._alleralGui, window._alleralBase
+		end
+		return findMaclibRoot()
 	end
 
 	local function hookButtonRow(row)
@@ -228,7 +263,8 @@ return function(Core, spr)
 		if not row or isHooked(row) then
 			return
 		end
-		local interact = row:FindFirstChild("DropdownInteract", true)
+		local interact = row:FindFirstChild("Interact", true) or row:FindFirstChild("DropdownInteract", true)
+		local dropdownImage = row:FindFirstChild("DropdownImage", true)
 		if not interact then
 			return
 		end
@@ -236,9 +272,43 @@ return function(Core, spr)
 
 		interact.MouseButton1Click:Connect(function()
 			springTarget(interact, { Rotation = 6 }, 1.4)
+			if dropdownImage then
+				springTarget(dropdownImage, { Rotation = 180 }, 1.2)
+			end
 			task.delay(0.12, function()
 				springTarget(interact, { Rotation = 0 }, 1)
+				if dropdownImage then
+					springTarget(dropdownImage, { Rotation = 0 }, 1)
+				end
 			end)
+		end)
+	end
+
+	local function hookInputRow(row)
+		if not row or isHooked(row) then
+			return
+		end
+		local inputBox = row:FindFirstChild("InputBox", true)
+		if not inputBox or not inputBox:IsA("TextBox") then
+			return
+		end
+		markHooked(row)
+
+		local stroke = inputBox:FindFirstChildOfClass("UIStroke")
+		local baseBg = inputBox.BackgroundTransparency
+		local baseStroke = stroke and stroke.Transparency or 0.9
+
+		inputBox.Focused:Connect(function()
+			springTarget(inputBox, { BackgroundTransparency = math.max(0.82, baseBg - 0.08) }, 1.3)
+			if stroke then
+				springTarget(stroke, { Transparency = math.max(0.45, baseStroke - 0.35) }, 1.3)
+			end
+		end)
+		inputBox.FocusLost:Connect(function()
+			springTarget(inputBox, { BackgroundTransparency = baseBg }, 1)
+			if stroke then
+				springTarget(stroke, { Transparency = baseStroke }, 1)
+			end
 		end)
 	end
 
@@ -266,18 +336,14 @@ return function(Core, spr)
 			if not child:IsA("GuiObject") then
 				return
 			end
-			local startX = child.Position.X.Offset + 14
-			child.Position = UDim2.new(child.Position.X.Scale, startX, child.Position.Y.Scale, child.Position.Y.Offset)
-			springTarget(child, {
-				Position = UDim2.new(child.Position.X.Scale, startX - 14, child.Position.Y.Scale, child.Position.Y.Offset),
-			}, 0.9)
-			for _, desc in ipairs(child:GetDescendants()) do
-				if desc:IsA("GuiObject") and desc.BackgroundTransparency < 1 then
-					local target = desc.BackgroundTransparency
-					desc.BackgroundTransparency = 1
-					springTarget(desc, { BackgroundTransparency = target }, 0.85)
-				end
+			if child.Name ~= "Elements" then
+				return
 			end
+			local targetX = child.Position.X.Offset
+			child.Position = UDim2.new(child.Position.X.Scale, targetX + 16, child.Position.Y.Scale, child.Position.Y.Offset)
+			springTarget(child, {
+				Position = UDim2.new(child.Position.X.Scale, targetX, child.Position.Y.Scale, child.Position.Y.Offset),
+			}, 0.95)
 		end)
 	end
 
@@ -308,6 +374,8 @@ return function(Core, spr)
 			hookSliderRow(inst)
 		elseif inst.Name == "Dropdown" and inst:IsA("Frame") then
 			hookDropdownRow(inst)
+		elseif inst.Name == "Input" and inst:IsA("Frame") then
+			hookInputRow(inst)
 		elseif inst.Name == "TabSwitcher" and inst:IsA("GuiObject") then
 			hookTabSwitcher(inst)
 		elseif inst.Name == "Notification" and inst:IsA("Frame") then
@@ -327,18 +395,18 @@ return function(Core, spr)
 	end
 
 	local function playStartup(base)
-		if not base or not motionEnabled() then
+		if not base or not motionEnabled() or ENV.Alleral_UiStartup == false then
 			return
 		end
 		local scale = base:FindFirstChild("BaseUIScale")
 		local stroke = base:FindFirstChild("BaseUIStroke")
+		local targetTransparency = base.BackgroundTransparency
 		if scale then
 			scale.Scale = 0.88
 			springTarget(scale, { Scale = 1 }, 0.75)
 		end
-		local startTransparency = base.BackgroundTransparency
 		base.BackgroundTransparency = 1
-		springTarget(base, { BackgroundTransparency = startTransparency }, 0.8)
+		springTarget(base, { BackgroundTransparency = targetTransparency }, 0.8)
 		if stroke then
 			local strokeTarget = stroke.Transparency
 			stroke.Transparency = 1
@@ -386,8 +454,20 @@ return function(Core, spr)
 			return false
 		end
 
+		if window._alleralMotionAttached and base then
+			tightenSpacing(base)
+			scanTree(base)
+			return true
+		end
+
 		if not gui or not base then
-			gui, base = findMaclibRoot()
+			for _ = 1, 20 do
+				gui, base = resolveWindowGui(window)
+				if base then
+					break
+				end
+				task.wait(0.05)
+			end
 		end
 		if not base then
 			return false
@@ -395,6 +475,7 @@ return function(Core, spr)
 
 		window._alleralGui = gui
 		window._alleralBase = base
+		window._alleralMotionAttached = true
 
 		tightenSpacing(base)
 		scanTree(base)
@@ -442,9 +523,13 @@ return function(Core, spr)
 
 	function Motion.repair(window)
 		local base = window and window._alleralBase
+		local gui = window and window._alleralGui
 		if not base then
-			local _, found = findMaclibRoot()
-			base = found
+			gui, base = resolveWindowGui(window)
+			if window and base then
+				window._alleralGui = gui
+				window._alleralBase = base
+			end
 		end
 		if base then
 			tightenSpacing(base)
