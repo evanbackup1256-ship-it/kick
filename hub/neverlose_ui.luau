@@ -16,8 +16,13 @@ return function(Core)
 	}
 	local LIBRARY_FILE = "library.lua"
 	local SPRING_FILE = "spring.luau"
+	local SPR_FILE = "spr.luau"
+	local RIPPLE_FILE = "ripple.luau"
+	local FUSION_FILE = "fusion.luau"
 	local MIN_LIBRARY_BYTES = 80000
-	local MIN_SPRING_BYTES = 400
+	local MIN_SPRING_BYTES = 200
+	local MIN_SPR_BYTES = 8000
+	local MIN_RIPPLE_BYTES = 800
 
 	local function genv()
 		local ok, env = pcall(function()
@@ -88,17 +93,45 @@ return function(Core)
 		return source:find("LibRef", 1, true) ~= nil and source:find("EnsureGuiRoot", 1, true) ~= nil
 	end
 
-	local function loadNeverloseLibrary()
-		if neverloseLibraryLive(ENV._NeverloseLibrary) then
-			return ENV._NeverloseLibrary
+	local function releaseNeverloseRuntime()
+		local lib = ENV._NeverloseLibrary
+		if type(lib) == "table" and type(lib.Unload) == "function" then
+			pcall(lib.Unload, lib)
 		end
 		ENV._NeverloseLibrary = nil
+		ENV._NeverloseMotion = nil
 		if getgenv().Library then
 			getgenv().Library = nil
 		end
+	end
+
+	local function loadMotionStack()
+		local sprRaw = compileModule(readLocal(SPR_FILE) or fetchRemote(SPR_FILE, MIN_SPR_BYTES), "@Neverlose/spr")
+		local Spr = type(sprRaw) == "table" and sprRaw or nil
+
+		local rippleFactory = compileModule(readLocal(RIPPLE_FILE) or fetchRemote(RIPPLE_FILE, MIN_RIPPLE_BYTES), "@Neverlose/ripple")
+		local Ripple = type(rippleFactory) == "function" and rippleFactory() or nil
+
+		local fusionFactory = compileModule(readLocal(FUSION_FILE) or fetchRemote(FUSION_FILE, MIN_RIPPLE_BYTES), "@Neverlose/fusion")
+		local Fusion = type(fusionFactory) == "function" and fusionFactory() or nil
 
 		local springFactory = compileModule(readLocal(SPRING_FILE) or fetchRemote(SPRING_FILE, MIN_SPRING_BYTES), "@Neverlose/spring")
-		local Spring = type(springFactory) == "function" and springFactory() or nil
+		local Spring = type(springFactory) == "function" and springFactory({
+			spr = Spr,
+			ripple = Ripple,
+			fusion = Fusion,
+		}) or nil
+
+		return Spring, Spr, Ripple, Fusion
+	end
+
+	local function loadNeverloseLibrary()
+		releaseNeverloseRuntime()
+		if neverloseLibraryLive(ENV._NeverloseLibrary) then
+			return ENV._NeverloseLibrary
+		end
+
+		local Spring, Spr, Ripple, Fusion = loadMotionStack()
 
 		local libSource = readLocal(LIBRARY_FILE)
 		if libSource and not librarySourceValid(libSource) then
@@ -126,10 +159,10 @@ return function(Core)
 			local springModule = Spring
 			local origNotification = type(Library.Notification) == "function" and Library.Notification or nil
 			local motionProfiles = {
-				fluid = { frequency = 7, damping = 0.78 },
-				snappy = { frequency = 11, damping = 0.9 },
-				bouncy = { frequency = 6, damping = 0.58 },
-				cinematic = { frequency = 4.5, damping = 0.95 },
+				fluid = { frequency = 5.5, damping = 1 },
+				snappy = { frequency = 8, damping = 1 },
+				bouncy = { frequency = 6, damping = 0.72 },
+				cinematic = { frequency = 4.2, damping = 1 },
 				reduced = { frequency = 18, damping = 1 },
 			}
 			local themePresets = {
@@ -155,6 +188,9 @@ return function(Core)
 
 			Library._SpringModule = springModule
 			Library._Spring = springModule
+			Library._Spr = Spr
+			Library._Ripple = Ripple
+			Library._Fusion = Fusion
 			Library._SpringMotion = motionProfiles.fluid
 			Library.ALLERAL_UI_V2 = true
 			Library.WindUI = Library
@@ -390,7 +426,19 @@ return function(Core)
 	end
 
 	local function uiOk(bundle)
-		return type(bundle) == "table" and type(bundle.Library) == "table" and type(bundle.CreateWindow) == "function"
+		if type(bundle) ~= "table" or type(bundle.Library) ~= "table" or type(bundle.CreateWindow) ~= "function" then
+			return false
+		end
+		local lib = bundle.Library
+		if not neverloseLibraryLive(lib) then
+			return false
+		end
+		local expected = Core.NEVERLOSE_UI_VERSION
+		local actual = lib.GetNeverloseVersion and lib:GetNeverloseVersion() or nil
+		if type(expected) == "string" and type(actual) == "string" and actual ~= expected then
+			return false
+		end
+		return true
 	end
 
 	local function cacheUi(bundle)
@@ -416,6 +464,10 @@ return function(Core)
 		local cached = ENV.Alleral_UI
 		if uiOk(cached) then
 			return cacheUi(cached)
+		end
+		if cached then
+			releaseNeverloseRuntime()
+			ENV.Alleral_UI = nil
 		end
 
 		local Library, err = loadNeverloseLibrary()
@@ -456,6 +508,8 @@ return function(Core)
 	function Core.preloadUi()
 		return Core.loadUi()
 	end
+
+	Core.releaseNeverloseRuntime = releaseNeverloseRuntime
 
 	function Core.uiLibrary(bundle)
 		if type(bundle) ~= "table" then

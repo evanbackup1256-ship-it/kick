@@ -345,6 +345,9 @@ function Core.releaseUiWindow()
 			lib:ReleaseWindow(lib.Window)
 		end)
 	end
+	if type(lib) == "table" and type(lib.Unload) == "function" then
+		pcall(lib.Unload, lib)
+	end
 	ENV.Alleral_UiWindow = nil
 	getgenv().Alleral_UiWindow = nil
 end

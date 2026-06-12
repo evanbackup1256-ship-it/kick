@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.8.8"
+local LOADER_VERSION = "7.9.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -23,11 +23,11 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.8.8",
+	loader = "7.9.0",
 	core = "2.8.8",
 	ui = "Alleral",
-	neverlose = "1.1.1-kick",
-	windui = "1.1.1-kick",
+	neverlose = "1.3.0-kick",
+	windui = "1.3.0-kick",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -2390,9 +2390,23 @@ local function buildManagedFiles()
 			paths = {
 				UI .. "/neverlose/library.lua",
 				UI .. "/neverlose/spring.luau",
+				UI .. "/neverlose/spr.luau",
+				UI .. "/neverlose/ripple.luau",
+				UI .. "/neverlose/fusion.luau",
 			},
 			expectedKey = "neverlose",
 			extract = "neverlose",
+		},
+		{
+			paths = {
+				UI .. "/windui/main.lua",
+				UI .. "/windui/bootstrap.lua",
+				UI .. "/windui/aller.luau",
+				UI .. "/windui/arrrel.luau",
+				UI .. "/windui/autoscale.luau",
+				UI .. "/windui/v2/boost.luau",
+			},
+			alwaysDelete = true,
 		},
 		{
 			paths = { CFG .. "/weao.json", "config/weao.json" },
@@ -2651,6 +2665,18 @@ local function scanLegacyLoaders()
 end
 
 local function clearLegacySession()
+	if type(ENV.Alleral_Core) == "table" and type(ENV.Alleral_Core.releaseUiWindow) == "function" then
+		pcall(ENV.Alleral_Core.releaseUiWindow)
+	end
+	local lib = ENV._NeverloseLibrary
+	if type(lib) == "table" and type(lib.Unload) == "function" then
+		pcall(lib.Unload, lib)
+	end
+	ENV._NeverloseLibrary = nil
+	ENV._NeverloseMotion = nil
+	if getgenv().Library then
+		getgenv().Library = nil
+	end
 	if ENV.Alleral_State and type(ENV.Alleral_State.Alleral_Unload) == "function" then
 		pcall(ENV.Alleral_State.Alleral_Unload)
 	end
@@ -3051,6 +3077,7 @@ local function main()
 
 	local expectedVersions = fetchExpectedVersionsFast()
 	ENV._Alleral_ExpectedVersions = expectedVersions
+	purgeOutdatedWorkspace()
 	refreshExpectedVersionsAsync()
 	if expectedVersions.minLoader and versionLt(LOADER_VERSION, expectedVersions.minLoader) then
 		local msg = "Loader v"

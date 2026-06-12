@@ -1,5 +1,5 @@
--- Neverlose UI · NEVERLOSE_UI_VERSION = "1.1.1-kick"
-local NEVERLOSE_UI_VERSION = "1.1.1-kick"
+-- Neverlose UI · NEVERLOSE_UI_VERSION = "1.3.0-kick"
+local NEVERLOSE_UI_VERSION = "1.3.0-kick"
 local Library do 
  local Workspace = game:GetService("Workspace")
  local UserInputService = game:GetService("UserInputService")
@@ -67,12 +67,12 @@ local Library do
  Flags = { },
 
  Tween = {
- Time = 0.3,
- Style = Enum.EasingStyle.Quad,
+ Time = 0.26,
+ Style = Enum.EasingStyle.Quart,
  Direction = Enum.EasingDirection.Out
  },
 
- FadeSpeed = 0.2,
+ FadeSpeed = 0.22,
 
         Folders = {
             Directory = "Alleral",
@@ -201,6 +201,30 @@ local Library do
 
  Library.Theme = TableClone(Themes["Preset"])
 
+ Library.GetSpringMotion = function(self)
+ return self._SpringMotion or { frequency = 5.5, damping = 1 }
+ end
+
+ Library.AnimateFluid = function(self, instance, goals, duration)
+ if not instance or type(goals) ~= "table" then
+ return
+ end
+ local motion = Library:GetSpringMotion()
+ if Library._Ripple and type(Library._Ripple.tween) == "function" and not (Library._Spring and Library._Spring.spr) then
+  Library._Ripple.tween(instance, goals, {
+   easing = "quartOut",
+   duration = duration or Library.Tween.Time,
+  })
+  return
+ end
+ if Library._Spring and Library._Spring.target then
+  Library._Spring.target(instance, goals, motion)
+  return
+ end
+ duration = duration or Library.Tween.Time
+ TweenService:Create(instance, TweenInfo.new(duration, Library.Tween.Style, Library.Tween.Direction), goals):Play()
+ end
+
  -- Folders
  for Index, Value in Library.Folders do 
  if not isfolder(Value) then
@@ -225,7 +249,7 @@ local Library do
    end
   end
   if next(springGoal) then
-   local motion = Library._SpringMotion or { frequency = 8, damping = 0.78 }
+   local motion = Library._SpringMotion or { frequency = 5.5, damping = 1 }
    local completed = Instance.new("BindableEvent")
    Library._Spring.target(Item, springGoal, {
     frequency = motion.frequency,
@@ -788,6 +812,36 @@ local Library do
  return self
  end
 
+ Library.SafeReparent = function(self, instance, parentInstance)
+ if typeof(instance) ~= "Instance" or typeof(parentInstance) ~= "Instance" then
+  return false
+ end
+ if not instance.Parent and instance:GetFullName() == instance.Name then
+  return false
+ end
+ self:EnsureGuiRoot()
+ local ok = pcall(function()
+  if instance.Parent ~= parentInstance then
+   instance.Parent = parentInstance
+  end
+ end)
+ return ok
+ end
+
+ Library.ReleaseWindow = function(self, window)
+ if type(window) ~= "table" then
+  return
+ end
+ if type(window.SetOpen) == "function" then
+  pcall(window.SetOpen, window, false)
+ end
+ if window.Items and window.Items.MainFrame and window.Items.MainFrame.Instance then
+  pcall(function()
+   window.Items.MainFrame.Instance:Destroy()
+  end)
+ end
+ end
+
  Library:EnsureGuiRoot()
 
  Library.Unload = function(self)
@@ -828,6 +882,9 @@ local Library do
  end
 
  getgenv().Library = nil
+ local genv = getgenv()
+ genv._NeverloseLibrary = nil
+ genv._NeverloseMotion = nil
  end
 
  Library.GetImage = function(self, Image)
@@ -2586,7 +2643,7 @@ local Library do
  Name = "\0",
  Position = UDim2New(0.5, 0, 0, 20),
  AnchorPoint = Vector2New(0.5, 0),
- Visible = true,
+ Visible = false,
  BorderColor3 = FromRGB(0, 0, 0),
  Size = UDim2New(0, 50, 0, 50),
  BorderSizePixel = 0,
@@ -2594,27 +2651,52 @@ local Library do
  ZIndex = 127,
  BackgroundColor3 = Library.Theme.Background
  }) Items["FloatingButton"]:AddToTheme({BackgroundColor3 = "Background"})
+ else
+ Items["FloatingButton"] = Instances:Create("TextButton", {
+ Parent = LibRef.Holder.Instance,
+ Text = "",
+ AutoButtonColor = false,
+ Name = "\0",
+ Position = UDim2New(1, -62, 1, -62),
+ AnchorPoint = Vector2New(1, 1),
+ Visible = false,
+ BorderColor3 = FromRGB(0, 0, 0),
+ Size = UDim2New(0, 44, 0, 44),
+ BorderSizePixel = 0,
+ BackgroundTransparency = 0.18,
+ ZIndex = 127,
+ BackgroundColor3 = Library.Theme.Background
+ }) Items["FloatingButton"]:AddToTheme({BackgroundColor3 = "Background"})
+ end
 
  local Gui = Items["FloatingButton"].Instance
 
  local Dragging = false 
  local DragStart
  local StartPosition 
+ local DragMoved = false
  
  local Set = function(Input)
  local DragDelta = Input.Position - DragStart
+ if DragDelta.Magnitude > 6 then
+ DragMoved = true
+ end
  Items["FloatingButton"]:Tween(TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(StartPosition.X.Scale, StartPosition.X.Offset + DragDelta.X, StartPosition.Y.Scale, StartPosition.Y.Offset + DragDelta.Y)})
  end
  
  Items["FloatingButton"]:Connect("InputBegan", function(Input)
  if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
  Dragging = true
+ DragMoved = false
  
  DragStart = Input.Position
  StartPosition = Gui.Position
  
  Input.Changed:Connect(function()
  if Input.UserInputState == Enum.UserInputState.End then
+ if Dragging and not DragMoved then
+ Window:SetOpen(not Window.IsOpen)
+ end
  Dragging = false
  end
  end)
@@ -2657,7 +2739,14 @@ local Library do
  }):AddToTheme({Color = function()
  return RGBSequence{RGBSequenceKeypoint(0, Library.Theme.Accent), RGBSequenceKeypoint(1, Library.Theme.AccentGradient)}
  end})
- end
+
+ Instances:Create("UIStroke", {
+ Parent = Items["FloatingButton"].Instance,
+ Name = "\0",
+ Thickness = 1,
+ Transparency = 0.35,
+ Color = FromRGB(255, 255, 255),
+ }):AddToTheme({Color = "Accent"})
 
  Items["PagePlaceholder"] = Instances:Create("Frame", {
  Parent = Items["MainFrame"].Instance,
@@ -3038,6 +3127,10 @@ local Library do
  Items["MainFrame"].Instance.Visible = true 
  end
 
+ if Items["FloatingButton"] then
+ Items["FloatingButton"].Instance.Visible = not Window.IsOpen
+ end
+
  local Descendants = Items["MainFrame"].Instance:GetDescendants()
  TableInsert(Descendants, Items["MainFrame"].Instance)
 
@@ -3326,6 +3419,13 @@ local Library do
  Settings.IsOpen = Bool
  
  Debounce = true 
+ Library:EnsureGuiRoot()
+ local holder = LibRef.Holder and LibRef.Holder.Instance
+ local unused = LibRef.UnusedHolder and LibRef.UnusedHolder.Instance
+ if not holder or not unused then
+ Debounce = false
+ return
+ end
  
  if Settings.IsOpen then 
  for Index, Value in Settings.Elements do
@@ -3334,11 +3434,17 @@ local Library do
  end
  
  SettingsItems["Settings"].Instance.Visible = true
- SettingsItems["Settings"].Instance.Parent = LibRef.Holder.Instance
+ Library:SafeReparent(SettingsItems["Settings"].Instance, holder)
  
  RenderStepped = RunService.RenderStepped:Connect(function()
- SettingsItems["Settings"].Instance.Position = UDim2New(0, Items["SettingsIcon"].Instance.AbsolutePosition.X, 0, Items["SettingsIcon"].Instance.AbsolutePosition.Y + Items["SettingsButton"].Instance.AbsoluteSize.Y + 108)
- SettingsItems["Settings"].Instance.Size = UDim2New(0, 325, 0, 230)
+ local panel = SettingsItems["Settings"].Instance
+ local icon = Items["SettingsIcon"] and Items["SettingsIcon"].Instance
+ local button = Items["SettingsButton"] and Items["SettingsButton"].Instance
+ if not panel or not panel.Parent or not icon or not icon.Parent or not button or not button.Parent then
+ return
+ end
+ panel.Position = UDim2New(0, icon.AbsolutePosition.X, 0, icon.AbsolutePosition.Y + button.AbsoluteSize.Y + 108)
+ panel.Size = UDim2New(0, 325, 0, 230)
  end)
  
  for Index, Value in Library.OpenFrames do 
@@ -3393,7 +3499,11 @@ local Library do
  Debounce = false 
  SettingsItems["Settings"].Instance.Visible = Settings.IsOpen
  task.wait(0.2)
- SettingsItems["Settings"].Instance.Parent = not Settings.IsOpen and LibRef.UnusedHolder.Instance or LibRef.Holder.Instance
+ if RenderStepped then
+ RenderStepped:Disconnect()
+ RenderStepped = nil
+ end
+ Library:SafeReparent(SettingsItems["Settings"].Instance, Settings.IsOpen and holder or unused)
  end)
  end
  
@@ -3478,14 +3588,6 @@ local Library do
  Items["MainFrame"].Instance.AnchorPoint = Vector2New(0, 0)
 
  Items["MainFrame"].Instance.Position = UDim2New(0, CenterPosition.X, 0, CenterPosition.Y)
- end
-
- if IsMobile then 
- Items["FloatingButton"]:Connect("InputBegan", function(Input)
- if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
- Window:SetOpen(not Window.IsOpen)
- end
- end)
  end
 
  --[[
@@ -3941,7 +4043,7 @@ Library.Watermark = function(self, Data)
  Size = UDim2New(1, 0, 1, 0),
  BorderColor3 = FromRGB(0, 0, 0),
  ZIndex = 2,
- Position = UDim2New(0, 0, 0, 60),
+ Position = UDim2New(0, 0, 0, 22),
  BorderSizePixel = 0,
  BackgroundColor3 = FromRGB(255, 255, 255)
  })
@@ -4008,9 +4110,12 @@ Library.Watermark = function(self, Data)
  Items["Page"].Instance.Visible = Bool 
  Items["Page"].Instance.Parent = Bool and Page.Window.Items["Content"].Instance or LibRef.UnusedHolder.Instance
 
+ local tabMotion = TweenInfo.new(Library.Tween.Time + 0.04, Library.Tween.Style, Library.Tween.Direction)
+ local slideOffset = 22
+
  if Page.Active then
- Items["Inactive"]:Tween(nil, {BackgroundTransparency = 0.25})
- Items["Page"]:Tween(TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, 0, 0)})
+ Items["Inactive"]:Tween(tabMotion, {BackgroundTransparency = 0.25})
+ Items["Page"]:Tween(tabMotion, {Position = UDim2New(0, 0, 0, 0)})
 
  for Index, Value in Page.Sections do 
  task.spawn(function()
@@ -4018,8 +4123,8 @@ Library.Watermark = function(self, Data)
  end)
  end
  else
- Items["Inactive"]:Tween(nil, {BackgroundTransparency = 1})
- Items["Page"]:Tween(TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, 0, 60)})
+ Items["Inactive"]:Tween(tabMotion, {BackgroundTransparency = 1})
+ Items["Page"]:Tween(tabMotion, {Position = UDim2New(0, 0, 0, slideOffset)})
  end
 
  local AllInstances = Items["Page"].Instance:GetDescendants()
@@ -5175,12 +5280,12 @@ Library.Watermark = function(self, Data)
  Library.Flags[Toggle.Flag] = Value 
 
  if Toggle.Value then 
- Items["Accent"]:Tween(TweenInfo.new(Library.Tween.Time + 0.1, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 0, Size = UDim2New(1, 0, 1, 0)})
+ Items["Accent"]:Tween(TweenInfo.new(Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {BackgroundTransparency = 0, Size = UDim2New(1, 0, 1, 0)})
  Items["CheckImage"]:Tween(nil, {ImageTransparency = 0, Size = UDim2New(0, 10, 0, 9)})
 
  --Items["Gradient"].Instance.Enabled = true 
  else
- Items["Accent"]:Tween(TweenInfo.new(Library.Tween.Time + 0.05, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 1, Size = UDim2New(0, 0, 0, 0)})
+ Items["Accent"]:Tween(TweenInfo.new(Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {BackgroundTransparency = 1, Size = UDim2New(0, 0, 0, 0)})
  Items["CheckImage"]:Tween(nil, {ImageTransparency = 1, Size = UDim2New(0, 0, 0, 0)})
 
  --Items["Gradient"].Instance.Enabled = false
@@ -5361,6 +5466,13 @@ Library.Watermark = function(self, Data)
  Settings.IsOpen = Bool
  
  Debounce = true 
+ Library:EnsureGuiRoot()
+ local holder = LibRef.Holder and LibRef.Holder.Instance
+ local unused = LibRef.UnusedHolder and LibRef.UnusedHolder.Instance
+ if not holder or not unused then
+ Debounce = false
+ return
+ end
  
  if Settings.IsOpen then 
  task.spawn(function()
@@ -5371,13 +5483,18 @@ Library.Watermark = function(self, Data)
  end)
 
  SettingsItem["Settings"].Instance.Visible = true
- SettingsItem["Settings"].Instance.Parent = LibRef.Holder.Instance
+ Library:SafeReparent(SettingsItem["Settings"].Instance, holder)
  
  RenderStepped = RunService.RenderStepped:Connect(function()
- SettingsItem["Settings"].Instance.Position = UDim2New(
- 0, Items["Toggle"].Instance.AbsolutePosition.X + Items["Toggle"].Instance.AbsoluteSize.X / 1.9 + 15, 
- 0, Items["Toggle"].Instance.AbsolutePosition.Y + Items["Toggle"].Instance.AbsoluteSize.Y + Size / 1.9)
- SettingsItem["Settings"].Instance.Size = UDim2New(0, 245, 0, Size)
+ local panel = SettingsItem["Settings"].Instance
+ local toggle = Items["Toggle"] and Items["Toggle"].Instance
+ if not panel or not panel.Parent or not toggle or not toggle.Parent then
+ return
+ end
+ panel.Position = UDim2New(
+ 0, toggle.AbsolutePosition.X + toggle.AbsoluteSize.X / 1.9 + 15, 
+ 0, toggle.AbsolutePosition.Y + toggle.AbsoluteSize.Y + Size / 1.9)
+ panel.Size = UDim2New(0, 245, 0, Size)
  end)
  
  for Index, Value in Library.OpenFrames do 
@@ -5431,7 +5548,11 @@ Library.Watermark = function(self, Data)
  Debounce = false 
  SettingsItem["Settings"].Instance.Visible = Settings.IsOpen
  task.wait(0.2)
- SettingsItem["Settings"].Instance.Parent = not Settings.IsOpen and LibRef.UnusedHolder.Instance or LibRef.Holder.Instance
+ if RenderStepped then
+ RenderStepped:Disconnect()
+ RenderStepped = nil
+ end
+ Library:SafeReparent(SettingsItem["Settings"].Instance, Settings.IsOpen and holder or unused)
  end)
  end
 

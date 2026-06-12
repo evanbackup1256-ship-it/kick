@@ -1,182 +1,58 @@
+-- NEVERLOSE_UI_VERSION = "1.3.0-kick"
 --[[
-	Critical-damping spring animator for Neverlose UI instances.
-	Animates numbers, UDim2 (scale + offset), and Vector2 on one Heartbeat loop.
+	Unified motion adapter for Neverlose UI.
+	Uses spr (springs), ripple (easing tweens), fusion (reactive state bridge).
 ]]
 
-return function()
-	local RunService = game:GetService("RunService")
+return function(deps)
+	deps = type(deps) == "table" and deps or {}
+	local Spr = deps.spr
+	local Ripple = deps.ripple
+	local Fusion = deps.fusion
 
-	local motors = {}
-	local conn
-
-	local function applyUdim(instance, key, states)
-		local current = instance[key]
-		local xs, xo, ys, yo = current.X.Scale, current.X.Offset, current.Y.Scale, current.Y.Offset
-		for _, state in pairs(states) do
-			if state.udimKey == key then
-				if state.udimAxis == "X" and state.udimKind == "Scale" then
-					xs = state.position
-				elseif state.udimAxis == "X" and state.udimKind == "Offset" then
-					xo = state.position
-				elseif state.udimAxis == "Y" and state.udimKind == "Scale" then
-					ys = state.position
-				elseif state.udimAxis == "Y" and state.udimKind == "Offset" then
-					yo = state.position
-				end
-			end
-		end
-		instance[key] = UDim2.new(xs, xo, ys, yo)
+	local function mapMotion(opts)
+		opts = type(opts) == "table" and opts or {}
+		local frequency = opts.frequency or 5.5
+		local damping = opts.damping or 1
+		return damping, frequency
 	end
 
-	local function stopMotor(id)
-		motors[id] = nil
-		if not next(motors) and conn then
-			conn:Disconnect()
-			conn = nil
-		end
-	end
-
-	local function ensureLoop()
-		if conn then
-			return
-		end
-		conn = RunService.Heartbeat:Connect(function(dt)
-			dt = math.clamp(dt, 1 / 240, 1 / 20)
-			for id, motor in pairs(motors) do
-				local done = true
-				for key, state in pairs(motor.states) do
-					local omega = state.frequency * math.pi * 2
-					local c = 2 * omega * state.damping
-					local accel = -c * state.velocity - (omega * omega) * (state.position - state.target)
-					state.velocity += accel * dt
-					state.position += state.velocity * dt
-					if motor.instance and motor.instance.Parent then
-						if state.udimKey then
-							applyUdim(motor.instance, state.udimKey, motor.states)
-						elseif state.vectorKey then
-							local current = motor.instance[state.vectorKey]
-							if state.vectorAxis == "X" then
-								motor.instance[state.vectorKey] = Vector2.new(state.position, current.Y)
-							else
-								motor.instance[state.vectorKey] = Vector2.new(current.X, state.position)
-							end
-						else
-							motor.instance[key] = state.position
-						end
-					end
-					if math.abs(state.position - state.target) > 0.0005 or math.abs(state.velocity) > 0.0005 then
-						done = false
-					else
-						state.position = state.target
-						state.velocity = 0
-					end
-				end
-				if done then
-					if motor.instance and motor.instance.Parent then
-						for key, state in pairs(motor.states) do
-							if state.udimKey then
-								state.position = state.target
-								applyUdim(motor.instance, state.udimKey, motor.states)
-							elseif state.vectorKey then
-								local current = motor.instance[state.vectorKey]
-								if state.vectorAxis == "X" then
-									motor.instance[state.vectorKey] = Vector2.new(state.target, current.Y)
-								else
-									motor.instance[state.vectorKey] = Vector2.new(current.X, state.target)
-								end
-							else
-								motor.instance[key] = state.target
-							end
-						end
-					end
-					stopMotor(id)
-					if motor.onComplete then
-						pcall(motor.onComplete)
-					end
-				end
-			end
-		end)
-	end
-
-	local function addUdimStates(states, instance, key, target, frequency, damping)
-		local current = instance[key]
-		local specs = {
-			{ axis = "X", kind = "Scale", pos = current.X.Scale, tgt = target.X.Scale },
-			{ axis = "X", kind = "Offset", pos = current.X.Offset, tgt = target.X.Offset },
-			{ axis = "Y", kind = "Scale", pos = current.Y.Scale, tgt = target.Y.Scale },
-			{ axis = "Y", kind = "Offset", pos = current.Y.Offset, tgt = target.Y.Offset },
-		}
-		for _, spec in ipairs(specs) do
-			local id = key .. "_" .. spec.axis .. spec.kind
-			states[id] = {
-				position = spec.pos,
-				target = spec.tgt,
-				velocity = 0,
-				frequency = frequency,
-				damping = damping,
-				udimKey = key,
-				udimAxis = spec.axis,
-				udimKind = spec.kind,
-			}
-		end
-	end
-
-	local function spring(instance, goal, opts)
+	local function springTarget(instance, goal, opts)
 		if not instance or type(goal) ~= "table" then
 			return
 		end
 		opts = type(opts) == "table" and opts or {}
-		local frequency = opts.frequency or 7
-		local damping = opts.damping or 0.78
-		local states = {}
-		for key, target in pairs(goal) do
-			local targetType = typeof(target)
-			if targetType == "number" then
-				states[key] = {
-					position = instance[key],
-					target = target,
-					velocity = 0,
-					frequency = frequency,
-					damping = damping,
-				}
-			elseif targetType == "UDim2" then
-				addUdimStates(states, instance, key, target, frequency, damping)
-			elseif targetType == "Vector2" then
-				states[key .. "_X"] = {
-					position = instance[key].X,
-					target = target.X,
-					velocity = 0,
-					frequency = frequency,
-					damping = damping,
-					vectorKey = key,
-					vectorAxis = "X",
-				}
-				states[key .. "_Y"] = {
-					position = instance[key].Y,
-					target = target.Y,
-					velocity = 0,
-					frequency = frequency,
-					damping = damping,
-					vectorKey = key,
-					vectorAxis = "Y",
-				}
+		if Spr and type(Spr.target) == "function" then
+			local damping, frequency = mapMotion(opts)
+			Spr.target(instance, damping, frequency, goal)
+			if opts.onComplete and type(Spr.completed) == "function" then
+				Spr.completed(instance, opts.onComplete)
 			end
-		end
-		if not next(states) then
 			return
 		end
-		motors[instance] = {
-			instance = instance,
-			states = states,
-			onComplete = opts.onComplete,
-		}
-		ensureLoop()
+		if Ripple and type(Ripple.tween) == "function" then
+			Ripple.tween(instance, goal, {
+				easing = opts.easing or "quartOut",
+				duration = opts.duration or 0.26,
+				onComplete = opts.onComplete,
+			})
+		end
+	end
+
+	local function springCancel(instance)
+		if Spr and type(Spr.stop) == "function" then
+			Spr.stop(instance)
+		elseif Ripple and type(Ripple.stop) == "function" then
+			Ripple.stop(instance)
+		end
 	end
 
 	return {
-		target = spring,
-		cancel = function(instance)
-			stopMotor(instance)
-		end,
+		target = springTarget,
+		cancel = springCancel,
+		spr = Spr,
+		ripple = Ripple,
+		fusion = Fusion,
+		tween = Ripple and Ripple.tween or nil,
 	}
 end
