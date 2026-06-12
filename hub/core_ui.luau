@@ -10,7 +10,6 @@ return function(Core)
 		return ok and env or {}
 	end
 	local ENV = genv()
-	local agentDebug = ENV._AlleralAgentDebug or function() end
 
 	local function uiOk(bundle)
 		return type(bundle) == "table"
@@ -1215,27 +1214,10 @@ function Core.prepareGame(state)
 		uiLibrary, err = core.loadUi()
 	end
 	if not uiLibrary then
-		task.wait(0.2)
-		uiLibrary, err = core.loadUi()
-	end
-	if not uiLibrary then
 		local msg = err or "UI unavailable"
-		-- #region agent log
-		agentDebug("H5", "core_ui:prepareGame", "UI boot failed", {
-			err = msg,
-			coreVersion = core and core.VERSION,
-			alleralUiVersion = core and core.ALLERAL_UI_VERSION,
-		})
-		-- #endregion
 		signalBootFailure(msg)
 		return core, nil, msg
 	end
-	-- #region agent log
-	agentDebug("H5", "core_ui:prepareGame", "UI boot ok", {
-		coreVersion = core and core.VERSION,
-		hasLibrary = type(uiLibrary) == "table",
-	})
-	-- #endregion
 	pcall(function()
 		if core.refreshLoaderCapabilities then
 			core.refreshLoaderCapabilities()

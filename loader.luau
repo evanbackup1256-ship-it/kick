@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.2"
+local LOADER_VERSION = "8.2.3"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -23,8 +23,8 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.2",
-	core = "2.9.2",
+	loader = "8.2.3",
+	core = "2.9.3",
 	ui = "Maclib",
 	windui = "3.0.2-maclib",
 	alleral = "3.0.2-maclib",
@@ -155,83 +155,7 @@ local function getHttpRequestFn()
 	return nil
 end
 
--- #region agent log
-local AGENT_DEBUG_SESSION = "8ad4ab"
-local AGENT_DEBUG_PATHS = {
-	"debug-8ad4ab.log",
-	"kick/debug-8ad4ab.log",
-	".alleral/debug-8ad4ab.log",
-	"debug-2b507f.log",
-	"kick/debug-2b507f.log",
-	".alleral/debug-2b507f.log",
-}
-local AGENT_DEBUG_ENDPOINT = "http://127.0.0.1:7711/ingest/a1d7fbba-2153-4950-a2ea-2c45ed3c7b92"
-local AgentHttpService = pcall(function()
-	return game:GetService("HttpService")
-end) and game:GetService("HttpService") or nil
-
-local function agentDebug(hypothesisId, location, message, data)
-	data = type(data) == "table" and data or {}
-	local payload = {
-		sessionId = AGENT_DEBUG_SESSION,
-		hypothesisId = tostring(hypothesisId or "?"),
-		location = tostring(location or "?"),
-		message = tostring(message or ""),
-		data = data,
-		timestamp = math.floor(tick() * 1000),
-		runId = "pre-fix",
-	}
-	local line = payload.message
-	if AgentHttpService then
-		local ok, encoded = pcall(AgentHttpService.JSONEncode, AgentHttpService, payload)
-		if ok and type(encoded) == "string" then
-			line = encoded
-		end
-	end
-	if writeFileFn then
-		for _, path in ipairs(AGENT_DEBUG_PATHS) do
-			pcall(function()
-				local prev = ""
-				if isFile then
-					local okExists, exists = pcall(isFile, path)
-					if okExists and exists and readFile then
-						local okRead, body = pcall(readFile, path)
-						if okRead and type(body) == "string" then
-							prev = body
-						end
-					end
-				end
-				writeFileFn(path, prev .. line .. "\n")
-			end)
-		end
-	end
-	local req = getHttpRequestFn()
-	if req then
-		pcall(req, {
-			Url = AGENT_DEBUG_ENDPOINT,
-			Method = "POST",
-			Headers = {
-				["Content-Type"] = "application/json",
-				["X-Debug-Session-Id"] = AGENT_DEBUG_SESSION,
-			},
-			Body = line,
-		})
-	elseif AgentHttpService then
-		pcall(function()
-			AgentHttpService:PostAsync(
-				AGENT_DEBUG_ENDPOINT,
-				line,
-				Enum.HttpContentType.ApplicationJson,
-				false,
-				{ ["X-Debug-Session-Id"] = AGENT_DEBUG_SESSION }
-			)
-		end)
-	end
-	warn("[DBG-8ad4ab] " .. payload.hypothesisId .. " | " .. payload.location .. " | " .. payload.message)
-end
-
-ENV._AlleralAgentDebug = agentDebug
--- #endregion
+local RunService = game:GetService("RunService")
 
 local function tryGameHttpGet(url)
 	local urls = { url .. "?t=" .. tostring(tick()), url }
@@ -1192,26 +1116,11 @@ local function compileCoreSource(src, label)
 	if sanitized ~= src then
 		fn, err = loadStringFn(sanitized, label or "Alleral/core-check")
 		if type(fn) == "function" then
-			-- #region agent log
-			agentDebug("H1", "loader:compileCoreSource", "sanitized compile ok", {
-				executor = EXECUTOR.slug,
-				label = label,
-				bytes = #src,
-			})
-			-- #endregion
 			COMPILE_VALIDATE_CACHE[cacheKey] = true
 			return true
 		end
 	end
 	if relaxedCompileOk(src) then
-		-- #region agent log
-		agentDebug("H1", "loader:compileCoreSource", "relaxed compile accept", {
-			executor = EXECUTOR.slug,
-			label = label,
-			bytes = #src,
-			err = tostring(err),
-		})
-		-- #endregion
 		COMPILE_VALIDATE_CACHE[cacheKey] = true
 		return true
 	end
@@ -1536,22 +1445,9 @@ end
 local function fetchRemoteCoreFile(relativePath, validFn, rejectReasonFn, minBytes)
 	minBytes = minBytes or CORE_BASE_MIN_BYTES
 	local lastReason = "no response"
-	local debugAlleralUi = relativePath == CORE_ALLERAL_UI_PATH
 	for attempt = 1, 2 do
 		for _, base in ipairs(CORE_REMOTE_BASES) do
 			local body, via = httpGet(base .. "/" .. relativePath, minBytes)
-			-- #region agent log
-			if debugAlleralUi then
-				pcall(agentDebug, "H2", "loader:fetchRemoteCoreFile", "alleral ui remote attempt", {
-					attempt = attempt,
-					base = base,
-					minBytes = minBytes,
-					bodyBytes = type(body) == "string" and #body or 0,
-					via = via,
-					lastReason = lastReason,
-				})
-			end
-			-- #endregion
 			if type(body) == "string" and #body >= minBytes then
 				if validFn(body) then
 					cacheRemote(relativePath, body)
@@ -1597,7 +1493,7 @@ local function runParallel(tasks)
 		end)
 	end
 	while remaining > 0 do
-		task.wait()
+		RunService.Heartbeat:Wait()
 	end
 	return results
 end
@@ -1608,21 +1504,6 @@ local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, re
 	local expected = ENV._Alleral_ExpectedVersions or fetchExpectedVersions()
 	local expectedVersion = opts.expectedVersion or expectedVersionForKind(expected, versionKind)
 	local src, path = readLocal(localPaths, minBytes)
-	-- #region agent log
-	if versionKind == "alleral" then
-		local rawSrc, rawPath = readLocal(localPaths, 0)
-		pcall(agentDebug, "H1", "loader:resolveCoreSource", "alleral ui local probe", {
-			rawBytes = rawSrc and #rawSrc or 0,
-			rawPath = rawPath,
-			minBytes = minBytes,
-			belowMin = rawSrc and #rawSrc < minBytes,
-			valid = rawSrc and validFn(rawSrc),
-			stale = rawSrc and sourceVersionStale(rawSrc, versionKind, expectedVersion),
-			expectedVersion = expectedVersion,
-			version = rawSrc and extractFileVersion(rawSrc, "alleral"),
-		})
-	end
-	-- #endregion
 	local label
 	if src then
 		if not validFn(src) or sourceVersionStale(src, versionKind, expectedVersion) then
@@ -1663,29 +1544,9 @@ local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, re
 	else
 		src, label = fetchRemoteCoreFile(remotePath, validFn, rejectReasonFn, minBytes)
 		if not src then
-			-- #region agent log
-			if versionKind == "alleral" then
-				pcall(agentDebug, "H3", "loader:resolveCoreSource", "alleral ui remote failed", {
-					label = label,
-					minBytes = minBytes,
-					remotePath = remotePath,
-				})
-			end
-			-- #endregion
 			return nil, label
 		end
 	end
-	-- #region agent log
-	pcall(agentDebug, "H6", "loader:resolveCoreSource", "core source resolved", {
-		label = label,
-		path = path,
-		versionKind = versionKind,
-		expectedVersion = expectedVersion,
-		version = src and extractFileVersion(src, versionKind) or nil,
-		bytes = src and #src or 0,
-		remotePath = remotePath,
-	})
-	-- #endregion
 	return src, label
 end
 
@@ -1839,10 +1700,24 @@ local function loadCore()
 		})
 	end
 
-	local baseSrc, baseLabel = resolveArgs(baseArgs, "core")
-	local uiSrc, uiLabel = resolveArgs(uiArgs, "core")
-	local alleralUiSrc, alleralUiLabel = resolveArgs(alleralUiArgs, "alleral")
-	local hubUiSrc, hubUiLabel = resolveArgs(hubArgs, "core")
+	local resolved = runParallel({
+		function()
+			return resolveArgs(baseArgs, "core")
+		end,
+		function()
+			return resolveArgs(uiArgs, "core")
+		end,
+		function()
+			return resolveArgs(alleralUiArgs, "alleral")
+		end,
+		function()
+			return resolveArgs(hubArgs, "core")
+		end,
+	})
+	local baseSrc, baseLabel = resolved[1][2], resolved[1][3]
+	local uiSrc, uiLabel = resolved[2][2], resolved[2][3]
+	local alleralUiSrc, alleralUiLabel = resolved[3][2], resolved[3][3]
+	local hubUiSrc, hubUiLabel = resolved[4][2], resolved[4][3]
 	if not baseSrc then
 		return false, baseLabel or "core_base download failed"
 	end
@@ -1890,12 +1765,14 @@ local function loadCore()
 		ENV.Alleral_Core = nil
 		return false, applyErr or "Core UI layer failed"
 	end
+	RunService.Heartbeat:Wait()
 
 	applied, applyErr = ENV.Alleral_Core.applyUiLayer(alleralUiSrc, alleralUiLabel or "@Alleral/alleral_ui")
 	if not applied then
 		ENV.Alleral_Core = nil
 		return false, applyErr or "Alleral UI layer failed"
 	end
+	RunService.Heartbeat:Wait()
 
 	applied, applyErr = ENV.Alleral_Core.applyUiLayer(hubUiSrc, hubUiLabel or "@Alleral/core_hub_ui")
 	if not applied then
@@ -1935,15 +1812,6 @@ local function loadCore()
 			.. " + "
 			.. tostring(hubUiLabel)
 	)
-	-- #region agent log
-	agentDebug("H1", "loader:loadCore", "core stack loaded", {
-		coreVersion = ENV.Alleral_Core and ENV.Alleral_Core.VERSION,
-		alleralUiVersion = ENV.Alleral_Core and ENV.Alleral_Core.ALLERAL_UI_VERSION,
-		baseLabel = baseLabel,
-		alleralUiLabel = alleralUiLabel,
-		hasLoadUi = ENV.Alleral_Core and type(ENV.Alleral_Core.loadUi) == "function",
-	})
-	-- #endregion
 	return true
 end
 
@@ -2882,11 +2750,15 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 		return true
 	end
 
+	local foundVersion = extractFileVersion(src, entry.extract)
+	if type(foundVersion) == "string" and foundVersion ~= "" and type(expectedVersion) == "string" and expectedVersion ~= "" then
+		return foundVersion ~= expectedVersion
+	end
+
 	if entry.isValid and not entry.isValid(src) then
 		return true
 	end
 
-	local foundVersion = extractFileVersion(src, entry.extract)
 	if not foundVersion then
 		if entry.isValid and entry.isValid(src) then
 			return false
@@ -3135,12 +3007,13 @@ local function reportLegacyScan(hits, deletedPaths)
 	end
 end
 
-local function purgeOutdatedWorkspace()
+local function purgeOutdatedWorkspace(opts)
+	opts = type(opts) == "table" and opts or {}
 	if not isFile or not readFile then
 		return
 	end
 
-	local expected = fetchExpectedVersions()
+	local expected = opts.useNetwork and fetchExpectedVersions() or fetchExpectedVersionsFast()
 	local installedManifest = readInstalledManifest()
 	local removed = 0
 
@@ -3462,7 +3335,12 @@ local function main()
 
 	local expectedVersions = fetchExpectedVersionsFast()
 	ENV._Alleral_ExpectedVersions = expectedVersions
-	purgeOutdatedWorkspace()
+	purgeOutdatedWorkspace({ useNetwork = false })
+	task.defer(function()
+		pcall(function()
+			purgeOutdatedWorkspace({ useNetwork = true })
+		end)
+	end)
 	refreshExpectedVersionsAsync()
 	if expectedVersions.minLoader and versionLt(LOADER_VERSION, expectedVersions.minLoader) then
 		local msg = "Loader v"
@@ -3476,46 +3354,36 @@ local function main()
 		return
 	end
 
-	loadWeaoStack()
 	task.spawn(function()
+		pcall(loadWeaoStack)
 		pcall(function()
 			syncWeaoConfig(true)
 		end)
+		pcall(refreshWeaoProfile, EXECUTOR)
 	end)
-
-	if typeof(task) == "table" and type(task.spawn) == "function" then
-		task.spawn(function()
-			refreshWeaoProfile(EXECUTOR)
-		end)
-	end
 
 	clearLegacySession()
 
 	local loaderUpgraded = type(PREVIOUS_LOADER_VERSION) == "string" and PREVIOUS_LOADER_VERSION ~= LOADER_VERSION
-	local legacyRemoved, autoexecHit, deletedPaths = 0, false, {}
-	if loaderUpgraded then
-		legacyRemoved, autoexecHit, deletedPaths = purgeLegacyLoaders()
-	else
-		task.spawn(function()
-			purgeLegacyLoaders()
-		end)
-	end
-	if legacyRemoved > 0 then
-		log("Removed " .. tostring(legacyRemoved) .. " legacy loader file(s)")
-		if autoexecHit then
-			installAutoexecRedirect()
+	task.spawn(function()
+		local legacyRemoved, autoexecHit, deletedPaths = purgeLegacyLoaders()
+		if legacyRemoved > 0 then
+			log("Removed " .. tostring(legacyRemoved) .. " legacy loader file(s)")
+			if autoexecHit then
+				installAutoexecRedirect()
+			end
+		elseif loaderUpgraded then
+			local remaining = scanLegacyLoaders()
+			if #remaining > 0 then
+				reportLegacyScan(remaining, deletedPaths)
+				notify(
+					"Alleral",
+					"Old loader files found — run getgenv().Alleral_ScanLegacy() to list them",
+					8
+				)
+			end
 		end
-	else
-		local remaining = scanLegacyLoaders()
-		if #remaining > 0 then
-			reportLegacyScan(remaining, deletedPaths)
-			notify(
-				"Alleral",
-				"Old loader files found — check console or run getgenv().Alleral_ScanLegacy()",
-				12
-			)
-		end
-	end
+	end)
 
 	if type(PREVIOUS_LOADER_VERSION) == "string" and versionLt(PREVIOUS_LOADER_VERSION, "5.0") then
 		log(
@@ -3589,9 +3457,12 @@ local function main()
 	end
 
 	local uiBundle, uiErr, gameSrc, gameLabel
-	local _ = runParallel({
+	local critical = runParallel({
 		function()
-			loadTelemetryConfig(true)
+			loadModule({ HUB .. "/security.luau" }, HUB .. "/security.luau", "Alleral_Security", "Alleral/security")
+		end,
+		function()
+			loadModule({ HUB .. "/access.luau", "core/access.luau" }, HUB .. "/access.luau", "Alleral_Access", "Alleral/access")
 		end,
 		function()
 			loadSecurityConfig()
@@ -3609,23 +3480,14 @@ local function main()
 		function()
 			gameSrc, gameLabel = fetchGameScript(profile)
 		end,
-		function()
-			loadModule({ HUB .. "/analytics.luau" }, HUB .. "/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
-		end,
-		function()
-			loadModule({ HUB .. "/helpers.luau", "core/game_helpers.luau" }, HUB .. "/helpers.luau", "GameHelpers", "Alleral/helpers")
-		end,
-		function()
-			loadModule({ HUB .. "/telemetry.luau", "core/telemetry.luau" }, HUB .. "/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
-		end,
-		function()
-			loadModule({ HUB .. "/security.luau" }, HUB .. "/security.luau", "Alleral_Security", "Alleral/security")
-		end,
-		function()
-			loadModule({ HUB .. "/access.luau", "core/access.luau" }, HUB .. "/access.luau", "Alleral_Access", "Alleral/access")
-		end,
 	})
 	grantPublicAccess()
+	task.spawn(function()
+		pcall(loadTelemetryConfig, true)
+		pcall(loadModule, { HUB .. "/analytics.luau" }, HUB .. "/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
+		pcall(loadModule, { HUB .. "/helpers.luau", "core/game_helpers.luau" }, HUB .. "/helpers.luau", "GameHelpers", "Alleral/helpers")
+		pcall(loadModule, { HUB .. "/telemetry.luau", "core/telemetry.luau" }, HUB .. "/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
+	end)
 
 	if not enforceSecurityGate(profile, "pre_inject") then
 		ENV.Alleral_LoaderRunning = false
@@ -3637,9 +3499,6 @@ local function main()
 		log("Alleral ready")
 	elseif uiErr then
 		log("UI skipped: " .. tostring(uiErr), true)
-		-- #region agent log
-		agentDebug("H5", "loader:inject", "UI preload skipped", { err = tostring(uiErr) })
-		-- #endregion
 	end
 
 	if ENV.Alleral_Telemetry and ENV.Alleral_Telemetry.ReportInject then
@@ -3768,12 +3627,13 @@ end
 ENV.Alleral_SyncWeao = syncWeaoConfig
 getgenv().Alleral_SyncWeao = syncWeaoConfig
 
-print("=== Alleral " .. LOADER_VERSION .. " active ===")
-print("[Alleral] v" .. LOADER_VERSION .. " | PlaceId " .. tostring(game.PlaceId) .. " | executor=" .. EXECUTOR.slug)
+log("v" .. LOADER_VERSION .. " booting on PlaceId " .. tostring(game.PlaceId) .. " (" .. EXECUTOR.slug .. ")")
 
-local ok, err = pcall(main)
-if not ok then
-	warn("[Alleral] " .. tostring(err))
-	notify("Alleral", tostring(err), 10)
-	ENV.Alleral_LoaderRunning = false
-end
+task.defer(function()
+	local ok, err = pcall(main)
+	if not ok then
+		log(tostring(err), true)
+		notify("Alleral", tostring(err), 10)
+		ENV.Alleral_LoaderRunning = false
+	end
+end)
