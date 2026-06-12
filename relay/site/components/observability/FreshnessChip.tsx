@@ -17,10 +17,9 @@ export function FreshnessChip({
   const fresh = secondsAgo != null && secondsAgo < 20;
   return (
     <motion.span
-      layout
       transition={spring.status}
       className={clsx(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] backdrop-blur-xl",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px]",
         fresh ? "border-cyan-400/30 text-cyan-200" : "border-border text-muted",
         className
       )}

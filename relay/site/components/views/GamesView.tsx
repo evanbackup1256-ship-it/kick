@@ -20,7 +20,7 @@ export function GamesView({ site }: { site: SitePayload }) {
   const [query, setQuery] = useState("");
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [modal, setModal] = useState<{ id: string; game: GameEntry } | null>(null);
-  const { data: live, secondsAgo } = useHubStatus(15000);
+  const { data: live, secondsAgo } = useHubStatus();
 
   const liveStatus = useMemo(() => {
     const map: Record<string, string> = {};

@@ -11,8 +11,6 @@ import { usePlatformStore, type PlatformView } from "@/lib/store/platform";
 import { useHubStatus } from "@/lib/hooks/useHubStatus";
 import { reveal, spring } from "@/lib/motion/config";
 import { CloudflareGate } from "@/components/gate/CloudflareGate";
-import { MeshBackground } from "@/components/background/MeshBackground";
-import { AmbientScene } from "@/components/platform/AmbientScene";
 import { CommandPalette } from "@/components/platform/CommandPalette";
 import { Sidebar } from "@/components/platform/Sidebar";
 import { TopBar } from "@/components/platform/TopBar";
@@ -23,16 +21,75 @@ import { ToolsView } from "@/components/views/ToolsView";
 import { ChangelogView } from "@/components/views/ChangelogView";
 import { SupportView } from "@/components/views/SupportView";
 import { CreditsView } from "@/components/views/CreditsView";
-import { LenisProvider } from "@/components/providers/LenisProvider";
+import { HubStatusProvider } from "@/components/providers/HubStatusProvider";
+import { LenisProvider, ScrollContent } from "@/components/providers/LenisProvider";
 
 gsap.registerPlugin(ScrollTrigger);
+
+function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }) {
+  const activeView = usePlatformStore((s) => s.activeView);
+  const workspace = usePlatformStore((s) => s.workspace);
+  const { secondsAgo, refresh: refreshLive } = useHubStatus();
+
+  const copyLoadstring = async () => {
+    if (!site?.loadstring) return;
+    try {
+      await navigator.clipboard.writeText(site.loadstring);
+      toast.success("Loader copied to clipboard");
+    } catch {
+      toast.error("Copy failed");
+    }
+  };
+
+  const mainPad = workspace === "compact" ? "p-3 md:p-4" : workspace === "wide" ? "p-5 md:p-8" : "p-4 md:p-6";
+
+  return (
+    <>
+      <div className="noise-overlay" aria-hidden />
+      <div className="ambient-orb left-[-10%] top-[-20%] h-[420px] w-[420px] bg-indigo-500/15" aria-hidden />
+      <div className="ambient-orb right-[-5%] top-[10%] h-[360px] w-[360px] bg-cyan-400/10" aria-hidden />
+
+      <div className="relative z-10 flex h-screen min-h-0">
+        <Sidebar online={online} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <TopBar online={online} workspace={workspace} secondsAgo={secondsAgo} />
+          <LenisProvider>
+            <ScrollContent className={`mx-auto w-full max-w-[1520px] ${mainPad} ${workspace === "wide" ? "max-w-[1680px]" : ""}`}>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeView}
+                  initial={reveal.initial}
+                  animate={reveal.animate}
+                  exit={reveal.exit}
+                  transition={spring.panel}
+                >
+                  {activeView === "overview" ? <OverviewView site={site} online={online} onCopy={() => void copyLoadstring()} /> : null}
+                  {activeView === "status" ? <StatusView site={site} /> : null}
+                  {activeView === "games" ? <GamesView site={site} /> : null}
+                  {activeView === "tools" ? <ToolsView site={site} /> : null}
+                  {activeView === "changelog" ? <ChangelogView site={site} /> : null}
+                  {activeView === "support" ? <SupportView site={site} /> : null}
+                  {activeView === "credits" ? <CreditsView site={site} /> : null}
+                </motion.div>
+              </AnimatePresence>
+            </ScrollContent>
+          </LenisProvider>
+        </div>
+      </div>
+      <CommandPalette
+        onCopyScript={() => void copyLoadstring()}
+        onRefresh={() => {
+          void refreshLive();
+          toast.message("Refreshing live data");
+        }}
+      />
+    </>
+  );
+}
 
 export function PlatformApp() {
   const [site, setSite] = useState<SitePayload | null>(null);
   const [online, setOnline] = useState<boolean | undefined>();
-  const activeView = usePlatformStore((s) => s.activeView);
-  const workspace = usePlatformStore((s) => s.workspace);
-  const { secondsAgo, refresh: refreshLive } = useHubStatus(15000);
 
   const load = useCallback(async () => {
     try {
@@ -72,16 +129,6 @@ export function PlatformApp() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const copyLoadstring = async () => {
-    if (!site?.loadstring) return;
-    try {
-      await navigator.clipboard.writeText(site.loadstring);
-      toast.success("Loader copied to clipboard");
-    } catch {
-      toast.error("Copy failed");
-    }
-  };
-
   if (!site) {
     return (
       <div className="grid min-h-screen place-items-center">
@@ -92,52 +139,11 @@ export function PlatformApp() {
     );
   }
 
-  const mainPad = workspace === "compact" ? "p-3 md:p-4" : workspace === "wide" ? "p-5 md:p-8" : "p-4 md:p-6";
-
   return (
-    <LenisProvider>
+    <HubStatusProvider intervalMs={20000}>
       <CloudflareGate>
-        <MeshBackground />
-        <AmbientScene />
-        <div className="noise-overlay" aria-hidden />
-        <div className="ambient-orb left-[-10%] top-[-20%] h-[420px] w-[420px] bg-indigo-500/20" aria-hidden />
-        <div className="ambient-orb right-[-5%] top-[10%] h-[360px] w-[360px] bg-cyan-400/15" aria-hidden />
-
-        <div className="relative z-10 flex min-h-screen">
-          <Sidebar online={online} />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar online={online} workspace={workspace} secondsAgo={secondsAgo} />
-            <main className={`flex-1 overflow-y-auto obs-scroll ${mainPad}`}>
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeView}
-                  initial={reveal.initial}
-                  animate={reveal.animate}
-                  exit={reveal.exit}
-                  transition={spring.panel}
-                  className={`mx-auto w-full max-w-[1520px] ${workspace === "wide" ? "max-w-[1680px]" : ""}`}
-                >
-                  {activeView === "overview" ? <OverviewView site={site} online={online} onCopy={() => void copyLoadstring()} /> : null}
-                  {activeView === "status" ? <StatusView site={site} /> : null}
-                  {activeView === "games" ? <GamesView site={site} /> : null}
-                  {activeView === "tools" ? <ToolsView site={site} /> : null}
-                  {activeView === "changelog" ? <ChangelogView site={site} /> : null}
-                  {activeView === "support" ? <SupportView site={site} /> : null}
-                  {activeView === "credits" ? <CreditsView site={site} /> : null}
-                </motion.div>
-              </AnimatePresence>
-            </main>
-          </div>
-        </div>
-        <CommandPalette
-          onCopyScript={() => void copyLoadstring()}
-          onRefresh={() => {
-            void load();
-            void refreshLive();
-            toast.message("Refreshing telemetry");
-          }}
-        />
+        <PlatformShell site={site} online={online} />
       </CloudflareGate>
-    </LenisProvider>
+    </HubStatusProvider>
   );
 }

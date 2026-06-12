@@ -22,15 +22,15 @@ export const stagger = {
 };
 
 export const reveal = {
-  initial: { opacity: 0, y: 22, filter: "blur(12px)" },
-  animate: { opacity: 1, y: 0, filter: "blur(0px)" },
-  exit: { opacity: 0, y: -14, filter: "blur(8px)" },
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -10 },
 };
 
 export const scaleReveal = {
-  initial: { opacity: 0, scale: 0.96, filter: "blur(8px)" },
-  animate: { opacity: 1, scale: 1, filter: "blur(0px)" },
-  exit: { opacity: 0, scale: 0.98, filter: "blur(4px)" },
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.99 },
 };
 
 export const slidePanel = {

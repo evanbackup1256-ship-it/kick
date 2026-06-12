@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Lenis from "lenis";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -8,16 +8,25 @@ import { LenisContext } from "@/lib/lenis-context";
 
 gsap.registerPlugin(ScrollTrigger);
 
-export function LenisProvider({ children }: { children: React.ReactNode }) {
+export function LenisProvider({ children }: { children: ReactNode }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [lenis, setLenis] = useState<Lenis | null>(null);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const wrapper = wrapperRef.current;
+    const content = contentRef.current;
+    if (!wrapper || !content) return;
 
     const instance = new Lenis({
-      duration: 1.15,
+      wrapper,
+      content,
+      duration: 1.05,
       easing: (t) => Math.min(1, 1.001 - 2 ** (-10 * t)),
       smoothWheel: true,
+      wheelMultiplier: 0.9,
+      touchMultiplier: 1.1,
     });
     setLenis(instance);
 
@@ -26,7 +35,10 @@ export function LenisProvider({ children }: { children: React.ReactNode }) {
     gsap.ticker.add(tick);
     gsap.ticker.lagSmoothing(0);
 
-    const onGatePassed = () => ScrollTrigger.refresh();
+    const onGatePassed = () => {
+      instance.resize();
+      ScrollTrigger.refresh();
+    };
     window.addEventListener("alleral:gate-passed", onGatePassed);
 
     return () => {
@@ -37,5 +49,15 @@ export function LenisProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return <LenisContext.Provider value={lenis}>{children}</LenisContext.Provider>;
+  return (
+    <LenisContext.Provider value={lenis}>
+      <div ref={wrapperRef} className="min-h-0 flex-1 overflow-hidden" data-lenis-root>
+        <div ref={contentRef}>{children}</div>
+      </div>
+    </LenisContext.Provider>
+  );
+}
+
+export function ScrollContent({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={className}>{children}</div>;
 }

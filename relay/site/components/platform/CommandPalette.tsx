@@ -48,9 +48,9 @@ export function CommandPalette({
           />
           <motion.div
             className="fixed left-1/2 top-[18%] z-[301] w-[min(640px,calc(100vw-24px))] -translate-x-1/2"
-            initial={{ opacity: 0, y: -12, scale: 0.98, filter: "blur(6px)" }}
-            animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, y: -8, scale: 0.98, filter: "blur(4px)" }}
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={spring.snappy}
           >
             <Command className="glass-float overflow-hidden rounded-2xl border border-border-strong shadow-[0_40px_120px_rgba(0,0,0,0.65)]" label="Command palette">

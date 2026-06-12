@@ -23,7 +23,7 @@ export function OverviewView({
   onCopy: () => void;
 }) {
   const setView = usePlatformStore((s) => s.setView);
-  const { data: live, secondsAgo } = useHubStatus(15000);
+  const { data: live, secondsAgo } = useHubStatus();
   const games = Object.values(site.games || {});
   const working = live?.games?.working ?? games.filter((g) => (g.status || "working").toLowerCase() === "working").length;
   const total = live?.games?.total ?? games.length;

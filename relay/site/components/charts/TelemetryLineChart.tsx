@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { memo, useMemo, useState, useCallback } from "react";
 import { Group } from "@visx/group";
 import { LinePath, AreaClosed } from "@visx/shape";
 import { scaleLinear } from "@visx/scale";
@@ -9,7 +9,6 @@ import { GridRows } from "@visx/grid";
 import { curveMonotoneX } from "@visx/curve";
 import { LinearGradient } from "@visx/gradient";
 import { ParentSize } from "@visx/responsive";
-import { motion } from "motion/react";
 import { Activity } from "lucide-react";
 import { chart as chartTokens } from "@/lib/design/tokens";
 import { ChartTooltip } from "./ChartTooltip";
@@ -107,15 +106,7 @@ function InnerChart({
           {hover ? (
             <>
               <line x1={xScale(hover.idx)} x2={xScale(hover.idx)} y1={0} y2={innerH} stroke={chartTokens.crosshair} strokeDasharray="4 4" />
-              <motion.circle
-                cx={xScale(hover.idx)}
-                cy={yScale(data[hover.idx]?.y ?? 0)}
-                r={6}
-                fill={color}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                style={{ filter: `drop-shadow(0 0 12px ${chartTokens.pointGlow})` }}
-              />
+              <circle cx={xScale(hover.idx)} cy={yScale(data[hover.idx]?.y ?? 0)} r={6} fill={color} />
               <circle cx={xScale(hover.idx)} cy={yScale(data[hover.idx]?.y ?? 0)} r={12} fill={color} opacity={0.15} />
             </>
           ) : null}
@@ -147,7 +138,7 @@ function InnerChart({
   );
 }
 
-export function TelemetryLineChart({
+export const TelemetryLineChart = memo(function TelemetryLineChart({
   series,
   secondary,
   className,
@@ -164,4 +155,4 @@ export function TelemetryLineChart({
       <ParentSize>{({ width, height }) => (width > 0 && height > 0 ? <InnerChart width={width} height={height} data={data} secondary={sec} /> : null)}</ParentSize>
     </div>
   );
-}
+});
