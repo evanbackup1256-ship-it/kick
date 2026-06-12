@@ -168,6 +168,9 @@ return function(Core)
 		if type(source) ~= "string" or #source < MIN_LIBRARY_BYTES then
 			return false
 		end
+		if source:find("writefile(`", 1, true) or source:find("return `", 1, true) then
+			return false
+		end
 		return source:find("LibRef", 1, true) ~= nil and source:find("EnsureGuiRoot", 1, true) ~= nil
 	end
 

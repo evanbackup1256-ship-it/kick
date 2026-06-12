@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.9.5"
+local LOADER_VERSION = "7.9.6"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -10,7 +10,7 @@ local CORE_UI_MIN_BYTES = 50000
 local CORE_UI_MAX_BYTES = 90000
 local CORE_HUB_UI_MIN_BYTES = 60000
 local CORE_HUB_UI_MAX_BYTES = 75000
-local CORE_NEVERLOSE_UI_MIN_BYTES = 10000
+local CORE_NEVERLOSE_UI_MIN_BYTES = 28000
 local CORE_NEVERLOSE_UI_MAX_BYTES = 40000
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
@@ -23,7 +23,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.9.5",
+	loader = "7.9.6",
 	core = "2.8.8",
 	ui = "Alleral",
 	neverlose = "1.5.3-kick",
@@ -1238,6 +1238,12 @@ local function coreBaseValid(src)
 	if not coreVersionOk(ver) then
 		return false
 	end
+	local neverloseVer = src:match('Core%.NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"')
+	local expectedNeverlose = (ENV._Alleral_ExpectedVersions and ENV._Alleral_ExpectedVersions.neverlose)
+		or RELEASE_FALLBACK.neverlose
+	if type(neverloseVer) == "string" and type(expectedNeverlose) == "string" and neverloseVer ~= expectedNeverlose then
+		return false
+	end
 	return compileCoreSource(src, "Alleral/core-base")
 end
 
@@ -1290,6 +1296,12 @@ local function neverloseUiValid(src)
 		return false
 	end
 	if not src:find("resolveUiWindow", 1, true) then
+		return false
+	end
+	if not src:find("sanitizeLuauSource", 1, true) then
+		return false
+	end
+	if not src:find("invalid Neverlose library:", 1, true) then
 		return false
 	end
 	if compileCoreSource(src, "Alleral/neverlose_ui") then
@@ -1449,6 +1461,35 @@ local function extractFileVersion(src, kind)
 	return src:match(pattern)
 end
 
+local function expectedVersionForKind(expected, kind)
+	if type(expected) ~= "table" then
+		return nil
+	end
+	if kind == "neverlose" or kind == "windui" then
+		return expected.neverlose or expected.windui
+	end
+	return expected[kind] or expected.core
+end
+
+local function sourceVersionStale(src, kind, expectedVersion)
+	if type(src) ~= "string" or type(expectedVersion) ~= "string" or expectedVersion == "" then
+		return false
+	end
+	if kind == "neverlose" then
+		local neverloseVer = src:match('Core%.NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"')
+			or extractFileVersion(src, "neverlose")
+		return type(neverloseVer) == "string" and neverloseVer ~= expectedVersion
+	end
+	local found = extractFileVersion(src, kind or "core")
+	return type(found) == "string" and found ~= expectedVersion
+end
+
+local function deleteListedWorkspaceFiles(paths)
+	for _, path in ipairs(paths or {}) do
+		deleteWorkspaceFile(path)
+	end
+end
+
 local function fetchRemoteCoreFile(relativePath, validFn, rejectReasonFn, minBytes)
 	minBytes = minBytes or CORE_BASE_MIN_BYTES
 	local lastReason = "no response"
@@ -1505,37 +1546,44 @@ local function runParallel(tasks)
 	return results
 end
 
-local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, rejectReasonFn, minBytes)
+local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, rejectReasonFn, minBytes, opts)
+	opts = type(opts) == "table" and opts or {}
+	local versionKind = opts.versionKind or "core"
 	local expected = ENV._Alleral_ExpectedVersions or fetchExpectedVersions()
-	local expectedCore = expected and expected.core
+	local expectedVersion = opts.expectedVersion or expectedVersionForKind(expected, versionKind)
 	local src, path = readLocal(localPaths, minBytes)
 	local label
+	if src then
+		if not validFn(src) or sourceVersionStale(src, versionKind, expectedVersion) then
+			log(
+				"Removing outdated local "
+					.. tostring(path or localPaths[1])
+					.. (expectedVersion and (" (need " .. tostring(expectedVersion) .. ")") or ""),
+				true
+			)
+			deleteListedWorkspaceFiles(localPaths)
+			deleteListedWorkspaceFiles(cachePaths)
+			src = nil
+			path = nil
+		end
+	end
 	if not src then
 		src, path = readLocal(cachePaths, minBytes)
 		if src then
 			label = "cache:" .. tostring(path or cachePaths[1])
-			if type(expectedCore) == "string" and expectedCore ~= "" then
-				local cachedVersion = extractFileVersion(src, "core")
-				if cachedVersion and cachedVersion ~= expectedCore then
-					log("Removing outdated cache at " .. tostring(path or cachePaths[1]) .. " (core " .. tostring(cachedVersion) .. " != " .. expectedCore .. ")", true)
-					for _, cachePath in ipairs(cachePaths) do
-						deleteWorkspaceFile(cachePath)
-					end
-					src = nil
-					label = nil
-					path = nil
-				end
+			if not validFn(src) or sourceVersionStale(src, versionKind, expectedVersion) then
+				log("Removing outdated cache at " .. tostring(path or cachePaths[1]), true)
+				deleteListedWorkspaceFiles(cachePaths)
+				src = nil
+				label = nil
+				path = nil
 			end
 		end
 	end
 	if src and not validFn(src) then
 		log("Removing broken file at " .. tostring(path or localPaths[1]), true)
-		for _, localPath in ipairs(localPaths) do
-			deleteWorkspaceFile(localPath)
-		end
-		for _, cachePath in ipairs(cachePaths) do
-			deleteWorkspaceFile(cachePath)
-		end
+		deleteListedWorkspaceFiles(localPaths)
+		deleteListedWorkspaceFiles(cachePaths)
 		src = nil
 		label = nil
 	end
@@ -1548,11 +1596,12 @@ local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, re
 		end
 	end
 	-- #region agent log
-	pcall(agentDebug, "H1", "loader:resolveCoreSource", "core source resolved", {
+	pcall(agentDebug, "H6", "loader:resolveCoreSource", "core source resolved", {
 		label = label,
 		path = path,
-		expectedCore = expectedCore,
-		version = src and extractFileVersion(src, "core") or nil,
+		versionKind = versionKind,
+		expectedVersion = expectedVersion,
+		version = src and (extractFileVersion(src, versionKind) or src:match('Core%.NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"')) or nil,
 		bytes = src and #src or 0,
 		remotePath = remotePath,
 	})
@@ -1597,9 +1646,57 @@ local function purgeStaleCorePaths()
 	end
 end
 
+local function purgeStaleHubPaths()
+	local expected = ENV._Alleral_ExpectedVersions
+	if type(fetchExpectedVersions) == "function" and not expected then
+		expected = fetchExpectedVersions()
+	end
+	local hubPaths = {
+		{ paths = { HUB .. "/neverlose_ui.luau", CORE_NEVERLOSE_UI_PATH }, valid = neverloseUiValid, kind = "neverlose" },
+		{ paths = { HUB .. "/core_base.luau", CORE_BASE_PATH }, valid = coreBaseValid, kind = "core" },
+		{ paths = { UI .. "/neverlose/library.lua" }, valid = function(src)
+			if type(src) ~= "string" or #src < 80000 then
+				return false
+			end
+			if not src:find("LibRef", 1, true) or not src:find("EnsureGuiRoot", 1, true) then
+				return false
+			end
+			if src:find("writefile(`", 1, true) or src:find("return `", 1, true) then
+				return false
+			end
+			local ver = extractFileVersion(src, "neverlose")
+			local expectedNeverlose = expectedVersionForKind(expected, "neverlose") or RELEASE_FALLBACK.neverlose
+			if ver and expectedNeverlose and ver ~= expectedNeverlose then
+				return false
+			end
+			return true
+		end, kind = "neverlose" },
+	}
+	for _, entry in ipairs(hubPaths) do
+		for _, path in ipairs(entry.paths) do
+			if isFile and readFile then
+				local okExists, exists = pcall(isFile, path)
+				if okExists and exists then
+					local okRead, src = pcall(readFile, path)
+					if okRead and type(src) == "string" and src ~= "" then
+						local expectedVersion = expectedVersionForKind(expected, entry.kind)
+						if not entry.valid(src)
+							or sourceVersionStale(src, entry.kind, expectedVersion)
+						then
+							log("Removing outdated hub file " .. path, true)
+							deleteWorkspaceFile(path)
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
 local function loadCore()
 	ENV.Alleral_Core = nil
 	pcall(purgeStaleCorePaths)
+	pcall(purgeStaleHubPaths)
 
 	local baseArgs = {
 		{ CORE_BASE_PATH, CORE_BASE_LEGACY_PATH, "core/alleral_core.luau", "alleral_core.luau" },
@@ -1634,14 +1731,16 @@ local function loadCore()
 		CORE_NEVERLOSE_UI_MIN_BYTES,
 	}
 
-	local function resolveArgs(args)
-		return resolveCoreSource(args[1], args[2], args[3], args[4], args[5], args[6])
+	local function resolveArgs(args, versionKind)
+		return resolveCoreSource(args[1], args[2], args[3], args[4], args[5], args[6], {
+			versionKind = versionKind or "core",
+		})
 	end
 
-	local baseSrc, baseLabel = resolveArgs(baseArgs)
-	local uiSrc, uiLabel = resolveArgs(uiArgs)
-	local neverloseUiSrc, neverloseUiLabel = resolveArgs(neverloseArgs)
-	local hubUiSrc, hubUiLabel = resolveArgs(hubArgs)
+	local baseSrc, baseLabel = resolveArgs(baseArgs, "core")
+	local uiSrc, uiLabel = resolveArgs(uiArgs, "core")
+	local neverloseUiSrc, neverloseUiLabel = resolveArgs(neverloseArgs, "neverlose")
+	local hubUiSrc, hubUiLabel = resolveArgs(hubArgs, "core")
 	if not baseSrc then
 		return false, baseLabel or "core_base download failed"
 	end
@@ -2185,6 +2284,7 @@ local GAMES = {
 		placeIds = { 107646426076756 },
 		scriptFiles = { "games/build_a_ring_farm.luau", "build_a_ring_farm.luau" },
 		scriptUrl = "games/build_a_ring_farm.luau",
+		sourceMarker = "coreRef.logWarn",
 		minBytes = 55000,
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Shared" }, 20)
@@ -2582,6 +2682,27 @@ local function buildManagedFiles()
 			},
 			expectedKey = "neverlose",
 			extract = "neverlose",
+			isValid = function(src)
+				if type(src) ~= "string" then
+					return false
+				end
+				if src:find("LibRef", 1, true) and src:find("EnsureGuiRoot", 1, true) then
+					if #src < 80000 then
+						return false
+					end
+					if src:find("writefile(`", 1, true) or src:find("return `", 1, true) then
+						return false
+					end
+					return true
+				end
+				if src:find("sanitizeLuauSource", 1, true) and src:find("bindFilesystem", 1, true) then
+					return #src >= 200
+				end
+				if src:find("return function(Core)", 1, true) and src:find("Neverlose UI layer", 1, true) then
+					return neverloseUiValid(src)
+				end
+				return true
+			end,
 		},
 		{
 			paths = {
