@@ -33,7 +33,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.0",
-	commit = "03b57cc",
+	commit = "58cf089",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
 }
@@ -2482,7 +2482,7 @@ local function buildUpdateFingerprint(expected, profile)
 		return ""
 	end
 	local parts = {
-		"commit=" .. tostring(expected.commit or ""),
+		"commit = "58cf089""),
 		"updated=" .. tostring(expected.updatedAt or ""),
 		"loader=" .. tostring(expected.loader or ""),
 		"core=" .. tostring(expected.core or ""),
