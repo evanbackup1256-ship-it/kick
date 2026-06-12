@@ -39,7 +39,7 @@ export function OverviewView({
           <div className="pointer-events-none absolute -bottom-16 left-1/3 h-48 w-48 rounded-full bg-indigo-500/15 blur-3xl" />
           <div className="relative z-[1]">
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              <StatusPill kind={relayKind} pulse={online !== false} />
+              <StatusPill kind={relayKind} pulse={relayKind === "syncing"} />
               <StatusPill kind={syncKind} size="sm" />
               <FreshnessChip dataUpdatedAt={dataUpdatedAt} live />
             </div>

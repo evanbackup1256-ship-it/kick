@@ -77,7 +77,7 @@ function SidebarNav({ online, collapsed }: { online?: boolean; collapsed: boolea
       <div className="border-t border-border p-3">
         {!collapsed ? <p className="mb-2 px-1 text-[10px] uppercase tracking-wider text-muted-2">Relay status</p> : null}
         <div className={clsx("flex items-center gap-2 rounded-xl border border-border bg-black/25 px-3 py-2.5", collapsed && "justify-center px-2")}>
-          {!collapsed ? <StatusPill kind={relayKind} size="sm" pulse={online !== false} /> : <span className={clsx("h-2 w-2 rounded-full", online !== false ? "bg-green-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" : "bg-red-400")} />}
+          {!collapsed ? <StatusPill kind={relayKind} size="sm" pulse={relayKind === "syncing"} /> : <span className={clsx("h-2 w-2 rounded-full", online !== false ? "bg-green-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" : "bg-red-400")} />}
         </div>
       </div>
     </>

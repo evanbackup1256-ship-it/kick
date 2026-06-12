@@ -32,9 +32,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <Toaster
           theme="dark"
-          position="bottom-center"
+          position="bottom-right"
+          expand
+          visibleToasts={4}
+          gap={10}
           toastOptions={{
-            className: "glass-float border border-border text-sm",
+            unstyled: true,
+            classNames: {
+              toast: "glass-float border border-border rounded-2xl px-4 py-3 text-sm shadow-2xl",
+            },
           }}
         />
       </body>

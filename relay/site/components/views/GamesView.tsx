@@ -129,5 +129,5 @@ export function GamesView({ site }: { site: SitePayload }) {
 
 function StatusBadge({ status }: { status: string }) {
   const kind = resolveGameStatus(status);
-  return <StatusPill kind={kind} size="sm" pulse={kind === "healthy"} className="capitalize" label={status} />;
+  return <StatusPill kind={kind} size="sm" pulse={kind === "syncing"} className="capitalize" label={status} />;
 }

@@ -224,15 +224,22 @@
     scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
   }
 
-  .os-theme-alleral {
-    --os-size: 10px;
-    --os-padding-perpendicular: 2px;
-    --os-padding-axis: 2px;
-    --os-track-border-radius: 999px;
-    --os-handle-border-radius: 999px;
-    --os-handle-bg: rgba(148, 163, 184, 0.35);
-    --os-handle-bg-hover: rgba(34, 211, 238, 0.55);
-    --os-handle-bg-active: rgba(34, 211, 238, 0.75);
+  .lenis-root {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(34, 211, 238, 0.35) transparent;
+  }
+
+  .lenis-root::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .lenis-root::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.35);
+  }
+
+  .lenis-root::-webkit-scrollbar-thumb:hover {
+    background: rgba(34, 211, 238, 0.55);
   }
 
   .chart-tooltip {
@@ -401,19 +408,17 @@ html.cf-gate-lock body {
   }
 }
 
-/* Slow live indicator — matches public site ambient pulse cadence */
+/* Legacy pulse helper — prefer motion-driven StatusPill pulse */
 .status-live-pulse {
-  animation: status-live-pulse 3.5s var(--ease-drift) infinite;
+  animation: status-live-pulse 4s var(--ease-drift) infinite;
 }
 
 @keyframes status-live-pulse {
   0%, 100% {
-    opacity: 0.85;
-    transform: scale(1);
+    opacity: 0.7;
   }
   50% {
     opacity: 0.35;
-    transform: scale(1.35);
   }
 }
 
@@ -449,8 +454,13 @@ html.cf-gate-lock body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+  html {
+    scroll-behavior: auto;
+  }
+
+  .ambient-orb,
+  .status-live-pulse,
+  .view-enter {
+    animation: none !important;
   }
 }

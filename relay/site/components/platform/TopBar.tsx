@@ -45,7 +45,7 @@ export function TopBar({
 
       <div className="flex shrink-0 items-center gap-1.5 md:gap-3">
         <FreshnessChip dataUpdatedAt={dataUpdatedAt} live={online !== false} className="hidden sm:inline-flex" />
-        <StatusPill kind={relayKind} size="sm" pulse={online !== false} className="hidden md:inline-flex" />
+        <StatusPill kind={relayKind} size="sm" pulse={relayKind === "syncing"} className="hidden md:inline-flex" />
         <div className="hidden w-44 lg:block">
           <Select name="workspace" options={WORKSPACE_OPTIONS} value={preset} onChange={(v) => setWorkspace(v as WorkspacePreset)} />
         </div>

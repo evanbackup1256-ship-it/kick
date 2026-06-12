@@ -2,17 +2,17 @@
 
 import clsx from "clsx";
 import type { ReactNode } from "react";
-import { SmoothScroll } from "@/components/ui/SmoothScroll";
+import { LenisProvider } from "@/components/providers/LenisProvider";
 
-/** Main app scroll — uses OverlayScrollbars smooth scroll module. */
+/** Primary scroll region — Lenis smooth scroll + GSAP ScrollTrigger scroller. */
 export function MainScroll({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <SmoothScroll id="main-scroll" className={clsx("min-h-0 flex-1", className)} flex>
+    <LenisProvider id="main-scroll" className={clsx("flex min-h-0 flex-1 flex-col", className)}>
       {children}
-    </SmoothScroll>
+    </LenisProvider>
   );
 }
 
 export function ScrollContent({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={className}>{children}</div>;
+  return <div className={clsx("flex min-h-0 flex-1 flex-col", className)}>{children}</div>;
 }

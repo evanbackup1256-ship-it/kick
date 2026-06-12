@@ -12,6 +12,7 @@ import { CloudflareGate } from "@/components/gate/CloudflareGate";
 import { CommandPalette } from "@/components/platform/CommandPalette";
 import { Sidebar } from "@/components/platform/Sidebar";
 import { TopBar } from "@/components/platform/TopBar";
+import { LiveAlerts } from "@/components/observability/LiveAlerts";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { MainScroll, ScrollContent } from "@/components/providers/MainScroll";
 import { PageTransition } from "@/components/motion/Reveal";
@@ -40,7 +41,7 @@ function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }
   const activeView = usePlatformStore((s) => s.activeView);
   const workspace = usePlatformStore((s) => s.workspace);
   const mobileNavOpen = usePlatformStore((s) => s.mobileNavOpen);
-  const { dataUpdatedAt, refresh: refreshLive } = useLiveSyncMeta();
+  const { data, error, dataUpdatedAt, refresh: refreshLive } = useLiveSyncMeta();
 
   const copyLoadstring = useCallback(async () => {
     if (!site?.loadstring) return;
@@ -61,6 +62,7 @@ function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }
 
   return (
     <>
+      <LiveAlerts online={online !== false} errorMessage={error?.message} data={data} />
       <ScrollProgress />
       <div className="noise-overlay" aria-hidden />
       <div className="ambient-orb left-[-10%] top-[-20%] h-[420px] w-[420px] bg-indigo-500/15" aria-hidden />

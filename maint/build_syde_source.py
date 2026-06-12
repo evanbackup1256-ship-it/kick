@@ -111,11 +111,20 @@ def patch_slider_labels(text: str) -> str:
         "Slider.Title.Text = Options.Title",
         "do local _sliderTitle = sydeSliderLabel(Slider); if _sliderTitle then _sliderTitle.Text = Options.Title end end",
     )
-    text = re.sub(
-        r"tweenservice:Create\(Slider\.Title,",
-        "tweenservice:Create(sydeSliderLabel(Slider),",
-        text,
-    )
+
+    def wrap_slider_tween(match: re.Match[str]) -> str:
+        args = match.group(1)
+        return (
+            "do local _sliderTitle = sydeSliderLabel(Slider); "
+            f"if _sliderTitle then tweenservice:Create(_sliderTitle,{args}):Play() end end"
+        )
+
+    for pattern in (
+        r"tweenservice:Create\(Slider\.Title,(.*?)\):Play\(\)",
+        r"tweenservice:Create\(sydeSliderLabel\(Slider\),(.*?)\):Play\(\)",
+    ):
+        text = re.sub(pattern, wrap_slider_tween, text, flags=re.DOTALL)
+
     return text
 
 

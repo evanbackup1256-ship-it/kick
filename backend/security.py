@@ -22,16 +22,27 @@ JWT_ALG = "HS256"
 JWT_ISSUER = "alleral-relay"
 MIN_API_KEY_LEN = 24
 _TEXT_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+_jwt_secret_cache: str | None = None
 
 
 def _jwt_secret() -> str:
+    global _jwt_secret_cache
+    if _jwt_secret_cache is not None:
+        return _jwt_secret_cache
+
     secret = (
         os.environ.get("JWT_SECRET", "").strip()
         or os.environ.get("ADMIN_API_KEY", "").strip()
         or os.environ.get("API_KEY", "").strip()
     )
     if len(secret) < MIN_API_KEY_LEN:
-        return secrets.token_urlsafe(48)
+        secret = secrets.token_urlsafe(48)
+        logger.warning(
+            "JWT_SECRET not configured — using ephemeral process secret; "
+            "set JWT_SECRET (24+ chars) for stable admin tokens across restarts"
+        )
+
+    _jwt_secret_cache = secret
     return secret
 
 

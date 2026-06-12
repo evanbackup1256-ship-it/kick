@@ -2,8 +2,10 @@
 
 import clsx from "clsx";
 import * as Popover from "@radix-ui/react-popover";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, ChevronDown } from "lucide-react";
 import { memo, useEffect, useId, useMemo, useState } from "react";
+import { spring } from "@/lib/motion/config";
 
 export type SelectOption = { value: string; label: string };
 
@@ -32,6 +34,7 @@ export const Select = memo(function Select({
   className?: string;
   disabled?: boolean;
 }) {
+  const reduce = useReducedMotion();
   const items = useMemo(() => normalizeOptions(options), [options]);
   const listId = useId();
   const [open, setOpen] = useState(false);
@@ -67,36 +70,54 @@ export const Select = memo(function Select({
           aria-controls={listId}
         >
           <span className={clsx("truncate", !selected && "text-muted")}>{label}</span>
-          <ChevronDown className={clsx("h-4 w-4 shrink-0 text-muted transition-transform", open && "rotate-180")} />
+          <motion.span animate={{ rotate: open ? 180 : 0 }} transition={spring.tooltip}>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted" />
+          </motion.span>
         </button>
       </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          id={listId}
-          role="listbox"
-          sideOffset={6}
-          align="start"
-          collisionPadding={12}
-          className="custom-select-menu z-[600] max-h-60 w-[var(--radix-popover-trigger-width)] overflow-y-auto p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
-        >
-          {items.map((opt) => {
-            const active = opt.value === current;
-            return (
-              <button
-                key={`${opt.value}-${opt.label}`}
-                type="button"
-                role="option"
-                aria-selected={active}
-                className={clsx("custom-select-option", active && "selected")}
-                onClick={() => pick(opt.value)}
+      <AnimatePresence>
+        {open ? (
+          <Popover.Portal forceMount>
+            <Popover.Content
+              id={listId}
+              role="listbox"
+              sideOffset={6}
+              align="start"
+              collisionPadding={12}
+              asChild
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
+              <motion.div
+                initial={reduce ? false : { opacity: 0, y: -6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduce ? undefined : { opacity: 0, y: -4, scale: 0.99 }}
+                transition={spring.tooltip}
+                className="custom-select-menu z-[600] max-h-60 w-[var(--radix-popover-trigger-width)] overflow-y-auto p-1"
               >
-                <span className="truncate">{opt.label}</span>
-                {active ? <Check className="h-3.5 w-3.5 shrink-0 opacity-80" /> : null}
-              </button>
-            );
-          })}
-        </Popover.Content>
-      </Popover.Portal>
+                {items.map((opt, index) => {
+                  const active = opt.value === current;
+                  return (
+                    <motion.button
+                      key={`${opt.value}-${opt.label}`}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      initial={reduce ? false : { opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ ...spring.tooltip, delay: reduce ? 0 : index * 0.025 }}
+                      className={clsx("custom-select-option", active && "selected")}
+                      onClick={() => pick(opt.value)}
+                    >
+                      <span className="truncate">{opt.label}</span>
+                      {active ? <Check className="h-3.5 w-3.5 shrink-0 opacity-80" /> : null}
+                    </motion.button>
+                  );
+                })}
+              </motion.div>
+            </Popover.Content>
+          </Popover.Portal>
+        ) : null}
+      </AnimatePresence>
     </Popover.Root>
   );
 });

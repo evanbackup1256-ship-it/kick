@@ -22,7 +22,7 @@ export function FreshnessChip({
   return (
     <span
       className={clsx(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] transition-colors duration-500",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] tabular-nums transition-colors duration-700",
         fresh ? "border-cyan-400/25 text-cyan-200/90" : "border-border text-muted",
         className
       )}
@@ -30,7 +30,7 @@ export function FreshnessChip({
         background: fresh ? "rgba(34,211,238,0.06)" : "rgba(255,255,255,0.03)",
       }}
     >
-      {live && fresh ? <span className="status-live-pulse h-1.5 w-1.5 rounded-full bg-cyan-400/90" /> : null}
+      {live && fresh ? <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/80" aria-hidden /> : null}
       {formatFreshness(secondsAgo)}
     </span>
   );

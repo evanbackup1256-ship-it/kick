@@ -1,6 +1,8 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Activity, Gamepad2, Layers, Radio } from "lucide-react";
 import { useLiveSyncMeta } from "@/lib/queries/hooks";
@@ -13,12 +15,13 @@ import { SyncMonitor } from "@/components/observability/SyncMonitor";
 import { HealthRing } from "@/components/observability/HealthRing";
 import { FreshnessChip } from "@/components/observability/FreshnessChip";
 import { StatusPill } from "@/components/observability/StatusPill";
+import { TelemetryAlertBanner, TelemetryMetaStrip } from "@/components/observability/TelemetryPanels";
 import { TelemetryLineChart } from "@/components/charts/TelemetryLineChart";
 import { StatusHeatmap } from "@/components/charts/StatusHeatmap";
 import { EventTimeline, GameStatusStream } from "@/components/charts/EventTimeline";
 import { ServiceGraph } from "@/components/charts/ServiceGraph";
-import { SmoothScroll } from "@/components/ui/SmoothScroll";
-import { Reveal, Stagger, StaggerItem } from "@/components/motion/Reveal";
+import { InViewReveal } from "@/components/motion/InViewReveal";
+import { Reveal } from "@/components/motion/Reveal";
 
 const PANEL_CLASS = "flex min-h-0 flex-col overflow-hidden";
 
@@ -30,6 +33,7 @@ function MetricsColumn({
   sync,
   online,
   dataUpdatedAt,
+  relayError,
 }: {
   healthPct: number;
   working: number;
@@ -38,9 +42,10 @@ function MetricsColumn({
   sync?: { enabled?: boolean; autoStatus?: boolean; lastSyncAt?: string; lastError?: string };
   online: boolean;
   dataUpdatedAt?: number;
+  relayError?: string | null;
 }) {
   return (
-    <div className="flex flex-col gap-3 pb-2">
+    <div className="obs-scroll flex flex-col gap-3 overflow-y-auto overscroll-contain pb-2 pr-1">
       <div className="obs-panel flex items-center gap-4">
         <HealthRing kind={healthPct >= 80 ? "healthy" : healthPct >= 50 ? "warning" : "error"} value={healthPct} label="Health" />
         <div className="min-w-0">
@@ -52,14 +57,40 @@ function MetricsColumn({
       </div>
       <MetricCard label="Working scripts" numeric={working} icon={Gamepad2} accent="green" sparkline={historyToSeries(history, "working")} trend="Live from relay" />
       <MetricCard label="Tracked games" numeric={total} icon={Layers} accent="violet" />
-      <SyncMonitor sync={sync} dataUpdatedAt={dataUpdatedAt} online={online} />
+      <SyncMonitor sync={sync} dataUpdatedAt={dataUpdatedAt} online={online} relayError={relayError} />
     </div>
   );
 }
 
-function ChartBlock({ chartData }: { chartData: { value: number; label: string }[] }) {
+function ChartBlock({ chartData, hasLiveData }: { chartData: { value: number; label: string }[]; hasLiveData: boolean }) {
+  const chartRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = chartRef.current;
+    if (!el) return;
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        el,
+        { opacity: 0.6, y: 12 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: el,
+            scroller: "[data-lenis-root]",
+            start: "top 85%",
+            toggleActions: "play none none reverse",
+          },
+        }
+      );
+    }, el);
+    return () => ctx.revert();
+  }, []);
+
   return (
-    <div className="obs-panel obs-panel-chart flex h-full min-h-0 flex-col overflow-hidden">
+    <InViewReveal className="obs-panel obs-panel-chart flex h-full min-h-0 flex-col overflow-hidden">
       <div className="obs-panel-head shrink-0">
         <div>
           <p className="obs-kicker">Throughput</p>
@@ -67,10 +98,16 @@ function ChartBlock({ chartData }: { chartData: { value: number; label: string }
         </div>
         <Activity className="h-4 w-4 shrink-0 text-cyan-400" strokeWidth={1.75} />
       </div>
-      <div className="relative mt-2 min-h-0 flex-1 overflow-hidden">
-        <TelemetryLineChart series={chartData} className="absolute inset-0" />
+      <div ref={chartRef} className="relative mt-2 min-h-0 flex-1 overflow-hidden">
+        {hasLiveData ? (
+          <TelemetryLineChart series={chartData} className="absolute inset-0" />
+        ) : (
+          <div className="absolute inset-0 grid place-items-center px-4 text-center">
+            <p className="text-xs text-muted">Collecting live samples… chart appears after a few poll cycles.</p>
+          </div>
+        )}
       </div>
-    </div>
+    </InViewReveal>
   );
 }
 
@@ -79,6 +116,7 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
   const { data, error, dataUpdatedAt, loading } = useLiveSyncMeta();
   const online = !error && data?.ok !== false;
   const relayKind = resolveRelayStatus(online, error ? error.message : null);
+  const relayError = error ? error.message : null;
 
   const games = useMemo(() => {
     if (data?.games?.items?.length) return data.games.items;
@@ -98,39 +136,63 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
   const snapshot = useMemo(() => ({ working, total, health: healthPct }), [working, total, healthPct]);
   const history = useMetricHistory(snapshot, 36, 20000);
   const workingSeries = useMemo(
-    () => historyToSeries(history, "working").map((v, i) => ({ value: v, label: `${i}h` })),
+    () => historyToSeries(history, "working").map((v, i) => ({ value: v, label: `${i}` })),
     [history]
   );
+  const hasLiveData = workingSeries.length > 2;
 
   const timeline = useMemo(() => {
-    const items: { at?: string; title?: string; detail?: string; kind?: "release" | "sync" | "status" }[] = [];
+    const items: {
+      at?: string;
+      title?: string;
+      detail?: string;
+      kind?: "release" | "sync" | "status" | "error";
+      severity?: "info" | "warning" | "error";
+    }[] = [];
+
+    if (data?.sync?.lastError) {
+      items.push({
+        at: data.sync.lastSyncAt ? new Date(data.sync.lastSyncAt).toLocaleTimeString() : "Recent",
+        title: "Sync pipeline fault",
+        detail: data.sync.lastError,
+        kind: "error",
+        severity: "error",
+      });
+    }
+
+    games
+      .filter((g) => (g.status || "working") !== "working")
+      .forEach((g) => {
+        items.push({
+          at: "Live",
+          title: `${g.name || g.id} degraded`,
+          detail: g.message || `Status: ${g.status || "unknown"} · id ${g.id}${g.version ? ` · v${g.version}` : ""}`,
+          kind: "error",
+          severity: "error",
+        });
+      });
+
     if (data?.sync?.lastSyncAt) {
       items.push({
         at: new Date(data.sync.lastSyncAt).toLocaleTimeString(),
         title: "GitHub sync completed",
         kind: "sync",
-        detail: "Scripts refreshed from repository",
+        detail: `Commit ${data.release?.commit || "—"} · branch ${data.release?.branch || "main"}`,
       });
     }
+
     (data?.changelog || []).slice(0, 5).forEach((c) => {
       items.push({ at: c.date, title: c.title, detail: c.items?.[0], kind: "release" });
     });
-    if (site.announcement) {
-      items.push({ at: "Now", title: "Announcement", detail: site.announcement, kind: "status" });
-    }
-    return items;
-  }, [data, site.announcement]);
 
-  const chartData = useMemo(
-    () =>
-      workingSeries.length > 2 ?
-        workingSeries
-      : Array.from({ length: 24 }, (_, i) => ({
-          value: working + Math.sin(i * 0.5) * 0.6 + (i % 3) * 0.2,
-          label: `${i}h`,
-        })),
-    [workingSeries, working]
-  );
+    if (site.announcement) {
+      items.push({ at: "Now", title: "Announcement", detail: site.announcement, kind: "status", severity: "warning" });
+    }
+
+    return items;
+  }, [data, games, site.announcement]);
+
+  const chartData = hasLiveData ? workingSeries : [];
 
   return (
     <div className="command-center flex min-h-0 flex-col">
@@ -139,15 +201,27 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
           <p className="obs-kicker">Observability</p>
           <h2 className="obs-title">Mission control</h2>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusPill kind={relayKind} pulse={online} />
+        <div className="flex flex-wrap items-center gap-2 md:hidden">
+          <StatusPill kind={relayKind} pulse={relayKind === "syncing"} />
           <FreshnessChip dataUpdatedAt={dataUpdatedAt} live={!loading} />
         </div>
       </Reveal>
 
+      <TelemetryAlertBanner online={online} errorMessage={relayError} sync={data?.sync} />
+      <TelemetryMetaStrip data={data} siteLoader={site.loaderVersion} siteCore={site.coreVersion} />
+
       {isMobile ? (
-        <div className="flex flex-col gap-3 pb-4">
-          <MetricsColumn healthPct={healthPct} working={working} total={total} history={history} sync={data?.sync} online={online} dataUpdatedAt={dataUpdatedAt} />
+        <div className="mt-4 flex flex-col gap-3 pb-4">
+          <MetricsColumn
+            healthPct={healthPct}
+            working={working}
+            total={total}
+            history={history}
+            sync={data?.sync}
+            online={online}
+            dataUpdatedAt={dataUpdatedAt}
+            relayError={relayError}
+          />
           <div className="obs-panel obs-panel-chart overflow-hidden">
             <div className="obs-panel-head">
               <div>
@@ -155,20 +229,31 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
                 <h3 className="obs-title-sm">Working scripts · rolling window</h3>
               </div>
             </div>
-            <TelemetryLineChart series={chartData} className="relative mt-2 h-[220px] w-full" />
+            {hasLiveData ? (
+              <TelemetryLineChart series={chartData} className="relative mt-2 h-[220px] w-full" />
+            ) : (
+              <p className="px-4 py-8 text-center text-xs text-muted">Collecting live samples…</p>
+            )}
           </div>
           <StatusHeatmap games={games} className="min-h-[220px]" />
-          <ServiceGraph games={games} className="min-h-[220px]" />
+          <ServiceGraph games={games} sync={data?.sync} className="min-h-[280px]" />
           <GameStatusStream games={games} className="min-h-[280px]" />
           <EventTimeline events={timeline} className="min-h-[280px]" />
         </div>
       ) : (
-        <div className="command-center-grid min-h-0 shrink-0 overflow-hidden">
+        <div className="command-center-grid mt-4 min-h-0 shrink-0 overflow-hidden">
           <Group orientation="horizontal" className="h-full w-full gap-2">
             <Panel defaultSize={20} minSize={18} maxSize={28} className={PANEL_CLASS}>
-              <SmoothScroll className="h-full min-h-0 pr-1" flex>
-                <MetricsColumn healthPct={healthPct} working={working} total={total} history={history} sync={data?.sync} online={online} dataUpdatedAt={dataUpdatedAt} />
-              </SmoothScroll>
+              <MetricsColumn
+                healthPct={healthPct}
+                working={working}
+                total={total}
+                history={history}
+                sync={data?.sync}
+                online={online}
+                dataUpdatedAt={dataUpdatedAt}
+                relayError={relayError}
+              />
             </Panel>
 
             <Separator className="obs-separator" />
@@ -176,13 +261,13 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
             <Panel defaultSize={52} minSize={36} className={PANEL_CLASS}>
               <Group orientation="vertical" className="h-full min-h-0 gap-2">
                 <Panel defaultSize={58} minSize={35} className={PANEL_CLASS}>
-                  <ChartBlock chartData={chartData} />
+                  <ChartBlock chartData={chartData} hasLiveData={hasLiveData} />
                 </Panel>
                 <Separator className="obs-separator horizontal" />
                 <Panel defaultSize={42} minSize={28} className={PANEL_CLASS}>
                   <div className="grid h-full min-h-0 grid-cols-1 gap-2 overflow-hidden xl:grid-cols-2">
                     <StatusHeatmap games={games} className="min-h-0 overflow-hidden" />
-                    <ServiceGraph games={games} className="min-h-0 overflow-hidden" />
+                    <ServiceGraph games={games} sync={data?.sync} className="min-h-0 overflow-hidden" />
                   </div>
                 </Panel>
               </Group>
@@ -213,6 +298,7 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
         <span>
           {data?.versions?.ui || site.uiLibrary} {data?.versions?.uiVersion || site.uiVersion}
         </span>
+        {relayError ? <span className="text-red-300/90">api: {relayError}</span> : null}
       </div>
     </div>
   );
