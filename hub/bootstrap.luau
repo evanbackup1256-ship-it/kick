@@ -138,7 +138,7 @@ local function loaderSydePatchFromSource(src)
 	return tonumber(src:match("local SYDE_PATCH_VERSION = (%d+)"))
 end
 
-local function loaderMatchesRelease(src, meta)
+local function loaderMatchesRelease(src, meta, strictCommit)
 	if type(src) ~= "string" or type(meta) ~= "table" then
 		return false, "invalid loader body"
 	end
@@ -148,7 +148,7 @@ local function loaderMatchesRelease(src, meta)
 			return false, "loader v" .. tostring(remoteVer or "?") .. " != release v" .. meta.loader
 		end
 	end
-	if type(meta.commit) == "string" and meta.commit ~= "" then
+	if strictCommit and type(meta.commit) == "string" and meta.commit ~= "" then
 		local embedded = loaderCommitFromSource(src)
 		if embedded ~= meta.commit then
 			return false, "embedded commit " .. tostring(embedded or "?") .. " != release " .. meta.commit
@@ -176,8 +176,9 @@ local function buildLoaderUrls(meta)
 	local commit = (meta and meta.commit) or BRANCH
 	local bust = "?t=" .. tostring(tick())
 	return {
-		"https://raw.githubusercontent.com/" .. REPO .. "/" .. commit .. "/loader.luau" .. bust,
-		JSDELIVR .. "@" .. commit .. "/loader.luau" .. bust,
+		{ url = "https://raw.githubusercontent.com/" .. REPO .. "/" .. commit .. "/loader.luau" .. bust, strictCommit = true },
+		{ url = JSDELIVR .. "@" .. commit .. "/loader.luau" .. bust, strictCommit = true },
+		{ url = GITHUB_RAW .. "/loader.luau" .. bust, strictCommit = false },
 	}
 end
 
@@ -501,10 +502,10 @@ local function Alleral_Bootstrap(reason)
 	local urls = buildLoaderUrls(meta)
 	local src, via = nil, metaVia
 	local lastReject = "no matching loader"
-	for _, url in ipairs(urls) do
-		local body, transport = httpGet(url, 500)
+	for _, entry in ipairs(urls) do
+		local body, transport = httpGet(entry.url, 500)
 		if type(body) == "string" and #body >= 500 then
-			local ok, detail = loaderMatchesRelease(body, meta)
+			local ok, detail = loaderMatchesRelease(body, meta, entry.strictCommit == true)
 			if ok then
 				src, via = body, transport
 				break

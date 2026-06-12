@@ -3668,15 +3668,8 @@ local function main()
 				.. tostring(RELEASE_FALLBACK.commit)
 				.. " != release "
 				.. tostring(expectedVersions.commit)
-				.. " — auto-updating via bootstrap"
+				.. " — continuing (bootstrap may refresh on next relaunch)"
 		)
-		ENV.Alleral_LoaderRunning = false
-		task.defer(function()
-			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
-				ENV._Alleral_RelaunchViaBootstrap("commit-sync")
-			end
-		end)
-		return
 	end
 	local needSydePatch = tonumber(expectedVersions.sydePatch) or SYDE_PATCH_VERSION
 	if needSydePatch ~= SYDE_PATCH_VERSION then
