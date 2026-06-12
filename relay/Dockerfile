@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY telemetry_relay.py script_registry.py ban_registry.py site_registry.py roblox_api.py weao_api.py auto_sync.py manage_backend.py ./
 COPY --from=site-build /site/out ./site
 COPY scripts_manifest.json site.json ./
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chmod 777 /app/data
 ENV TELEMETRY_HOST=0.0.0.0
 ENV SCRIPTS_MANIFEST_PATH=/app/scripts_manifest.json
 ENV SITE_CONFIG_PATH=/app/site.json

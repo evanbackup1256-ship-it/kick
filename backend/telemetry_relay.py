@@ -268,8 +268,65 @@ def cors_preflight():
     return "", 204
 
 
-BAN_DB_PATH = Path(os.environ.get("BAN_DB_PATH", str(APP_DIR / "data" / "bans.db")))
 DATA_DIR = Path(os.environ.get("ALLERAL_DATA_DIR", str(APP_DIR / "data")))
+BAN_DB_PATH = Path(os.environ.get("BAN_DB_PATH", str(DATA_DIR / "bans.db")))
+
+
+def _probe_writable_dir(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return True
+    except OSError:
+        return False
+
+
+def ensure_writable_data_paths() -> None:
+    """Pick a writable data directory; fall back when /app/data is read-only (common on PaaS)."""
+    global DATA_DIR, BAN_DB_PATH
+
+    data_override = os.environ.get("ALLERAL_DATA_DIR", "").strip()
+    ban_override = os.environ.get("BAN_DB_PATH", "").strip()
+
+    candidates: list[Path] = []
+    if data_override:
+        candidates.append(Path(data_override))
+    default_data = APP_DIR / "data"
+    if default_data not in candidates:
+        candidates.append(default_data)
+    tmp_data = Path("/tmp/alleral-data")
+    if tmp_data not in candidates:
+        candidates.append(tmp_data)
+
+    for base in candidates:
+        if not _probe_writable_dir(base):
+            continue
+        DATA_DIR = base
+        if ban_override:
+            ban_path = Path(ban_override)
+            if _probe_writable_dir(ban_path.parent):
+                BAN_DB_PATH = ban_path
+            else:
+                BAN_DB_PATH = DATA_DIR / "bans.db"
+        else:
+            BAN_DB_PATH = DATA_DIR / "bans.db"
+        os.environ["ALLERAL_DATA_DIR"] = str(DATA_DIR)
+        os.environ["BAN_DB_PATH"] = str(BAN_DB_PATH)
+        if base != candidates[0]:
+            print(
+                f"[bootstrap] Using fallback data dir {DATA_DIR} (ban db: {BAN_DB_PATH})",
+                file=sys.stderr,
+            )
+        return
+
+    raise RuntimeError(
+        "No writable data directory found; set ALLERAL_DATA_DIR or mount a writable volume"
+    )
+
+
+ensure_writable_data_paths()
 
 
 def claim_sync_webhook_notification(commit: str) -> bool:

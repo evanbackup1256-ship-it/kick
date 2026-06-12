@@ -40,15 +40,20 @@ def normalize_ban_value(ban_type: str, value: object) -> str:
 
 class BanRegistry:
     def __init__(self, path: Path) -> None:
-        self.path = path
+        self.path = Path(path)
         self._lock = threading.Lock()
+        if self.path.exists() and self.path.is_dir():
+            raise RuntimeError(f"Ban database path is a directory, not a file: {self.path}")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.path, timeout=30, check_same_thread=False)
+        conn = sqlite3.connect(str(self.path), timeout=30, check_same_thread=False)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.OperationalError:
+            conn.execute("PRAGMA journal_mode=DELETE")
         conn.execute("PRAGMA foreign_keys=ON")
         return conn
 

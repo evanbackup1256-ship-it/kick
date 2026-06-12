@@ -14,7 +14,7 @@ COPY --from=site-build /site/out ./site
 COPY cfg/scripts_manifest.json ./scripts_manifest.json
 COPY cfg/site.json ./site.json
 COPY cfg/weao.json ./weao.json
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chmod 777 /app/data
 ENV TELEMETRY_HOST=0.0.0.0
 ENV SCRIPTS_MANIFEST_PATH=/app/scripts_manifest.json
 ENV SITE_CONFIG_PATH=/app/site.json

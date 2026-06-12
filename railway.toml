@@ -1,7 +1,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
-watchPatterns = ["backend/**", "cfg/scripts_manifest.json", "cfg/site.json"]
+watchPatterns = ["backend/**", "relay/**", "cfg/**", "Dockerfile", "railway.toml"]
 
 [deploy]
 healthcheckPath = "/health"

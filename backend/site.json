@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-12T19:59:27Z",
+  "updatedAt": "2026-06-12T20:48:36Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
   "loaderVersion": "8.2.24",
@@ -15,7 +15,6 @@
   "features": [
     "Finds the right script when you inject",
     "Syde UI with live status on each game",
-    "Ban checks against Roblox UserId, username, and HWID",
     "Site and scripts pull from GitHub automatically",
     "Game status comes from real inject data, not guesses",
     "Updates land within about a minute of a push",
@@ -36,15 +35,11 @@
     },
     {
       "q": "Why didn't the script load?",
-      "a": "Usually it's the wrong game, a weak executor, or the game is marked Broken/Maintenance. If you see a ban message, your account or device is blocked on the server."
+      "a": "Usually it's the wrong game, a weak executor, or the game is marked Broken/Maintenance."
     },
     {
       "q": "Does it auto-update?",
       "a": "Yeah. The loader checks GitHub every ~45 seconds and reloads when something new is pushed."
-    },
-    {
-      "q": "How does the ban system work?",
-      "a": "Before the script loads, Alleral checks your Roblox UserId, username, HWID, fingerprint, IP, and executor against the ban list on Railway. Client-side bypass won't work."
     },
     {
       "q": "How do I report a bug?",
@@ -300,17 +295,15 @@
   },
   "executors": [],
   "resources": [
-    { "title": "Ban API v1", "desc": "Third-party ban check & management docs", "url": "#ban-api", "icon": "shield" },
     { "title": "WEAO — Live executors", "desc": "WhatExpsAre.Online status feed (same data as Tools)", "url": "https://whatexpsare.online/", "icon": "pulse" },
     { "title": "Loader source", "desc": "Raw loader.luau on GitHub", "urlKey": "loaderRaw", "icon": "code" },
     { "title": "Repository", "desc": "Full project + game scripts", "urlKey": "github", "icon": "github" },
-    { "title": "Admin panel", "desc": "Manage bans, site content, sync", "urlKey": "admin", "icon": "shield" },
     { "title": "Sync status", "desc": "Live GitHub auto-sync JSON", "url": "/api/sync/status", "icon": "sync" },
     { "title": "Health check", "desc": "Relay uptime + commit hash", "url": "/health", "icon": "pulse" }
   ],
   "credits": {
     "headline": "Built by Sammy.",
-    "subheadline": "Alleral — loader, hub, bans, game scripts, and everything on this site.",
+    "subheadline": "Alleral — loader, hub, game scripts, and everything on this site.",
     "teams": [
       {
         "id": "creator",
@@ -321,7 +314,7 @@
             "displayName": "Sammy",
             "role": "Owner & Developer",
             "robloxUsername": "ProgrammerSammy",
-            "bio": "Everything you see here — loader architecture, telemetry relay, ban system, game scripts, and this hub.",
+            "bio": "Everything you see here — loader architecture, telemetry relay, game scripts, and this hub.",
             "featured": true,
             "accent": "#2997ff",
             "tags": ["Loader", "Backend", "Hub", "Games"],
