@@ -1,5 +1,5 @@
--- Neverlose UI · NEVERLOSE_UI_VERSION = "1.5.1-kick"
-local NEVERLOSE_UI_VERSION = "1.5.1-kick"
+-- Neverlose UI · NEVERLOSE_UI_VERSION = "1.5.2-kick"
+local NEVERLOSE_UI_VERSION = "1.5.2-kick"
 local Library do 
  local Workspace = game:GetService("Workspace")
  local UserInputService = game:GetService("UserInputService")
@@ -20,7 +20,17 @@ local Library do
 
  local FromRGB = Color3.fromRGB
  local FromHSV = Color3.fromHSV
- local FromHex = Color3.fromHex
+ local FromHex = Color3.fromHex or function(hex)
+ hex = tostring(hex or ""):gsub("#", "")
+ if #hex >= 6 then
+  return Color3.fromRGB(
+   tonumber(hex:sub(1, 2), 16) or 255,
+   tonumber(hex:sub(3, 4), 16) or 255,
+   tonumber(hex:sub(5, 6), 16) or 255
+  )
+ end
+ return Color3.new(1, 1, 1)
+ end
 
  local RGBSequence = ColorSequence.new
  local RGBSequenceKeypoint = ColorSequenceKeypoint.new
@@ -499,9 +509,11 @@ local Library do
 
  -- Folders
  for Index, Value in Library.Folders do 
- if not isfolder(Value) then
+ pcall(function()
+ if type(isfolder) == "function" and type(makefolder) == "function" and not isfolder(Value) then
  makefolder(Value)
  end
+ end)
  end
 
  -- Tweening

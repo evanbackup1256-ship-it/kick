@@ -130,6 +130,17 @@ return function(Core)
 		return Spring, Spr, Ripple, Fusion
 	end
 
+	local function compileLibrarySource(source, label)
+		if type(source) ~= "string" or source == "" then
+			return nil, "empty library source"
+		end
+		local lib, err = compileModule(source, label)
+		if type(lib) == "table" then
+			return lib
+		end
+		return nil, err or "compile failed"
+	end
+
 	local function loadNeverloseLibrary()
 		releaseNeverloseRuntime()
 		if neverloseLibraryLive(ENV._NeverloseLibrary) then
@@ -138,12 +149,16 @@ return function(Core)
 
 		local Spring, Spr, Ripple, Fusion = loadMotionStack()
 
-		local libSource = readLocal(LIBRARY_FILE)
+		local libSource, libPath = readLocal(LIBRARY_FILE)
 		if libSource and not librarySourceValid(libSource) then
-			Core.logWarn("Ignoring stale local Neverlose library.lua")
+			Core.logWarn("Ignoring stale local Neverlose library.lua at " .. tostring(libPath or LIBRARY_FILE))
 			libSource = nil
+			libPath = nil
 		end
-		libSource = libSource or fetchRemote(LIBRARY_FILE, MIN_LIBRARY_BYTES)
+		if not libSource then
+			libSource = fetchRemote(LIBRARY_FILE, MIN_LIBRARY_BYTES)
+			libPath = libSource and "remote:" .. LIBRARY_FILE or nil
+		end
 		if not libSource then
 			return nil, "library.lua missing"
 		end
@@ -151,9 +166,19 @@ return function(Core)
 			return nil, "stale library.lua missing LibRef/EnsureGuiRoot"
 		end
 
-		local Library = compileModule(libSource, "@Neverlose/library")
+		local Library, compileErr = compileLibrarySource(libSource, "@Neverlose/library")
+		if not Library and libPath and libPath:find("^local:", 1, false) == nil then
+			Core.logWarn("Neverlose library compile failed: " .. tostring(compileErr))
+		end
+		if not Library then
+			local remoteSource = fetchRemote(LIBRARY_FILE, MIN_LIBRARY_BYTES)
+			if type(remoteSource) == "string" and remoteSource ~= libSource then
+				Library, compileErr = compileLibrarySource(remoteSource, "@Neverlose/library-remote")
+				libSource = remoteSource
+			end
+		end
 		if type(Library) ~= "table" then
-			return nil, "invalid Neverlose library"
+			return nil, "invalid Neverlose library: " .. tostring(compileErr or "compile returned non-table")
 		end
 
 		if not Spring then
@@ -168,6 +193,15 @@ return function(Core)
 		end
 
 		do
+			local function hexColor(value, fallback)
+				if Color3.fromHex then
+					local ok, color = pcall(Color3.fromHex, value)
+					if ok and typeof(color) == "Color3" then
+						return color
+					end
+				end
+				return fallback
+			end
 			local springModule = Spring
 			local origNotification = type(Library.Notification) == "function" and Library.Notification or nil
 			local motionProfiles = {
@@ -178,18 +212,18 @@ return function(Core)
 				reduced = { frequency = 18, damping = 1 },
 			}
 			local themePresets = {
-				Mint = { Accent = Color3.fromHex("#53fc18"), Background = Color3.fromHex("#0c0c0e"), ["AccentGradient"] = Color3.fromHex("#30ff6a") },
-				Arrrel = { Accent = Color3.fromHex("#53fc18"), Background = Color3.fromHex("#0c0c0e"), ["AccentGradient"] = Color3.fromHex("#30ff6a") },
-				ArrrelNeon = { Accent = Color3.fromHex("#00ff88"), Background = Color3.fromHex("#050508") },
-				ArrrelMidnight = { Accent = Color3.fromHex("#4a9eff"), Background = Color3.fromHex("#080810") },
-				ArrrelAurora = { Accent = Color3.fromHex("#7c5cff"), Background = Color3.fromHex("#0a0812") },
-				ArrrelObsidian = { Accent = Color3.fromHex("#30ff6a"), Background = Color3.fromHex("#050505") },
-				ArrrelSynth = { Accent = Color3.fromHex("#ff3d9a"), Background = Color3.fromHex("#120818") },
-				ArrrelOcean = { Accent = Color3.fromHex("#00c3ff"), Background = Color3.fromHex("#061018") },
-				ArrrelEmber = { Accent = Color3.fromHex("#ff6b2b"), Background = Color3.fromHex("#120a08") },
-				ArrrelStealth = { Accent = Color3.fromHex("#8a8a8a"), Background = Color3.fromHex("#101010") },
-				ArrrelPaper = { Accent = Color3.fromHex("#2d6cdf"), Background = Color3.fromHex("#f0f0f2") },
-				ArrrelVoid = { Accent = Color3.fromHex("#b026ff"), Background = Color3.fromHex("#030003") },
+				Mint = { Accent = hexColor("#53fc18", Color3.fromRGB(83, 252, 24)), Background = hexColor("#0c0c0e", Color3.fromRGB(12, 12, 14)), ["AccentGradient"] = hexColor("#30ff6a", Color3.fromRGB(48, 255, 106)) },
+				Arrrel = { Accent = hexColor("#53fc18", Color3.fromRGB(83, 252, 24)), Background = hexColor("#0c0c0e", Color3.fromRGB(12, 12, 14)), ["AccentGradient"] = hexColor("#30ff6a", Color3.fromRGB(48, 255, 106)) },
+				ArrrelNeon = { Accent = hexColor("#00ff88", Color3.fromRGB(0, 255, 136)), Background = hexColor("#050508", Color3.fromRGB(5, 5, 8)) },
+				ArrrelMidnight = { Accent = hexColor("#4a9eff", Color3.fromRGB(74, 158, 255)), Background = hexColor("#080810", Color3.fromRGB(8, 8, 16)) },
+				ArrrelAurora = { Accent = hexColor("#7c5cff", Color3.fromRGB(124, 92, 255)), Background = hexColor("#0a0812", Color3.fromRGB(10, 8, 18)) },
+				ArrrelObsidian = { Accent = hexColor("#30ff6a", Color3.fromRGB(48, 255, 106)), Background = hexColor("#050505", Color3.fromRGB(5, 5, 5)) },
+				ArrrelSynth = { Accent = hexColor("#ff3d9a", Color3.fromRGB(255, 61, 154)), Background = hexColor("#120818", Color3.fromRGB(18, 8, 24)) },
+				ArrrelOcean = { Accent = hexColor("#00c3ff", Color3.fromRGB(0, 195, 255)), Background = hexColor("#061018", Color3.fromRGB(6, 16, 24)) },
+				ArrrelEmber = { Accent = hexColor("#ff6b2b", Color3.fromRGB(255, 107, 43)), Background = hexColor("#120a08", Color3.fromRGB(18, 10, 8)) },
+				ArrrelStealth = { Accent = hexColor("#8a8a8a", Color3.fromRGB(138, 138, 138)), Background = hexColor("#101010", Color3.fromRGB(16, 16, 16)) },
+				ArrrelPaper = { Accent = hexColor("#2d6cdf", Color3.fromRGB(45, 108, 223)), Background = hexColor("#f0f0f2", Color3.fromRGB(240, 240, 242)) },
+				ArrrelVoid = { Accent = hexColor("#b026ff", Color3.fromRGB(176, 38, 255)), Background = hexColor("#030003", Color3.fromRGB(3, 0, 3)) },
 				Neverlose = { Accent = Color3.fromRGB(0, 116, 224), Background = Color3.fromRGB(12, 12, 14) },
 			}
 			local themeNames = {}

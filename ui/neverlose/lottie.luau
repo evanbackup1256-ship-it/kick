@@ -1,4 +1,4 @@
--- NEVERLOSE_UI_VERSION = "1.5.1-kick"
+-- NEVERLOSE_UI_VERSION = "1.5.2-kick"
 --[[
 	Lightweight Lottie-inspired timeline director for Neverlose UI.
 	Integrates with Library:Motion / AnimateFluid — one shared Heartbeat loop.

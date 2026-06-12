@@ -1624,7 +1624,7 @@ function Core.prepareGame(state)
 	if not uiLibrary then
 		local msg = err or "UI unavailable"
 		signalBootFailure(msg)
-		return nil, nil, msg
+		return core, nil, msg
 	end
 	pcall(function()
 		if core.refreshLoaderCapabilities then

@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.9.2"
+local LOADER_VERSION = "7.9.3"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -23,11 +23,11 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.9.2",
+	loader = "7.9.3",
 	core = "2.8.8",
 	ui = "Alleral",
-	neverlose = "1.5.1-kick",
-	windui = "1.5.1-kick",
+	neverlose = "1.5.2-kick",
+	windui = "1.5.2-kick",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -1367,12 +1367,26 @@ local function runParallel(tasks)
 end
 
 local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, rejectReasonFn, minBytes)
+	local expected = ENV._Alleral_ExpectedVersions or fetchExpectedVersions()
+	local expectedCore = expected and expected.core
 	local src, path = readLocal(localPaths, minBytes)
 	local label
 	if not src then
 		src, path = readLocal(cachePaths, minBytes)
 		if src then
 			label = "cache:" .. tostring(path or cachePaths[1])
+			if type(expectedCore) == "string" and expectedCore ~= "" then
+				local cachedVersion = extractFileVersion(src, "core")
+				if cachedVersion and cachedVersion ~= expectedCore then
+					log("Removing outdated cache at " .. tostring(path or cachePaths[1]) .. " (core " .. tostring(cachedVersion) .. " != " .. expectedCore .. ")", true)
+					for _, cachePath in ipairs(cachePaths) do
+						deleteWorkspaceFile(cachePath)
+					end
+					src = nil
+					label = nil
+					path = nil
+				end
+			end
 		end
 	end
 	if src and not validFn(src) then
@@ -1398,6 +1412,11 @@ local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, re
 end
 
 local function purgeStaleCorePaths()
+	local expected = ENV._Alleral_ExpectedVersions
+	if type(fetchExpectedVersions) == "function" and not expected then
+		expected = fetchExpectedVersions()
+	end
+	local expectedCore = type(expected) == "table" and expected.core or nil
 	local stalePaths = {
 		CORE_BASE_LEGACY_PATH,
 		".alleral/cache/" .. CORE_BASE_LEGACY_PATH,
@@ -1414,7 +1433,13 @@ local function purgeStaleCorePaths()
 					if path:find("core.luau", 1, true) and not path:find("core_base", 1, true) then
 						stale = true
 					end
-					if stale and not coreValid(src) then
+					if type(expectedCore) == "string" and expectedCore ~= "" then
+						local cachedVersion = extractFileVersion(src, "core")
+						if cachedVersion and cachedVersion ~= expectedCore then
+							stale = true
+						end
+					end
+					if stale and (not coreValid(src) or (type(expectedCore) == "string" and expectedCore ~= "" and extractFileVersion(src, "core") ~= expectedCore)) then
 						deleteWorkspaceFile(path)
 					end
 				end
@@ -2333,25 +2358,44 @@ end
 local function buildManagedFiles()
 	local managed = {
 		{
-			paths = { CORE_BASE_PATH, CORE_BASE_LEGACY_PATH, "core/alleral_core.luau", "alleral_core.luau" },
+			paths = {
+				CORE_BASE_PATH,
+				CORE_BASE_LEGACY_PATH,
+				"core/alleral_core.luau",
+				"alleral_core.luau",
+				".alleral/cache/" .. CORE_BASE_PATH,
+				".alleral/cache/" .. CORE_BASE_LEGACY_PATH,
+			},
 			expectedKey = "core",
 			extract = "core",
 			isValid = coreValid,
 		},
 		{
-			paths = { CORE_UI_PATH, HUB .. "/core_ui.luau" },
+			paths = {
+				CORE_UI_PATH,
+				HUB .. "/core_ui.luau",
+				".alleral/cache/" .. CORE_UI_PATH,
+			},
 			expectedKey = "core",
 			extract = "core",
 			isValid = coreUiValid,
 		},
 		{
-			paths = { CORE_NEVERLOSE_UI_PATH, HUB .. "/neverlose_ui.luau" },
+			paths = {
+				CORE_NEVERLOSE_UI_PATH,
+				HUB .. "/neverlose_ui.luau",
+				".alleral/cache/" .. CORE_NEVERLOSE_UI_PATH,
+			},
 			expectedKey = "core",
 			extract = "core",
 			isValid = neverloseUiValid,
 		},
 		{
-			paths = { CORE_HUB_UI_PATH, HUB .. "/core_hub_ui.luau" },
+			paths = {
+				CORE_HUB_UI_PATH,
+				HUB .. "/core_hub_ui.luau",
+				".alleral/cache/" .. CORE_HUB_UI_PATH,
+			},
 			expectedKey = "core",
 			extract = "core",
 			isValid = coreHubUiValid,
@@ -2394,6 +2438,12 @@ local function buildManagedFiles()
 				UI .. "/neverlose/ripple.luau",
 				UI .. "/neverlose/fusion.luau",
 				UI .. "/neverlose/lottie.luau",
+				".alleral/cache/" .. UI .. "/neverlose/library.lua",
+				".alleral/cache/" .. UI .. "/neverlose/spring.luau",
+				".alleral/cache/" .. UI .. "/neverlose/spr.luau",
+				".alleral/cache/" .. UI .. "/neverlose/ripple.luau",
+				".alleral/cache/" .. UI .. "/neverlose/fusion.luau",
+				".alleral/cache/" .. UI .. "/neverlose/lottie.luau",
 			},
 			expectedKey = "neverlose",
 			extract = "neverlose",
