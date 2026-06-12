@@ -54,6 +54,15 @@
   "changelog": [
     {
       "date": "2026-06-12",
+      "title": "Loader 8.2.20 — commit sync, game update notice, legacy purge",
+      "items": [
+        "Loader 8.2.20 — bump_release always mirrors RELEASE_FALLBACK.commit from release.json",
+        "Bootstrap v1.0.2 warns when PlaceVersion changed; script still loads normally",
+        "Bootstrap purges legacy v3/v4 loaders and obfuscated UI dumps from executor workspace"
+      ]
+    },
+    {
+      "date": "2026-06-12",
       "title": "Loader 8.2.19 — register limit fix + commit-pinned bootstrap",
       "items": [
         "Loader 8.2.19 — teleport/relaunch hooks moved to hub/loader_relaunch.luau to stay under Luau register cap",

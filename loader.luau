@@ -81,6 +81,7 @@ local LEGACY_LOADER_MARKERS = {
 	"launch.template.luau",
 	"LOADER_VERSION = \"3.",
 	"LOADER_VERSION = \"4.",
+	"obfusctated_uilibrary",
 }
 local LEGACY_ENTRY_NAMES = {
 	"loader.luau",
@@ -3863,6 +3864,10 @@ local function main()
 	ENV._Alleral_LastJobId = game.JobId
 	ENV._Alleral_PendingRelaunch = nil
 	notify("Alleral", profile.name .. " loaded", 4)
+	if ENV._Alleral_GameRecentlyUpdated and type(ENV._Alleral_GameUpdateMessage) == "string" then
+		notify("Alleral", ENV._Alleral_GameUpdateMessage, 10)
+		ENV._Alleral_GameRecentlyUpdated = nil
+	end
 	log("ready")
 end
 

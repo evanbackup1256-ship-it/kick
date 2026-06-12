@@ -47,15 +47,14 @@ if ($hashBumpNeeded) {
     $release.updatedAt = $updatedAt
     Write-Utf8NoBom $releasePath (($release | ConvertTo-Json -Depth 6) + "`n")
     Write-Host "release.json -> commit=$commit updatedAt=$updatedAt"
-
-    $commitRx = [regex]::new('(?m)^\tcommit = "[^"]+"')
-    $loaderRaw = $commitRx.Replace($loaderRaw, ("`tcommit = `"$commit`""), 1)
-    Write-Host "loader.luau RELEASE_FALLBACK.commit -> $commit"
 } else {
     Write-Host "release.json commit remains $commit"
 }
+$commitRx = [regex]::new('(?m)^\tcommit = "[^"]+"')
+$loaderRaw = $commitRx.Replace($loaderRaw, ("`tcommit = `"$commit`""), 1)
 Write-Utf8NoBom $loaderPath $loaderRaw
 Write-Host "loader.luau LOADER_VERSION -> $($release.loader)"
+Write-Host "loader.luau RELEASE_FALLBACK.commit -> $commit"
 
 $manifestSrc = Join-Path $root "cfg/scripts_manifest.json"
 $siteSrc = Join-Path $root "cfg/site.json"
