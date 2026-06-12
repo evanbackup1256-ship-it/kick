@@ -54,7 +54,7 @@ export function SyncMonitor({
   ] as const;
 
   return (
-    <div className="obs-panel overflow-hidden">
+    <div className="obs-panel">
       <div className="obs-panel-head">
         <div>
           <p className="obs-kicker">Sync Monitor</p>
@@ -76,7 +76,7 @@ export function SyncMonitor({
                 <StatusPill kind={row.kind} size="sm" pulse={row.pulse} />
               </div>
             </div>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-2">{row.detail}</p>
+            <p className="mt-1.5 break-words text-[11px] leading-relaxed text-muted-2">{row.detail}</p>
           </div>
         ))}
       </div>

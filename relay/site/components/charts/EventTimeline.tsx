@@ -17,6 +17,28 @@ type TimelineEvent = {
 
 type GameRow = { id: string; name?: string; status?: string; message?: string; version?: string };
 
+function SimpleScrollList<T>({
+  items,
+  className,
+  empty,
+  renderRow,
+}: {
+  items: T[];
+  className?: string;
+  empty: React.ReactNode;
+  renderRow: (item: T, index: number) => React.ReactNode;
+}) {
+  if (!items.length) {
+    return <div className={clsx("text-sm text-muted-2", className)}>{empty}</div>;
+  }
+
+  return (
+    <div className={clsx("obs-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain", className)} data-lenis-prevent>
+      <div className="flex flex-col gap-2">{items.map((item, index) => renderRow(item, index))}</div>
+    </div>
+  );
+}
+
 function VirtualList<T>({
   items,
   estimateSize,
@@ -35,7 +57,7 @@ function VirtualList<T>({
     count: items.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => estimateSize,
-    overscan: 6,
+    overscan: 4,
   });
 
   if (!items.length) {
@@ -48,6 +70,8 @@ function VirtualList<T>({
         {virtualizer.getVirtualItems().map((row) => (
           <div
             key={row.key}
+            data-index={row.index}
+            ref={virtualizer.measureElement}
             style={{
               position: "absolute",
               top: 0,
@@ -71,6 +95,47 @@ function eventKind(ev: TimelineEvent) {
   return "online" as const;
 }
 
+function TimelineRow({ ev }: { ev: TimelineEvent }) {
+  return (
+    <div
+      className={clsx(
+        "relative flex gap-3 pl-4 pr-1",
+        ev.severity === "error" && "rounded-xl border border-red-400/15 bg-red-400/5 py-2 pr-2"
+      )}
+    >
+      <span
+        className={clsx(
+          "absolute bottom-1 left-0 top-1.5 w-px bg-gradient-to-b to-transparent",
+          ev.severity === "error" ? "from-red-400/60" : "from-cyan-400/50"
+        )}
+      />
+      <span
+        className={clsx(
+          "absolute left-[-3px] top-1.5 h-2 w-2 shrink-0 rounded-full border",
+          ev.severity === "error" ? "border-red-400/60 bg-red-400/30" : "border-cyan-400/60 bg-cyan-400/30"
+        )}
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <StatusPill kind={eventKind(ev)} size="sm" label={ev.kind || "event"} />
+          <time className="font-mono text-[10px] text-muted-2">{ev.at || "—"}</time>
+        </div>
+        <p className="mt-1.5 text-sm font-medium leading-snug text-text">{ev.title || "Update"}</p>
+        {ev.detail ? (
+          <p
+            className={clsx(
+              "mt-1 text-xs leading-relaxed break-words",
+              ev.severity === "error" ? "font-mono text-red-200/90" : "text-muted"
+            )}
+          >
+            {ev.detail}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export const EventTimeline = memo(function EventTimeline({
   events,
   className,
@@ -88,44 +153,11 @@ export const EventTimeline = memo(function EventTimeline({
           <h3 className="obs-title-sm">Activity & fault stream</h3>
         </div>
       </div>
-      <VirtualList
+      <SimpleScrollList
         items={events}
-        estimateSize={96}
         className="mt-3"
         empty="Waiting for activity…"
-        renderRow={(ev) => (
-          <div
-            className={clsx(
-              "relative flex gap-3 pb-4 pl-4",
-              ev.severity === "error" && "rounded-xl border border-red-400/15 bg-red-400/5 pr-2"
-            )}
-          >
-            <span
-              className={clsx(
-                "absolute left-0 top-1.5 h-full w-px bg-gradient-to-b to-transparent",
-                ev.severity === "error" ? "from-red-400/60" : "from-cyan-400/50"
-              )}
-            />
-            <span
-              className={clsx(
-                "absolute left-[-3px] top-1.5 h-2 w-2 rounded-full border",
-                ev.severity === "error" ? "border-red-400/60 bg-red-400/30" : "border-cyan-400/60 bg-cyan-400/30"
-              )}
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusPill kind={eventKind(ev)} size="sm" label={ev.kind || "event"} />
-                <time className="font-mono text-[10px] text-muted-2">{ev.at || "—"}</time>
-              </div>
-              <p className="mt-1 text-sm font-medium text-text">{ev.title || "Update"}</p>
-              {ev.detail ? (
-                <p className={clsx("mt-0.5 text-xs leading-relaxed", ev.severity === "error" ? "font-mono text-red-200/90" : "text-muted")}>
-                  {ev.detail}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        )}
+        renderRow={(ev, index) => <TimelineRow key={`${ev.at ?? "na"}-${ev.title ?? "event"}-${index}`} ev={ev} />}
       />
     </>
   );
@@ -156,7 +188,7 @@ export const GameStatusStream = memo(function GameStatusStream({
       </div>
       <VirtualList
         items={games}
-        estimateSize={78}
+        estimateSize={92}
         className="mt-2"
         empty="No scripts tracked yet."
         renderRow={(g) => {
@@ -170,13 +202,13 @@ export const GameStatusStream = memo(function GameStatusStream({
               )}
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{g.name || g.id}</p>
                   <p className="mt-0.5 font-mono text-[10px] text-muted-2">
                     {g.id}
                     {g.version ? ` · v${g.version}` : ""}
                   </p>
-                  <p className={clsx("mt-1 text-[11px] leading-relaxed", broken ? "text-red-200/90" : "text-muted")}>
+                  <p className={clsx("mt-1 text-[11px] leading-relaxed break-words", broken ? "text-red-200/90" : "text-muted")}>
                     {g.message || (broken ? "Non-operational — check relay auto-status logs" : "Operational")}
                   </p>
                 </div>

@@ -233,8 +233,8 @@ function MissionControlInner({ site }: { site: SitePayload }) {
           <div className="mc-slot mc-slot-main">
             <ThroughputPanel chartData={chartData} hasLiveData={hasLiveData} />
             <div className="mc-insights">
-              <StatusHeatmap games={games} className="h-full min-h-0" />
-              <ServiceGraph games={games} sync={data?.sync} embedded className="h-full min-h-0" />
+              <StatusHeatmap games={games} className="self-start" />
+              <ServiceGraph games={games} sync={data?.sync} embedded className="h-full min-h-[280px]" />
             </div>
           </div>
 

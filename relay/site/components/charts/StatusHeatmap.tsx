@@ -35,14 +35,14 @@ export function StatusHeatmap({
   const max = Math.max(1, ...Object.values(counts));
 
   return (
-    <div className={clsx("obs-panel flex min-h-0 flex-col", className)}>
+    <div className={clsx("obs-panel flex h-auto flex-col self-start", className)}>
       <div className="obs-panel-head shrink-0">
         <div>
           <p className="obs-kicker">Status heatmap</p>
           <h3 className="obs-title-sm">Script health distribution</h3>
         </div>
       </div>
-      <div className="mt-3 grid min-w-0 grid-cols-5 gap-1.5 sm:gap-2">
+      <div className="mt-3 grid min-w-0 grid-cols-5 gap-1">
         {KINDS.map((kind) => {
           const n = counts[kind];
           const intensity = n / max;
@@ -51,34 +51,36 @@ export function StatusHeatmap({
             <div
               key={kind}
               title={meta.label}
-              className="min-w-0 rounded-xl border border-border/60 p-2 text-center sm:p-3"
+              className="flex min-w-0 flex-col items-center justify-center rounded-xl border border-border/60 px-1 py-2"
               style={{
                 background: `linear-gradient(180deg, ${meta.color}${Math.round(intensity * 40 + 8).toString(16).padStart(2, "0")}, transparent)`,
                 boxShadow: n ? `0 0 ${8 + intensity * 16}px ${meta.glow}` : undefined,
               }}
             >
-              <p className="font-mono text-base font-semibold sm:text-lg" style={{ color: meta.color }}>
+              <p className="font-mono text-base font-semibold leading-none" style={{ color: meta.color }}>
                 {n}
               </p>
-              <p className="mt-1 truncate text-[8px] uppercase tracking-wide text-muted-2 sm:text-[9px]">{SHORT[kind]}</p>
+              <p className="mt-1.5 text-[9px] font-medium uppercase leading-none tracking-wide text-muted-2">{SHORT[kind]}</p>
             </div>
           );
         })}
       </div>
-      <div className="mt-3 flex flex-wrap gap-1">
-        {games.slice(0, 24).map((g) => {
-          const kind = resolveGameStatus(g.status);
-          const meta = status[kind];
-          return (
-            <span
-              key={g.id}
-              title={`${g.name || g.id}: ${meta.label}`}
-              className="h-2.5 w-2.5 rounded-sm"
-              style={{ background: meta.color }}
-            />
-          );
-        })}
-      </div>
+      {games.length > 0 ? (
+        <div className="mt-2.5 flex flex-wrap gap-1">
+          {games.slice(0, 24).map((g) => {
+            const kind = resolveGameStatus(g.status);
+            const meta = status[kind];
+            return (
+              <span
+                key={g.id}
+                title={`${g.name || g.id}: ${meta.label}`}
+                className="h-2 w-2 rounded-sm"
+                style={{ background: meta.color }}
+              />
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
