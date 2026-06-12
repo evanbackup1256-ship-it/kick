@@ -2482,7 +2482,7 @@ local function buildUpdateFingerprint(expected, profile)
 		return ""
 	end
 	local parts = {
-		"commit = "58cf089""),
+		"commit=" .. tostring(expected.commit or ""),
 		"updated=" .. tostring(expected.updatedAt or ""),
 		"loader=" .. tostring(expected.loader or ""),
 		"core=" .. tostring(expected.core or ""),

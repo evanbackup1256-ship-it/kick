@@ -25,11 +25,8 @@ Write-Host "release.json -> commit=$commit updatedAt=$updatedAt"
 
 $loaderPath = Join-Path $root "loader.luau"
 $loaderRaw = Get-Content $loaderPath -Raw -Encoding UTF8
-$loaderRaw = [regex]::Replace(
-    $loaderRaw,
-    '(commit\s*=\s*")[^"]+(")',
-    ('commit = "' + $commit + '"')
-)
+$commitRx = [regex]::new('(?m)^\tcommit = "[^"]+"')
+$loaderRaw = $commitRx.Replace($loaderRaw, ('commit = "' + $commit + '"'), 1)
 Write-Utf8NoBom $loaderPath $loaderRaw
 Write-Host "loader.luau RELEASE_FALLBACK.commit -> $commit"
 
