@@ -362,29 +362,27 @@ end
 -- Applies the `properties` table to bound parts.
 function syde:Modify(frame, properties)
 	local parts = syde:GetBoundParts(frame)
-	if parts then
-		for propName, propValue in pairs(properties) do
-			for _, pt in pairs(parts) do
-				pt[propName] = propValue
-			end
+	if not parts then
+		return
+	end
+	for propName, propValue in pairs(properties) do
+		for _, pt in pairs(parts) do
+			pt[propName] = propValue
 		end
-	else
-		warn(('No part bindings exist for %s'):format(frame:GetFullName()))
 	end
 end
 
 -- Removes the part binding from a gui object if one exists.
 function syde:UnbindFrame(frame)
 	local cb = binds[frame]
-	if cb then
-		RunService:UnbindFromRenderStep(cb.uid)
-		for _, v in pairs(cb.parts) do
-			v:Destroy()
-		end
-		binds[frame] = nil
-	else
-		warn(('No part bindings exist for %s'):format(frame:GetFullName()))
+	if not cb then
+		return
 	end
+	RunService:UnbindFromRenderStep(cb.uid)
+	for _, v in pairs(cb.parts) do
+		v:Destroy()
+	end
+	binds[frame] = nil
 end
 
 -- Returns true if a part binding exists for the gui object.

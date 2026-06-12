@@ -1,7 +1,10 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 16
+local ALLERAL_SYDE_PATCH = 17
+
+local function sydeLog(...) end
+local function sydeWarn(...) end
 
 local SYDE_CANONICAL_NAMES = {
 	Main = "main",
@@ -384,7 +387,7 @@ end
 local function sydeClonePageTemplate(pageContainer, templateName)
 	local template = sydePageTemplate(pageContainer, templateName)
 	if not template then
-		warn("[Syde] Missing page template: " .. tostring(templateName))
+		sydeWarn("[Syde] Missing page template: " .. tostring(templateName))
 		return nil
 	end
 	local clone = template:Clone()

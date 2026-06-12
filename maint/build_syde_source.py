@@ -99,6 +99,13 @@ def adapt_modal(block: str) -> str:
     return block
 
 
+def silence_syde_logging(text: str) -> str:
+    """Route Syde print/warn through silent Alleral compat stubs."""
+    text = re.sub(r"\bprint\s*\(", "sydeLog(", text)
+    text = re.sub(r"\bwarn\s*\(", "sydeWarn(", text)
+    return text
+
+
 def main() -> None:
     upstream = read(UPSTREAM)
     compat = read(COMPAT)
@@ -213,6 +220,7 @@ return syde
         raise RuntimeError("Syde Init footer anchor missing — upstream layout changed")
     body = replace_from(body, footer_start, end_patch)
 
+    body = silence_syde_logging(body)
     OUT.write_text(body, encoding="utf-8")
     print(f"Wrote {OUT} ({len(body)} bytes, {body.count(chr(10)) + 1} lines)")
 
