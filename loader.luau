@@ -18,6 +18,8 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
+local SYDE_PATCH_VERSION = 7
+local SYDE_PATCH_REQUIRED_FN = "sydeEnsureDropholderDropFrame"
 local CORE_BASE_PATH = HUB .. "/core_base.luau"
 local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
 local CORE_UI_PATH = HUB .. "/core_ui.luau"
@@ -869,15 +871,41 @@ local function cacheRemote(relativePath, src)
 	pcall(writeFileFn, relativePath, src)
 end
 
+local function sydePatchFromSource(src)
+	if type(src) ~= "string" then
+		return nil
+	end
+	return tonumber(src:match("ALLERAL_SYDE_PATCH%s*=%s*(%d+)"))
+end
+
 local function sydeSourceValid(src)
-	return type(src) == "string"
-		and #src >= SYDE_SOURCE_MIN_BYTES
-		and src:find("sydeFindChild", 1, true)
-		and src:find(SYDE_PATCH_MARKER, 1, true)
-		and looksLikeLua(src)
+	if type(src) ~= "string"
+		or #src < SYDE_SOURCE_MIN_BYTES
+		or not src:find("sydeFindChild", 1, true)
+		or not src:find(SYDE_PATCH_MARKER, 1, true)
+		or not src:find("sydePrepareDropdownDrop", 1, true)
+		or not src:find(SYDE_PATCH_REQUIRED_FN, 1, true)
+		or not looksLikeLua(src) then
+		return false
+	end
+	local patch = sydePatchFromSource(src)
+	return type(patch) == "number" and patch >= SYDE_PATCH_VERSION
+end
+
+local function clearStaleSydeRuntime()
+	local env = genv()
+	if type(env) ~= "table" or type(env._AlleralSyde) ~= "table" then
+		return
+	end
+	local patch = env._AlleralSyde.__AlleralPatch
+	if type(patch) ~= "number" or patch < SYDE_PATCH_VERSION then
+		env._AlleralSyde = nil
+		env._AlleralSydeSourceKey = nil
+	end
 end
 
 local function ensureSydeSource()
+	clearStaleSydeRuntime()
 	local localPaths = {
 		SYDE_SOURCE_PATH,
 		"kick/" .. SYDE_SOURCE_PATH,
@@ -890,7 +918,8 @@ local function ensureSydeSource()
 	if src and sydeSourceValid(src) then
 		cacheRemote(SYDE_SOURCE_PATH, src)
 		cacheRemote(".alleral/cache/" .. SYDE_SOURCE_PATH, src)
-		return true, "local:" .. tostring(path)
+		local patch = sydePatchFromSource(src)
+		return true, "local:" .. tostring(path) .. ", patch v" .. tostring(patch or "?")
 	end
 	for _, rel in ipairs(localPaths) do
 		deleteWorkspaceFile(rel)
@@ -901,13 +930,15 @@ local function ensureSydeSource()
 	src, path = readLocal(cachePaths, SYDE_SOURCE_MIN_BYTES)
 	if src and sydeSourceValid(src) then
 		cacheRemote(SYDE_SOURCE_PATH, src)
-		return true, "cache:" .. tostring(path)
+		local patch = sydePatchFromSource(src)
+		return true, "cache:" .. tostring(path) .. ", patch v" .. tostring(patch or "?")
 	end
 	src, path = fetchRemote(SYDE_SOURCE_PATH, SYDE_SOURCE_MIN_BYTES)
 	if src and sydeSourceValid(src) then
 		cacheRemote(SYDE_SOURCE_PATH, src)
 		cacheRemote(".alleral/cache/" .. SYDE_SOURCE_PATH, src)
-		return true, "remote"
+		local patch = sydePatchFromSource(src)
+		return true, "remote, patch v" .. tostring(patch or "?")
 	end
 	return false, path or "patched Syde source unavailable"
 end
@@ -1323,6 +1354,9 @@ local function alleralUiValid(src)
 		return false
 	end
 	if not src:find("loadSyde", 1, true) then
+		return false
+	end
+	if not src:find("SYDE_PATCH_VERSION%s*=%s*7", 1, false) then
 		return false
 	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then

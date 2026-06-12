@@ -97,7 +97,7 @@ if update then return end
 local Library =         game:GetObjects("rbxassetid://123800669522471")[1]
 local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 
-local ALLERAL_SYDE_PATCH = 6
+local ALLERAL_SYDE_PATCH = 7
 
 -- Alleral: tolerate Roblox template renames (Title/title, Buttons/buttons, etc.)
 local function sydeFindChild(parent, ...)
@@ -354,6 +354,42 @@ local function sydeSetDropSelectedText(drop, text)
 	end
 end
 
+local function sydeSanitizeUiClone(root)
+	if not root then
+		return
+	end
+	for _, desc in ipairs(root:GetDescendants()) do
+		if desc:IsA("LocalScript") or desc:IsA("Script") then
+			desc:Destroy()
+		end
+	end
+end
+
+local function sydeEnsureDropholderDropFrame(dropholder)
+	if not dropholder then
+		return nil
+	end
+	local drop = sydeFindChild(dropholder, "drop", "Drop")
+	if drop then
+		return drop
+	end
+	drop = Instance.new("Frame")
+	drop.Name = "drop"
+	drop.BackgroundTransparency = 1
+	drop.BorderSizePixel = 0
+	drop.Size = UDim2.new(1, 0, 1, 0)
+	drop.Position = UDim2.new(0, 0, 0, 0)
+	drop.ZIndex = dropholder.ZIndex
+	local children = dropholder:GetChildren()
+	drop.Parent = dropholder
+	for _, child in ipairs(children) do
+		if child ~= drop then
+			child.Parent = drop
+		end
+	end
+	return drop
+end
+
 local function sydeResolveDropFrame(dropholder)
 	if not dropholder then
 		return nil
@@ -382,6 +418,7 @@ local function sydePrepareDropdownDrop(dropdown)
 	if not dropdown then
 		return nil
 	end
+	sydeSanitizeUiClone(dropdown)
 	local holder = sydeFindChild(dropdown, "dropholder", "DropHolder", "Dropholder", "dropHolder")
 	if not holder then
 		for _, child in ipairs(dropdown:GetChildren()) do
@@ -394,7 +431,7 @@ local function sydePrepareDropdownDrop(dropdown)
 	if not holder then
 		return nil
 	end
-	local dropFrame = sydeResolveDropFrame(holder)
+	local dropFrame = sydeEnsureDropholderDropFrame(holder) or sydeResolveDropFrame(holder)
 	if not dropFrame then
 		return nil
 	end

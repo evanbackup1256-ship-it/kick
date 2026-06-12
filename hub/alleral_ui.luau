@@ -13,7 +13,8 @@ return function(Core)
 		"kick/kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 6
+	local SYDE_PATCH_VERSION = 7
+	local SYDE_PATCH_REQUIRED_FN = "sydeEnsureDropholderDropFrame"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
 		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/syde/source.luau",
@@ -80,12 +81,25 @@ return function(Core)
 		return iconImage(icon)
 	end
 
+	local function sydePatchFromSource(src)
+		if type(src) ~= "string" then
+			return nil
+		end
+		return tonumber(src:match("ALLERAL_SYDE_PATCH%s*=%s*(%d+)"))
+	end
+
 	local function sydeSourceValid(src)
-		return type(src) == "string"
-			and #src >= 5000
-			and not src:find("<!DOCTYPE", 1, true)
-			and src:find("sydeFindChild", 1, true)
-			and src:find(SYDE_PATCH_MARKER, 1, true)
+		if type(src) ~= "string"
+			or #src < 5000
+			or src:find("<!DOCTYPE", 1, true)
+			or not src:find("sydeFindChild", 1, true)
+			or not src:find(SYDE_PATCH_MARKER, 1, true)
+			or not src:find("sydePrepareDropdownDrop", 1, true)
+			or not src:find(SYDE_PATCH_REQUIRED_FN, 1, true) then
+			return false
+		end
+		local patch = sydePatchFromSource(src)
+		return type(patch) == "number" and patch >= SYDE_PATCH_VERSION
 	end
 
 	local function sydeIoFn(name)
