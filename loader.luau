@@ -34,7 +34,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.0",
-	commit = "e5672da",
+	commit = "e82b436",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
 }
