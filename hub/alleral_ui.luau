@@ -13,7 +13,7 @@ return function(Core)
 		"kick/kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 17
+	local SYDE_PATCH_VERSION = 18
 	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
@@ -81,6 +81,17 @@ return function(Core)
 		return iconImage(icon)
 	end
 
+	local function requiredSydePatch()
+		local expected = ENV._Alleral_ExpectedVersions
+		if type(expected) == "table" then
+			local patch = tonumber(expected.sydePatch)
+			if patch then
+				return patch
+			end
+		end
+		return SYDE_PATCH_VERSION
+	end
+
 	local function sydePatchFromSource(src)
 		if type(src) ~= "string" then
 			return nil
@@ -99,7 +110,8 @@ return function(Core)
 			return false
 		end
 		local patch = sydePatchFromSource(src)
-		return type(patch) == "number" and patch >= SYDE_PATCH_VERSION
+		local need = requiredSydePatch()
+		return type(patch) == "number" and patch == need
 	end
 
 	local function sydeIoFn(name)
@@ -212,7 +224,7 @@ return function(Core)
 			consider(src, "remote:" .. baseUrl)
 		end
 
-		if not bestSrc or bestPatch < SYDE_PATCH_VERSION then
+		if not bestSrc or bestPatch ~= requiredSydePatch() then
 			return nil, nil
 		end
 
@@ -227,7 +239,8 @@ return function(Core)
 	local function loadSyde()
 		if type(ENV._AlleralSyde) == "table" then
 			local patch = ENV._AlleralSyde.__AlleralPatch
-			if type(patch) ~= "number" or patch < SYDE_PATCH_VERSION then
+			local need = requiredSydePatch()
+			if type(patch) ~= "number" or patch ~= need then
 				ENV._AlleralSyde = nil
 				ENV._AlleralSydeSourceKey = nil
 			end
@@ -235,12 +248,12 @@ return function(Core)
 
 		local source, sourceLabel = readSydeSource()
 		if not source then
-			return nil, "Syde source missing (need patched ui/syde/source.luau v" .. tostring(SYDE_PATCH_VERSION) .. "+)"
+			return nil, "Syde source missing (need patched ui/syde/source.luau v" .. tostring(requiredSydePatch()) .. ")"
 		end
 		local sourceKey = tostring(#source) .. ":" .. tostring(sourceLabel or "unknown")
 		if ENV._AlleralSydeSourceKey == sourceKey and type(ENV._AlleralSyde) == "table" and type(ENV._AlleralSyde.Init) == "function" then
 			local patch = ENV._AlleralSyde.__AlleralPatch
-			if type(patch) == "number" and patch >= SYDE_PATCH_VERSION then
+			if type(patch) == "number" and patch == requiredSydePatch() then
 				return ENV._AlleralSyde
 			end
 		end
@@ -257,10 +270,10 @@ return function(Core)
 		if not ok or type(Syde) ~= "table" or type(Syde.Init) ~= "function" then
 			return nil, tostring(Syde or "Syde runtime failed")
 		end
-		if type(Syde.__AlleralPatch) ~= "number" or Syde.__AlleralPatch < SYDE_PATCH_VERSION then
+		if type(Syde.__AlleralPatch) ~= "number" or Syde.__AlleralPatch ~= requiredSydePatch() then
 			ENV._AlleralSyde = nil
 			ENV._AlleralSydeSourceKey = nil
-			return nil, "Syde patch outdated (need v" .. tostring(SYDE_PATCH_VERSION) .. "+)"
+			return nil, "Syde patch outdated (need v" .. tostring(requiredSydePatch()) .. ")"
 		end
 		ENV._AlleralSydeSourceKey = sourceKey
 		ENV._AlleralSyde = Syde

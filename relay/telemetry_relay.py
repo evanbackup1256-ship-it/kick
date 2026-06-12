@@ -1926,6 +1926,83 @@ def sync_status():
     return jsonify({"ok": True, **AUTO_SYNC.status()})
 
 
+@app.get("/api/live/status")
+def live_status():
+    """Public aggregate for the hub live update tracker."""
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+
+    site = SITE_REGISTRY.load()
+    sync_meta: dict[str, Any] = {"enabled": False, "autoStatus": False}
+    if AUTO_SYNC is not None:
+        try:
+            sync_meta = AUTO_SYNC.status()
+        except Exception:
+            pass
+
+    telemetry_24h: dict[str, Any] = {}
+    if AUTO_SYNC is not None:
+        try:
+            telemetry_24h = AUTO_SYNC.stats.global_summary(24)
+        except Exception:
+            pass
+
+    games = site.get("games") if isinstance(site.get("games"), dict) else {}
+    working = sum(
+        1 for g in games.values()
+        if isinstance(g, dict) and str(g.get("status", "working")).lower() == "working"
+    )
+
+    changelog = site.get("changelog") if isinstance(site.get("changelog"), list) else []
+    recent_changes = []
+    for entry in changelog[:6]:
+        if not isinstance(entry, dict):
+            continue
+        recent_changes.append({
+            "date": entry.get("date"),
+            "title": entry.get("title"),
+            "items": (entry.get("items") or [])[:3],
+        })
+
+    return jsonify({
+        "ok": True,
+        "at": utc_iso(),
+        "versions": {
+            "loader": site.get("loaderVersion"),
+            "core": site.get("coreVersion"),
+            "ui": site.get("uiLibrary"),
+            "uiVersion": site.get("uiVersion"),
+            "sydePatch": site.get("sydePatch"),
+            "telemetry": site.get("telemetryVersion"),
+        },
+        "release": {
+            "commit": sync_meta.get("commit") or site.get("githubCommit"),
+            "branch": sync_meta.get("branch") or "main",
+            "updatedAt": site.get("updatedAt") or site.get("siteUpdatedAt"),
+            "scriptsUpdatedAt": site.get("scriptsUpdatedAt"),
+        },
+        "sync": {
+            "enabled": sync_meta.get("enabled", False),
+            "autoStatus": sync_meta.get("autoStatus", False),
+            "lastSyncAt": sync_meta.get("lastSyncAt"),
+            "lastError": sync_meta.get("lastError"),
+        },
+        "games": {
+            "total": len(games),
+            "working": working,
+        },
+        "telemetry24h": {
+            "inject_loaded": telemetry_24h.get("inject_loaded"),
+            "inject_failed": telemetry_24h.get("inject_failed"),
+            "errors": telemetry_24h.get("errors"),
+            "place_updated": telemetry_24h.get("place_updated"),
+            "success_rate": telemetry_24h.get("success_rate"),
+        },
+        "changelog": recent_changes,
+    })
+
+
 @app.get("/api/games/thumbnails")
 def game_thumbnails():
     """Proxy Roblox game icons so the hub avoids browser CORS blocks."""

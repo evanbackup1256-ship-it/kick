@@ -37,11 +37,16 @@
       weaoFingerprints: {},
       weaoPollTimer: 0,
       weaoCountdownTimer: 0,
-      weaoNextPollAt: 0
+      weaoNextPollAt: 0,
+      liveSnapshot: "",
+      liveFeed: [],
+      livePollTimer: 0
     };
     const WEAO_LIVE_POLL_MS = 35e3;
     const WEAO_IDLE_POLL_MS = 12e4;
     const SITE_POLL_MS = 3e4;
+    const LIVE_POLL_MS = 15e3;
+    const LIVE_FEED_MAX = 40;
     const EXECUTOR_PREF_KEY = "alleral_last_executor";
     const VISIT_KEY = "alleral_hub_logged";
     function escapeHtml(value) {
@@ -727,6 +732,148 @@
         void copyText(`${window.location.origin}/api/v1/bans/docs`, "Docs URL copied");
       });
     }
+    function liveSnapshotKey(data) {
+      if (!data) return "";
+      const v = data.versions || {};
+      const r = data.release || {};
+      const s = data.sync || {};
+      const t = data.telemetry24h || {};
+      return [
+        v.loader,
+        v.core,
+        v.sydePatch,
+        r.commit,
+        r.updatedAt,
+        s.lastSyncAt,
+        s.autoStatus,
+        t.inject_loaded,
+        t.errors,
+        t.place_updated
+      ].join("|");
+    }
+    function pushLiveFeed(message, kind = "info") {
+      if (!message) return;
+      const last = state.liveFeed[0];
+      if (last && last.message === message) return;
+      state.liveFeed.unshift({
+        at: Date.now(),
+        message,
+        kind
+      });
+      if (state.liveFeed.length > LIVE_FEED_MAX) state.liveFeed.length = LIVE_FEED_MAX;
+    }
+    function renderLiveFeed() {
+      const root = $("#liveFeed");
+      if (!root) return;
+      if (!state.liveFeed.length) {
+        root.innerHTML = '<p class="empty">No changes detected yet.</p>';
+        return;
+      }
+      root.innerHTML = state.liveFeed.map((entry) => {
+        const time = new Date(entry.at).toLocaleTimeString();
+        return `<article class="live-feed-item live-feed-${escapeHtml(entry.kind || "info")}"><time>${escapeHtml(time)}</time><p>${escapeHtml(entry.message)}</p></article>`;
+      }).join("");
+    }
+    function renderLiveDashboard(data) {
+      const pulse = $("#livePulse");
+      const updated = $("#liveUpdatedAt");
+      const versions = $("#liveVersionGrid");
+      const syncPanel = $("#liveSyncPanel");
+      const telemetryPanel = $("#liveTelemetryPanel");
+      if (!data || !versions) return;
+      const v = data.versions || {};
+      const r = data.release || {};
+      const s = data.sync || {};
+      const t = data.telemetry24h || {};
+      const g = data.games || {};
+      if (pulse) {
+        const online = s.autoStatus === true || s.enabled === true;
+        pulse.className = `live-pulse${online ? " online" : ""}`;
+        pulse.innerHTML = `<span class="status-dot"></span>${online ? "Live · auto-sync active" : "Relay online · sync idle"}`;
+      }
+      if (updated) {
+        updated.textContent = data.at ? `Updated ${new Date(data.at).toLocaleTimeString()}` : "—";
+      }
+      versions.innerHTML = `
+        <div class="live-version-card"><span>Loader</span><strong>v${escapeHtml(String(v.loader || "—"))}</strong></div>
+        <div class="live-version-card"><span>Core</span><strong>v${escapeHtml(String(v.core || "—"))}</strong></div>
+        <div class="live-version-card"><span>${escapeHtml(String(v.ui || "UI"))}</span><strong>patch ${escapeHtml(String(v.sydePatch ?? "—"))}</strong></div>
+        <div class="live-version-card"><span>Games OK</span><strong>${escapeHtml(String(g.working ?? "—"))}/${escapeHtml(String(g.total ?? "—"))}</strong></div>
+        <div class="live-version-card live-version-wide"><span>Commit</span><strong class="mono">${escapeHtml(String(r.commit || "—"))}</strong></div>
+      `;
+      if (syncPanel) {
+        syncPanel.innerHTML = `
+          <dl class="live-kv">
+            <div><dt>Branch</dt><dd>${escapeHtml(String(r.branch || "main"))}</dd></div>
+            <div><dt>Site updated</dt><dd>${escapeHtml(String(r.updatedAt || "—"))}</dd></div>
+            <div><dt>Scripts synced</dt><dd>${escapeHtml(String(r.scriptsUpdatedAt || "—"))}</dd></div>
+            <div><dt>Last GitHub pull</dt><dd>${escapeHtml(String(s.lastSyncAt || "—"))}</dd></div>
+          </dl>
+        `;
+      }
+      if (telemetryPanel) {
+        const rate = t.success_rate != null ? `${Math.round(Number(t.success_rate) * 100)}%` : "—";
+        telemetryPanel.innerHTML = `
+          <dl class="live-kv">
+            <div><dt>Injects OK</dt><dd class="live">${escapeHtml(String(t.inject_loaded ?? "—"))}</dd></div>
+            <div><dt>Failed</dt><dd class="warn">${escapeHtml(String(t.inject_failed ?? "—"))}</dd></div>
+            <div><dt>Errors</dt><dd>${escapeHtml(String(t.errors ?? "—"))}</dd></div>
+            <div><dt>Game updates</dt><dd>${escapeHtml(String(t.place_updated ?? "—"))}</dd></div>
+            <div><dt>Success rate</dt><dd>${escapeHtml(rate)}</dd></div>
+          </dl>
+        `;
+      }
+      renderLiveFeed();
+      afterRender();
+    }
+    function noteLiveChanges(data, prevKey) {
+      const nextKey = liveSnapshotKey(data);
+      if (!prevKey) {
+        pushLiveFeed("Live tracker connected.", "sync");
+        const latest = (data.changelog || [])[0];
+        if (latest?.title) pushLiveFeed(`Latest release: ${latest.title}`, "release");
+        return nextKey;
+      }
+      if (nextKey === prevKey) return nextKey;
+      const v = data.versions || {};
+      const r = data.release || {};
+      const s = data.sync || {};
+      const prevParts = prevKey.split("|");
+      if (String(v.loader) !== prevParts[0]) pushLiveFeed(`Loader updated to v${v.loader}`, "release");
+      if (String(v.sydePatch) !== prevParts[2]) pushLiveFeed(`Syde patch now v${v.sydePatch}`, "release");
+      if (String(r.commit) !== prevParts[3]) pushLiveFeed(`GitHub commit → ${r.commit}`, "sync");
+      if (String(s.lastSyncAt) !== prevParts[5]) pushLiveFeed(`Auto-sync pulled at ${s.lastSyncAt || "now"}`, "sync");
+      return nextKey;
+    }
+    async function pollLiveStatus(notify = false) {
+      const base = window.ALLERAL_API || "";
+      try {
+        const res = await fetch(`${base}/api/live/status`, { cache: "no-store" });
+        const data = await res.json();
+        if (!data.ok) throw new Error(String(data.error || "live status failed"));
+        const prev = state.liveSnapshot;
+        state.liveSnapshot = noteLiveChanges(data, prev);
+        renderLiveDashboard(data);
+        if (notify && prev && state.liveSnapshot !== prev) flash("Live tracker detected changes");
+      } catch (e) {
+        const pulse = $("#livePulse");
+        if (pulse) {
+          pulse.className = "live-pulse offline";
+          pulse.innerHTML = '<span class="status-dot"></span>Offline';
+        }
+      }
+    }
+    function startLivePolling() {
+      if (state.livePollTimer) clearInterval(state.livePollTimer);
+      void pollLiveStatus(false);
+      state.livePollTimer = setInterval(() => {
+        void pollLiveStatus(true);
+      }, LIVE_POLL_MS);
+      $("#liveFeedClear")?.addEventListener("click", () => {
+        state.liveFeed = [];
+        renderLiveFeed();
+      });
+    }
     async function renderSyncPanel() {
       const root = $("#syncPanelBody");
       if (!root) return;
@@ -1048,22 +1195,21 @@
         location.hash = "#support";
         $("#support")?.scrollIntoView({ behavior: "smooth" });
       });
+      $("#quickLive")?.addEventListener("click", () => {
+        location.hash = "#live";
+        $("#live")?.scrollIntoView({ behavior: "smooth" });
+      });
       $("#quickExecutors")?.addEventListener("click", () => {
         location.hash = "#tools";
         $("#tools")?.scrollIntoView({ behavior: "smooth" });
         setTimeout(() => $("#executorSearch")?.focus(), 350);
       });
-      $("#quickTeam")?.addEventListener("click", () => {
-        location.hash = "#credits";
-        $("#credits")?.scrollIntoView({ behavior: "smooth" });
-      });
     }
     const CMD_ACTIONS = [
       { label: "Go to Home", hash: "#home", keys: "G H" },
+      { label: "Go to Live tracker", hash: "#live", keys: "G L" },
       { label: "Go to Games", hash: "#games", keys: "G G" },
-      { label: "Go to Ban API", hash: "#ban-api", keys: "G B" },
-      { label: "Go to Creator", hash: "#credits", keys: "G C" },
-      { label: "Go to FAQ", hash: "#faq", keys: "G F" },
+      { label: "Go to Tools", hash: "#tools", keys: "G T" },
       { label: "Go to Support", hash: "#support", keys: "G S" },
       { label: "Copy loadstring", action: "copy", keys: "C L" },
       { label: "Search games", action: "search", keys: "/" }
@@ -1493,6 +1639,7 @@
       bindExecutorTools();
       bindBanApiTools();
       startWeaoPolling();
+      startLivePolling();
       void initFormCaptcha();
       setActiveNav();
       void checkLiveStatus();

@@ -31,13 +31,10 @@
       <a class="nav-logo" href="#home" id="brandName">Alleral</a>
       <div class="nav-links" id="mainNav">
         <a href="#home" data-section="home">Home</a>
-        <a href="#features" data-section="features">Features</a>
+        <a href="#live" data-section="live">Live</a>
         <a href="#games" data-section="games">Games</a>
         <a href="#tools" data-section="tools">Tools</a>
-        <a href="#ban-api" data-section="ban-api">Ban API</a>
         <a href="#changelog" data-section="changelog">Updates</a>
-        <a href="#credits" data-section="credits">Creator</a>
-        <a href="#faq" data-section="faq">FAQ</a>
         <a href="#support" data-section="support">Support</a>
       </div>
       <div class="nav-actions">
@@ -106,9 +103,9 @@
       <div class="quick-actions reveal">
         <button id="quickCopyScript" class="quick-action" type="button">Copy Script</button>
         <button id="quickViewGames" class="quick-action" type="button">Browse Games</button>
-        <button id="quickSupport" class="quick-action" type="button">Get Help</button>
+        <button id="quickLive" class="quick-action" type="button">Live Tracker</button>
         <button id="quickExecutors" class="quick-action" type="button">Check Executors</button>
-        <button id="quickTeam" class="quick-action" type="button">Creator</button>
+        <button id="quickSupport" class="quick-action" type="button">Get Help</button>
       </div>
 
       <div class="script-panel reveal">
@@ -131,6 +128,40 @@
         <div class="stat"><strong id="scriptsUpdated">—</strong><span>Last sync</span></div>
         <div class="stat-divider"></div>
         <div class="stat online"><strong>Live</strong><span>Hub status</span></div>
+      </div>
+    </section>
+
+    <section id="live" class="section wrap section-live">
+      <header class="section-intro reveal">
+        <p class="section-label">Live tracker</p>
+        <h2>Real-time Alleral status</h2>
+        <p class="section-desc">Versions, GitHub sync, inject health, and changelog — refreshed every 15 seconds while this page is open.</p>
+      </header>
+      <div class="live-dashboard reveal">
+        <div class="live-dashboard-head">
+          <span id="livePulse" class="live-pulse"><span class="status-dot"></span>Connecting…</span>
+          <span id="liveUpdatedAt" class="live-updated-at">—</span>
+        </div>
+        <div id="liveVersionGrid" class="live-version-grid"></div>
+        <div class="live-panels">
+          <div class="live-panel">
+            <h3>Sync &amp; release</h3>
+            <div id="liveSyncPanel" class="live-sync-panel"></div>
+          </div>
+          <div class="live-panel">
+            <h3>24h inject health</h3>
+            <div id="liveTelemetryPanel" class="live-telemetry-panel"></div>
+          </div>
+        </div>
+        <div class="live-panel live-panel-wide">
+          <div class="live-feed-head">
+            <h3>Update feed</h3>
+            <button id="liveFeedClear" class="btn-text" type="button">Clear</button>
+          </div>
+          <div id="liveFeed" class="live-feed">
+            <p class="empty">Waiting for first sync…</p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -162,7 +193,7 @@
       </ol>
     </section>
 
-    <section id="features" class="section section-alt section-with-render">
+    <section id="features" class="section section-alt section-with-render hidden">
       <div class="section-render-accent features-render" aria-hidden="true">
         <div class="render-orb-stack">
           <span></span><span></span><span></span>
@@ -225,9 +256,13 @@
         <div id="weaoStats" class="weao-stats reveal"></div>
         <div class="tools-grid reveal">
           <div class="tool-panel">
-            <h3>Live sync</h3>
-            <p class="tool-panel-desc">GitHub auto-sync status from Railway.</p>
-            <div id="syncPanelBody"></div>
+            <h3>Developer links</h3>
+            <p class="tool-panel-desc">Ban API docs, admin panel, and GitHub source.</p>
+            <div class="dev-links">
+              <a class="resource-card" href="#ban-api" onclick="document.getElementById('ban-api')?.classList.remove('hidden');location.hash='#ban-api';return false;"><strong>Ban API</strong><span>REST check &amp; partner docs</span></a>
+              <a class="resource-card" href="/admin" target="_blank" rel="noopener"><strong>Admin</strong><span>Owner dashboard</span></a>
+              <a class="resource-card" href="https://github.com/evanbackup1256-ship-it/kick" target="_blank" rel="noopener"><strong>GitHub</strong><span>Source &amp; releases</span></a>
+            </div>
           </div>
           <div class="tool-panel tool-panel-compact">
             <h3>Live status feed</h3>
@@ -276,7 +311,7 @@
       </div>
     </section>
 
-    <section id="ban-api" class="section wrap">
+    <section id="ban-api" class="section wrap hidden">
       <header class="section-intro reveal">
         <p class="section-label">Integrations</p>
         <h2>Third-party Ban API</h2>
@@ -323,7 +358,7 @@
       </div>
     </section>
 
-    <section id="faq" class="section wrap">
+    <section id="faq" class="section wrap hidden">
       <header class="section-intro reveal">
         <p class="section-label">FAQ</p>
         <h2>Frequently Asked Questions</h2>

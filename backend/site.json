@@ -3,7 +3,7 @@
   "updatedAt": "2026-06-12T19:53:16Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
-  "loaderVersion": "8.2.23",
+  "loaderVersion": "8.2.24",
   "coreVersion": "2.9.4",
   "uiLibrary": "Syde",
   "uiVersion": "4.0.0-syde",
@@ -52,6 +52,15 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-12",
+      "title": "Loader 8.2.24 — core fix + hub live tracker",
+      "items": [
+        "Fix alleral_ui validation (Syde patch 18 sync) — Core failed on inject",
+        "Hub website revamp with real-time live status dashboard (15s refresh)",
+        "New public /api/live/status endpoint for versions, sync, and inject health"
+      ]
+    },
     {
       "date": "2026-06-12",
       "title": "Loader 8.2.23 — version lock + relay fixes",

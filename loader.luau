@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.23"
+local LOADER_VERSION = "8.2.24"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -27,7 +27,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.23",
+	loader = "8.2.24",
 	core = "2.9.4",
 	ui = "Syde",
 	windui = "4.0.0-syde",
@@ -1457,7 +1457,7 @@ local function alleralUiValid(src)
 	if not src:find("loadSyde", 1, true) then
 		return false
 	end
-	if not src:find("SYDE_PATCH_VERSION%s*=%s*" .. tostring(SYDE_PATCH_VERSION), 1, false) then
+	if not src:find("ALLERAL_SYDE_PATCH", 1, true) then
 		return false
 	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then
@@ -1582,6 +1582,9 @@ local function alleralUiRejectReason(src)
 	end
 	if not src:find("loadSyde", 1, true) then
 		return "missing loadSyde bootstrap"
+	end
+	if not src:find("ALLERAL_SYDE_PATCH", 1, true) then
+		return "missing ALLERAL_SYDE_PATCH marker"
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua body"
@@ -3055,7 +3058,7 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.2.23"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.2.24"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
