@@ -112,24 +112,90 @@ local function loaderVersionFromSource(src)
 	return src:match('LOADER_VERSION%s*=%s*"([%d%.]+)"')
 end
 
-local function cacheLoader(src)
-	local writeFileFn = pick({ "writefile", "WriteFile", "write_file" })
-	local makeFolderFn = pick({ "makefolder", "MakeFolder", "make_folder" })
-	if not writeFileFn then
-		return
+local PURGE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
+local PURGE_PATHS = {
+	"loader.luau",
+	"kick/loader.luau",
+	"kick/kick/loader.luau",
+	"Alleral/loader.luau",
+	"hub/bootstrap.luau",
+	"hub/alleral_ui.luau",
+	"hub/core_base.luau",
+	"hub/core_ui.luau",
+	"hub/core_hub_ui.luau",
+	"ui/syde/source.luau",
+	".alleral/versions.json",
+}
+
+local function purgeAlleralWorkspace()
+	local deleteFileFn = pick({ "delfile", "deletefile", "delete_file", "DeleteFile", "removefile", "RemoveFile" })
+	local isFileFn = pick({ "isfile", "is_file", "IsFile" })
+	local listFilesFn = pick({ "listfiles", "list_files", "ListFiles" })
+	local isFolderFn = pick({ "isfolder", "is_folder", "IsFolder" })
+	local deleteFolderFn = pick({ "delfolder", "deletefolder", "delete_folder", "DeleteFolder" })
+	if not deleteFileFn or not isFileFn then
+		return 0
 	end
-	if makeFolderFn then
-		pcall(makeFolderFn, "kick")
-		pcall(makeFolderFn, ".alleral")
+
+	local removed = 0
+	local seen = {}
+	local function tryDelete(path)
+		if type(path) ~= "string" or path == "" or seen[path] then
+			return
+		end
+		seen[path] = true
+		local okExists, exists = pcall(isFileFn, path)
+		if okExists and exists then
+			if pcall(deleteFileFn, path) then
+				removed += 1
+			end
+		end
 	end
-	for _, path in ipairs({
-		"loader.luau",
-		"kick/loader.luau",
-		"kick/kick/loader.luau",
-		"Alleral/loader.luau",
-	}) do
-		pcall(writeFileFn, path, src)
+
+	for _, path in ipairs(PURGE_PATHS) do
+		tryDelete(path)
+		for _, root in ipairs(PURGE_ROOTS) do
+			tryDelete(root .. path)
+		end
 	end
+
+	local function purgeTree(dir)
+		if type(dir) ~= "string" or dir == "" or not listFilesFn then
+			return
+		end
+		dir = dir:gsub("^/", ""):gsub("/$", "")
+		local okList, entries = pcall(listFilesFn, dir)
+		if not okList or type(entries) ~= "table" then
+			if deleteFolderFn then
+				pcall(deleteFolderFn, dir)
+			end
+			return
+		end
+		for _, entry in ipairs(entries) do
+			if type(entry) == "string" then
+				local path = entry:gsub("^/", "")
+				local isDir = false
+				if isFolderFn then
+					local okFolder, folder = pcall(isFolderFn, path)
+					isDir = okFolder and folder == true
+				end
+				if isDir then
+					purgeTree(path)
+				else
+					tryDelete(path)
+				end
+			end
+		end
+		if deleteFolderFn then
+			pcall(deleteFolderFn, dir)
+		end
+	end
+
+	for _, dir in ipairs({ ".alleral", "hub", "ui", "games", "Alleral" }) do
+		purgeTree(dir)
+	end
+
+	return removed
 end
 
 local function runLoaderSource(src, label)
@@ -157,6 +223,11 @@ local function Alleral_Bootstrap(reason)
 	end
 	ENV._Alleral_BootstrapRunning = true
 
+	local purged = purgeAlleralWorkspace()
+	if purged > 0 then
+		print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Purged " .. tostring(purged) .. " cached workspace file(s)")
+	end
+
 	local src, via = httpGet(LOADER_URL, 500)
 	if type(src) ~= "string" or #src < 500 then
 		ENV._Alleral_BootstrapRunning = false
@@ -178,13 +249,15 @@ local function Alleral_Bootstrap(reason)
 			.. "]"
 	)
 
-	cacheLoader(src)
 	local ok, err = runLoaderSource(src, "Alleral/loader@" .. remoteVer)
 	ENV._Alleral_BootstrapRunning = false
 	if not ok then
 		warn("[Alleral Bootstrap] " .. tostring(err))
 		return false, err
 	end
+	task.defer(function()
+		purgeAlleralWorkspace()
+	end)
 	return true, remoteVer
 end
 

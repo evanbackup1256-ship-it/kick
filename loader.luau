@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.16"
+local LOADER_VERSION = "8.2.17"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -27,7 +27,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.16",
+	loader = "8.2.17",
 	core = "2.9.4",
 	ui = "Syde",
 	windui = "4.0.0-syde",
@@ -219,6 +219,9 @@ local isFile = firstExecFunc("isfile", "is_file", "IsFile")
 local writeFileFn = firstExecFunc("writefile", "write_file", "WriteFile")
 local makeFolderFn = firstExecFunc("makefolder", "make_folder", "MakeFolder")
 local deleteFileFn = firstExecFunc("delfile", "deletefile", "delete_file", "DeleteFile", "removefile", "RemoveFile")
+local deleteFolderFn = firstExecFunc("delfolder", "deletefolder", "delete_folder", "DeleteFolder", "removefolder", "RemoveFolder")
+local listFilesFn = firstExecFunc("listfiles", "list_files", "ListFiles")
+local isFolderFn = firstExecFunc("isfolder", "is_folder", "IsFolder")
 
 local function getHttpRequestFn()
 	local fn = firstExecFunc("request", "http_request", "Request", "httprequest")
@@ -845,7 +848,8 @@ local function fetchRemote(relativePath, minBytes)
 	return nil, lastErr or ("fetch failed for " .. relativePath)
 end
 
-local function deleteWorkspaceFile(relativePath)
+local function deleteWorkspaceFile(relativePath, opts)
+	opts = type(opts) == "table" and opts or {}
 	if type(deleteFileFn) ~= "function" or type(isFile) ~= "function" then
 		return false
 	end
@@ -854,8 +858,9 @@ local function deleteWorkspaceFile(relativePath)
 		return false
 	end
 	local ok = pcall(deleteFileFn, relativePath)
-	if ok then
-		log("Removed outdated " .. relativePath)
+	if ok and not opts.silent then
+		local label = opts.label or "outdated"
+		log("Removed " .. label .. " " .. relativePath)
 	end
 	return ok
 end
@@ -1151,18 +1156,8 @@ local function expectedGameVersion(profile)
 	return profile.version
 end
 
-local function cacheLoaderSource(src)
-	if type(writeFileFn) ~= "function" or type(src) ~= "string" then
-		return false
-	end
-	if makeFolderFn then
-		pcall(makeFolderFn, "kick")
-		pcall(makeFolderFn, ".alleral")
-	end
-	for _, path in ipairs(LOADER_LOCAL_PATHS) do
-		pcall(writeFileFn, path, src)
-	end
-	return true
+local function cacheLoaderSource(_src)
+	return false
 end
 
 local function fetchRemoteLoaderSource()
@@ -1204,17 +1199,7 @@ local function readFreshLocalLoaderSource()
 end
 
 local function syncWorkspaceLoaderFromRemote()
-	local body, via = fetchRemoteLoaderSource()
-	if type(body) ~= "string" or #body < 500 then
-		return false
-	end
-	local remoteVer = extractFileVersion(body, "loader")
-	if type(remoteVer) ~= "string" or remoteVer == "" then
-		return false
-	end
-	cacheLoaderSource(body)
-	log("Cached remote loader v" .. remoteVer .. " to workspace (" .. tostring(via) .. ")")
-	return true
+	return false
 end
 
 local function compileAndRun(source, chunkName, runEnv)
@@ -3258,38 +3243,128 @@ local function reportLegacyScan(hits, deletedPaths)
 	end
 end
 
-local function purgeOutdatedWorkspace(opts)
+local function purgeDirectoryTree(dir, opts, removedCounter)
 	opts = type(opts) == "table" and opts or {}
-	if not isFile or not readFile then
+	if type(dir) ~= "string" or dir == "" then
 		return
 	end
-
-	local expected = opts.useNetwork and fetchExpectedVersions() or fetchExpectedVersionsFast()
-	local installedManifest = readInstalledManifest()
-	local removed = 0
-
-	for _, entry in ipairs(buildManagedFiles()) do
-		for _, root in ipairs(WORKSPACE_ROOTS) do
-			for _, path in ipairs(entry.paths) do
-				local fullPath = root .. path
-				local okExists, exists = pcall(isFile, fullPath)
-				if okExists and exists then
-					local okRead, src = pcall(readFile, fullPath)
-					if shouldDeleteCachedFile(okRead and src or nil, entry, expected, installedManifest) then
-						if deleteWorkspaceFile(fullPath) then
-							removed += 1
-						end
-					end
-				end
+	dir = dir:gsub("^/", ""):gsub("/$", "")
+	if not listFilesFn then
+		return
+	end
+	local okList, entries = pcall(listFilesFn, dir)
+	if not okList or type(entries) ~= "table" then
+		if deleteFolderFn then
+			pcall(deleteFolderFn, dir)
+		end
+		return
+	end
+	for _, entry in ipairs(entries) do
+		if type(entry) == "string" then
+			local path = entry:gsub("^/", "")
+			local isDir = false
+			if isFolderFn then
+				local okFolder, folder = pcall(isFolderFn, path)
+				isDir = okFolder and folder == true
+			end
+			if isDir then
+				purgeDirectoryTree(path, opts, removedCounter)
+			elseif deleteWorkspaceFile(path, { silent = true, label = opts.label or "cached" }) then
+				removedCounter[1] += 1
 			end
 		end
 	end
+	if deleteFolderFn then
+		pcall(deleteFolderFn, dir)
+	end
+end
 
-	if removed > 0 then
-		log("Workspace cleanup: removed " .. tostring(removed) .. " outdated file(s)")
+local function collectAlleralPurgePaths()
+	local paths = {}
+	local seen = {}
+	local function add(path)
+		if type(path) ~= "string" or path == "" or seen[path] then
+			return
+		end
+		seen[path] = true
+		table.insert(paths, path)
+	end
+	for _, path in ipairs(LOADER_LOCAL_PATHS) do
+		add(path)
+	end
+	for _, path in ipairs(BOOTSTRAP_LOCAL_PATHS) do
+		add(path)
+	end
+	add("alleral_bootstrap.luau")
+	add("Alleral/loader.luau")
+	add(INSTALL_MANIFEST)
+	for _, entry in ipairs(buildManagedFiles()) do
+		for _, path in ipairs(entry.paths) do
+			add(path)
+		end
+	end
+	return paths
+end
+
+local function purgeAlleralWorkspace(opts)
+	opts = type(opts) == "table" and opts or {}
+	if not isFile or not deleteFileFn then
+		return 0
 	end
 
+	local removedCounter = { 0 }
+	local seen = {}
+	local deleteOpts = { silent = true, label = opts.label or "cached" }
+
+	local function tryDelete(relativePath)
+		if type(relativePath) ~= "string" or relativePath == "" or seen[relativePath] then
+			return
+		end
+		seen[relativePath] = true
+		if deleteWorkspaceFile(relativePath, deleteOpts) then
+			removedCounter[1] += 1
+		end
+	end
+
+	for _, path in ipairs(collectAlleralPurgePaths()) do
+		tryDelete(path)
+		for _, root in ipairs(WORKSPACE_ROOTS) do
+			tryDelete(root .. path)
+		end
+	end
+
+	for _, dir in ipairs({ ".alleral", HUB, UI, CFG, "core", "games", "Alleral", "kick" }) do
+		purgeDirectoryTree(dir, deleteOpts, removedCounter)
+	end
+
+	forEachWorkspaceFile(function(path)
+		local lower = path:lower()
+		if lower:find("alleral", 1, true)
+			or lower:find("loader%.luau$")
+			or lower:find("bootstrap%.luau$")
+			or lower:find("syde", 1, true)
+		then
+			tryDelete(path)
+		end
+	end)
+
+	if removedCounter[1] > 0 and not opts.quiet then
+		local reason = opts.reason and (" (" .. tostring(opts.reason) .. ")") or ""
+		log("Workspace purge: removed " .. tostring(removedCounter[1]) .. " cached Alleral file(s)" .. reason)
+	end
+
+	return removedCounter[1]
+end
+
+local function purgeOutdatedWorkspace(opts)
+	opts = type(opts) == "table" and opts or {}
+	local expected = opts.useNetwork and fetchExpectedVersions() or fetchExpectedVersionsFast()
 	ENV._Alleral_ExpectedVersions = expected
+	return purgeAlleralWorkspace({
+		reason = opts.reason or "sync",
+		quiet = opts.quiet,
+		label = opts.label,
+	})
 end
 
 local function recordInstalledVersions()
@@ -3718,7 +3793,7 @@ local function main()
 	local expectedVersions = fetchExpectedVersions(true)
 	ENV._Alleral_ExpectedVersions = expectedVersions
 	loadTelemetryConfig(false)
-	purgeOutdatedWorkspace({ useNetwork = false })
+	purgeAlleralWorkspace({ reason = "boot" })
 	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
 	ENV.Alleral_HTTP.get = httpGet
 	local sydePrefetchOk, sydePrefetchLabel = ensureSydeSource()
@@ -3957,15 +4032,15 @@ local function main()
 	wireTelemetry(profile)
 	recordInstalledVersions()
 	task.defer(function()
-		pcall(purgeOutdatedWorkspace)
-		armAutoUpdateFingerprint(profile, true)
+		pcall(purgeAlleralWorkspace, { reason = "post-boot", quiet = true })
+		pcall(ensureAutoexecLoader)
+		pcall(armAutoUpdateFingerprint, profile, true)
 	end)
 	startAutoUpdater(profile)
 	ENV._Alleral_LastLoadAt = tick()
 	ENV._Alleral_LastPlaceId = game.PlaceId
 	ENV._Alleral_LastJobId = game.JobId
 	ENV._Alleral_PendingRelaunch = nil
-	ensureAutoexecLoader()
 	wireTeleportRelaunch()
 	notify("Alleral", profile.name .. " loaded", 4)
 	log("ready")
@@ -4030,7 +4105,7 @@ end)
 
 publishConsoleApi("Alleral_PurgeCache", function()
 	local ok, err = pcall(function()
-		purgeOutdatedWorkspace()
+		purgeAlleralWorkspace({ reason = "manual" })
 		checkForRemoteUpdate(ENV._Alleral_ActiveProfile, false)
 	end)
 	if not ok then
