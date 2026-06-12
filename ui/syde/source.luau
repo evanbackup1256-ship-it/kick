@@ -97,7 +97,7 @@ if update then return end
 local Library =         game:GetObjects("rbxassetid://123800669522471")[1]
 local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 
-local ALLERAL_SYDE_PATCH = 5
+local ALLERAL_SYDE_PATCH = 6
 
 -- Alleral: tolerate Roblox template renames (Title/title, Buttons/buttons, etc.)
 local function sydeFindChild(parent, ...)
@@ -370,32 +370,15 @@ local function sydeResolveDropFrame(dropholder)
 			if sydeFindChild(child, "Container", "container") or sydeDropSelectedLabel(child) then
 				return child
 			end
+			if sydeFindChild(child, "down", "Down") or sydeFindChild(child, "search", "Search") then
+				return child
+			end
 		end
 	end
 	return nil
 end
 
-local function sydeBindDropHolder(dropholder)
-	if not dropholder then
-		return nil
-	end
-	local dropFrame = sydeResolveDropFrame(dropholder)
-	if not dropFrame then
-		return nil
-	end
-	local boundDrop = sydeBindDropFrame(dropFrame) or dropFrame
-	return setmetatable({
-		drop = boundDrop,
-		Drop = boundDrop,
-	}, {
-		__index = dropholder,
-		__newindex = function(_, key, value)
-			dropholder[key] = value
-		end,
-	})
-end
-
-local function sydeDropdownHolder(dropdown)
+local function sydePrepareDropdownDrop(dropdown)
 	if not dropdown then
 		return nil
 	end
@@ -408,7 +391,14 @@ local function sydeDropdownHolder(dropdown)
 			end
 		end
 	end
-	return sydeBindDropHolder(holder) or holder
+	if not holder then
+		return nil
+	end
+	local dropFrame = sydeResolveDropFrame(holder)
+	if not dropFrame then
+		return nil
+	end
+	return sydeBindDropFrame(dropFrame) or dropFrame
 end
 
 local resizing =        false
@@ -5303,32 +5293,25 @@ function syde:Init(library)
 				dropdown.Parent = Page
 				dropdown.title.Text = data.Title
 				dropdown.Name = data.Title
-				local boundHolder = sydeDropdownHolder(dropdown)
-				if boundHolder then
-					dropdown.dropholder = boundHolder
-				end
-				if not dropdown.dropholder or not dropdown.dropholder.drop then
+				local drop = sydePrepareDropdownDrop(dropdown)
+				if not drop or not drop.Container then
 					warn("[Syde] Skipping dropdown: " .. tostring(data.Title))
 					return telement
 				end
-				local boundDrop = sydeBindDropFrame(dropdown.dropholder.drop)
-				if boundDrop then
-					dropdown.dropholder.drop = boundDrop
-				end
-				dropdown.dropholder.drop.Container.Option.Visible = false
-				dropdown.dropholder.drop.Container.Visible = false
-				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
-				sydeSetDropSelectedText(dropdown.dropholder.drop, data.PlaceHolder)
+				drop.Container.Option.Visible = false
+				drop.Container.Visible = false
+				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
+				sydeSetDropSelectedText(drop, data.PlaceHolder)
 
 				local DropOpen = false
 				local DeBounce = false
-				local OptionButton = dropdown.dropholder.drop.Container.Option
+				local OptionButton = drop.Container.Option
 				local SelectedOptions = {}
 				local SelectedOrder = {}
 
 				local function UpdateCustomLayout()
 					local yOffset = 0
-					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+					for _, option in ipairs(drop.Container:GetChildren()) do
 						if option:IsA("Frame") and option.Visible then
 							tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
 							yOffset = yOffset + option.Size.Y.Offset + 7
@@ -5338,44 +5321,44 @@ function syde:Init(library)
 
 				local function OpenDrop()
 					DropOpen = true
-					dropdown.dropholder.drop.Container.Visible = true
-					dropdown.dropholder.drop.search.Visible = true
+					drop.Container.Visible = true
+					drop.search.Visible = true
 
 					tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(0, 20) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+					tweenservice:Create(drop.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(0, 20) }):Play()
+					tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+					tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+					tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
 
-					tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+					tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
+					tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
+					tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+					tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+					tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
 
 				end
 
 				local function CloseDrop()
 					DropOpen = false
 					tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(1, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(1,0) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+					tweenservice:Create(drop.UICorner, TweenInfo.new(1, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(1,0) }):Play()
+					tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+					tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+					tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
 
-					tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+					tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+					tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+					tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 
 					task.wait(0.6)
-					dropdown.dropholder.drop.Container.Visible = false
-					dropdown.dropholder.drop.search.Visible = false
+					drop.Container.Visible = false
+					drop.search.Visible = false
 
 				end
 
-				dropdown.dropholder.drop.down.MouseButton1Click:Connect(function()
+				drop.down.MouseButton1Click:Connect(function()
 					if DeBounce then return end
 					DeBounce = true
 
@@ -5426,7 +5409,7 @@ function syde:Init(library)
 						end
 					end
 
-					local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
+					local selectedContainer = drop.selectContainer.ScrollingFrame
 					for _, child in ipairs(selectedContainer:GetChildren()) do
 						if child:IsA("Frame") and child.Name == option then
 							child:Destroy()
@@ -5436,10 +5419,10 @@ function syde:Init(library)
 				end
 
 				local function UpdateSelectedText()
-					local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
-					local placeholderText = dropdown.dropholder.drop.selected
+					local selectedContainer = drop.selectContainer.ScrollingFrame
+					local placeholderText = drop.selected
 					selectedContainer.Visible = data.Multi
-					dropdown.dropholder.drop.selected.Visible = false
+					drop.selected.Visible = false
 
 
 					if data.Multi then
@@ -5466,7 +5449,7 @@ function syde:Init(library)
 									UpdateSelectedText()
 
 									-- Visually update the dropdown list
-									for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+									for _, opt in ipairs(drop.Container:GetChildren()) do
 										if opt:IsA("Frame") and opt.Name == option then
 											tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 											tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
@@ -5498,20 +5481,20 @@ function syde:Init(library)
 
 					else
 						-- Single option text fallback
-						dropdown.dropholder.drop.selected.Visible = true
+						drop.selected.Visible = true
 						if #SelectedOrder > 0 then
-							dropdown.dropholder.drop.selected.Text = SelectedOrder[1]
+							drop.selected.Text = SelectedOrder[1]
 						else
-							dropdown.dropholder.drop.selected.Text = data.PlaceHolder
+							drop.selected.Text = data.PlaceHolder
 						end
 					end
 				end
 
 				--[SEARCH]
-				dropdown.dropholder.drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-					local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower()
+				drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+					local searchText = drop.search.TextBox.Text:lower()
 
-					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+					for _, option in ipairs(drop.Container:GetChildren()) do
 						if option:IsA("Frame") and option:FindFirstChild("Title") then
 							local optionText = option.Title.Text:lower()
 							local isTemplate = option.Name == "Option"
@@ -5554,13 +5537,13 @@ function syde:Init(library)
 					for _, OptionText in ipairs(data.Options) do
 						local option = OptionButton:Clone()
 						option.Title.Text = OptionText
-						option.Parent = dropdown.dropholder.drop.Container
+						option.Parent = drop.Container
 						option.Visible = true
 						option.Name = OptionText
 
 						if OptionText == data.StarterOption and not starterSet then
 							starterSet = true
-							dropdown.dropholder.drop.selected.Text = OptionText
+							drop.selected.Text = OptionText
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
 
@@ -5584,12 +5567,12 @@ function syde:Init(library)
 									data.CallBack(SelectedOrder)
 								end
 							else
-								dropdown.dropholder.drop.selected.Text = OptionText
+								drop.selected.Text = OptionText
 
 								SelectedOptions = {[OptionText] = true}
 								SelectedOrder = {OptionText}
 
-								for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+								for _, opt in ipairs(drop.Container:GetChildren()) do
 									if opt:IsA("Frame") then
 										tweenservice:Create(opt, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
 										tweenservice:Create(opt.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
@@ -5614,7 +5597,7 @@ function syde:Init(library)
 					end
 
 					if not starterSet then
-						dropdown.dropholder.drop.selected.Text = data.PlaceHolder
+						drop.selected.Text = data.PlaceHolder
 					end
 
 					UpdateCustomLayout()
@@ -8800,33 +8783,26 @@ function syde:Init(library)
 			dropdown.Parent = Page
 			dropdown.title.Text = data.Title
 			dropdown.Name = data.Title
-			local boundHolder = sydeDropdownHolder(dropdown)
-			if boundHolder then
-				dropdown.dropholder = boundHolder
-			end
-			if not dropdown.dropholder or not dropdown.dropholder.drop then
+			local drop = sydePrepareDropdownDrop(dropdown)
+			if not drop or not drop.Container then
 				warn("[Syde] Skipping dropdown: " .. tostring(data.Title))
 				return initelement
 			end
-			local boundDrop = sydeBindDropFrame(dropdown.dropholder.drop)
-			if boundDrop then
-				dropdown.dropholder.drop = boundDrop
-			end
-			dropdown.dropholder.drop.Container.Option.Visible = false
-			dropdown.dropholder.drop.Container.Visible = false
-			tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
-			sydeSetDropSelectedText(dropdown.dropholder.drop, data.PlaceHolder)
+			drop.Container.Option.Visible = false
+			drop.Container.Visible = false
+			tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
+			sydeSetDropSelectedText(drop, data.PlaceHolder)
 			dropdown:SetAttribute("Searchable", true)
 
 			local DropOpen = false
 			local DeBounce = false
-			local OptionButton = dropdown.dropholder.drop.Container.Option
+			local OptionButton = drop.Container.Option
 			local SelectedOptions = {}
 			local SelectedOrder = {}
 
 			local function UpdateCustomLayout()
 				local yOffset = 0
-				for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+				for _, option in ipairs(drop.Container:GetChildren()) do
 					if option:IsA("Frame") and option.Visible then
 						tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
 						yOffset = yOffset + option.Size.Y.Offset + 7
@@ -8836,42 +8812,42 @@ function syde:Init(library)
 
 			local function OpenDrop()
 				DropOpen = true
-				dropdown.dropholder.drop.Container.Visible = true
-				dropdown.dropholder.drop.search.Visible = true
+				drop.Container.Visible = true
+				drop.search.Visible = true
 
 				tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+				tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+				tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
 
-				tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+				tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
+				tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
+				tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+				tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
 
 			end
 
 			local function CloseDrop()
 				DropOpen = false
 				tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+				tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
 
-				tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+				tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 
 				task.wait(0.6)
-				dropdown.dropholder.drop.Container.Visible = false
-				dropdown.dropholder.drop.search.Visible = false
+				drop.Container.Visible = false
+				drop.search.Visible = false
 
 			end
 
-			dropdown.dropholder.drop.down.MouseButton1Click:Connect(function()
+			drop.down.MouseButton1Click:Connect(function()
 				if DeBounce then return end
 				DeBounce = true
 
@@ -8922,7 +8898,7 @@ function syde:Init(library)
 					end
 				end
 
-				local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
+				local selectedContainer = drop.selectContainer.ScrollingFrame
 				for _, child in ipairs(selectedContainer:GetChildren()) do
 					if child:IsA("Frame") and child.Name == option then
 						child:Destroy()
@@ -8932,10 +8908,10 @@ function syde:Init(library)
 			end
 
 			local function UpdateSelectedText()
-				local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
-				local placeholderText = dropdown.dropholder.drop.selected
+				local selectedContainer = drop.selectContainer.ScrollingFrame
+				local placeholderText = drop.selected
 				selectedContainer.Visible = data.Multi
-				dropdown.dropholder.drop.selected.Visible = false
+				drop.selected.Visible = false
 
 
 				if data.Multi then
@@ -8962,7 +8938,7 @@ function syde:Init(library)
 								UpdateSelectedText()
 
 								-- Visually update the dropdown list
-								for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+								for _, opt in ipairs(drop.Container:GetChildren()) do
 									if opt:IsA("Frame") and opt.Name == option then
 										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
@@ -8994,20 +8970,20 @@ function syde:Init(library)
 
 				else
 					-- Single option text fallback
-					dropdown.dropholder.drop.selected.Visible = true
+					drop.selected.Visible = true
 					if #SelectedOrder > 0 then
-						dropdown.dropholder.drop.selected.Text = SelectedOrder[1]
+						drop.selected.Text = SelectedOrder[1]
 					else
-						dropdown.dropholder.drop.selected.Text = data.PlaceHolder
+						drop.selected.Text = data.PlaceHolder
 					end
 				end
 			end
 
 			--[SEARCH]
-			dropdown.dropholder.drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-				local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower()
+			drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+				local searchText = drop.search.TextBox.Text:lower()
 
-				for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+				for _, option in ipairs(drop.Container:GetChildren()) do
 					if option:IsA("Frame") and option:FindFirstChild("Title") then
 						local optionText = option.Title.Text:lower()
 						local isTemplate = option.Name == "Option"
@@ -9050,13 +9026,13 @@ function syde:Init(library)
 				for _, OptionText in ipairs(data.Options) do
 					local option = OptionButton:Clone()
 					option.Title.Text = OptionText
-					option.Parent = dropdown.dropholder.drop.Container
+					option.Parent = drop.Container
 					option.Visible = true
 					option.Name = OptionText
 
 					if OptionText == data.StarterOption and not starterSet then
 						starterSet = true
-						dropdown.dropholder.drop.selected.Text = OptionText
+						drop.selected.Text = OptionText
 						SelectedOptions = {[OptionText] = true}
 						SelectedOrder = {OptionText}
 
@@ -9080,12 +9056,12 @@ function syde:Init(library)
 								data.CallBack(SelectedOrder)
 							end
 						else
-							dropdown.dropholder.drop.selected.Text = OptionText
+							drop.selected.Text = OptionText
 
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
 
-							for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+							for _, opt in ipairs(drop.Container:GetChildren()) do
 								if opt:IsA("Frame") then
 									tweenservice:Create(opt, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
 									tweenservice:Create(opt.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
@@ -9110,7 +9086,7 @@ function syde:Init(library)
 				end
 
 				if not starterSet then
-					dropdown.dropholder.drop.selected.Text = data.PlaceHolder
+					drop.selected.Text = data.PlaceHolder
 				end
 
 				UpdateCustomLayout()

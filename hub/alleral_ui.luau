@@ -13,7 +13,7 @@ return function(Core)
 		"kick/kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 5
+	local SYDE_PATCH_VERSION = 6
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
 		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/syde/source.luau",
