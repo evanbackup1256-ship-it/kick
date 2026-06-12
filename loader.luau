@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.7"
+local LOADER_VERSION = "8.2.8"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -22,7 +22,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.7",
+	loader = "8.2.8",
 	core = "2.9.4",
 	ui = "Maclib",
 	windui = "3.0.5-premium",
@@ -98,13 +98,6 @@ local REMOTE_BASES = { GITHUB_RAW, GITHUB_WEB }
 local JSDELIVR = "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH
 local CORE_REMOTE_BASES = { GITHUB_RAW, GITHUB_WEB, JSDELIVR }
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local HttpService = nil
-pcall(function()
-	HttpService = game:GetService("HttpService")
-end)
-
 local function genv()
 	local ok, env = pcall(function()
 		return getgenv and getgenv() or getfenv()
@@ -112,7 +105,43 @@ local function genv()
 	return ok and env or {}
 end
 
+local function resolveGameInstance()
+	if typeof(game) == "Instance" then
+		return game
+	end
+	if _G and typeof(_G.game) == "Instance" then
+		return _G.game
+	end
+	local env = genv()
+	if typeof(env.game) == "Instance" then
+		return env.game
+	end
+	return nil
+end
+
+local game = resolveGameInstance()
+if not game then
+	error(
+		"[Alleral] game is nil — run the loader inside a Roblox game session (not the executor menu outside a place)."
+	)
+end
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local HttpService = nil
+pcall(function()
+	HttpService = game:GetService("HttpService")
+end)
+
 local ENV = genv()
+
+local function loaderRunEnv()
+	local env = genv()
+	if typeof(env.game) ~= "Instance" then
+		env.game = game
+	end
+	return env
+end
 local PREVIOUS_LOADER_VERSION = ENV._Alleral_LoaderVersion or ENV.Alleral_LoaderVersion
 ENV._Alleral_LoaderVersion = LOADER_VERSION
 ENV.Alleral_LoaderRunning = false
@@ -986,7 +1015,10 @@ local function compileAndRun(source, chunkName, runEnv)
 	if not fn then
 		return false, "Compile: " .. tostring(err)
 	end
-	if runEnv and setfenv then
+	if not runEnv then
+		runEnv = loaderRunEnv()
+	end
+	if setfenv then
 		pcall(setfenv, fn, runEnv)
 	end
 	local ok, runErr = pcall(fn)
@@ -3161,6 +3193,12 @@ local function installGlobalBootstrap()
 					if ok and type(src) == "string" and #src > 500 and loadStringFn and localLoaderFresh(src) then
 						local compiled, compileErr = loadStringFn(src, "Alleral/loader")
 						if compiled then
+							if typeof(game) == "Instance" and typeof(g.game) ~= "Instance" then
+								g.game = game
+							end
+							if setfenv then
+								pcall(setfenv, compiled, g)
+							end
 							task.defer(compiled)
 							return
 						end
@@ -3187,6 +3225,12 @@ local function installGlobalBootstrap()
 					if writeFileFn and makeFolderFn then
 						pcall(makeFolderFn, "kick")
 						pcall(writeFileFn, "loader.luau", src)
+					end
+					if typeof(game) == "Instance" and typeof(g.game) ~= "Instance" then
+						g.game = game
+					end
+					if setfenv then
+						pcall(setfenv, compiled, g)
 					end
 					task.defer(compiled)
 					return
@@ -3634,14 +3678,9 @@ publishConsoleApi("Alleral_Load", function()
 		warn("[Alleral v" .. LOADER_VERSION .. "] Could not download loader (" .. tostring(via) .. ")")
 		return false
 	end
-	local fn, err = loadStringFn(body, "Alleral/loader")
-	if not fn then
-		warn("[Alleral v" .. LOADER_VERSION .. "] Loader compile failed: " .. tostring(err))
-		return false
-	end
-	local ok, runErr = pcall(fn)
+	local ok, err = compileAndRun(body, "Alleral/loader", loaderRunEnv())
 	if not ok then
-		warn("[Alleral v" .. LOADER_VERSION .. "] Loader runtime failed: " .. tostring(runErr))
+		warn("[Alleral v" .. LOADER_VERSION .. "] Loader failed: " .. tostring(err))
 		return false
 	end
 	return true

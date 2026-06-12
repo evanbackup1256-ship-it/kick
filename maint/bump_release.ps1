@@ -23,6 +23,16 @@ $release.updatedAt = $updatedAt
 Write-Utf8NoBom $releasePath (($release | ConvertTo-Json -Depth 6) + "`n")
 Write-Host "release.json -> commit=$commit updatedAt=$updatedAt"
 
+$loaderPath = Join-Path $root "loader.luau"
+$loaderRaw = Get-Content $loaderPath -Raw -Encoding UTF8
+$loaderRaw = [regex]::Replace(
+    $loaderRaw,
+    '(commit\s*=\s*")[^"]+(")',
+    ('commit = "' + $commit + '"')
+)
+Write-Utf8NoBom $loaderPath $loaderRaw
+Write-Host "loader.luau RELEASE_FALLBACK.commit -> $commit"
+
 $manifestSrc = Join-Path $root "cfg/scripts_manifest.json"
 $siteSrc = Join-Path $root "cfg/site.json"
 $siteRaw = Get-Content $siteSrc -Raw -Encoding UTF8
