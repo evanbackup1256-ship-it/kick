@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.9.6"
+local LOADER_VERSION = "7.9.7"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -23,11 +23,11 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.9.6",
+	loader = "7.9.7",
 	core = "2.8.8",
 	ui = "Alleral",
-	neverlose = "1.5.3-kick",
-	windui = "1.5.3-kick",
+	neverlose = "1.5.4-kick",
+	windui = "1.5.4-kick",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",

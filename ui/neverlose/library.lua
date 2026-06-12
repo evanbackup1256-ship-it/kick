@@ -1,5 +1,5 @@
--- Neverlose UI · NEVERLOSE_UI_VERSION = "1.5.3-kick"
-local NEVERLOSE_UI_VERSION = "1.5.3-kick"
+-- Neverlose UI · NEVERLOSE_UI_VERSION = "1.5.4-kick"
+local NEVERLOSE_UI_VERSION = "1.5.4-kick"
 local Library do 
  local Workspace = game:GetService("Workspace")
  local UserInputService = game:GetService("UserInputService")
@@ -420,9 +420,6 @@ local Library do
 
  Library.Motion = function(self, instance, goals, preset, opts)
  return self:MotionTo(instance, goals, preset, opts)
- end
- for name, preset in pairs(Library.MotionPresets) do
- Library.Motion[name] = preset
  end
 
  Library.SpawnRipple = function(self, host, input)

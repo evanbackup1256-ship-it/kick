@@ -1,10 +1,10 @@
 {
-    "loader":  "7.9.6",
+    "loader":  "7.9.7",
     "core":  "2.8.8",
     "weao":  "1.1",
     "ui":  "Neverlose",
-    "neverlose":  "1.5.3-kick",
-    "windui":  "1.5.3-kick",
+    "neverlose":  "1.5.4-kick",
+    "windui":  "1.5.4-kick",
     "commit":  "c99d6b7",
     "updatedAt":  "2026-06-11T12:00:00Z",
     "updatePollSeconds":  120,
