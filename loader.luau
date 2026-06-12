@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.3"
+local LOADER_VERSION = "8.2.4"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -23,8 +23,8 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.3",
-	core = "2.9.3",
+	loader = "8.2.4",
+	core = "2.9.4",
 	ui = "Maclib",
 	windui = "3.0.2-maclib",
 	alleral = "3.0.2-maclib",
@@ -2117,12 +2117,47 @@ local function enforceSecurityGate(profile, stage)
 	return false
 end
 
+local function refreshTelemetryConfig()
+	local telemetry = ENV.Alleral_Telemetry
+	local cfg = ENV.Alleral_OwnerTelemetry
+	if type(telemetry) ~= "table" or type(cfg) ~= "table" then
+		return false
+	end
+	if type(telemetry.ReloadFromEnv) == "function" then
+		local ok = pcall(telemetry.ReloadFromEnv, telemetry)
+		return ok and telemetry:IsEnabled()
+	end
+	if type(telemetry.Configure) == "function" then
+		pcall(telemetry.Configure, telemetry, cfg)
+	end
+	return type(telemetry.IsEnabled) == "function" and telemetry:IsEnabled()
+end
+
+local function ensureTelemetryLoaded()
+	if ENV.Alleral_Telemetry and type(ENV.Alleral_Telemetry.ReportInject) == "function" then
+		return refreshTelemetryConfig()
+	end
+	loadTelemetryConfig(false)
+	if not loadModule(
+		{ HUB .. "/telemetry.luau", "core/telemetry.luau" },
+		HUB .. "/telemetry.luau",
+		"Alleral_Telemetry",
+		"Alleral/telemetry"
+	) then
+		return false
+	end
+	return refreshTelemetryConfig()
+end
+
 local function wireTelemetry(profile)
+	if not ensureTelemetryLoaded() then
+		return
+	end
 	local telemetry = ENV.Alleral_Telemetry
 	if type(telemetry) ~= "table" or type(telemetry.IsEnabled) ~= "function" or not telemetry:IsEnabled() then
 		return
 	end
-	log("Telemetry on")
+	log("Telemetry active")
 	telemetry:ReportSessionStart({
 		gameId = profile and profile.id,
 		scriptVersion = profile and profile.version,
@@ -3335,6 +3370,7 @@ local function main()
 
 	local expectedVersions = fetchExpectedVersionsFast()
 	ENV._Alleral_ExpectedVersions = expectedVersions
+	loadTelemetryConfig(false)
 	purgeOutdatedWorkspace({ useNetwork = false })
 	task.defer(function()
 		pcall(function()
@@ -3481,12 +3517,12 @@ local function main()
 			gameSrc, gameLabel = fetchGameScript(profile)
 		end,
 	})
+	ensureTelemetryLoaded()
+
 	grantPublicAccess()
 	task.spawn(function()
-		pcall(loadTelemetryConfig, true)
 		pcall(loadModule, { HUB .. "/analytics.luau" }, HUB .. "/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
 		pcall(loadModule, { HUB .. "/helpers.luau", "core/game_helpers.luau" }, HUB .. "/helpers.luau", "GameHelpers", "Alleral/helpers")
-		pcall(loadModule, { HUB .. "/telemetry.luau", "core/telemetry.luau" }, HUB .. "/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
 	end)
 
 	if not enforceSecurityGate(profile, "pre_inject") then
@@ -3501,7 +3537,7 @@ local function main()
 		log("UI skipped: " .. tostring(uiErr), true)
 	end
 
-	if ENV.Alleral_Telemetry and ENV.Alleral_Telemetry.ReportInject then
+	if ensureTelemetryLoaded() then
 		ENV.Alleral_Telemetry:ReportInject("start", {
 			gameId = profile.id,
 			scriptVersion = profile.version,
@@ -3567,7 +3603,7 @@ local function main()
 	ensureAutoexecLoader()
 	wireTeleportRelaunch()
 	notify("Alleral", profile.name .. " loaded", 4)
-	log("ready (auto-relaunch on hop)")
+	log("ready")
 end
 
 ENV.Alleral_Reload = function()

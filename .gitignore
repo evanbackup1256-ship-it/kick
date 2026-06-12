@@ -12,3 +12,7 @@ supabase/.temp/
 backend/data/
 .alleral/
 runtime_secrets.json
+
+# Editor / local debug
+.cursor/*.log
+.cursor/maclib_sample.txt

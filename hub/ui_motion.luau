@@ -1,7 +1,4 @@
---[[
-	Alleral UI motion layer — spring animations via spr (Fraktality/spr).
-	Hooks Maclib instances for open/close, tabs, toggles, sliders, dropdowns, buttons, notifications.
-]]
+-- Spring motion hooks for Maclib (uses spr).
 return function(Core, spr)
 	if type(spr) ~= "table" or type(spr.target) ~= "function" then
 		return nil

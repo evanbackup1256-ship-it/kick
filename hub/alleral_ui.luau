@@ -1,7 +1,7 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.2-maclib"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.3-maclib"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Maclib"
 
@@ -694,11 +694,19 @@ return function(Core)
 			local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
 			local label = rawSection:Label({ Text = text })
 			return {
+				_raw = label,
 				Set = function(_, nextSettings)
 					local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text)
 						or tostring(nextSettings or "")
-					if label and label.Set then
+					if label and type(label.UpdateName) == "function" then
+						pcall(label.UpdateName, label, nextText)
+					elseif label and label.Set then
 						pcall(label.Set, label, nextText)
+					end
+				end,
+				SetVisible = function(_, visible)
+					if label and type(label.SetVisibility) == "function" then
+						pcall(label.SetVisibility, label, visible == true)
 					end
 				end,
 			}
@@ -735,7 +743,15 @@ return function(Core)
 				end
 			end
 			function status:SetVisible(visible)
-				self.Visible = visible == true
+				local show = visible == true
+				self.Visible = show
+				for _, row in pairs(self.Labels) do
+					if row and type(row.SetVisible) == "function" then
+						row:SetVisible(show)
+					elseif row and row._raw and type(row._raw.SetVisibility) == "function" then
+						pcall(row._raw.SetVisibility, row._raw, show)
+					end
+				end
 			end
 			return status
 		end

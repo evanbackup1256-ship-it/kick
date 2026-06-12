@@ -484,7 +484,11 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 			if nextSettings.CurrentValue ~= nil then
 				setElementValue(handle, tostring(nextSettings.CurrentValue))
 			end
-		end)
+		end, {
+			raw = handle,
+			bindKey = settings.BindKey or settings.StateKey,
+			kind = "input",
+		})
 	end
 
 	function groupbox:CreateDropdown(settings, id)

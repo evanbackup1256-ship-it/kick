@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-12T02:30:00Z",
+  "updatedAt": "2026-06-12T02:57:17Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
-  "loaderVersion": "8.2.3",
-  "coreVersion": "2.9.3",
+  "loaderVersion": "8.2.4",
+  "coreVersion": "2.9.4",
   "uiLibrary": "Maclib",
   "uiVersion": "3.0.2-maclib",
   "announcement": "",
@@ -51,6 +51,15 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-12",
+      "title": "Maclib UI integration",
+      "items": [
+        "Loader 8.2.0 replaces custom hub/ui stack with Maclib 1.2.6",
+        "Removed Neverlose, WindUI, Fusion, OnyxUI vendor bootstrap modules",
+        "Core 2.9.0 keeps existing game script UI API via Maclib adapters"
+      ]
+    },
     {
       "date": "2026-06-11",
       "title": "WindUI revamp",

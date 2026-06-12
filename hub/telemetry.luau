@@ -831,9 +831,15 @@ end
 
 function Telemetry:InitFromEnv()
 	local cfg = ENV.Alleral_OwnerTelemetry
-	if type(cfg) == "table" then
-		self:Configure(cfg)
+	if type(cfg) ~= "table" then
+		return
 	end
+	self:Configure(cfg)
+end
+
+function Telemetry:ReloadFromEnv()
+	self:InitFromEnv()
+	return self:IsEnabled()
 end
 
 function Telemetry:HookLifecycle()
