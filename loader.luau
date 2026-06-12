@@ -1863,6 +1863,46 @@ local function loadCore()
 	cacheRemote(".alleral/cache/" .. CORE_ALLERAL_UI_PATH, alleralUiSrc)
 	cacheRemote(CORE_HUB_UI_PATH, hubUiSrc)
 	cacheRemote(".alleral/cache/" .. CORE_HUB_UI_PATH, hubUiSrc)
+
+	local UI_BOOTSTRAP_MODULES = {
+		"ModuleLoader.luau",
+		"Vendor.luau",
+		"Maid.luau",
+		"Spring.luau",
+		"Utils.luau",
+		"Icons.luau",
+		"Theme.luau",
+		"Motion.luau",
+		"Config.luau",
+		"Tooltip.luau",
+		"Notification.luau",
+		"Modal.luau",
+		"CommandPalette.luau",
+		"Components.luau",
+		"Section.luau",
+		"Page.luau",
+		"Navigation.luau",
+		"Window.luau",
+		"Library.luau",
+	}
+	for _, moduleName in ipairs(UI_BOOTSTRAP_MODULES) do
+		local rel = "hub/ui/" .. moduleName
+		local cached = readLocal({ rel, ".alleral/cache/" .. rel }, 50)
+		if not cached then
+			local body = select(1, httpGet(GITHUB_RAW .. "/" .. rel, 50))
+			if body and looksLikeLua(body) then
+				cacheRemote(rel, body)
+				cacheRemote(".alleral/cache/" .. rel, body)
+			end
+		end
+	end
+
+	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
+	ENV.Alleral_HTTP.get = httpGet
+	if ENV.Alleral_Core then
+		ENV.Alleral_Core._UiRemoteBases = CORE_REMOTE_BASES
+	end
+
 	log(
 		"Core v"
 			.. tostring(ENV.Alleral_Core.VERSION)

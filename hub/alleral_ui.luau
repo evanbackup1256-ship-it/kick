@@ -13,10 +13,12 @@ return function(Core)
 	}
 	local UI_MIRRORS = {
 		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/ui/",
-		"https://github.com/evanbackup1256-ship-it/kick/main/hub/ui/",
+		"https://github.com/evanbackup1256-ship-it/kick/raw/main/hub/ui/",
+		"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/hub/ui/",
 	}
 	local LIBRARY_FILE = "Library.luau"
 	local MIN_LIBRARY_BYTES = 8000
+	local MIN_MODULE_BYTES = 50
 
 	local function genv()
 		local ok, env = pcall(function()
@@ -25,16 +27,62 @@ return function(Core)
 		return ok and env or {}
 	end
 	local ENV = genv()
+	local agentDebug = ENV._AlleralAgentDebug or function() end
 
-	local function readLocal(name)
+	local function moduleSourceValid(source, minBytes)
+		minBytes = minBytes or MIN_MODULE_BYTES
+		if type(source) ~= "string" or #source < minBytes then
+			return false
+		end
+		if #source <= 8192 and source:find("404: Not Found", 1, true) then
+			return false
+		end
+		if source:find("<!DOCTYPE", 1, true) or source:find("<html", 1, true) then
+			return false
+		end
+		return source:find("return", 1, true) ~= nil or source:find("function", 1, true) ~= nil
+	end
+
+	local function readLocal(name, minBytes)
+		minBytes = minBytes or MIN_MODULE_BYTES
 		local roots = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
 		for _, vendor in ipairs(UI_ROOTS) do
 			for _, root in ipairs(roots) do
 				local path = root .. vendor .. name
 				local body = Core.readFile(path)
-				if body then
+				if moduleSourceValid(body, minBytes) then
 					return body, path
 				end
+			end
+		end
+		return nil
+	end
+
+	local function cacheUiSource(name, body)
+		if type(body) ~= "string" or not moduleSourceValid(body) then
+			return
+		end
+		local rel = "hub/ui/" .. name:gsub("\\", "/")
+		local cacheRel = ".alleral/cache/" .. rel
+		if Core.writeFile then
+			pcall(Core.writeFile, rel, body)
+			pcall(Core.writeFile, cacheRel, body)
+		end
+	end
+
+	local function uiHttpGet(url, minBytes)
+		minBytes = minBytes or 0
+		if type(Core.httpGet) == "function" then
+			local body = Core.httpGet(url)
+			if type(body) == "string" and #body >= minBytes then
+				return body
+			end
+		end
+		local http = ENV.Alleral_HTTP
+		if type(http) == "table" and type(http.get) == "function" then
+			local body = http.get(url, minBytes)
+			if type(body) == "string" and #body >= minBytes then
+				return body
 			end
 		end
 		return nil
@@ -53,9 +101,20 @@ return function(Core)
 	local function fetchRemote(name, minBytes, opts)
 		minBytes = minBytes or MIN_LIBRARY_BYTES
 		opts = type(opts) == "table" and opts or {}
-		local validate = opts.validate
+		local validate = opts.validate or moduleSourceValid
 		local versionTag = tostring(Core.ALLERAL_UI_VERSION or "kick"):gsub("[^%w%.%-]", "")
-		for _, base in ipairs(UI_MIRRORS) do
+		local bases = UI_MIRRORS
+		if type(Core._UiRemoteBases) == "table" and #Core._UiRemoteBases > 0 then
+			local merged = {}
+			for _, base in ipairs(Core._UiRemoteBases) do
+				table.insert(merged, base .. "/hub/ui/")
+			end
+			for _, base in ipairs(UI_MIRRORS) do
+				table.insert(merged, base)
+			end
+			bases = merged
+		end
+		for _, base in ipairs(bases) do
 			local plain = base .. name
 			local candidates = {
 				plain .. (plain:find("?", 1, true) and "&" or "?") .. "v=" .. versionTag .. "&t=" .. tostring(tick()),
@@ -65,13 +124,27 @@ return function(Core)
 				candidates = { candidates[1] }
 			end
 			for _, url in ipairs(candidates) do
-				local body = Core.httpGet(url)
-				if type(body) == "string" and #body >= minBytes and (not validate or validate(body)) then
+				local body = uiHttpGet(url, minBytes)
+				if type(body) == "string" and #body >= minBytes and validate(body, minBytes) then
+					cacheUiSource(name, body)
 					return body, url
 				end
 			end
 		end
 		return nil
+	end
+
+	local function resolveUiSource(name, minBytes)
+		minBytes = minBytes or MIN_MODULE_BYTES
+		local source, path = readLocal(name, minBytes)
+		if source then
+			return source, path, nil
+		end
+		source, path = fetchRemote(name, minBytes, { validate = moduleSourceValid })
+		if source then
+			return source, path or ("remote:" .. name), nil
+		end
+		return nil, nil, "missing module " .. name
 	end
 
 	local function sanitizeLuauSource(source)
@@ -94,15 +167,15 @@ return function(Core)
 		if moduleCache[name] then
 			return moduleCache[name]
 		end
-		local source, path = readLocal(name)
+		local source, path, resolveErr = resolveUiSource(name, MIN_MODULE_BYTES)
 		if not source then
-			source = fetchRemote(name, 200, { validate = function(body)
-				return type(body) == "string" and #body > 100
-			end })
-			path = source and "remote:" .. name or nil
-		end
-		if not source then
-			return nil, "missing module " .. name
+			-- #region agent log
+			agentDebug("H7", "alleral_ui:loadUiModule", "module source missing", {
+				name = name,
+				err = resolveErr,
+			})
+			-- #endregion
+			return nil, resolveErr or ("missing module " .. name)
 		end
 		local loadFn = Core.loadStringFn()
 		if not loadFn then
@@ -110,10 +183,25 @@ return function(Core)
 		end
 		local chunk, err = loadFn(sanitizeLuauSource(source), "@Alleral/ui/" .. name .. ":" .. tostring(path))
 		if not chunk then
+			-- #region agent log
+			agentDebug("H8", "alleral_ui:loadUiModule", "module compile failed", {
+				name = name,
+				path = path,
+				bytes = #source,
+				err = tostring(err),
+			})
+			-- #endregion
 			return nil, tostring(err)
 		end
 		local ok, result = pcall(chunk)
 		if not ok then
+			-- #region agent log
+			agentDebug("H8", "alleral_ui:loadUiModule", "module execute failed", {
+				name = name,
+				path = path,
+				err = tostring(result),
+			})
+			-- #endregion
 			return nil, tostring(result)
 		end
 		if name == LIBRARY_FILE and type(result) ~= "function" then
@@ -124,18 +212,36 @@ return function(Core)
 	end
 
 	local function loadUiLibrary()
-		local moduleLoaderFactory = loadUiModule("ModuleLoader.luau")
-		local vendorFactory = loadUiModule("Vendor.luau")
+		local moduleLoaderFactory, mlErr = loadUiModule("ModuleLoader.luau")
+		local vendorFactory, vendorErr = loadUiModule("Vendor.luau")
 		if not moduleLoaderFactory or not vendorFactory then
-			return nil, "Alleral UI vendor loader missing"
+			-- #region agent log
+			agentDebug("H7", "alleral_ui:loadUiLibrary", "vendor bootstrap missing", {
+				hasModuleLoader = moduleLoaderFactory ~= nil,
+				moduleLoaderErr = mlErr,
+				hasVendor = vendorFactory ~= nil,
+				vendorErr = vendorErr,
+			})
+			-- #endregion
+			local detail = mlErr or vendorErr or "unknown"
+			return nil, "Alleral UI vendor loader missing: " .. tostring(detail)
 		end
 		local readVendorSource = function(rel)
 			rel = tostring(rel or ""):gsub("\\", "/")
-			local body = readLocal(rel)
+			local body, path = readLocal(rel, MIN_MODULE_BYTES)
 			if body then
 				return body
 			end
-			return readLocal("vendor/" .. rel:gsub("^vendor/", ""))
+			local alt = rel:gsub("^vendor/", "")
+			body, path = readLocal("vendor/" .. alt, MIN_MODULE_BYTES)
+			if body then
+				return body
+			end
+			body = fetchRemote(rel, MIN_MODULE_BYTES, { validate = moduleSourceValid })
+			if body then
+				return body
+			end
+			return fetchRemote("vendor/" .. alt, MIN_MODULE_BYTES, { validate = moduleSourceValid })
 		end
 		local loadChunk = function(source, name)
 			local loadFn = Core.loadStringFn()
