@@ -288,6 +288,70 @@ local function sydeTintSlideframe(slideframeProxy, color)
 	end
 end
 
+local function sydeDropSelectedLabel(drop)
+	if not drop then
+		return nil
+	end
+	local label = sydeFindChild(
+		drop,
+		"selected",
+		"Selected",
+		"select",
+		"Select",
+		"value",
+		"Value",
+		"placeholder",
+		"Placeholder"
+	)
+	if label then
+		return label
+	end
+	for _, child in ipairs(drop:GetChildren()) do
+		if child:IsA("TextLabel") or child:IsA("TextButton") then
+			return child
+		end
+	end
+	return nil
+end
+
+local function sydeBindDropFrame(drop)
+	if not drop then
+		return nil
+	end
+	local selectedLabel = sydeDropSelectedLabel(drop)
+	local selectContainer = sydeFindChild(drop, "selectContainer", "SelectContainer", "selectedContainer", "SelectedContainer")
+	local container = sydeFindChild(drop, "Container", "container")
+	local search = sydeFindChild(drop, "search", "Search")
+	local down = sydeFindChild(drop, "down", "Down")
+	local v0 = sydeFindChild(drop, "v0", "V0")
+	return setmetatable({
+		selected = selectedLabel,
+		Selected = selectedLabel,
+		selectContainer = selectContainer,
+		SelectContainer = selectContainer,
+		Container = container,
+		container = container,
+		search = search,
+		Search = search,
+		down = down,
+		Down = down,
+		v0 = v0,
+		V0 = v0,
+	}, {
+		__index = drop,
+		__newindex = function(_, key, value)
+			drop[key] = value
+		end,
+	})
+end
+
+local function sydeSetDropSelectedText(drop, text)
+	local label = drop and (drop.selected or sydeDropSelectedLabel(drop))
+	if label then
+		label.Text = tostring(text or "")
+	end
+end
+
 local resizing =        false
 local screenSize =      workspace.CurrentCamera.ViewportSize
 local isMobile =        userinput.TouchEnabled or (screenSize.X < 1024 and screenSize.Y < 768)
@@ -5167,10 +5231,14 @@ function syde:Init(library)
 				dropdown.Parent = Page
 				dropdown.title.Text = data.Title
 				dropdown.Name = data.Title
+				local boundDrop = sydeBindDropFrame(dropdown.dropholder.drop)
+				if boundDrop then
+					dropdown.dropholder.drop = boundDrop
+				end
 				dropdown.dropholder.drop.Container.Option.Visible = false
 				dropdown.dropholder.drop.Container.Visible = false
 				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
-				dropdown.dropholder.drop.selected.Text = data.PlaceHolder 
+				sydeSetDropSelectedText(dropdown.dropholder.drop, data.PlaceHolder)
 
 				local DropOpen = false
 				local DeBounce = false
@@ -8652,10 +8720,14 @@ function syde:Init(library)
 			dropdown.Parent = Page
 			dropdown.title.Text = data.Title
 			dropdown.Name = data.Title
+			local boundDrop = sydeBindDropFrame(dropdown.dropholder.drop)
+			if boundDrop then
+				dropdown.dropholder.drop = boundDrop
+			end
 			dropdown.dropholder.drop.Container.Option.Visible = false
 			dropdown.dropholder.drop.Container.Visible = false
 			tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
-			dropdown.dropholder.drop.selected.Text = data.PlaceHolder 
+			sydeSetDropSelectedText(dropdown.dropholder.drop, data.PlaceHolder)
 			dropdown:SetAttribute("Searchable", true)
 
 			local DropOpen = false
