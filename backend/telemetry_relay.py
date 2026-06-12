@@ -89,6 +89,27 @@ def serve_asset(filename: str):
     return path.read_text(encoding="utf-8"), 200, {"Content-Type": content_type}
 
 
+def _safe_site_path(relative: str) -> Path | None:
+    rel = relative.lstrip("/").replace("\\", "/")
+    if not rel or ".." in rel.split("/"):
+        return None
+    path = (SITE_DIR / rel).resolve()
+    root = SITE_DIR.resolve()
+    if not str(path).startswith(str(root)) or not path.is_file():
+        return None
+    return path
+
+
+def send_site_file(relative: str):
+    path = _safe_site_path(relative)
+    if path is None:
+        return None
+    response = send_from_directory(path.parent, path.name)
+    if relative.replace("\\", "/").startswith("_next/static/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
+
+
 def load_dotenv(path: Path) -> None:
     if not path.is_file():
         return
@@ -1886,6 +1907,14 @@ def site_asset(filename: str):
     if rendered:
         return rendered
     return "Asset not found", 404
+
+
+@app.get("/_next/<path:filename>")
+def site_next_static(filename: str):
+    found = send_site_file(f"_next/{filename}")
+    if found is not None:
+        return found
+    return "Not found", 404
 
 
 @app.get("/api/bootstrap")
