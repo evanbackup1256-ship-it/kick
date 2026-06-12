@@ -3,17 +3,17 @@
   "updatedAt": "2026-06-12T06:35:40Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
-  "loaderVersion": "8.2.14",
+  "loaderVersion": "8.2.16",
   "coreVersion": "2.9.4",
-  "uiLibrary": "Maclib",
-  "uiVersion": "3.0.2-maclib",
+  "uiLibrary": "Syde",
+  "uiVersion": "4.0.0-syde",
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
   "branch": "main",
   "features": [
     "Finds the right script when you inject",
-    "WindUI with live status on each game",
+    "Syde UI with live status on each game",
     "Ban checks against Roblox UserId, username, and HWID",
     "Site and scripts pull from GitHub automatically",
     "Game status comes from real inject data, not guesses",
@@ -51,6 +51,15 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-12",
+      "title": "Syde UI (upstream + compat fixes)",
+      "items": [
+        "Loader 8.2.16 ships essencejs Syde with a thin Alleral compat layer (patch v15)",
+        "Dropdown, modal, template casing, and Volt asset sanitization fixes kept",
+        "Syde fetch uses jsDelivr commit mirror + in-memory cache when workspace write fails"
+      ]
+    },
     {
       "date": "2026-06-12",
       "title": "Maclib UI integration",

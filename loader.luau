@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.14"
+local LOADER_VERSION = "8.2.16"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -18,8 +18,8 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 14
-local SYDE_PATCH_REQUIRED_FN = "sydeApplyRowTitle"
+local SYDE_PATCH_VERSION = 15
+local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 local CORE_BASE_PATH = HUB .. "/core_base.luau"
 local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
 local CORE_UI_PATH = HUB .. "/core_ui.luau"
@@ -27,7 +27,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.14",
+	loader = "8.2.16",
 	core = "2.9.4",
 	ui = "Syde",
 	windui = "4.0.0-syde",
@@ -892,6 +892,74 @@ local function sydeSourceValid(src)
 	return type(patch) == "number" and patch >= SYDE_PATCH_VERSION
 end
 
+local function sydeSourceRejectReason(src)
+	if type(src) ~= "string" then
+		return "no body"
+	end
+	if #src < SYDE_SOURCE_MIN_BYTES then
+		return "too small (" .. tostring(#src) .. "b, need " .. tostring(SYDE_SOURCE_MIN_BYTES) .. "+)"
+	end
+	if not looksLikeLua(src) then
+		return "not lua (" .. tostring(#src) .. "b)"
+	end
+	if not src:find("sydeFindChild", 1, true) then
+		return "missing sydeFindChild"
+	end
+	if not src:find(SYDE_PATCH_MARKER, 1, true) then
+		return "missing patch marker"
+	end
+	if not src:find("sydePrepareDropdownDrop", 1, true) then
+		return "missing sydePrepareDropdownDrop"
+	end
+	if not src:find(SYDE_PATCH_REQUIRED_FN, 1, true) then
+		return "missing " .. SYDE_PATCH_REQUIRED_FN
+	end
+	local patch = sydePatchFromSource(src)
+	if type(patch) ~= "number" or patch < SYDE_PATCH_VERSION then
+		return "patch v" .. tostring(patch or "?") .. " < v" .. tostring(SYDE_PATCH_VERSION)
+	end
+	return "ok"
+end
+
+local function sydeRemoteBases()
+	local bases = { GITHUB_RAW, GITHUB_WEB }
+	local expected = ENV._Alleral_ExpectedVersions
+	local commit = type(expected) == "table" and expected.commit
+	if type(commit) == "string" and commit ~= "" then
+		table.insert(bases, "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. commit)
+	end
+	table.insert(bases, JSDELIVR)
+	return bases
+end
+
+local function fetchRemoteSyde()
+	local lastReason = "no response"
+	for attempt = 1, 3 do
+		for _, base in ipairs(sydeRemoteBases()) do
+			local body, via = httpGet(base .. "/" .. SYDE_SOURCE_PATH, SYDE_SOURCE_MIN_BYTES)
+			if type(body) == "string" and #body >= SYDE_SOURCE_MIN_BYTES then
+				if sydeSourceValid(body) then
+					return body, base .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
+				end
+				lastReason = sydeSourceRejectReason(body)
+					.. " ("
+					.. tostring(#body)
+					.. "b via "
+					.. tostring(via)
+					.. ")"
+			elseif type(body) == "string" then
+				lastReason = "too small (" .. tostring(#body) .. "b via " .. tostring(via) .. ")"
+			else
+				lastReason = tostring(via or "http failed")
+			end
+		end
+		if attempt < 3 then
+			task.wait(0.25 * attempt)
+		end
+	end
+	return nil, lastReason
+end
+
 local function clearStaleSydeRuntime()
 	local env = genv()
 	if type(env) ~= "table" or type(env._AlleralSyde) ~= "table" then
@@ -922,22 +990,34 @@ local function ensureSydeSource()
 		cacheRemote(SYDE_SOURCE_PATH, src)
 		cacheRemote(".alleral/cache/" .. SYDE_SOURCE_PATH, src)
 		local patch = sydePatchFromSource(src)
+		ENV._AlleralSydeSource = src
+		ENV._AlleralSydeSourcePatch = patch
+		ENV._AlleralSydeSourceLabel = label
+		ENV._AlleralSydeSourceReady = true
 		return true, label .. ", patch v" .. tostring(patch or "?")
 	end
 
-	local remoteSrc, remoteVia = fetchRemote(SYDE_SOURCE_PATH, SYDE_SOURCE_MIN_BYTES)
-	local remotePatch = sydePatchFromSource(remoteSrc)
+	local cacheSrc, cachePath = readLocal(cachePaths, SYDE_SOURCE_MIN_BYTES)
+	local cacheOk = cacheSrc and sydeSourceValid(cacheSrc)
+	local cachePatch = sydePatchFromSource(cacheSrc)
+
+	local remoteSrc, remoteVia = fetchRemoteSyde()
 	local remoteOk = remoteSrc and sydeSourceValid(remoteSrc)
+	local remotePatch = sydePatchFromSource(remoteSrc)
 
 	local localSrc, localPath = readLocal(localPaths, SYDE_SOURCE_MIN_BYTES)
-	local localPatch = sydePatchFromSource(localSrc)
 	local localOk = localSrc and sydeSourceValid(localSrc)
+	local localPatch = sydePatchFromSource(localSrc)
 
 	if remoteOk then
-		if localOk and (localPatch or 0) >= (remotePatch or 0) then
-			return adoptSyde(localSrc, "local:" .. tostring(localPath))
+		local bestSrc, bestLabel = remoteSrc, "remote:" .. tostring(remoteVia or "github")
+		local bestPatch = remotePatch or 0
+		if localOk and (localPatch or 0) > bestPatch then
+			bestSrc, bestLabel, bestPatch = localSrc, "local:" .. tostring(localPath), localPatch or 0
+		elseif cacheOk and (cachePatch or 0) > bestPatch then
+			bestSrc, bestLabel = cacheSrc, "cache:" .. tostring(cachePath)
 		end
-		if localOk and localPath then
+		if localOk and localPath and (localPatch or 0) < (remotePatch or 0) then
 			log(
 				"Replacing stale Syde source (local v"
 					.. tostring(localPatch or "?")
@@ -948,29 +1028,19 @@ local function ensureSydeSource()
 			)
 			deleteWorkspaceFile(localPath)
 		end
-		for _, rel in ipairs(localPaths) do
-			if rel ~= localPath then
-				deleteWorkspaceFile(rel)
-			end
-		end
-		return adoptSyde(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
+		return adoptSyde(bestSrc, bestLabel)
 	end
 
 	if localOk then
 		return adoptSyde(localSrc, "local:" .. tostring(localPath))
 	end
 
-	for _, rel in ipairs(localPaths) do
-		deleteWorkspaceFile(rel)
-	end
-	for _, rel in ipairs(cachePaths) do
-		deleteWorkspaceFile(rel)
-	end
-	local cacheSrc, cachePath = readLocal(cachePaths, SYDE_SOURCE_MIN_BYTES)
-	if cacheSrc and sydeSourceValid(cacheSrc) then
+	if cacheOk then
 		return adoptSyde(cacheSrc, "cache:" .. tostring(cachePath))
 	end
-	return false, "patched Syde source unavailable (need v" .. tostring(SYDE_PATCH_VERSION) .. "+)"
+
+	local fetchDetail = type(remoteVia) == "string" and remoteVia or sydeSourceRejectReason(remoteSrc)
+	return false, "patched Syde source unavailable (need v" .. tostring(SYDE_PATCH_VERSION) .. "+): " .. tostring(fetchDetail)
 end
 
 local function usesLegacyHttpHash(src)
@@ -1941,11 +2011,13 @@ local function loadCore()
 		return false, alleralUiLabel or "Alleral UI layer download failed"
 	end
 
-	local sydeOk, sydeLabel = ensureSydeSource()
-	if sydeOk then
-		log("Syde source ready (" .. tostring(sydeLabel) .. ")")
-	else
-		log("Syde source not cached yet: " .. tostring(sydeLabel), true)
+	if not ENV._AlleralSydeSourceReady then
+		local sydeOk, sydeLabel = ensureSydeSource()
+		if sydeOk then
+			log("Syde source ready (" .. tostring(sydeLabel) .. ")")
+		else
+			log("Syde source not cached yet: " .. tostring(sydeLabel), true)
+		end
 	end
 
 	if not hubUiSrc then
@@ -3647,6 +3719,14 @@ local function main()
 	ENV._Alleral_ExpectedVersions = expectedVersions
 	loadTelemetryConfig(false)
 	purgeOutdatedWorkspace({ useNetwork = false })
+	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
+	ENV.Alleral_HTTP.get = httpGet
+	local sydePrefetchOk, sydePrefetchLabel = ensureSydeSource()
+	if sydePrefetchOk then
+		log("Syde source ready (" .. tostring(sydePrefetchLabel) .. ")")
+	else
+		log("Syde source not cached yet: " .. tostring(sydePrefetchLabel), true)
+	end
 	refreshExpectedVersionsAsync()
 	if expectedVersions.loader and versionLt(LOADER_VERSION, expectedVersions.loader) then
 		local remoteLoaderMsg = "Remote loader is v"

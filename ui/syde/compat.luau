@@ -1,0 +1,393 @@
+-- Alleral compatibility layer for upstream Syde (essencejs/syde).
+-- Applied before the original library body; keeps upstream logic intact.
+
+local ALLERAL_SYDE_PATCH = 15
+
+local SYDE_CANONICAL_NAMES = {
+	Main = "main",
+	Top = "top",
+	Tabs = "tabs",
+	Pages = "pages",
+	Settings = "settings",
+	Dim = "dim",
+	Modal = "modal",
+	User = "user",
+	Search = "search",
+	Render = "render",
+	Minihome = "minihome",
+	Toastholder = "toastholder",
+	ToastHolder = "toastholder",
+	Toast = "toast",
+	Title = "title",
+	Sub = "sub",
+	Subtitle = "sub",
+	Tog = "tog",
+	Check = "check",
+	Gradfr = "gradfr",
+	GradFr = "gradfr",
+	Glow = "glow",
+	Interact = "interact",
+	Configure = "configure",
+	ClipFrame = "clipframe",
+	Clipframe = "clipframe",
+	Separator = "separator",
+	Desc = "desc",
+	Icon = "icon",
+	Timer = "timer",
+	Slide = "slide",
+	SlideFrame = "slideframe",
+	Slideframe = "slideframe",
+	DropHolder = "dropholder",
+	Dropholder = "dropholder",
+	Drop = "drop",
+	Selected = "selected",
+	Down = "down",
+	Shadow = "shadow",
+	Functions = "functions",
+	Resize = "resize",
+	Wallpaper = "wallpaper",
+	Homeicon = "homeicon",
+	HomeIcon = "homeicon",
+	Tb = "tb",
+	Btn = "btn",
+	Tab = "tab",
+	Page = "page",
+	Indicator = "indicator",
+	Buttons = "buttons",
+	Confirm = "confirm",
+	Cancel = "cancel",
+	Option = "Option",
+}
+
+local function sydeFindChild(parent, ...)
+	if not parent then
+		return nil
+	end
+	for i = 1, select("#", ...) do
+		local name = select(i, ...)
+		local child = parent:FindFirstChild(name)
+		if child then
+			return child
+		end
+	end
+	return nil
+end
+
+local function sydeButtonLabel(button)
+	if not button then
+		return nil
+	end
+	return sydeFindChild(button, "TextLabel", "text", "title")
+end
+
+local function sydeButtonStroke(button)
+	if not button then
+		return nil
+	end
+	return button:FindFirstChildOfClass("UIStroke") or sydeFindChild(button, "UIStroke")
+end
+
+local function sydeResolveModal(instance)
+	local buttonsFrame = sydeFindChild(instance, "Buttons", "buttons")
+	local confirm = buttonsFrame and sydeFindChild(buttonsFrame, "Confirm", "confirm")
+		or sydeFindChild(instance, "Confirm", "confirm")
+	local cancel = buttonsFrame and sydeFindChild(buttonsFrame, "Cancel", "cancel")
+		or sydeFindChild(instance, "Cancel", "cancel")
+	return {
+		Instance = instance,
+		Title = sydeFindChild(instance, "Title", "title"),
+		Content = sydeFindChild(instance, "Content", "content"),
+		UIStroke = instance:FindFirstChildOfClass("UIStroke"),
+		Confirm = confirm,
+		Cancel = cancel,
+		ConfirmLabel = sydeButtonLabel(confirm),
+		CancelLabel = sydeButtonLabel(cancel),
+		ConfirmStroke = sydeButtonStroke(confirm),
+		CancelStroke = sydeButtonStroke(cancel),
+	}
+end
+
+local function sydeSetInteractable(button, enabled)
+	if not button then
+		return
+	end
+	if typeof(button.Interactable) == "boolean" then
+		button.Interactable = enabled
+	end
+	local interact = sydeFindChild(button, "interact", "Interact")
+	if interact and typeof(interact.Interactable) == "boolean" then
+		interact.Interactable = enabled
+	end
+end
+
+local function sydeConnectClick(button, callback)
+	if not button or type(callback) ~= "function" then
+		return
+	end
+	if button:IsA("GuiButton") then
+		button.MouseButton1Click:Connect(callback)
+		return
+	end
+	local interact = sydeFindChild(button, "interact", "Interact")
+	if interact and interact:IsA("GuiButton") then
+		interact.MouseButton1Click:Connect(callback)
+	end
+end
+
+local function sydeDropSelectedLabel(drop)
+	if not drop then
+		return nil
+	end
+	local label = sydeFindChild(
+		drop,
+		"selected",
+		"Selected",
+		"select",
+		"Select",
+		"value",
+		"Value",
+		"placeholder",
+		"Placeholder"
+	)
+	if label then
+		return label
+	end
+	for _, child in ipairs(drop:GetChildren()) do
+		if child:IsA("TextLabel") or child:IsA("TextButton") then
+			return child
+		end
+	end
+	return nil
+end
+
+local function sydeBindDropFrame(drop)
+	if not drop then
+		return nil
+	end
+	local selectedLabel = sydeDropSelectedLabel(drop)
+	local selectContainer = sydeFindChild(drop, "selectContainer", "SelectContainer", "selectedContainer", "SelectedContainer")
+	local container = sydeFindChild(drop, "Container", "container")
+	local search = sydeFindChild(drop, "search", "Search")
+	local down = sydeFindChild(drop, "down", "Down")
+	local v0 = sydeFindChild(drop, "v0", "V0")
+	local bound = {
+		_drop = drop,
+		selected = selectedLabel,
+		Selected = selectedLabel,
+		selectContainer = selectContainer,
+		SelectContainer = selectContainer,
+		Container = container,
+		container = container,
+		search = search,
+		Search = search,
+		down = down,
+		Down = down,
+		v0 = v0,
+		V0 = v0,
+	}
+	return setmetatable(bound, {
+		__index = function(_, key)
+			if key == "_drop" then
+				return drop
+			end
+			local value = rawget(bound, key)
+			if value ~= nil then
+				return value
+			end
+			local instValue = drop[key]
+			if type(instValue) == "function" then
+				return function(first, ...)
+					if first == drop or first == bound then
+						return instValue(drop, ...)
+					end
+					return instValue(drop, first, ...)
+				end
+			end
+			return instValue
+		end,
+		__newindex = function(_, key, value)
+			drop[key] = value
+		end,
+	})
+end
+
+local function sydeUnwrapDropFrame(drop)
+	if type(drop) == "table" and drop._drop then
+		return drop._drop
+	end
+	return drop
+end
+
+local function sydeSetDropSelectedText(drop, text)
+	local frame = sydeUnwrapDropFrame(drop)
+	local label = drop and (drop.selected or sydeDropSelectedLabel(frame))
+	if label then
+		label.Text = tostring(text or "")
+	end
+end
+
+local function sydeSanitizeAssetRoot(root)
+	if not root then
+		return
+	end
+	for _, desc in ipairs(root:GetDescendants()) do
+		if desc:IsA("LocalScript") or desc:IsA("Script") or desc:IsA("ModuleScript") then
+			pcall(function()
+				desc:Destroy()
+			end)
+		end
+	end
+end
+
+local function sydeNormalizeTemplateNames(root)
+	if not root then
+		return
+	end
+	for _, desc in ipairs(root:GetDescendants()) do
+		local canonical = SYDE_CANONICAL_NAMES[desc.Name]
+		if canonical and canonical ~= desc.Name then
+			pcall(function()
+				desc.Name = canonical
+			end)
+		end
+	end
+end
+
+local function sydePrepareAssetRoot(root)
+	sydeSanitizeAssetRoot(root)
+	sydeNormalizeTemplateNames(root)
+end
+
+local function sydeSanitizeUiClone(root)
+	sydePrepareAssetRoot(root)
+end
+
+sydePrepareAssetRoot(Library)
+sydePrepareAssetRoot(Loader)
+
+local function sydeEnsureDropholderDropFrame(dropholder)
+	if not dropholder then
+		return nil
+	end
+	local drop = sydeFindChild(dropholder, "drop", "Drop")
+	if drop then
+		return drop
+	end
+	drop = Instance.new("Frame")
+	drop.Name = "drop"
+	drop.BackgroundTransparency = 1
+	drop.BorderSizePixel = 0
+	drop.Size = UDim2.new(1, 0, 1, 0)
+	drop.Position = UDim2.new(0, 0, 0, 0)
+	drop.ZIndex = dropholder.ZIndex
+	local children = dropholder:GetChildren()
+	drop.Parent = dropholder
+	for _, child in ipairs(children) do
+		if child ~= drop then
+			child.Parent = drop
+		end
+	end
+	return drop
+end
+
+local function sydeResolveDropFrame(dropholder)
+	if not dropholder then
+		return nil
+	end
+	local drop = sydeFindChild(dropholder, "drop", "Drop")
+	if drop then
+		return drop
+	end
+	if sydeFindChild(dropholder, "Container", "container") or sydeDropSelectedLabel(dropholder) then
+		return dropholder
+	end
+	for _, child in ipairs(dropholder:GetChildren()) do
+		if child:IsA("GuiObject") then
+			if sydeFindChild(child, "Container", "container") or sydeDropSelectedLabel(child) then
+				return child
+			end
+		end
+	end
+	return nil
+end
+
+local function sydeDropHasContainer(dropFrame)
+	return dropFrame ~= nil and sydeFindChild(dropFrame, "Container", "container") ~= nil
+end
+
+local function sydePrepareDropdownDrop(dropdown)
+	if not dropdown then
+		return nil
+	end
+	sydeSanitizeUiClone(dropdown)
+	local holder = sydeFindChild(dropdown, "dropholder", "DropHolder", "Dropholder", "dropHolder")
+	if not holder then
+		for _, child in ipairs(dropdown:GetChildren()) do
+			if sydeResolveDropFrame(child) then
+				holder = child
+				break
+			end
+		end
+	end
+	local dropFrame = nil
+	if holder then
+		dropFrame = sydeEnsureDropholderDropFrame(holder) or sydeResolveDropFrame(holder)
+	end
+	if not sydeDropHasContainer(dropFrame) then
+		local altDrop = sydeFindChild(dropdown, "drop", "Drop")
+		if sydeDropHasContainer(altDrop) then
+			dropFrame = altDrop
+		else
+			for _, child in ipairs(dropdown:GetChildren()) do
+				if child ~= holder then
+					local resolved = sydeResolveDropFrame(child)
+					if sydeDropHasContainer(resolved) then
+						dropFrame = resolved
+						break
+					end
+				end
+			end
+		end
+	end
+	if not dropFrame then
+		return nil
+	end
+	return sydeBindDropFrame(dropFrame) or dropFrame
+end
+
+local PAGE_TEMPLATE_ALIASES = {
+	Button = { "Button", "button" },
+	Toggle = { "Toggle", "toggle" },
+	KeyBind = { "KeyBind", "keybind", "Keybind" },
+	ColorPicker = { "ColorPicker", "colorpicker", "Colorpicker" },
+	Dropdown = { "Dropdown", "dropdown" },
+	Slider = { "Slider", "slider" },
+	Paragraph = { "Paragraph", "paragraph", "Para", "para" },
+	Input = { "Input", "input", "TextInput", "textinput" },
+	Label = { "Label", "label" },
+	Section = { "Section", "section" },
+	["3DView"] = { "3DView", "3dview", "View3D", "view3d" },
+}
+
+local function sydePageTemplate(pageContainer, templateName)
+	if not pageContainer then
+		return nil
+	end
+	local aliases = PAGE_TEMPLATE_ALIASES[templateName]
+	if aliases then
+		return sydeFindChild(pageContainer, table.unpack(aliases))
+	end
+	local lower = templateName:sub(1, 1):lower() .. templateName:sub(2)
+	return sydeFindChild(pageContainer, templateName, lower)
+end
+
+local function sydeClonePageTemplate(pageContainer, templateName)
+	local template = sydePageTemplate(pageContainer, templateName)
+	if not template then
+		warn("[Syde] Missing page template: " .. tostring(templateName))
+		return nil
+	end
+	local clone = template:Clone()
+	sydeSanitizeUiClone(clone)
+	return clone
+end

@@ -13,8 +13,8 @@ return function(Core)
 		"kick/kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 14
-	local SYDE_PATCH_REQUIRED_FN = "sydeApplyRowTitle"
+	local SYDE_PATCH_VERSION = 15
+	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
 		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/syde/source.luau",
@@ -185,6 +185,10 @@ return function(Core)
 			if patch > bestPatch then
 				bestSrc, bestLabel, bestPatch = src, label, patch
 			end
+		end
+
+		if type(ENV._AlleralSydeSource) == "string" then
+			consider(ENV._AlleralSydeSource, ENV._AlleralSydeSourceLabel or "memory:loader")
 		end
 
 		for _, path in ipairs(SYDE_SOURCE_PATHS) do

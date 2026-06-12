@@ -97,401 +97,6 @@ if update then return end
 local Library =         game:GetObjects("rbxassetid://123800669522471")[1]
 local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 
-
--- Alleral compatibility layer for upstream Syde (essencejs/syde).
--- Applied before the original library body; keeps upstream logic intact.
-
-local ALLERAL_SYDE_PATCH = 15
-
-local SYDE_CANONICAL_NAMES = {
-	Main = "main",
-	Top = "top",
-	Tabs = "tabs",
-	Pages = "pages",
-	Settings = "settings",
-	Dim = "dim",
-	Modal = "modal",
-	User = "user",
-	Search = "search",
-	Render = "render",
-	Minihome = "minihome",
-	Toastholder = "toastholder",
-	ToastHolder = "toastholder",
-	Toast = "toast",
-	Title = "title",
-	Sub = "sub",
-	Subtitle = "sub",
-	Tog = "tog",
-	Check = "check",
-	Gradfr = "gradfr",
-	GradFr = "gradfr",
-	Glow = "glow",
-	Interact = "interact",
-	Configure = "configure",
-	ClipFrame = "clipframe",
-	Clipframe = "clipframe",
-	Separator = "separator",
-	Desc = "desc",
-	Icon = "icon",
-	Timer = "timer",
-	Slide = "slide",
-	SlideFrame = "slideframe",
-	Slideframe = "slideframe",
-	DropHolder = "dropholder",
-	Dropholder = "dropholder",
-	Drop = "drop",
-	Selected = "selected",
-	Down = "down",
-	Shadow = "shadow",
-	Functions = "functions",
-	Resize = "resize",
-	Wallpaper = "wallpaper",
-	Homeicon = "homeicon",
-	HomeIcon = "homeicon",
-	Tb = "tb",
-	Btn = "btn",
-	Tab = "tab",
-	Page = "page",
-	Indicator = "indicator",
-	Buttons = "buttons",
-	Confirm = "confirm",
-	Cancel = "cancel",
-	Option = "Option",
-}
-
-local function sydeFindChild(parent, ...)
-	if not parent then
-		return nil
-	end
-	for i = 1, select("#", ...) do
-		local name = select(i, ...)
-		local child = parent:FindFirstChild(name)
-		if child then
-			return child
-		end
-	end
-	return nil
-end
-
-local function sydeButtonLabel(button)
-	if not button then
-		return nil
-	end
-	return sydeFindChild(button, "TextLabel", "text", "title")
-end
-
-local function sydeButtonStroke(button)
-	if not button then
-		return nil
-	end
-	return button:FindFirstChildOfClass("UIStroke") or sydeFindChild(button, "UIStroke")
-end
-
-local function sydeResolveModal(instance)
-	local buttonsFrame = sydeFindChild(instance, "Buttons", "buttons")
-	local confirm = buttonsFrame and sydeFindChild(buttonsFrame, "Confirm", "confirm")
-		or sydeFindChild(instance, "Confirm", "confirm")
-	local cancel = buttonsFrame and sydeFindChild(buttonsFrame, "Cancel", "cancel")
-		or sydeFindChild(instance, "Cancel", "cancel")
-	return {
-		Instance = instance,
-		Title = sydeFindChild(instance, "Title", "title"),
-		Content = sydeFindChild(instance, "Content", "content"),
-		UIStroke = instance:FindFirstChildOfClass("UIStroke"),
-		Confirm = confirm,
-		Cancel = cancel,
-		ConfirmLabel = sydeButtonLabel(confirm),
-		CancelLabel = sydeButtonLabel(cancel),
-		ConfirmStroke = sydeButtonStroke(confirm),
-		CancelStroke = sydeButtonStroke(cancel),
-	}
-end
-
-local function sydeSetInteractable(button, enabled)
-	if not button then
-		return
-	end
-	if typeof(button.Interactable) == "boolean" then
-		button.Interactable = enabled
-	end
-	local interact = sydeFindChild(button, "interact", "Interact")
-	if interact and typeof(interact.Interactable) == "boolean" then
-		interact.Interactable = enabled
-	end
-end
-
-local function sydeConnectClick(button, callback)
-	if not button or type(callback) ~= "function" then
-		return
-	end
-	if button:IsA("GuiButton") then
-		button.MouseButton1Click:Connect(callback)
-		return
-	end
-	local interact = sydeFindChild(button, "interact", "Interact")
-	if interact and interact:IsA("GuiButton") then
-		interact.MouseButton1Click:Connect(callback)
-	end
-end
-
-local function sydeDropSelectedLabel(drop)
-	if not drop then
-		return nil
-	end
-	local label = sydeFindChild(
-		drop,
-		"selected",
-		"Selected",
-		"select",
-		"Select",
-		"value",
-		"Value",
-		"placeholder",
-		"Placeholder"
-	)
-	if label then
-		return label
-	end
-	for _, child in ipairs(drop:GetChildren()) do
-		if child:IsA("TextLabel") or child:IsA("TextButton") then
-			return child
-		end
-	end
-	return nil
-end
-
-local function sydeBindDropFrame(drop)
-	if not drop then
-		return nil
-	end
-	local selectedLabel = sydeDropSelectedLabel(drop)
-	local selectContainer = sydeFindChild(drop, "selectContainer", "SelectContainer", "selectedContainer", "SelectedContainer")
-	local container = sydeFindChild(drop, "Container", "container")
-	local search = sydeFindChild(drop, "search", "Search")
-	local down = sydeFindChild(drop, "down", "Down")
-	local v0 = sydeFindChild(drop, "v0", "V0")
-	local bound = {
-		_drop = drop,
-		selected = selectedLabel,
-		Selected = selectedLabel,
-		selectContainer = selectContainer,
-		SelectContainer = selectContainer,
-		Container = container,
-		container = container,
-		search = search,
-		Search = search,
-		down = down,
-		Down = down,
-		v0 = v0,
-		V0 = v0,
-	}
-	return setmetatable(bound, {
-		__index = function(_, key)
-			if key == "_drop" then
-				return drop
-			end
-			local value = rawget(bound, key)
-			if value ~= nil then
-				return value
-			end
-			local instValue = drop[key]
-			if type(instValue) == "function" then
-				return function(first, ...)
-					if first == drop or first == bound then
-						return instValue(drop, ...)
-					end
-					return instValue(drop, first, ...)
-				end
-			end
-			return instValue
-		end,
-		__newindex = function(_, key, value)
-			drop[key] = value
-		end,
-	})
-end
-
-local function sydeUnwrapDropFrame(drop)
-	if type(drop) == "table" and drop._drop then
-		return drop._drop
-	end
-	return drop
-end
-
-local function sydeSetDropSelectedText(drop, text)
-	local frame = sydeUnwrapDropFrame(drop)
-	local label = drop and (drop.selected or sydeDropSelectedLabel(frame))
-	if label then
-		label.Text = tostring(text or "")
-	end
-end
-
-local function sydeSanitizeAssetRoot(root)
-	if not root then
-		return
-	end
-	for _, desc in ipairs(root:GetDescendants()) do
-		if desc:IsA("LocalScript") or desc:IsA("Script") or desc:IsA("ModuleScript") then
-			pcall(function()
-				desc:Destroy()
-			end)
-		end
-	end
-end
-
-local function sydeNormalizeTemplateNames(root)
-	if not root then
-		return
-	end
-	for _, desc in ipairs(root:GetDescendants()) do
-		local canonical = SYDE_CANONICAL_NAMES[desc.Name]
-		if canonical and canonical ~= desc.Name then
-			pcall(function()
-				desc.Name = canonical
-			end)
-		end
-	end
-end
-
-local function sydePrepareAssetRoot(root)
-	sydeSanitizeAssetRoot(root)
-	sydeNormalizeTemplateNames(root)
-end
-
-local function sydeSanitizeUiClone(root)
-	sydePrepareAssetRoot(root)
-end
-
-sydePrepareAssetRoot(Library)
-sydePrepareAssetRoot(Loader)
-
-local function sydeEnsureDropholderDropFrame(dropholder)
-	if not dropholder then
-		return nil
-	end
-	local drop = sydeFindChild(dropholder, "drop", "Drop")
-	if drop then
-		return drop
-	end
-	drop = Instance.new("Frame")
-	drop.Name = "drop"
-	drop.BackgroundTransparency = 1
-	drop.BorderSizePixel = 0
-	drop.Size = UDim2.new(1, 0, 1, 0)
-	drop.Position = UDim2.new(0, 0, 0, 0)
-	drop.ZIndex = dropholder.ZIndex
-	local children = dropholder:GetChildren()
-	drop.Parent = dropholder
-	for _, child in ipairs(children) do
-		if child ~= drop then
-			child.Parent = drop
-		end
-	end
-	return drop
-end
-
-local function sydeResolveDropFrame(dropholder)
-	if not dropholder then
-		return nil
-	end
-	local drop = sydeFindChild(dropholder, "drop", "Drop")
-	if drop then
-		return drop
-	end
-	if sydeFindChild(dropholder, "Container", "container") or sydeDropSelectedLabel(dropholder) then
-		return dropholder
-	end
-	for _, child in ipairs(dropholder:GetChildren()) do
-		if child:IsA("GuiObject") then
-			if sydeFindChild(child, "Container", "container") or sydeDropSelectedLabel(child) then
-				return child
-			end
-		end
-	end
-	return nil
-end
-
-local function sydeDropHasContainer(dropFrame)
-	return dropFrame ~= nil and sydeFindChild(dropFrame, "Container", "container") ~= nil
-end
-
-local function sydePrepareDropdownDrop(dropdown)
-	if not dropdown then
-		return nil
-	end
-	sydeSanitizeUiClone(dropdown)
-	local holder = sydeFindChild(dropdown, "dropholder", "DropHolder", "Dropholder", "dropHolder")
-	if not holder then
-		for _, child in ipairs(dropdown:GetChildren()) do
-			if sydeResolveDropFrame(child) then
-				holder = child
-				break
-			end
-		end
-	end
-	local dropFrame = nil
-	if holder then
-		dropFrame = sydeEnsureDropholderDropFrame(holder) or sydeResolveDropFrame(holder)
-	end
-	if not sydeDropHasContainer(dropFrame) then
-		local altDrop = sydeFindChild(dropdown, "drop", "Drop")
-		if sydeDropHasContainer(altDrop) then
-			dropFrame = altDrop
-		else
-			for _, child in ipairs(dropdown:GetChildren()) do
-				if child ~= holder then
-					local resolved = sydeResolveDropFrame(child)
-					if sydeDropHasContainer(resolved) then
-						dropFrame = resolved
-						break
-					end
-				end
-			end
-		end
-	end
-	if not dropFrame then
-		return nil
-	end
-	return sydeBindDropFrame(dropFrame) or dropFrame
-end
-
-local PAGE_TEMPLATE_ALIASES = {
-	Button = { "Button", "button" },
-	Toggle = { "Toggle", "toggle" },
-	KeyBind = { "KeyBind", "keybind", "Keybind" },
-	ColorPicker = { "ColorPicker", "colorpicker", "Colorpicker" },
-	Dropdown = { "Dropdown", "dropdown" },
-	Slider = { "Slider", "slider" },
-	Paragraph = { "Paragraph", "paragraph", "Para", "para" },
-	Input = { "Input", "input", "TextInput", "textinput" },
-	Label = { "Label", "label" },
-	Section = { "Section", "section" },
-	["3DView"] = { "3DView", "3dview", "View3D", "view3d" },
-}
-
-local function sydePageTemplate(pageContainer, templateName)
-	if not pageContainer then
-		return nil
-	end
-	local aliases = PAGE_TEMPLATE_ALIASES[templateName]
-	if aliases then
-		return sydeFindChild(pageContainer, table.unpack(aliases))
-	end
-	local lower = templateName:sub(1, 1):lower() .. templateName:sub(2)
-	return sydeFindChild(pageContainer, templateName, lower)
-end
-
-local function sydeClonePageTemplate(pageContainer, templateName)
-	local template = sydePageTemplate(pageContainer, templateName)
-	if not template then
-		warn("[Syde] Missing page template: " .. tostring(templateName))
-		return nil
-	end
-	local clone = template:Clone()
-	sydeSanitizeUiClone(clone)
-	return clone
-end
-
 local resizing =        false
 local screenSize =      workspace.CurrentCamera.ViewportSize
 local isMobile =        userinput.TouchEnabled or (screenSize.X < 1024 and screenSize.Y < 768)
@@ -2340,134 +1945,86 @@ function syde:Modal(Modal)
 			ConfirmCallBack = Modal.ConfimCallBack
 		}
 
-		local ModalInstance = ui.main and ui.main.modal and ui.main.modal:Clone()
-		if not ModalInstance or not ui.main then
-			return
-		end
-		sydeSanitizeUiClone(ModalInstance)
+		local ModalInstance = ui.main.modal:Clone()
 		ModalInstance.Visible = true
 		ModalInstance.Parent = ui.main
-		local modalParts = sydeResolveModal(ModalInstance)
-		if modalParts.Title then
-			modalParts.Title.Text = ModalData.Title
-			modalParts.Title.TextTransparency = 1
-		end
-		if modalParts.Content then
-			modalParts.Content.Text = ModalData.Content
-			modalParts.Content.TextTransparency = 1
-		end
-		ModalInstance.Size = UDim2.new(0, 350, 0, 144)
+		ModalInstance.Title.Text = ModalData.Title
+		ModalInstance.Content.Text = ModalData.Content
+		--	ModalInstance.Content.Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)
+		ModalInstance.Size = UDim2.new(0, 350,0, 144)
 		ModalInstance.BackgroundTransparency = 1
-		if modalParts.Confirm then
-			modalParts.Confirm.BackgroundTransparency = 1
-		end
-		if modalParts.ConfirmLabel then
-			modalParts.ConfirmLabel.TextTransparency = 1
-		end
-		if modalParts.Cancel then
-			modalParts.Cancel.BackgroundTransparency = 1
-		end
-		if modalParts.CancelLabel then
-			modalParts.CancelLabel.TextTransparency = 1
-		end
-		if modalParts.CancelStroke then
-			modalParts.CancelStroke.Transparency = 1
-		end
+		ModalInstance.Title.TextTransparency = 1
+		ModalInstance.Content.TextTransparency = 1
+
+		ModalInstance.Buttons.Confirm.BackgroundTransparency = 1
+		ModalInstance.Buttons.Confirm.TextLabel.TextTransparency = 1
+		--	ModalInstance.Buttons.Confirm.UIStroke.Transparency = 1
+
+		ModalInstance.Buttons.Cancel.BackgroundTransparency = 1
+		ModalInstance.Buttons.Cancel.TextLabel.TextTransparency = 1
+		ModalInstance.Buttons.Cancel.UIStroke.Transparency = 1
 
 		local function openModal()
-			if modalParts.Content then
-				tweenservice:Create(
-					modalParts.Content,
-					TweenInfo.new(0.75, Enum.EasingStyle.Quint),
-					{ Size = UDim2.new(1, modalParts.Content.Size.X.Offset, 1, modalParts.Content.TextBounds.Y) }
-				):Play()
-			end
+			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)}):Play()
 			activeModals += 1
-			local contentHeight = modalParts.Content and modalParts.Content.TextBounds.Y or 0
-			tweenservice:Create(
-				ModalInstance,
-				TweenInfo.new(0.65, Enum.EasingStyle.Quint),
-				{ Size = UDim2.new(0, 350, 0, contentHeight + 150) }
-			):Play()
-			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			if modalParts.UIStroke then
-				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
-			end
-			if modalParts.Title then
-				tweenservice:Create(modalParts.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-			end
-			if modalParts.Content then
-				tweenservice:Create(modalParts.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-			end
-			if modalParts.Confirm then
-				tweenservice:Create(modalParts.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.5 }):Play()
-			end
-			if modalParts.ConfirmLabel then
-				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-			end
-			if modalParts.Cancel then
-				tweenservice:Create(modalParts.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-			end
-			if modalParts.CancelLabel then
-				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-			end
-			if modalParts.CancelStroke then
-				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
-			end
+			--	ModalInstance.Size = UDim2.new(0, ModalInstance.Size.X.Offset, 0, ModalInstance.Content.TextBounds.Y + 120)
+			tweenservice:Create(ModalInstance, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0,  ModalInstance.Content.TextBounds.Y + 150)}):Play()
+
+			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
+			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+			tweenservice:Create(ModalInstance.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+			tweenservice:Create(ModalInstance.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+
+			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+
+			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+
 		end
 		openModal()
 
 		local function closeModal()
 			activeModals -= 1
-			sydeSetInteractable(modalParts.Cancel, false)
-			sydeSetInteractable(modalParts.Confirm, false)
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), { Size = UDim2.new(0, 350, 0, 147) }):Play()
-			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-			if modalParts.Title then
-				tweenservice:Create(modalParts.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-			end
-			if modalParts.UIStroke then
-				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-			end
-			if modalParts.Content then
-				tweenservice:Create(modalParts.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-			end
-			if modalParts.Confirm then
-				tweenservice:Create(modalParts.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-			end
-			if modalParts.ConfirmLabel then
-				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-			end
-			if modalParts.Cancel then
-				tweenservice:Create(modalParts.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-			end
-			if modalParts.CancelLabel then
-				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-			end
-			if modalParts.CancelStroke then
-				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-			end
+			print(activeModals)
+			ModalInstance.Buttons.Cancel.Interactable = false
+			ModalInstance.Buttons.Confirm.Interactable = false
+			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0, 147)}):Play()
+			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+
+			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+
+			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 			task.wait(0.45)
 			ModalInstance:Destroy()
 		end
 
 
 
-		if activeModals == 1 and ui.main and ui.main.dim then
+		if activeModals == 1 then
 			ui.main.dim.Visible = true
 			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 				BackgroundTransparency = 0.3
 			}):Play()
 		end
 
-		sydeConnectClick(modalParts.Confirm, function()
+		ModalInstance.Buttons.Confirm.MouseButton1Click:Connect(function()
 			if typeof(ModalData.ConfirmCallBack) == "function" then
 				ModalData.ConfirmCallBack()
 			end
 
 			closeModal()
 
-			if activeModals == 0 and ui.main and ui.main.dim then
+			if activeModals == 0 then
 				tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 					BackgroundTransparency = 1
 				}):Play()
@@ -2476,15 +2033,13 @@ function syde:Modal(Modal)
 			end
 		end)
 
-		sydeConnectClick(modalParts.Cancel, function()
+		ModalInstance.Buttons.Cancel.MouseButton1Click:Connect(function()
 			closeModal()
-			if ui.main and ui.main.dim then
-				tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
-					BackgroundTransparency = 1
-				}):Play()
-				task.wait(0.7)
-				ui.main.dim.Visible = false
-			end
+			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+				BackgroundTransparency = 1
+			}):Play()
+			task.wait(0.7)
+			ui.main.dim.Visible = false
 		end)
 
 	end)
@@ -2919,10 +2474,6 @@ function syde:Init(library)
 	Data.Home.hTitle = Data.Home.hTitle or Data.Title
 	Data.Home.hSubText = Data.Home.hSubText or Data.SubText
 	Data.Home.profileImage = Data.Home.profileImage or Data.profileImage
-	if library.Keybind then
-		uitoggle = library.Keybind
-	end
-
 	
 	local Minihome = ui.minihome
 
@@ -3875,7 +3426,7 @@ function syde:Init(library)
 					HoldTime = Button.HoldTime or 3;
 				}
 
-				local button = sydeClonePageTemplate(window.settings.pages.page, "Button")
+				local button = window.settings.pages.page.Button:Clone()
 				button.Visible = true
 				button.Parent = Page
 				button.title.Text = data.Title
@@ -4056,7 +3607,7 @@ function syde:Init(library)
 					SettingsConfig = true;
 				}
 
-				local toggle = sydeClonePageTemplate(window.settings.pages.page, "Toggle")
+				local toggle = window.settings.pages.page.Toggle:Clone()
 				toggle.Visible = true
 				toggle.Parent = Page
 				toggle.title.Text = data.Title
@@ -4367,7 +3918,7 @@ function syde:Init(library)
 					Holding = false
 				}
 
-				local KeyBind = sydeClonePageTemplate(window.settings.pages.page, "KeyBind")
+				local KeyBind = window.settings.pages.page.KeyBind:Clone()
 				KeyBind.Visible = true
 				KeyBind.Parent = Page
 				KeyBind.title.Text = data.Title
@@ -4460,7 +4011,7 @@ function syde:Init(library)
 
 				ColorPicker.Linkable = ColorPicker.Linkable or true
 
-				local colorpicker = sydeClonePageTemplate(window.settings.pages.page, "ColorPicker")
+				local colorpicker = window.settings.pages.page.ColorPicker:Clone()
 				colorpicker.Visible = true
 				colorpicker.Parent = Page
 				colorpicker.title.Text = data.Title
@@ -5362,30 +4913,25 @@ function syde:Init(library)
 					CallBack = Dropdown.CallBack;
 				}
 
-				local dropdown = sydeClonePageTemplate(window.settings.pages.page, "Dropdown")
+				local dropdown = window.settings.pages.page.Dropdown:Clone()
 				dropdown.Visible = true
 				dropdown.Parent = Page
 				dropdown.title.Text = data.Title
 				dropdown.Name = data.Title
-			local drop = sydePrepareDropdownDrop(dropdown)
-			if not drop or not drop.Container then
-				warn("[Syde] Skipping dropdown: " .. tostring(data.Title))
-				return telement
-			end
-				drop.Container.Option.Visible = false
-				drop.Container.Visible = false
-				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
-				sydeSetDropSelectedText(drop, data.PlaceHolder) 
+				dropdown.dropholder.drop.Container.Option.Visible = false
+				dropdown.dropholder.drop.Container.Visible = false
+				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
+				dropdown.dropholder.drop.selected.Text = data.PlaceHolder 
 
 				local DropOpen = false
 				local DeBounce = false
-				local OptionButton = drop.Container.Option
+				local OptionButton = dropdown.dropholder.drop.Container.Option
 				local SelectedOptions = {}
 				local SelectedOrder = {}
 
 				local function UpdateCustomLayout()
 					local yOffset = 0
-					for _, option in ipairs(drop.Container:GetChildren()) do
+					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 						if option:IsA("Frame") and option.Visible then
 							tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
 							yOffset = yOffset + option.Size.Y.Offset + 7
@@ -5395,44 +4941,44 @@ function syde:Init(library)
 
 				local function OpenDrop()
 					DropOpen = true
-					drop.Container.Visible = true
-					drop.search.Visible = true
+					dropdown.dropholder.drop.Container.Visible = true
+					dropdown.dropholder.drop.search.Visible = true
 
 					tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-					tweenservice:Create(drop.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(0, 20) }):Play()
-					tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-					tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(0, 20) }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
 
-					tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-					tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-					tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-					tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-					tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
 
 				end
 
 				local function CloseDrop()
 					DropOpen = false
 					tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-					tweenservice:Create(drop.UICorner, TweenInfo.new(1, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(1,0) }):Play()
-					tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-					tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(1, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(1,0) }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
 
-					tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-					tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-					tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-					tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 
 					task.wait(0.6)
-					drop.Container.Visible = false
-					drop.search.Visible = false
+					dropdown.dropholder.drop.Container.Visible = false
+					dropdown.dropholder.drop.search.Visible = false
 
 				end
 
-				drop.down.MouseButton1Click:Connect(function()
+				dropdown.dropholder.drop.down.MouseButton1Click:Connect(function()
 					if DeBounce then return end
 					DeBounce = true
 
@@ -5483,7 +5029,7 @@ function syde:Init(library)
 						end
 					end
 
-					local selectedContainer = drop.selectContainer.ScrollingFrame
+					local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
 					for _, child in ipairs(selectedContainer:GetChildren()) do
 						if child:IsA("Frame") and child.Name == option then
 							child:Destroy()
@@ -5493,10 +5039,10 @@ function syde:Init(library)
 				end
 
 				local function UpdateSelectedText()
-					local selectedContainer = drop.selectContainer.ScrollingFrame
-					local placeholderText = drop.selected
+					local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
+					local placeholderText = dropdown.dropholder.drop.selected
 					selectedContainer.Visible = data.Multi
-					drop.selected.Visible = false
+					dropdown.dropholder.drop.selected.Visible = false
 
 
 					if data.Multi then
@@ -5523,7 +5069,7 @@ function syde:Init(library)
 									UpdateSelectedText()
 
 									-- Visually update the dropdown list
-									for _, opt in ipairs(drop.Container:GetChildren()) do
+									for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 										if opt:IsA("Frame") and opt.Name == option then
 											tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 											tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
@@ -5555,20 +5101,20 @@ function syde:Init(library)
 
 					else
 						-- Single option text fallback
-						drop.selected.Visible = true
+						dropdown.dropholder.drop.selected.Visible = true
 						if #SelectedOrder > 0 then
-							drop.selected.Text = SelectedOrder[1]
+							dropdown.dropholder.drop.selected.Text = SelectedOrder[1]
 						else
-							sydeSetDropSelectedText(drop, data.PlaceHolder)
+							dropdown.dropholder.drop.selected.Text = data.PlaceHolder
 						end
 					end
 				end
 
 				--[SEARCH]
-				drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-					local searchText = drop.search.TextBox.Text:lower()
+				dropdown.dropholder.drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+					local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower()
 
-					for _, option in ipairs(drop.Container:GetChildren()) do
+					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 						if option:IsA("Frame") and option:FindFirstChild("Title") then
 							local optionText = option.Title.Text:lower()
 							local isTemplate = option.Name == "Option"
@@ -5611,13 +5157,13 @@ function syde:Init(library)
 					for _, OptionText in ipairs(data.Options) do
 						local option = OptionButton:Clone()
 						option.Title.Text = OptionText
-						option.Parent = drop.Container
+						option.Parent = dropdown.dropholder.drop.Container
 						option.Visible = true
 						option.Name = OptionText
 
 						if OptionText == data.StarterOption and not starterSet then
 							starterSet = true
-							drop.Selected.Text = OptionText
+							dropdown.dropholder.drop.Selected.Text = OptionText
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
 
@@ -5641,12 +5187,12 @@ function syde:Init(library)
 									data.CallBack(SelectedOrder)
 								end
 							else
-								drop.selected.Text = OptionText
+								dropdown.dropholder.drop.selected.Text = OptionText
 
 								SelectedOptions = {[OptionText] = true}
 								SelectedOrder = {OptionText}
 
-								for _, opt in ipairs(drop.Container:GetChildren()) do
+								for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 									if opt:IsA("Frame") then
 										tweenservice:Create(opt, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
 										tweenservice:Create(opt.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
@@ -5671,7 +5217,7 @@ function syde:Init(library)
 					end
 
 					if not starterSet then
-						sydeSetDropSelectedText(drop, data.PlaceHolder)
+						dropdown.dropholder.drop.selected.Text = data.PlaceHolder
 					end
 
 					UpdateCustomLayout()
@@ -5687,7 +5233,7 @@ function syde:Init(library)
 					Sliders = Slider.Sliders
 				}
 
-				local slider = sydeClonePageTemplate(window.settings.pages.page, "Slider")
+				local slider = window.settings.pages.page.Slider:Clone()
 				slider.Visible = true
 				slider.Parent = Page
 				slider.title.Text = data.Title
@@ -6008,7 +5554,7 @@ function syde:Init(library)
 					Content = Paragraph.Content;
 				}
 
-				local Para = sydeClonePageTemplate(window.settings.pages.page, "Paragraph")
+				local Para = window.settings.pages.page.Paragraph:Clone()
 				Para.Visible = true
 				Para.Parent = Page
 				Para.Frame.title.Text = ParaData.Title
@@ -6061,7 +5607,7 @@ function syde:Init(library)
 					CallBack = TextInput.CallBack,
 				}
 
-				local textinput =  sydeClonePageTemplate(window.settings.pages.page, "Input")
+				local textinput =  window.settings.pages.page.Input:Clone()
 				textinput.Visible = true
 				textinput.Parent = Page
 				textinput.Name = data.Title
@@ -6773,9 +6319,6 @@ function syde:Init(library)
 	}
 
 	function tbdata:InitTab(tab)
-		if type(tab) == "string" then
-			tab = { Title = tab }
-		end
 		-- bootstrap Home-mode once so first-created tabs don't auto-open
 
 		if Data.Home.Enabled then
@@ -7349,7 +6892,7 @@ function syde:Init(library)
 				HoldTime = Button.HoldTime or 3;
 			}
 
-			local button = sydeClonePageTemplate(pages.page, "Button")
+			local button = pages.page.Button:Clone()
 			button.Visible = true
 			button.Parent = Page
 			button.title.Text = data.Title
@@ -7531,7 +7074,7 @@ function syde:Init(library)
 				Flag = Toggle.Flag;
 			}
 
-			local toggle = sydeClonePageTemplate(pages.page, "Toggle")
+			local toggle = pages.page.Toggle:Clone()
 			toggle.Visible = true
 			toggle.Parent = Page
 			toggle.title.Text = data.Title
@@ -7858,7 +7401,7 @@ function syde:Init(library)
 				Sliders = Slider.Sliders
 			}
 
-			local slider = sydeClonePageTemplate(pages.page, "Slider")
+			local slider = pages.page.Slider:Clone()
 			slider.Visible = true
 			slider.Parent = Page
 			slider.title.Text = data.Title
@@ -8181,7 +7724,7 @@ function syde:Init(library)
 				Holding = false
 			}
 
-			local KeyBind = sydeClonePageTemplate(pages.page, "KeyBind")
+			local KeyBind = pages.page.KeyBind:Clone()
 			KeyBind.Visible = true
 			KeyBind.Parent = Page
 			KeyBind.title.Text = data.Title
@@ -8270,7 +7813,7 @@ function syde:Init(library)
 				CallBack = TextInput.CallBack,
 			}
 
-			local textinput = sydeClonePageTemplate(pages.page, "Input")
+			local textinput = pages.page.Input:Clone()
 			textinput.Visible = true
 			textinput.Parent = Page
 			textinput.Name = data.Title
@@ -8403,7 +7946,7 @@ function syde:Init(library)
 				AutoRotate = View.AutoRotate ~= false -- default true
 			}
 
-			local EnchancedView = sydeClonePageTemplate(pages.page, "3DView")
+			local EnchancedView = pages.page["3DView"]:Clone()
 			EnchancedView.Visible = true
 			EnchancedView.Parent = Page
 			EnchancedView.Title.Text = Viewdata.Title
@@ -8689,7 +8232,7 @@ function syde:Init(library)
 				Content = Paragraph.Content;
 			}
 
-			local Para = sydeClonePageTemplate(pages.page, "Paragraph")
+			local Para = pages.page.Paragraph:Clone()
 			Para.Visible = true
 			Para.Parent = Page
 			Para.Frame.title.Text = ParaData.Title
@@ -8724,7 +8267,7 @@ function syde:Init(library)
 
 		function initelement:Label(Text, Alignment)
 
-			local Label = sydeClonePageTemplate(pages.page, "Label")
+			local Label = pages.page.Label:Clone()
 			Label.Visible = true
 			Label.Parent = Page
 			Label.text.Text = Text
@@ -8744,7 +8287,7 @@ function syde:Init(library)
 				Title = Title
 			}
 
-			local Section =  sydeClonePageTemplate(pages.page, "Section")
+			local Section =  pages.page.Section:Clone()
 			Section.Visible = true
 			Section.Title.Text = Title
 			Section.Parent = Page
@@ -8769,31 +8312,26 @@ function syde:Init(library)
 				CallBack = Dropdown.CallBack;
 			}
 
-			local dropdown = sydeClonePageTemplate(pages.page, "Dropdown")
+			local dropdown = pages.page.Dropdown:Clone()
 			dropdown.Visible = true
 			dropdown.Parent = Page
 			dropdown.title.Text = data.Title
 			dropdown.Name = data.Title
-			local drop = sydePrepareDropdownDrop(dropdown)
-			if not drop or not drop.Container then
-				warn("[Syde] Skipping dropdown: " .. tostring(data.Title))
-				return initelement
-			end
-			drop.Container.Option.Visible = false
-			drop.Container.Visible = false
-			tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
-			sydeSetDropSelectedText(drop, data.PlaceHolder) 
+			dropdown.dropholder.drop.Container.Option.Visible = false
+			dropdown.dropholder.drop.Container.Visible = false
+			tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
+			dropdown.dropholder.drop.selected.Text = data.PlaceHolder 
 			dropdown:SetAttribute("Searchable", true)
 
 			local DropOpen = false
 			local DeBounce = false
-			local OptionButton = drop.Container.Option
+			local OptionButton = dropdown.dropholder.drop.Container.Option
 			local SelectedOptions = {}
 			local SelectedOrder = {}
 
 			local function UpdateCustomLayout()
 				local yOffset = 0
-				for _, option in ipairs(drop.Container:GetChildren()) do
+				for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 					if option:IsA("Frame") and option.Visible then
 						tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
 						yOffset = yOffset + option.Size.Y.Offset + 7
@@ -8803,42 +8341,42 @@ function syde:Init(library)
 
 			local function OpenDrop()
 				DropOpen = true
-				drop.Container.Visible = true
-				drop.search.Visible = true
+				dropdown.dropholder.drop.Container.Visible = true
+				dropdown.dropholder.drop.search.Visible = true
 
 				tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-				tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
 
-				tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-				tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-				tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-				tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-				tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
 
 			end
 
 			local function CloseDrop()
 				DropOpen = false
 				tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-				tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
 
-				tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-				tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-				tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-				tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 
 				task.wait(0.6)
-				drop.Container.Visible = false
-				drop.search.Visible = false
+				dropdown.dropholder.drop.Container.Visible = false
+				dropdown.dropholder.drop.search.Visible = false
 
 			end
 
-			drop.down.MouseButton1Click:Connect(function()
+			dropdown.dropholder.drop.down.MouseButton1Click:Connect(function()
 				if DeBounce then return end
 				DeBounce = true
 
@@ -8889,7 +8427,7 @@ function syde:Init(library)
 					end
 				end
 
-				local selectedContainer = drop.selectContainer.ScrollingFrame
+				local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
 				for _, child in ipairs(selectedContainer:GetChildren()) do
 					if child:IsA("Frame") and child.Name == option then
 						child:Destroy()
@@ -8899,10 +8437,10 @@ function syde:Init(library)
 			end
 
 			local function UpdateSelectedText()
-				local selectedContainer = drop.selectContainer.ScrollingFrame
-				local placeholderText = drop.selected
+				local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
+				local placeholderText = dropdown.dropholder.drop.selected
 				selectedContainer.Visible = data.Multi
-				drop.selected.Visible = false
+				dropdown.dropholder.drop.selected.Visible = false
 
 
 				if data.Multi then
@@ -8929,7 +8467,7 @@ function syde:Init(library)
 								UpdateSelectedText()
 
 								-- Visually update the dropdown list
-								for _, opt in ipairs(drop.Container:GetChildren()) do
+								for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 									if opt:IsA("Frame") and opt.Name == option then
 										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
@@ -8961,20 +8499,20 @@ function syde:Init(library)
 
 				else
 					-- Single option text fallback
-					drop.selected.Visible = true
+					dropdown.dropholder.drop.selected.Visible = true
 					if #SelectedOrder > 0 then
-						drop.selected.Text = SelectedOrder[1]
+						dropdown.dropholder.drop.selected.Text = SelectedOrder[1]
 					else
-						sydeSetDropSelectedText(drop, data.PlaceHolder)
+						dropdown.dropholder.drop.selected.Text = data.PlaceHolder
 					end
 				end
 			end
 
 			--[SEARCH]
-			drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-				local searchText = drop.search.TextBox.Text:lower()
+			dropdown.dropholder.drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+				local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower()
 
-				for _, option in ipairs(drop.Container:GetChildren()) do
+				for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 					if option:IsA("Frame") and option:FindFirstChild("Title") then
 						local optionText = option.Title.Text:lower()
 						local isTemplate = option.Name == "Option"
@@ -9017,13 +8555,13 @@ function syde:Init(library)
 				for _, OptionText in ipairs(data.Options) do
 					local option = OptionButton:Clone()
 					option.Title.Text = OptionText
-					option.Parent = drop.Container
+					option.Parent = dropdown.dropholder.drop.Container
 					option.Visible = true
 					option.Name = OptionText
 
 					if OptionText == data.StarterOption and not starterSet then
 						starterSet = true
-						drop.Selected.Text = OptionText
+						dropdown.dropholder.drop.Selected.Text = OptionText
 						SelectedOptions = {[OptionText] = true}
 						SelectedOrder = {OptionText}
 
@@ -9047,12 +8585,12 @@ function syde:Init(library)
 								data.CallBack(SelectedOrder)
 							end
 						else
-							drop.selected.Text = OptionText
+							dropdown.dropholder.drop.selected.Text = OptionText
 
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
 
-							for _, opt in ipairs(drop.Container:GetChildren()) do
+							for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 								if opt:IsA("Frame") then
 									tweenservice:Create(opt, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
 									tweenservice:Create(opt.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
@@ -9077,7 +8615,7 @@ function syde:Init(library)
 				end
 
 				if not starterSet then
-					sydeSetDropSelectedText(drop, data.PlaceHolder)
+					dropdown.dropholder.drop.selected.Text = data.PlaceHolder
 				end
 
 				UpdateCustomLayout()
@@ -9102,7 +8640,7 @@ function syde:Init(library)
 			ColorPicker.Linkable = ColorPicker.Linkable or true
 
 
-			local colorpicker = sydeClonePageTemplate(pages.page, "ColorPicker")
+			local colorpicker = pages.page.ColorPicker:Clone()
 			colorpicker.Visible = true
 			colorpicker.Parent = Page
 			colorpicker.title.Text = data.Title
@@ -10051,40 +9589,13 @@ function syde:Init(library)
 			end
 		end
 
-
-		function initelement:Select()
-			SwitchToTab(tdata.Title)
-		end
-
 		return initelement
 
 
 	end
-
-	function tbdata:Toggle()
-		ToggleUI()
-	end
-
-	function tbdata:GetState()
-		return not uiclosed
-	end
-
-	function tbdata:SetState(state)
-		local want = state == true
-		if want and uiclosed then
-			ToggleUI()
-		elseif not want and not uiclosed then
-			ToggleUI()
-		end
-	end
-
 	return tbdata
 
 
 end
-
-syde.__AlleralPatch = ALLERAL_SYDE_PATCH
-
-return syde
 
 return syde
