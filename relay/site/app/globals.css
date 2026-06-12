@@ -150,7 +150,6 @@
     border: 1px solid var(--color-border);
     box-shadow: var(--shadow-panel);
     backdrop-filter: blur(12px) saturate(125%);
-    contain: layout paint;
     transition:
       border-color var(--motion-hover) var(--ease-out),
       box-shadow var(--motion-hover) var(--ease-out),
@@ -266,28 +265,110 @@
     z-index: 1;
   }
 
-  /* Mission Control: bounded dashboard height — page scrolls, panels stay readable */
+  /* Mission Control — stable CSS grid (no resizable-panel overlap) */
+  .mission-control {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+  }
+
+  .mission-control-board {
+    display: grid;
+    grid-template-columns: minmax(220px, 248px) minmax(0, 1fr) minmax(248px, 288px);
+    gap: 0.75rem;
+    align-items: stretch;
+    min-height: 560px;
+  }
+
+  .mc-slot {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .mc-slot-metrics .mc-rail {
+    max-height: 640px;
+  }
+
+  .mc-slot-main {
+    display: grid;
+    grid-template-rows: auto minmax(280px, 1fr);
+    gap: 0.75rem;
+    min-height: 0;
+  }
+
+  .mc-throughput {
+    flex-shrink: 0;
+  }
+
+  .mc-throughput-chart {
+    height: 200px;
+    max-height: 200px;
+  }
+
+  .mc-insights {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    min-height: 280px;
+    min-width: 0;
+  }
+
+  .mc-slot-feed {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.75rem;
+    min-height: 560px;
+    max-height: 640px;
+  }
+
+  @media (max-width: 1279px) {
+    .mission-control-board {
+      grid-template-columns: minmax(200px, 220px) minmax(0, 1fr) minmax(220px, 260px);
+    }
+  }
+
+  @media (max-width: 1023px) {
+    .mission-control-board {
+      grid-template-columns: 1fr;
+      min-height: 0;
+    }
+
+    .mc-slot-main {
+      grid-template-rows: auto auto;
+    }
+
+    .mc-insights {
+      grid-template-columns: 1fr;
+    }
+
+    .mc-slot-feed {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: minmax(260px, 320px);
+      max-height: none;
+    }
+  }
+
+  /* Legacy alias */
   .command-center-grid {
-    height: clamp(480px, 52vh, 600px);
-    min-height: 480px;
-    max-height: 600px;
+    height: auto;
+    min-height: 0;
+    max-height: none;
   }
 
   .command-center-chart-body {
-    height: clamp(160px, 22vh, 240px);
-    max-height: 240px;
+    height: 200px;
+    max-height: 200px;
   }
 
   @media (max-width: 767px) {
-    .command-center-grid {
-      height: auto;
-      min-height: 0;
-      max-height: none;
-    }
-
     .command-center-chart-body {
       height: 220px;
       max-height: none;
+    }
+
+    .mc-slot-feed {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto;
     }
   }
 

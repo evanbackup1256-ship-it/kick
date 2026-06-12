@@ -12,18 +12,20 @@ export function ServiceGraph({
   games,
   sync,
   className,
+  embedded,
 }: {
   games: GameNode[];
   sync?: { lastError?: string; enabled?: boolean; autoStatus?: boolean };
   className?: string;
+  embedded?: boolean;
 }) {
   const hub = status.online;
   const syncKind = resolveSyncStatus(sync);
   const syncMeta = status[syncKind];
   const broken = games.filter((g) => resolveGameStatus(g.status) !== "healthy");
 
-  return (
-    <InViewReveal className={clsx("obs-panel flex min-h-0 flex-col", className)}>
+  const body = (
+    <>
       <div className="obs-panel-head shrink-0">
         <div>
           <p className="obs-kicker">Dependency graph</p>
@@ -111,6 +113,12 @@ export function ServiceGraph({
           })}
         </ul>
       </div>
-    </InViewReveal>
+    </>
   );
+
+  if (embedded) {
+    return <div className={clsx("obs-panel flex min-h-0 flex-col", className)}>{body}</div>;
+  }
+
+  return <InViewReveal className={clsx("obs-panel flex min-h-0 flex-col", className)}>{body}</InViewReveal>;
 }

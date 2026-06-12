@@ -5,7 +5,7 @@ import * as Popover from "@radix-ui/react-popover";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, ChevronDown } from "lucide-react";
 import { memo, useEffect, useId, useMemo, useState } from "react";
-import { spring } from "@/lib/motion/config";
+import { spring, stagger } from "@/lib/motion/config";
 
 export type SelectOption = { value: string; label: string };
 
@@ -81,18 +81,19 @@ export const Select = memo(function Select({
             <Popover.Content
               id={listId}
               role="listbox"
-              sideOffset={6}
+              sideOffset={8}
               align="start"
               collisionPadding={12}
               asChild
               onOpenAutoFocus={(e) => e.preventDefault()}
             >
               <motion.div
-                initial={reduce ? false : { opacity: 0, y: -6, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={reduce ? undefined : { opacity: 0, y: -4, scale: 0.99 }}
-                transition={spring.tooltip}
-                className="custom-select-menu z-[600] max-h-60 w-[var(--radix-popover-trigger-width)] overflow-y-auto p-1"
+                initial={reduce ? false : { opacity: 0, y: -8, scale: 0.96, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                exit={reduce ? undefined : { opacity: 0, y: -6, scale: 0.98, filter: "blur(2px)" }}
+                transition={spring.panel}
+                style={{ transformOrigin: "var(--radix-popover-content-transform-origin)" }}
+                className="custom-select-menu z-[600] max-h-60 w-[var(--radix-popover-trigger-width)] overflow-y-auto overscroll-contain p-1"
               >
                 {items.map((opt, index) => {
                   const active = opt.value === current;
@@ -102,9 +103,12 @@ export const Select = memo(function Select({
                       type="button"
                       role="option"
                       aria-selected={active}
-                      initial={reduce ? false : { opacity: 0, x: -6 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ ...spring.tooltip, delay: reduce ? 0 : index * 0.025 }}
+                      initial={reduce ? false : { opacity: 0, x: -8, scale: 0.98 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      exit={reduce ? undefined : { opacity: 0, x: -4 }}
+                      whileHover={reduce ? undefined : { x: 2, backgroundColor: "rgba(255,255,255,0.05)" }}
+                      whileTap={reduce ? undefined : { scale: 0.98 }}
+                      transition={{ ...spring.tooltip, delay: reduce ? 0 : index * stagger.fast }}
                       className={clsx("custom-select-option", active && "selected")}
                       onClick={() => pick(opt.value)}
                     >

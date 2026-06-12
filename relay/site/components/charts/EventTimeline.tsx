@@ -74,12 +74,14 @@ function eventKind(ev: TimelineEvent) {
 export const EventTimeline = memo(function EventTimeline({
   events,
   className,
+  embedded,
 }: {
   events: TimelineEvent[];
   className?: string;
+  embedded?: boolean;
 }) {
-  return (
-    <InViewReveal className={clsx("obs-panel flex h-full min-h-0 flex-col", className)}>
+  const body = (
+    <>
       <div className="obs-panel-head shrink-0">
         <div>
           <p className="obs-kicker">Event timeline</p>
@@ -125,19 +127,27 @@ export const EventTimeline = memo(function EventTimeline({
           </div>
         )}
       />
-    </InViewReveal>
+    </>
   );
+
+  if (embedded) {
+    return <div className={clsx("obs-panel flex h-full min-h-0 flex-col", className)}>{body}</div>;
+  }
+
+  return <InViewReveal className={clsx("obs-panel flex h-full min-h-0 flex-col", className)}>{body}</InViewReveal>;
 });
 
 export const GameStatusStream = memo(function GameStatusStream({
   games,
   className,
+  embedded,
 }: {
   games: GameRow[];
   className?: string;
+  embedded?: boolean;
 }) {
-  return (
-    <InViewReveal className={clsx("obs-panel flex h-full min-h-0 flex-col", className)}>
+  const body = (
+    <>
       <div className="obs-panel-head shrink-0">
         <div>
           <p className="obs-kicker">Service map</p>
@@ -176,6 +186,12 @@ export const GameStatusStream = memo(function GameStatusStream({
           );
         }}
       />
-    </InViewReveal>
+    </>
   );
+
+  if (embedded) {
+    return <div className={clsx("obs-panel flex h-full min-h-0 flex-col", className)}>{body}</div>;
+  }
+
+  return <InViewReveal className={clsx("obs-panel flex h-full min-h-0 flex-col", className)}>{body}</InViewReveal>;
 });

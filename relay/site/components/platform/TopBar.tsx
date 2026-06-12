@@ -46,7 +46,7 @@ export function TopBar({
       <div className="flex shrink-0 items-center gap-1.5 md:gap-3">
         <FreshnessChip dataUpdatedAt={dataUpdatedAt} live={online !== false} className="hidden sm:inline-flex" />
         <StatusPill kind={relayKind} size="sm" className="hidden md:inline-flex" />
-        <div className="hidden w-44 lg:block">
+        <div className="hidden w-40 sm:block md:w-44">
           <Select name="workspace" options={WORKSPACE_OPTIONS} value={preset} onChange={(v) => setWorkspace(v as WorkspacePreset)} />
         </div>
         <Button variant="ghost" size="sm" onClick={() => setOpen(true)} className="gap-1.5 px-2 md:gap-2 md:px-3">
