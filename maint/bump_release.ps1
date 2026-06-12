@@ -63,8 +63,17 @@ $uiLibrary = if ($release.ui) { $release.ui } else { "Syde" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiLibrary"\s*:\s*"[^"]*"', ('"uiLibrary": "' + $uiLibrary + '"'))
 $uiVersion = if ($release.alleral) { $release.alleral } elseif ($release.windui) { $release.windui } else { "4.0.0-syde" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiVersion"\s*:\s*"[^"]*"', ('"uiVersion": "' + $uiVersion + '"'))
-if ($release.sydePatch) {
-    $siteRaw = [regex]::Replace($siteRaw, '"sydePatch"\s*:\s*\d+', ('"sydePatch": ' + [int]$release.sydePatch))
+if ($null -ne $release.sydePatch) {
+    $sydePatchVal = [int]$release.sydePatch
+    if ($siteRaw -match '"sydePatch"\s*:\s*\d+') {
+        $siteRaw = [regex]::Replace($siteRaw, '"sydePatch"\s*:\s*\d+', ('"sydePatch": ' + $sydePatchVal))
+    } else {
+        $siteRaw = [regex]::Replace(
+            $siteRaw,
+            '("uiVersion"\s*:\s*"[^"]*"\s*,)',
+            ('$1' + "`n  ""sydePatch"": " + $sydePatchVal + ",")
+        )
+    }
 }
 if ($hashBumpNeeded) {
     $siteRaw = [regex]::Replace($siteRaw, '"updatedAt"\s*:\s*"[^"]*"', ('"updatedAt": "' + $updatedAt + '"'))
