@@ -3178,29 +3178,6 @@ local function clearLegacySession()
 	ENV.Alleral_LoaderRunning = false
 end
 
-local function installAutoexecRedirect()
-	if type(writeFileFn) ~= "function" then
-		return
-	end
-	local stub = table.concat({
-		"local g = getgenv()",
-		"if g.Alleral_AutoRelaunch == false then return end",
-		"if not g._Alleral_SessionWasActive and not g._Alleral_PendingRelaunch then return end",
-		"local placeOk = g._Alleral_LastPlaceId == game.PlaceId",
-		"if type(g._Alleral_SupportedPlaces) == 'table' and g._Alleral_SupportedPlaces[game.PlaceId] then placeOk = true end",
-		"if not placeOk and not g._Alleral_PendingRelaunch then return end",
-		BOOTSTRAP_LOADSTRING,
-		"",
-	}, "\n")
-	for _, dir in ipairs({ "autoexec", "Autoexec" }) do
-		if makeFolderFn then
-			pcall(makeFolderFn, dir)
-		end
-		pcall(writeFileFn, dir .. "/alleral.luau", stub)
-	end
-	log("Wrote autoexec/alleral.luau (local-first relaunch)")
-end
-
 local function purgeLegacyLoaders()
 	if not isFile or not readFile then
 		return 0, false, {}
@@ -3479,19 +3456,43 @@ local function startAutoUpdater(profile)
 	log("Auto-update polling every " .. tostring(pollSeconds) .. "s")
 end
 
-local TELEPORT_RELAUNCH_COOLDOWN = 5
+do
+	local TELEPORT_RELAUNCH_COOLDOWN = 5
 
-local function markSupportedPlaces()
-	local places = {}
-	for _, profile in ipairs(GAMES) do
-		for _, placeId in ipairs(profile.placeIds or {}) do
-			places[placeId] = true
+	local function installAutoexecRedirect()
+		if type(writeFileFn) ~= "function" then
+			return
 		end
+		local stub = table.concat({
+			"local g = getgenv()",
+			"if g.Alleral_AutoRelaunch == false then return end",
+			"if not g._Alleral_SessionWasActive and not g._Alleral_PendingRelaunch then return end",
+			"local placeOk = g._Alleral_LastPlaceId == game.PlaceId",
+			"if type(g._Alleral_SupportedPlaces) == 'table' and g._Alleral_SupportedPlaces[game.PlaceId] then placeOk = true end",
+			"if not placeOk and not g._Alleral_PendingRelaunch then return end",
+			BOOTSTRAP_LOADSTRING,
+			"",
+		}, "\n")
+		for _, dir in ipairs({ "autoexec", "Autoexec" }) do
+			if makeFolderFn then
+				pcall(makeFolderFn, dir)
+			end
+			pcall(writeFileFn, dir .. "/alleral.luau", stub)
+		end
+		log("Wrote autoexec/alleral.luau (local-first relaunch)")
 	end
-	ENV._Alleral_SupportedPlaces = places
-end
 
-local function relaunchViaBootstrap(reason)
+	local function markSupportedPlaces()
+		local places = {}
+		for _, profile in ipairs(GAMES) do
+			for _, placeId in ipairs(profile.placeIds or {}) do
+				places[placeId] = true
+			end
+		end
+		ENV._Alleral_SupportedPlaces = places
+	end
+
+	local function relaunchViaBootstrap(reason)
 	reason = reason or "relaunch"
 	stopAutoUpdater()
 	if type(ENV.Alleral_Bootstrap) == "function" then
@@ -3648,11 +3649,17 @@ local function wireTeleportRelaunch()
 			ENV._Alleral_TeleportAt = nil
 			scheduleHubRelaunch("spawn-after-teleport", 2)
 		end)
-	end)
-end
+		end)
+	end
 
-ENV._Alleral_EnsureTeleportWatch = wireTeleportRelaunch
-ENV._Alleral_ScheduleRelaunch = scheduleHubRelaunch
+	ENV._Alleral_InstallAutoexecRedirect = installAutoexecRedirect
+	ENV._Alleral_MarkSupportedPlaces = markSupportedPlaces
+	ENV._Alleral_RelaunchViaBootstrap = relaunchViaBootstrap
+	ENV._Alleral_InstallGlobalBootstrap = installGlobalBootstrap
+	ENV._Alleral_EnsureAutoexec = ensureAutoexecLoader
+	ENV._Alleral_EnsureTeleportWatch = wireTeleportRelaunch
+	ENV._Alleral_ScheduleRelaunch = scheduleHubRelaunch
+end
 
 local function detectGame()
 	local placeId = game.PlaceId
@@ -3736,8 +3743,12 @@ local function main()
 		ENV.Alleral_AutoRelaunch = true
 	end
 
-	installGlobalBootstrap()
-	markSupportedPlaces()
+	if type(ENV._Alleral_InstallGlobalBootstrap) == "function" then
+		ENV._Alleral_InstallGlobalBootstrap()
+	end
+	if type(ENV._Alleral_MarkSupportedPlaces) == "function" then
+		ENV._Alleral_MarkSupportedPlaces()
+	end
 
 	local expectedVersions = fetchExpectedVersions(true)
 	ENV._Alleral_ExpectedVersions = expectedVersions
@@ -3762,7 +3773,9 @@ local function main()
 		)
 		ENV.Alleral_LoaderRunning = false
 		task.defer(function()
-			relaunchViaBootstrap("loader-version-sync")
+			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
+				ENV._Alleral_RelaunchViaBootstrap("loader-version-sync")
+			end
 		end)
 		return
 	end
@@ -3776,7 +3789,9 @@ local function main()
 		)
 		ENV.Alleral_LoaderRunning = false
 		task.defer(function()
-			relaunchViaBootstrap("min-loader-sync")
+			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
+				ENV._Alleral_RelaunchViaBootstrap("min-loader-sync")
+			end
 		end)
 		return
 	end
@@ -3796,8 +3811,8 @@ local function main()
 		local legacyRemoved, autoexecHit, deletedPaths = purgeLegacyLoaders()
 		if legacyRemoved > 0 then
 			log("Removed " .. tostring(legacyRemoved) .. " legacy loader file(s)")
-			if autoexecHit then
-				installAutoexecRedirect()
+			if autoexecHit and type(ENV._Alleral_InstallAutoexecRedirect) == "function" then
+				ENV._Alleral_InstallAutoexecRedirect()
 			end
 		elseif loaderUpgraded then
 			local remaining = scanLegacyLoaders()
@@ -3987,8 +4002,16 @@ local function main()
 
 	wireTelemetry(profile)
 	recordInstalledVersions()
-	pcall(ensureAutoexecLoader)
-	pcall(wireTeleportRelaunch)
+	pcall(function()
+		if type(ENV._Alleral_EnsureAutoexec) == "function" then
+			ENV._Alleral_EnsureAutoexec()
+		end
+	end)
+	pcall(function()
+		if type(ENV._Alleral_EnsureTeleportWatch) == "function" then
+			ENV._Alleral_EnsureTeleportWatch()
+		end
+	end)
 	task.defer(function()
 		pcall(purgeAlleralWorkspace, { reason = "post-boot", quiet = true })
 		pcall(armAutoUpdateFingerprint, profile, true)
@@ -4003,7 +4026,11 @@ local function main()
 end
 
 publishConsoleApi("Alleral_Bootstrap", function(reason)
-	local ok, err = relaunchViaBootstrap(reason or "manual-bootstrap")
+	local relaunch = ENV._Alleral_RelaunchViaBootstrap
+	if type(relaunch) ~= "function" then
+		return false, "bootstrap relaunch unavailable"
+	end
+	local ok, err = relaunch(reason or "manual-bootstrap")
 	if not ok then
 		warn("[Alleral v" .. LOADER_VERSION .. "] Bootstrap failed: " .. tostring(err))
 		return false, err
@@ -4012,7 +4039,12 @@ publishConsoleApi("Alleral_Bootstrap", function(reason)
 end)
 
 publishConsoleApi("Alleral_Load", function()
-	local ok, err = relaunchViaBootstrap("manual-load")
+	local relaunch = ENV._Alleral_RelaunchViaBootstrap
+	if type(relaunch) ~= "function" then
+		warn("[Alleral v" .. LOADER_VERSION .. "] Load failed: bootstrap relaunch unavailable")
+		return false
+	end
+	local ok, err = relaunch("manual-load")
 	if not ok then
 		warn("[Alleral v" .. LOADER_VERSION .. "] Load failed: " .. tostring(err))
 		return false
