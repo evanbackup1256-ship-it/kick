@@ -1,7 +1,7 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 20
+local ALLERAL_SYDE_PATCH = 21
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -142,6 +142,32 @@ local function sydeConnectClick(button, callback)
 	if interact and interact:IsA("GuiButton") then
 		interact.MouseButton1Click:Connect(callback)
 	end
+end
+
+local function sydeConnectSliderDrag(slideFrame, onDown, onUp)
+	if not slideFrame or type(onDown) ~= "function" or type(onUp) ~= "function" then
+		return
+	end
+	local handle = sydeFindChild(slideFrame, "interact", "Interact")
+	if not handle and slideFrame:IsA("GuiButton") then
+		handle = slideFrame
+	end
+	if handle and handle:IsA("GuiButton") then
+		handle.MouseButton1Down:Connect(onDown)
+		handle.MouseButton1Up:Connect(onUp)
+		return
+	end
+	slideFrame.Active = true
+	slideFrame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			onDown()
+		end
+	end)
+	slideFrame.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			onUp()
+		end
+	end)
 end
 
 local function sydeDropSelectedLabel(drop)

@@ -1,22 +1,27 @@
 "use client";
 
 import clsx from "clsx";
-import Lenis from "lenis";
+import LocomotiveScroll from "locomotive-scroll";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { LenisContext } from "@/lib/scroll/lenis-context";
-import "lenis/dist/lenis.css";
+import { ScrollContext } from "@/lib/scroll/lenis-context";
+import "locomotive-scroll/locomotive-scroll.css";
 
-type LenisProviderProps = {
+type ScrollProviderProps = {
   children: ReactNode;
   id?: string;
   className?: string;
 };
 
-export function LenisProvider({ children, id = "main-scroll", className }: LenisProviderProps) {
+function scheduleResize(instance: LocomotiveScroll) {
+  requestAnimationFrame(() => instance.resize());
+}
+
+/** Primary scroll region — Locomotive Scroll (Lenis-backed smooth scroll + in-view triggers). */
+export function LenisProvider({ children, id = "main-scroll", className }: ScrollProviderProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const lenisRef = useRef<Lenis | null>(null);
-  const [lenis, setLenis] = useState<Lenis | null>(null);
+  const scrollRef = useRef<LocomotiveScroll | null>(null);
+  const [scroll, setScroll] = useState<LocomotiveScroll | null>(null);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -24,43 +29,55 @@ export function LenisProvider({ children, id = "main-scroll", className }: Lenis
     if (!wrapper || !content) return;
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const instance = new Lenis({
-      wrapper,
-      content,
-      lerp: reduced ? 1 : 0.085,
-      smoothWheel: !reduced,
-      syncTouch: false,
-      autoRaf: false,
+    const instance = new LocomotiveScroll({
+      lenisOptions: {
+        wrapper,
+        content,
+        lerp: reduced ? 1 : 0.085,
+        smoothWheel: !reduced,
+        syncTouch: false,
+      },
+      autoStart: true,
     });
 
-    lenisRef.current = instance;
-    setLenis(instance);
+    scrollRef.current = instance;
+    setScroll(instance);
+    scheduleResize(instance);
 
-    const raf = (time: number) => {
-      instance.raf(time);
-      requestAnimationFrame(raf);
+    let resizeRaf = 0;
+    const onWindowResize = () => {
+      cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => instance.resize());
     };
-    requestAnimationFrame(raf);
+
+    const resizeObserver = new ResizeObserver(() => scheduleResize(instance));
+    resizeObserver.observe(content);
+    resizeObserver.observe(wrapper);
+
+    window.addEventListener("resize", onWindowResize, { passive: true });
 
     return () => {
+      cancelAnimationFrame(resizeRaf);
+      window.removeEventListener("resize", onWindowResize);
+      resizeObserver.disconnect();
       instance.destroy();
-      lenisRef.current = null;
-      setLenis(null);
+      scrollRef.current = null;
+      setScroll(null);
     };
   }, []);
 
   return (
-    <LenisContext.Provider value={lenis}>
+    <ScrollContext.Provider value={scroll}>
       <div
         ref={wrapperRef}
         id={id}
-        data-lenis-root
-        className={clsx("lenis-root min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain", className)}
+        data-scroll-root
+        className={clsx("scroll-root min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain", className)}
       >
-        <div ref={contentRef} data-lenis-content className="min-h-0 flex flex-col">
+        <div ref={contentRef} data-scroll-content className="flex flex-col">
           {children}
         </div>
       </div>
-    </LenisContext.Provider>
+    </ScrollContext.Provider>
   );
 }

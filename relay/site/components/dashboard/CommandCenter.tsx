@@ -1,11 +1,12 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Activity, Gamepad2, Layers, Radio } from "lucide-react";
 import { useLiveSyncMeta } from "@/lib/queries/hooks";
 import { useMetricHistory, historyToSeries } from "@/lib/hooks/useMetricHistory";
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
+import { useScrollResize, useScroll } from "@/lib/scroll/lenis-context";
 import { resolveRelayStatus } from "@/lib/status/resolve";
 import type { SitePayload } from "@/lib/types";
 import { MetricCard } from "@/components/observability/MetricCard";
@@ -43,7 +44,7 @@ function MetricsColumn({
   relayError?: string | null;
 }) {
   return (
-    <div className="obs-scroll flex flex-col gap-3 overflow-y-auto overscroll-contain pb-2 pr-1">
+    <div className="obs-scroll flex flex-col gap-3 overflow-y-auto overscroll-contain pb-2 pr-1" data-lenis-prevent>
       <div className="obs-panel flex items-center gap-4">
         <HealthRing kind={healthPct >= 80 ? "healthy" : healthPct >= 50 ? "warning" : "error"} value={healthPct} label="Health" />
         <div className="min-w-0">
@@ -62,7 +63,7 @@ function MetricsColumn({
 
 function ChartBlock({ chartData, hasLiveData }: { chartData: { value: number; label: string }[]; hasLiveData: boolean }) {
   return (
-    <InViewReveal className="obs-panel obs-panel-chart flex h-full min-h-0 flex-col overflow-hidden">
+    <InViewReveal className="obs-panel obs-panel-chart flex min-h-0 flex-col overflow-hidden">
       <div className="obs-panel-head shrink-0">
         <div>
           <p className="obs-kicker">Throughput</p>
@@ -70,12 +71,12 @@ function ChartBlock({ chartData, hasLiveData }: { chartData: { value: number; la
         </div>
         <Activity className="h-4 w-4 shrink-0 text-cyan-400" strokeWidth={1.75} />
       </div>
-      <div className="relative mt-2 min-h-0 flex-1 overflow-hidden">
+      <div className="command-center-chart-body relative mt-2 shrink-0 overflow-hidden">
         {hasLiveData ? (
-          <TelemetryLineChart series={chartData} className="absolute inset-0" />
+          <TelemetryLineChart series={chartData} className="h-full w-full" />
         ) : (
-          <div className="absolute inset-0 grid place-items-center px-4 text-center">
-            <p className="text-xs text-muted">Collecting live samples… chart appears after a few poll cycles.</p>
+          <div className="grid h-full place-items-center px-4 py-6 text-center">
+            <p className="max-w-xs text-xs text-muted">Collecting live samples… chart appears after a few poll cycles.</p>
           </div>
         )}
       </div>
@@ -165,6 +166,12 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
   }, [data, games, site.announcement]);
 
   const chartData = hasLiveData ? workingSeries : [];
+  const scroll = useScroll();
+  const onPanelLayout = useCallback(() => {
+    scroll?.resize();
+  }, [scroll]);
+
+  useScrollResize([isMobile, hasLiveData, games.length]);
 
   return (
     <div className="command-center flex min-h-0 flex-col">
@@ -213,8 +220,8 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
           <EventTimeline events={timeline} className="min-h-[280px]" />
         </div>
       ) : (
-        <div className="command-center-grid mt-4 min-h-0 shrink-0 overflow-hidden">
-          <Group orientation="horizontal" className="h-full w-full gap-2">
+        <div className="command-center-grid mt-4 min-h-0 overflow-hidden">
+          <Group orientation="horizontal" className="h-full w-full gap-2" onLayoutChanged={onPanelLayout}>
             <Panel defaultSize={20} minSize={18} maxSize={28} className={PANEL_CLASS}>
               <MetricsColumn
                 healthPct={healthPct}
@@ -232,11 +239,11 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
 
             <Panel defaultSize={52} minSize={36} className={PANEL_CLASS}>
               <Group orientation="vertical" className="h-full min-h-0 gap-2">
-                <Panel defaultSize={58} minSize={35} className={PANEL_CLASS}>
+                <Panel defaultSize={38} minSize={28} maxSize={45} className={PANEL_CLASS}>
                   <ChartBlock chartData={chartData} hasLiveData={hasLiveData} />
                 </Panel>
                 <Separator className="obs-separator horizontal" />
-                <Panel defaultSize={42} minSize={28} className={PANEL_CLASS}>
+                <Panel defaultSize={62} minSize={40} className={PANEL_CLASS}>
                   <div className="grid h-full min-h-0 grid-cols-1 gap-2 overflow-hidden xl:grid-cols-2">
                     <StatusHeatmap games={games} className="min-h-0 overflow-hidden" />
                     <ServiceGraph games={games} sync={data?.sync} className="min-h-0 overflow-hidden" />

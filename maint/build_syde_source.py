@@ -156,6 +156,31 @@ def patch_slider_labels(text: str) -> str:
     return text
 
 
+def patch_slider_drag(text: str) -> str:
+    pattern = re.compile(
+        r"^(\t*)Slider\.slide\.Interact\.MouseButton1Down:Connect\(function\(\)\s*\n"
+        r"\1\tdragging = true\s*\n"
+        r"\1end\)\s*\n\s*\n"
+        r"\1Slider\.slide\.Interact\.MouseButton1Up:Connect\(function\(\)\s*\n"
+        r"\1\tdragging = false\s*\n"
+        r"\1end\)",
+        re.MULTILINE,
+    )
+
+    def repl(match: re.Match[str]) -> str:
+        indent = match.group(1)
+        inner = indent + "\t"
+        return (
+            f"{indent}sydeConnectSliderDrag(Slider.slide, function()\n"
+            f"{inner}dragging = true\n"
+            f"{indent}end, function()\n"
+            f"{inner}dragging = false\n"
+            f"{indent}end)"
+        )
+
+    return pattern.sub(repl, text)
+
+
 def main() -> None:
     upstream = read(UPSTREAM)
     compat = read(COMPAT)
@@ -272,6 +297,7 @@ return syde
 
     body = silence_syde_logging(body)
     body = patch_slider_labels(body)
+    body = patch_slider_drag(body)
     OUT.write_text(body, encoding="utf-8")
     print(f"Wrote {OUT} ({len(body)} bytes, {body.count(chr(10)) + 1} lines)")
 

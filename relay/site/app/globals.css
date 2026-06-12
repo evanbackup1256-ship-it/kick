@@ -224,21 +224,21 @@
     scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
   }
 
-  .lenis-root {
+  .scroll-root {
     scrollbar-width: thin;
     scrollbar-color: rgba(34, 211, 238, 0.35) transparent;
   }
 
-  .lenis-root::-webkit-scrollbar {
+  .scroll-root::-webkit-scrollbar {
     width: 10px;
   }
 
-  .lenis-root::-webkit-scrollbar-thumb {
+  .scroll-root::-webkit-scrollbar-thumb {
     border-radius: 999px;
     background: rgba(148, 163, 184, 0.35);
   }
 
-  .lenis-root::-webkit-scrollbar-thumb:hover {
+  .scroll-root::-webkit-scrollbar-thumb:hover {
     background: rgba(34, 211, 238, 0.55);
   }
 
@@ -266,17 +266,27 @@
     z-index: 1;
   }
 
-  /* Mission Control: fixed viewport height so panels + charts don't blow out the page */
+  /* Mission Control: bounded dashboard height — page scrolls, panels stay readable */
   .command-center-grid {
-    height: calc(100dvh - 12rem);
-    min-height: 460px;
-    max-height: calc(100dvh - 12rem);
+    height: clamp(480px, 52vh, 600px);
+    min-height: 480px;
+    max-height: 600px;
+  }
+
+  .command-center-chart-body {
+    height: clamp(160px, 22vh, 240px);
+    max-height: 240px;
   }
 
   @media (max-width: 767px) {
     .command-center-grid {
       height: auto;
       min-height: 0;
+      max-height: none;
+    }
+
+    .command-center-chart-body {
+      height: 220px;
       max-height: none;
     }
   }
@@ -463,4 +473,11 @@ html.cf-gate-lock body {
   .view-enter {
     animation: none !important;
   }
+}
+
+/* App shell: keep scroll inside MainScroll, not on document body */
+html.lenis,
+html.lenis body {
+  height: 100%;
+  overflow: hidden;
 }

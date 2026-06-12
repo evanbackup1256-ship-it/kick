@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useLenis } from "@/lib/scroll/lenis-context";
 
 function findScrollRoot(): HTMLElement | null {
-  return document.querySelector("[data-lenis-root]") as HTMLElement | null;
+  return document.querySelector("[data-scroll-root]") as HTMLElement | null;
 }
 
 export function ScrollProgress() {
