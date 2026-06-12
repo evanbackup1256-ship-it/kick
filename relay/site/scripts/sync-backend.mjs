@@ -20,6 +20,13 @@ function shouldSkipSync() {
   return false;
 }
 
+function emptyDir(dir) {
+  if (!fs.existsSync(dir)) return;
+  for (const entry of fs.readdirSync(dir)) {
+    fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
+  }
+}
+
 function copyDir(src, dest) {
   if (!fs.existsSync(src)) {
     console.warn(`Skip sync — missing ${src}`);
@@ -56,6 +63,8 @@ if (!fs.existsSync(outDir)) {
   console.warn("No out/ directory — run next build first");
   process.exit(0);
 }
+
+emptyDir(backendDir);
 
 if (copyDir(outDir, backendDir)) {
   console.log(`Synced ${outDir} → ${backendDir}`);

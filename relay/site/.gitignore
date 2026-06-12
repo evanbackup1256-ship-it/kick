@@ -6,8 +6,7 @@
 # next
 /.next/
 /out/
-
-# misc
+*.tsbuildinfo
 .DS_Store
 *.pem
 npm-debug.log*

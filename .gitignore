@@ -6,6 +6,12 @@ dist/
 build/
 .cache/
 
+# Next.js / static export build outputs (generated at deploy or via relay/site postbuild)
+backend/site/
+relay/site/.next/
+relay/site/out/
+relay/site/tsconfig.tsbuildinfo
+
 # Runtime / local artifacts (keep out of git + OneDrive sync)
 *.db
 supabase/.temp/
