@@ -97,9 +97,23 @@ if update then return end
 local Library =         game:GetObjects("rbxassetid://123800669522471")[1]
 local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 
-local ALLERAL_SYDE_PATCH = 13
+local ALLERAL_SYDE_PATCH = 14
 
 local SYDE_CANONICAL_NAMES = {
+	Main = "main",
+	Top = "top",
+	Tabs = "tabs",
+	Pages = "pages",
+	Settings = "settings",
+	Dim = "dim",
+	Modal = "modal",
+	User = "user",
+	Search = "search",
+	Render = "render",
+	Minihome = "minihome",
+	Toastholder = "toastholder",
+	ToastHolder = "toastholder",
+	Toast = "toast",
 	Title = "title",
 	Sub = "sub",
 	Subtitle = "sub",
@@ -131,6 +145,7 @@ local SYDE_CANONICAL_NAMES = {
 	Wallpaper = "wallpaper",
 	Homeicon = "homeicon",
 	HomeIcon = "homeicon",
+	Tb = "tb",
 	Btn = "btn",
 	Tab = "tab",
 	Page = "page",
@@ -161,6 +176,32 @@ local function sydeSetTitleText(parent, text)
 	if label then
 		label.Text = text
 	end
+end
+
+local function sydeFitTitleWidth(label, paddingX, height)
+	if not label then
+		return
+	end
+	paddingX = paddingX or 15
+	height = height or 35
+	local function apply()
+		if not label.Parent then
+			return
+		end
+		label.Size = UDim2.new(0, math.max(label.TextBounds.X + paddingX, paddingX + 8), 0, height)
+	end
+	apply()
+	task.defer(apply)
+	if not label:GetAttribute("_AlleralTitleFit") then
+		label:SetAttribute("_AlleralTitleFit", true)
+		label:GetPropertyChangedSignal("Text"):Connect(apply)
+		label:GetPropertyChangedSignal("TextBounds"):Connect(apply)
+	end
+end
+
+local function sydeApplyRowTitle(row, text, paddingX, height)
+	sydeSetTitleText(row, text)
+	sydeFitTitleWidth(sydeTitleLabel(row), paddingX, height)
 end
 
 local function sydeTweenTitle(parent, tweenInfo, props)
@@ -1380,8 +1421,8 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			resizing = true
 			startPosition = getInputPos(input)
 			startSize = Object.AbsoluteSize
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 15,0, 15)}):Play()
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 15,0, 15)}):Play()
+			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 		end
 	end
 
@@ -1419,8 +1460,8 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			isResizing = false
 			resizing = false
 			startPosition, startSize = nil, nil
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 20,0, 20)}):Play()
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(53, 53, 53)}):Play()
+			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 20,0, 20)}):Play()
+			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(53, 53, 53)}):Play()
 		end
 	end
 
@@ -2256,14 +2297,17 @@ end
 
 --@UiSetup
 local ui = Library
-local window = ui.main
-local top = window.top
-local tabs = window.tabs and window.tabs.tab
-local pages = window.pages
+local window = sydeFindChild(ui, "main", "Main")
+local dimOverlay = window and sydeFindChild(window, "dim", "Dim")
+local modalTemplate = window and sydeFindChild(window, "modal", "Modal")
+local top = window and sydeFindChild(window, "top", "Top")
+local tabsBar = window and sydeFindChild(window, "tabs", "Tabs")
+local tabs = tabsBar and sydeFindChild(tabsBar, "tab", "Tab")
+local pages = window and sydeFindChild(window, "pages", "Pages")
+local settingsFrame = window and sydeFindChild(window, "settings", "Settings")
 local pageRoot = pages and sydeFindChild(pages, "page", "Page")
-local settingsPageRoot = window.settings
-	and window.settings.pages
-	and sydeFindChild(window.settings.pages, "page", "Page")
+local settingsPages = settingsFrame and sydeFindChild(settingsFrame, "pages", "Pages")
+local settingsPageRoot = settingsPages and sydeFindChild(settingsPages, "page", "Page")
 local pagesClipFrame = pages and sydeFindChild(pages, "clipframe", "Clipframe", "ClipFrame")
 local windowClipFrame = sydeFindChild(window, "clipframe", "Clipframe", "ClipFrame") or pagesClipFrame
 local windowPagesClipFrame = pagesClipFrame
@@ -2284,7 +2328,7 @@ local uitoggle = Enum.KeyCode.RightShift
 
 function applyLayout(isMobile)
 	--	Library.lib.Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)
-	tweenservice:Create(Library.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)}):Play()
+	tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)}):Play()
 	local shadow = window:FindFirstChild("Shadow")
 	if shadow then
 		shadow.Visible = not isMobile 
@@ -2450,9 +2494,13 @@ function syde:Modal(Modal)
 			ConfirmCallBack = Modal.ConfimCallBack
 		}
 
-		local ModalInstance = ui.main.modal:Clone()
+		local ModalInstance = modalTemplate and modalTemplate:Clone()
+		if not ModalInstance or not window then
+			return
+		end
+		sydeSanitizeUiClone(ModalInstance)
 		ModalInstance.Visible = true
-		ModalInstance.Parent = ui.main
+		ModalInstance.Parent = window
 		local modalParts = sydeResolveModal(ModalInstance)
 		if modalParts.Title then
 			modalParts.Title.Text = ModalData.Title
@@ -2559,9 +2607,9 @@ function syde:Modal(Modal)
 
 
 
-		if activeModals == 1 then
-			ui.main.dim.Visible = true
-			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+		if activeModals == 1 and dimOverlay then
+			dimOverlay.Visible = true
+			tweenservice:Create(dimOverlay, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 				BackgroundTransparency = 0.3
 			}):Play()
 		end
@@ -2573,22 +2621,24 @@ function syde:Modal(Modal)
 
 			closeModal()
 
-			if activeModals == 0 then
-				tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+			if activeModals == 0 and dimOverlay then
+				tweenservice:Create(dimOverlay, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 					BackgroundTransparency = 1
 				}):Play()
 				task.wait(0.7)
-				ui.main.dim.Visible = false
+				dimOverlay.Visible = false
 			end
 		end)
 
 		sydeConnectClick(modalParts.Cancel, function()
 			closeModal()
-			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
-				BackgroundTransparency = 1
-			}):Play()
-			task.wait(0.7)
-			ui.main.dim.Visible = false
+			if dimOverlay then
+				tweenservice:Create(dimOverlay, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+					BackgroundTransparency = 1
+				}):Play()
+				task.wait(0.7)
+				dimOverlay.Visible = false
+			end
 		end)
 
 	end)
@@ -3936,7 +3986,7 @@ function syde:Init(library)
 			Tab.Visible = true
 			Tab.Parent = tabsContainer
 			Tab.Name = tdata.Title
-			Tab.title.Text = tdata.Title
+			sydeApplyRowTitle(Tab, tdata.Title, 30, 35)
 
 			-- === Page Setup ===
 			local Page = pagesContainer.page:Clone()
@@ -3955,15 +4005,18 @@ function syde:Init(library)
 			local textTween = TweenInfo.new(0.25, Enum.EasingStyle.Exponential)
 
 			local function ApplyTabStyle(tabButton, selected)
+				local tabTitle = sydeTitleLabel(tabButton)
 				tweenservice:Create(tabButton, bgTween, {
 					BackgroundColor3 = selected
 						and Color3.fromRGB(31, 31, 31)
 						or Color3.fromRGB(16, 16, 16)
 				}):Play()
 
-				tweenservice:Create(tabButton.title, textTween, {
-					TextTransparency = selected and 0 or 0.6
-				}):Play()
+				if tabTitle then
+					tweenservice:Create(tabTitle, textTween, {
+						TextTransparency = selected and 0 or 0.6
+					}):Play()
+				end
 			end
 
 			-- === First tab auto-select ===
@@ -4009,9 +4062,8 @@ function syde:Init(library)
 				local button = sydeClonePageTemplate(settingsPageRoot, "Button")
 				button.Visible = true
 				button.Parent = Page
-				button.title.Text = data.Title
 				button.Name = data.Title
-				button.title.Size = UDim2.new(0, button.title.TextBounds.X + 15,0, 35)
+				sydeApplyRowTitle(button, data.Title, 15, 35)
 
 				local c
 
@@ -4193,8 +4245,8 @@ function syde:Init(library)
 				end
 				toggle.Visible = true
 				toggle.Parent = Page
-				toggle.title.Text = data.Title
 				toggle.Name = data.Title
+				sydeApplyRowTitle(toggle, data.Title, 15, 35)
 
 
 				local toggleConfiguration = ui.Render.ToggleConfiguration:Clone()
@@ -6981,10 +7033,13 @@ function syde:Init(library)
 		local Tab = tabs.btn:Clone()
 		Tab.Visible = true
 		Tab.Parent = tabs
-		Tab.title.Text = tdata.Title
-		Tab.Name = tdata.Title
+			Tab.Name = tdata.Title
+			sydeApplyRowTitle(Tab, tdata.Title, 30, 35)
 
-		Tab.title.TextTransparency = 1
+		local tabTitle = sydeTitleLabel(Tab)
+		if tabTitle then
+			tabTitle.TextTransparency = 1
+		end
 		local tabIndicator, tabIndicatorGlow = sydeTabIndicator(Tab)
 		if tabIndicator then
 			tabIndicator.BackgroundTransparency = 1
@@ -7082,7 +7137,9 @@ function syde:Init(library)
 			if tabIndicatorGlow then
 				tweenservice:Create(tabIndicatorGlow, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 			end
-			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 30,0, 35) }):Play()
+			local tabTitle = sydeTitleLabel(Tab)
+			local tabWidth = tabTitle and tabTitle.TextBounds.X or 80
+			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, tabWidth + 30,0, 35) }):Play()
 			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 		else
 			local tabIndicator, tabIndicatorGlow = sydeTabIndicator(Tab)
@@ -7096,7 +7153,9 @@ function syde:Init(library)
 			if tabIndicatorGlow then
 				tweenservice:Create(tabIndicatorGlow, TweenInfo.new(2, Enum.EasingStyle.Exponential), { ImageColor3 = syde.theme.Accent }):Play()
 			end
-			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 80,0, 35) }):Play()
+			local tabTitle = sydeTitleLabel(Tab)
+			local tabWidth = tabTitle and tabTitle.TextBounds.X or 80
+			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, tabWidth + 80,0, 35) }):Play()
 			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.6 }):Play()
 		end
 
@@ -7125,18 +7184,22 @@ function syde:Init(library)
 		local isInit = true
 
 		local function ApplyTabStyle(tabButton, isSelected)
+			local tabTitle = sydeTitleLabel(tabButton)
+			local titleWidth = tabTitle and tabTitle.TextBounds.X or 80
 			local targetTextTransparency = isSelected and 0 or 0.6
 			local targetBackgroundTransparency = isSelected and 0 or 0.45
 			local targetTransparency = isSelected and 0 or 1
 			local targetColor = isSelected and syde.theme.Accent or Color3.fromRGB(29, 29, 29)
-			local targetSize = isSelected and UDim2.new(0, tabButton.title.TextBounds.X + 80,0, 35) or UDim2.new(0, tabButton.title.TextBounds.X + 50,0, 35)
+			local targetSize = isSelected and UDim2.new(0, titleWidth + 80,0, 35) or UDim2.new(0, titleWidth + 50,0, 35)
 
 
 			if isInit then
 				task.spawn(function()
 					for _, v in ipairs(tabs:GetChildren()) do
 						if v:IsA("Frame") then
-							tweenservice:Create(v, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = UDim2.new(0, v.title.TextBounds.X + 100,0, 30) }):Play()
+							local childTitle = sydeTitleLabel(v)
+							local childWidth = childTitle and childTitle.TextBounds.X or 80
+							tweenservice:Create(v, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = UDim2.new(0, childWidth + 100,0, 30) }):Play()
 							task.wait(0.15)
 							tweenservice:Create(tabButton, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = targetSize }):Play()
 							isInit = false
@@ -7149,7 +7212,9 @@ function syde:Init(library)
 
 			tweenservice:Create(tabButton, positionTweenInfo, { Size = targetSize }):Play()
 			tweenservice:Create(tabButton, colorTweenInfo, { BackgroundTransparency = targetBackgroundTransparency, }):Play()
-			tweenservice:Create(tabButton.title, colorTweenInfo, { TextTransparency = targetTextTransparency }):Play()
+			if tabTitle then
+				tweenservice:Create(tabTitle, colorTweenInfo, { TextTransparency = targetTextTransparency }):Play()
+			end
 			local indicator, glow = sydeTabIndicator(tabButton)
 			if glow then
 				tweenservice:Create(glow, colorTweenInfo, { ImageColor3 = targetColor }):Play()
@@ -7381,7 +7446,7 @@ function syde:Init(library)
 
 
 
-		local Pages = ui.main.pages
+		local Pages = pages
 		local Results = window.search.Container
 		local Template = Results.option
 
@@ -7422,7 +7487,7 @@ function syde:Init(library)
 
 				closesearch()
 
-				local openedPage = ui.main.pages:FindFirstChild(page.Name)
+				local openedPage = pages and pages:FindFirstChild(page.Name)
 				if not openedPage or not openedPage:IsA("ScrollingFrame") then return end
 
 				-- Optional: switch tab visuals (if SwitchToTab does this)
@@ -7557,9 +7622,8 @@ function syde:Init(library)
 			local button = sydeClonePageTemplate(pageRoot, "Button")
 			button.Visible = true
 			button.Parent = Page
-			button.title.Text = data.Title
 			button.Name = data.Title
-			button.title.Size = UDim2.new(0, button.title.TextBounds.X + 15,0, 35)
+			sydeApplyRowTitle(button, data.Title, 15, 35)
 			button:SetAttribute("Searchable", true)
 
 			local c
@@ -7729,9 +7793,7 @@ function syde:Init(library)
 				if nextSettings.Name or nextSettings.Title then
 					local title = tostring(nextSettings.Name or nextSettings.Title)
 					data.Title = title
-					button.title.Text = title
-					button.Name = title
-					button.title.Size = UDim2.new(0, button.title.TextBounds.X + 15, 0, 35)
+					sydeApplyRowTitle(button, title, 15, 35)
 				end
 				if nextSettings.Description ~= nil or nextSettings.Desc ~= nil then
 					data.Desc = tostring(nextSettings.Description or nextSettings.Desc or "")
@@ -7771,8 +7833,8 @@ function syde:Init(library)
 			end
 			toggle.Visible = true
 			toggle.Parent = Page
-			toggle.title.Text = data.Title
 			toggle.Name = data.Title
+			sydeApplyRowTitle(toggle, data.Title, 15, 35)
 			toggle:SetAttribute("Searchable", true)
 
 

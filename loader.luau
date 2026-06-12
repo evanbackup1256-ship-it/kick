@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.13"
+local LOADER_VERSION = "8.2.14"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -18,8 +18,8 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 13
-local SYDE_PATCH_REQUIRED_FN = "sydeClonePageTemplate"
+local SYDE_PATCH_VERSION = 14
+local SYDE_PATCH_REQUIRED_FN = "sydeApplyRowTitle"
 local CORE_BASE_PATH = HUB .. "/core_base.luau"
 local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
 local CORE_UI_PATH = HUB .. "/core_ui.luau"
@@ -27,7 +27,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.13",
+	loader = "8.2.14",
 	core = "2.9.4",
 	ui = "Syde",
 	windui = "4.0.0-syde",
