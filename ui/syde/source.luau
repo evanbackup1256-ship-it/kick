@@ -97,7 +97,46 @@ if update then return end
 local Library =         game:GetObjects("rbxassetid://123800669522471")[1]
 local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 
-local ALLERAL_SYDE_PATCH = 11
+local ALLERAL_SYDE_PATCH = 12
+
+local SYDE_CANONICAL_NAMES = {
+	Title = "title",
+	Sub = "sub",
+	Subtitle = "sub",
+	Tog = "tog",
+	Toggle = "tog",
+	Check = "check",
+	Gradfr = "gradfr",
+	GradFr = "gradfr",
+	Glow = "glow",
+	Interact = "interact",
+	Configure = "configure",
+	ClipFrame = "clipframe",
+	Clipframe = "clipframe",
+	Separator = "separator",
+	Desc = "desc",
+	Icon = "icon",
+	Timer = "timer",
+	Slide = "slide",
+	SlideFrame = "slideframe",
+	Slideframe = "slideframe",
+	DropHolder = "dropholder",
+	Dropholder = "dropholder",
+	Drop = "drop",
+	Selected = "selected",
+	Search = "search",
+	Down = "down",
+	Shadow = "shadow",
+	Functions = "functions",
+	Resize = "resize",
+	Wallpaper = "wallpaper",
+	Homeicon = "homeicon",
+	HomeIcon = "homeicon",
+	Btn = "btn",
+	Tab = "tab",
+	Page = "page",
+	Option = "Option",
+}
 
 -- Alleral: tolerate Roblox template renames (Title/title, Buttons/buttons, etc.)
 local function sydeFindChild(parent, ...)
@@ -395,12 +434,31 @@ local function sydeSanitizeAssetRoot(root)
 	end
 end
 
-local function sydeSanitizeUiClone(root)
-	sydeSanitizeAssetRoot(root)
+local function sydeNormalizeTemplateNames(root)
+	if not root then
+		return
+	end
+	for _, desc in ipairs(root:GetDescendants()) do
+		local canonical = SYDE_CANONICAL_NAMES[desc.Name]
+		if canonical and canonical ~= desc.Name then
+			pcall(function()
+				desc.Name = canonical
+			end)
+		end
+	end
 end
 
-sydeSanitizeAssetRoot(Library)
-sydeSanitizeAssetRoot(Loader)
+local function sydePrepareAssetRoot(root)
+	sydeSanitizeAssetRoot(root)
+	sydeNormalizeTemplateNames(root)
+end
+
+local function sydeSanitizeUiClone(root)
+	sydePrepareAssetRoot(root)
+end
+
+sydePrepareAssetRoot(Library)
+sydePrepareAssetRoot(Loader)
 
 local function sydeEnsureDropholderDropFrame(dropholder)
 	if not dropholder then
@@ -2158,6 +2216,7 @@ local top = window.top
 local tabs = window.tabs and window.tabs.tab
 local pages = window.pages
 local pagesClipFrame = pages and sydeFindChild(pages, "clipframe", "Clipframe", "ClipFrame")
+local windowClipFrame = sydeFindChild(window, "clipframe", "Clipframe", "ClipFrame") or pagesClipFrame
 local windowPagesClipFrame = pagesClipFrame
 
 --
@@ -2716,9 +2775,11 @@ function openui()
 	tweenservice:Create(window.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.3}):Play()
 
 	if glow == true then
-		for i, glow in pairs(window.clipframe:GetChildren()) do
-			if glow:IsA("ImageLabel") then
-				tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.8}):Play()
+		if windowClipFrame then
+			for i, glow in pairs(windowClipFrame:GetChildren()) do
+				if glow:IsA("ImageLabel") then
+					tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.8}):Play()
+				end
 			end
 		end
 
@@ -2763,9 +2824,11 @@ function closeui()
 		end
 	end
 
-	for i, glow in pairs(window.clipframe:GetChildren()) do
-		if glow:IsA("ImageLabel") then
-			tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
+	if windowClipFrame then
+		for i, glow in pairs(windowClipFrame:GetChildren()) do
+			if glow:IsA("ImageLabel") then
+				tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
+			end
 		end
 	end
 
@@ -3130,9 +3193,11 @@ function syde:Init(library)
 
 	syde:AddConnection(syde.Comms.Event, function(p, value)
 		if p == "Accent" then
-			for i, glow in pairs(window.clipframe:GetChildren()) do
-				if glow:IsA("ImageLabel") then
-					tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageColor3 = value}):Play()
+			if windowClipFrame then
+				for i, glow in pairs(windowClipFrame:GetChildren()) do
+					if glow:IsA("ImageLabel") then
+						tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageColor3 = value}):Play()
+					end
 				end
 			end
 			tweenservice:Create(window.shadow.glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageColor3 = value}):Play()
@@ -4074,6 +4139,7 @@ function syde:Init(library)
 				}
 
 				local toggle = window.settings.pages.page.Toggle:Clone()
+				sydeSanitizeUiClone(toggle)
 				toggle.Visible = true
 				toggle.Parent = Page
 				toggle.title.Text = data.Title
@@ -6328,9 +6394,11 @@ function syde:Init(library)
 			CallBack = function (v)
 				if v then
 					glow = true
-					for i, glow in pairs(window.clipframe:GetChildren()) do
-						if glow:IsA("ImageLabel") then
-							tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.8}):Play()
+					if windowClipFrame then
+						for i, glow in pairs(windowClipFrame:GetChildren()) do
+							if glow:IsA("ImageLabel") then
+								tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.8}):Play()
+							end
 						end
 					end
 					if window.pages and window.pages.v0 then
@@ -6344,9 +6412,11 @@ function syde:Init(library)
 
 				else
 					glow = false
-					for i, glow in pairs(window.clipframe:GetChildren()) do
-						if glow:IsA("ImageLabel") then
-							tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
+					if windowClipFrame then
+						for i, glow in pairs(windowClipFrame:GetChildren()) do
+							if glow:IsA("ImageLabel") then
+								tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
+							end
 						end
 					end
 
@@ -7638,6 +7708,7 @@ function syde:Init(library)
 			}
 
 			local toggle = pages.page.Toggle:Clone()
+			sydeSanitizeUiClone(toggle)
 			toggle.Visible = true
 			toggle.Parent = Page
 			toggle.title.Text = data.Title

@@ -1473,10 +1473,13 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 	end
 
 	local function instanceHasChild(parent, childName)
-		if type(parent) ~= "table" or type(parent.FindFirstChild) ~= "function" then
+		if type(parent) ~= "table" then
 			return false
 		end
-		return parent:FindFirstChild(childName) ~= nil
+		local ok, child = pcall(function()
+			return parent:FindFirstChild(childName)
+		end)
+		return ok and child ~= nil
 	end
 
 	local function waitForElement(element, timeout)
