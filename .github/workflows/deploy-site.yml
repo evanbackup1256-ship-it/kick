@@ -31,10 +31,12 @@ jobs:
           cache: npm
           cache-dependency-path: relay/site/package-lock.json
 
-      - name: Build site bundle
+      - name: Build Next.js site (GitHub Pages mirror)
         working-directory: relay/site
+        env:
+          NEXT_PUBLIC_BASE_PATH: /kick
         run: |
-          npm ci
+          npm install
           npm run build
           npm run typecheck
 
@@ -42,7 +44,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: relay/site
+          publish_dir: relay/site/out
           publish_branch: gh-pages
           force_orphan: true
           commit_message: "Deploy site from ${{ github.sha }}"

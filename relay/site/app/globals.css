@@ -1,0 +1,98 @@
+@import "tailwindcss";
+@source "../app/**/*.{ts,tsx}";
+@source "../components/**/*.{ts,tsx}";
+
+@theme {
+  --color-bg: #030508;
+  --color-bg-elevated: #0a0e14;
+  --color-bg-card: rgba(12, 16, 24, 0.82);
+  --color-border: rgba(255, 255, 255, 0.07);
+  --color-border-strong: rgba(255, 255, 255, 0.14);
+  --color-text: #f0f4f8;
+  --color-muted: #8b95a8;
+  --color-muted-2: #5c6578;
+  --color-accent: #22d3ee;
+  --color-violet: #a78bfa;
+  --color-green: #34d399;
+  --color-yellow: #fbbf24;
+  --color-red: #f87171;
+  --color-purple: #c084fc;
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    scroll-behavior: auto;
+  }
+
+  body {
+    @apply bg-bg text-text antialiased overflow-x-hidden;
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background: rgba(34, 211, 238, 0.25);
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply border border-border bg-[rgba(10,14,22,0.62)] backdrop-blur-2xl;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+      0 24px 80px rgba(0, 0, 0, 0.45);
+  }
+
+  .section-wrap {
+    @apply mx-auto w-[min(1120px,calc(100%-40px))];
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-b from-white to-white/75 bg-clip-text text-transparent;
+  }
+
+  .label-gradient {
+    background: linear-gradient(90deg, var(--color-accent), var(--color-violet), var(--color-accent));
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Cloudflare gate (ported from legacy gate.js styles) */
+html.cf-gate-lock,
+html.cf-gate-lock body {
+  overflow: hidden !important;
+  height: 100%;
+}
+
+.cf-gate-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 5, 8, 0.92);
+  backdrop-filter: blur(16px);
+}
+
+.cf-gate-card {
+  width: min(420px, calc(100vw - 32px));
+  padding: 32px 28px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 14, 22, 0.9);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

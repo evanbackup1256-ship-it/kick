@@ -644,94 +644,6 @@
       if (key === "website") return links.website || cfg.publicUrl || "";
       return links[key] || "";
     }
-    async function renderBanApiPanel() {
-      const statusRoot = $("#banApiStatus");
-      const endpointsRoot = $("#banApiEndpoints");
-      const exampleRoot = $("#banApiExample");
-      try {
-        const base = window.ALLERAL_API || window.location.origin;
-        const res = await fetch(`${base.replace(/\/$/, "")}/api/v1/bans/docs`, { cache: "no-store" });
-        const data = await res.json();
-        if (statusRoot) {
-          statusRoot.innerHTML = `
-          <div class="ban-api-stat"><span>Active bans</span><strong>${escapeHtml(String(data.activeBans ?? "\u2014"))}</strong></div>
-          <div class="ban-api-stat"><span>API version</span><strong>v${escapeHtml(String(data.version || "1"))}</strong></div>
-          <div class="ban-api-stat"><span>Status</span><strong class="live">${data.partnerApi ? "Auto-enabled" : "Off"}</strong></div>
-          <div class="ban-api-stat"><span>Base URL</span><strong>${escapeHtml(String(data.baseUrl || base).replace(/^https?:\/\//, ""))}</strong></div>
-        `;
-        }
-        const endpoints = data.endpoints || [];
-        if (endpointsRoot) {
-          endpointsRoot.innerHTML = endpoints.map(
-            (ep) => `
-          <article class="ban-api-endpoint">
-            <div class="ban-api-endpoint-head">
-              <span class="ban-api-method">${escapeHtml(ep.method || "GET")}</span>
-              <code>${escapeHtml(ep.path || "")}</code>
-              ${ep.auth ? `<span class="ban-api-auth">Auth</span>` : `<span class="ban-api-auth public">Public</span>`}
-            </div>
-            <p>${escapeHtml(ep.desc || "")}</p>
-          </article>`
-          ).join("");
-        }
-        const example = data.checkExample;
-        if (exampleRoot && example?.body) {
-          exampleRoot.textContent = JSON.stringify(example.body, null, 2);
-        }
-      } catch {
-        if (statusRoot) statusRoot.innerHTML = `<p class="tool-panel-desc">Could not load Ban API docs.</p>`;
-      }
-    }
-    async function runBanApiTest() {
-      const out = $("#banApiTestResult");
-      const key = $("#banTestKey")?.value.trim() || "";
-      const userId = $("#banTestUserId")?.value.trim() || "";
-      const username = $("#banTestUsername")?.value.trim() || "";
-      if (!userId && !username) {
-        flash("Enter a Roblox UserId or username", true);
-        return;
-      }
-      if (!key) {
-        flash("Partner API key required — copy from admin after sign-in or set BAN_PARTNER_API_KEY", true);
-        if (out) {
-          out.textContent = JSON.stringify({
-            ok: false,
-            error: "unauthorized",
-            hint: "Send X-Ban-Api-Key. Keys auto-provision on first relay boot.",
-          }, null, 2);
-        }
-        return;
-      }
-      const base = window.ALLERAL_API || window.location.origin;
-      const headers = { "Content-Type": "application/json" };
-      if (key) headers["X-Ban-Api-Key"] = key;
-      try {
-        const res = await fetch(`${base.replace(/\/$/, "")}/api/v1/bans/check`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            player: { userId: userId || void 0, name: username || void 0 }
-          })
-        });
-        const data = await res.json();
-        if (out) {
-          out.textContent = JSON.stringify(data, null, 2);
-          out.classList.toggle("banned", data.allowed === false);
-          out.classList.toggle("allowed", data.allowed === true);
-        }
-        if (!res.ok) flash(String(data.error || "Check failed"), true);
-        else flash(data.allowed ? "Player allowed" : "Player banned");
-      } catch (e) {
-        if (out) out.textContent = e instanceof Error ? e.message : "Request failed";
-        flash("Ban check failed", true);
-      }
-    }
-    function bindBanApiTools() {
-      $("#banApiTestBtn")?.addEventListener("click", () => void runBanApiTest());
-      $("#banApiCopyDocs")?.addEventListener("click", () => {
-        void copyText(`${window.location.origin}/api/v1/bans/docs`, "Docs URL copied");
-      });
-    }
     function liveSnapshotKey(data) {
       if (!data) return "";
       const v = data.versions || {};
@@ -1172,7 +1084,6 @@
     }
     function renderTools(site) {
       void fetchWeaoExploits(false, false);
-      void renderBanApiPanel();
       const resRoot = $("#resourcesGrid");
       if (resRoot) {
         resRoot.innerHTML = (site.resources || []).map((item) => {
@@ -1637,7 +1548,6 @@
       bindQuickActions();
       bindCommandPalette();
       bindExecutorTools();
-      bindBanApiTools();
       startWeaoPolling();
       startLivePolling();
       void initFormCaptcha();

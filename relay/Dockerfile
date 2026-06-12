@@ -1,9 +1,16 @@
+FROM node:24-alpine AS site-build
+WORKDIR /site
+COPY site/package.json site/package-lock.json ./
+RUN npm install
+COPY site ./
+RUN npm run build
+
 FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY telemetry_relay.py script_registry.py ban_registry.py site_registry.py roblox_api.py weao_api.py auto_sync.py manage_backend.py ./
-COPY site ./site
+COPY --from=site-build /site/out ./site
 COPY scripts_manifest.json site.json ./
 RUN mkdir -p /app/data
 ENV TELEMETRY_HOST=0.0.0.0

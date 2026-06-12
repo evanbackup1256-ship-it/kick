@@ -241,10 +241,8 @@
         <div class="tools-grid reveal">
           <div class="tool-panel glass-panel">
             <h3>Developer links</h3>
-            <p class="tool-panel-desc">Ban API, admin, GitHub.</p>
+            <p class="tool-panel-desc">GitHub and project links.</p>
             <div class="dev-links">
-              <a class="resource-card" href="#ban-api" onclick="document.getElementById('ban-api')?.classList.remove('hidden');location.hash='#ban-api';return false;"><strong>Ban API</strong><span>REST docs</span></a>
-              <a class="resource-card" href="/admin" target="_blank" rel="noopener"><strong>Admin</strong><span>Dashboard</span></a>
               <a class="resource-card" href="https://github.com/evanbackup1256-ship-it/kick" target="_blank" rel="noopener"><strong>GitHub</strong><span>Source</span></a>
             </div>
           </div>
@@ -287,37 +285,6 @@
         <div class="tool-panel glass-panel reveal">
           <h3>Resources</h3>
           <div id="resourcesGrid" class="resources-grid"></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="ban-api" class="section wrap hidden">
-      <header class="section-intro reveal">
-        <p class="section-label">Integrations</p>
-        <h2 class="section-title">Ban API</h2>
-        <p class="section-desc">REST endpoints for external tools and partner scripts.</p>
-      </header>
-      <div id="banApiStatus" class="ban-api-stats reveal"></div>
-      <div class="ban-api-grid reveal">
-        <div class="tool-panel glass-panel">
-          <div class="ban-api-panel-head">
-            <h3>Endpoints</h3>
-            <button id="banApiCopyDocs" class="btn btn-outline btn-sm" type="button">Copy docs</button>
-          </div>
-          <div id="banApiEndpoints" class="ban-api-endpoints"></div>
-        </div>
-        <div class="tool-panel glass-panel">
-          <h3>Live checker</h3>
-          <form class="form ban-api-test-form" onsubmit="return false">
-            <label>Partner API Key<input id="banTestKey" class="field-input field-mono" type="password" placeholder="X-Ban-Api-Key" autocomplete="off" /></label>
-            <div class="form-row">
-              <label>UserId<input id="banTestUserId" class="field-input" placeholder="123456789" inputmode="numeric" /></label>
-              <label>Username<input id="banTestUsername" class="field-input" placeholder="PlayerName" /></label>
-            </div>
-            <button id="banApiTestBtn" class="btn btn-fill btn-magnetic" type="button">Run Check</button>
-          </form>
-          <pre id="banApiTestResult" class="ban-api-result">Results appear here.</pre>
-          <pre id="banApiExample" class="ban-api-example field-mono">Loading…</pre>
         </div>
       </div>
     </section>
@@ -398,7 +365,7 @@
           </div>
           <div class="panel glass-panel hidden reveal panel-enter" data-panel-body="support">
             <form id="supportForm" class="form">
-              <label>Topic<div class="select-wrap"><select id="supportTopic" class="field-select"><option value="Loading">How to load</option><option value="Games">Games</option><option value="Ban">Ban issue</option><option value="Executor">Executor</option><option value="Other">Other</option></select></div></label>
+              <label>Topic<div class="select-wrap"><select id="supportTopic" class="field-select"><option value="Loading">How to load</option><option value="Games">Games</option><option value="Executor">Executor</option><option value="Other">Other</option></select></div></label>
               <div class="form-row">
                 <label>Username<input id="supportUser" class="field-input" placeholder="Your username" /></label>
                 <label>Contact <span class="muted-inline">optional</span><input id="supportContact" class="field-input" placeholder="Discord or email" /></label>
@@ -446,7 +413,6 @@
         <a href="#credits">Creator</a>
         <a href="#tools">Tools</a>
         <a href="#faq" onclick="document.getElementById('faq')?.classList.remove('hidden');return true;">FAQ</a>
-        <a href="/admin" target="_blank" rel="noopener">Admin</a>
         <a href="https://github.com/evanbackup1256-ship-it/kick" target="_blank" rel="noopener">GitHub</a>
       </div>
     </div>
