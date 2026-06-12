@@ -3,6 +3,7 @@ WORKDIR /site
 COPY site/package.json site/package-lock.json ./
 RUN npm install
 COPY site ./
+ENV SKIP_BACKEND_SYNC=1
 RUN npm run build
 
 FROM python:3.12-slim

@@ -35,6 +35,7 @@ jobs:
         working-directory: relay/site
         env:
           NEXT_PUBLIC_BASE_PATH: /kick
+          SKIP_BACKEND_SYNC: "1"
         run: |
           npm install
           npm run build
