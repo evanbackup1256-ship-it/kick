@@ -285,7 +285,7 @@ Get-ChildItem -Path $root -Recurse -Include *.luau,*.lua,*.json,*.md,*.ps1 -File
     }
 
 Get-ChildItem -Path $root -Recurse -Include *.luau,*.lua,*.ps1 -File |
-    Where-Object { ($_.FullName -notmatch '\\ui\\') -and ($_.Name -ne 'loader.luau') -and ($_.Name -ne 'verify_versions.ps1') } |
+    Where-Object { ($_.FullName -notmatch '\\ui\\') -and ($_.Name -ne 'loader.luau') -and ($_.Name -ne 'bootstrap.luau') -and ($_.Name -ne 'verify_versions.ps1') } |
     ForEach-Object {
         $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
         if (-not $text) { return }

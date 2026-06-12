@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-12T19:27:41Z",
+  "updatedAt": "2026-06-12T19:31:56Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
-  "loaderVersion": "8.2.19",
+  "loaderVersion": "8.2.20",
   "coreVersion": "2.9.4",
   "uiLibrary": "Syde",
   "uiVersion": "4.0.0-syde",
