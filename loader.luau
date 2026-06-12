@@ -18,7 +18,7 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 20
+local SYDE_PATCH_VERSION = 21
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 local CORE_BASE_PATH = HUB .. "/core_base.luau"
 local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
@@ -38,7 +38,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.0",
-	commit = "8428d94",
+	commit = "e12c90d",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
 }

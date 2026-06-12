@@ -1,8 +1,8 @@
--- Alleral Bootstrap v1.0.3
+-- Alleral Bootstrap v1.0.4
 -- Save this loadstring once in your executor — it always fetches the latest loader from GitHub.
 -- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=" .. tick(), true))()
 
-local BOOTSTRAP_VERSION = "1.0.3"
+local BOOTSTRAP_VERSION = "1.0.4"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
 local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
@@ -62,7 +62,10 @@ local function httpGet(url, minBytes)
 	minBytes = minBytes or 0
 	local plain = url:gsub("%?.*$", "")
 	local candidates = { plain .. "?t=" .. tostring(tick()), plain, url }
-	for _, candidate in ipairs(candidates) do
+	for i, candidate in ipairs(candidates) do
+		if i > 1 and typeof(task) == "table" and type(task.wait) == "function" then
+			pcall(task.wait)
+		end
 		if type(game.HttpGet) == "function" then
 			local ok, body = pcall(game.HttpGet, game, candidate, true)
 			if ok and type(body) == "string" and #body >= minBytes then
@@ -154,7 +157,7 @@ local function loaderMatchesRelease(src, meta, strictCommit)
 			return false, "embedded commit " .. tostring(embedded or "?") .. " != release " .. meta.commit
 		end
 	end
-	if type(meta.sydePatch) == "number" then
+	if strictCommit and type(meta.sydePatch) == "number" then
 		local patch = loaderSydePatchFromSource(src)
 		if patch ~= meta.sydePatch then
 			return false, "syde patch v" .. tostring(patch or "?") .. " != release v" .. tostring(meta.sydePatch)
@@ -390,7 +393,32 @@ local function checkGamePlaceUpdate()
 	savePlaceVersionMap(writeFileFn, makeFolderFn, known)
 end
 
-local function purgeAlleralWorkspace()
+local function purgeKnownPaths(deleteFileFn, isFileFn)
+	if not deleteFileFn or not isFileFn then
+		return 0
+	end
+	local removed = 0
+	local seen = {}
+	local function tryDelete(path)
+		if type(path) ~= "string" or path == "" or seen[path] then
+			return
+		end
+		seen[path] = true
+		local okExists, exists = pcall(isFileFn, path)
+		if okExists and exists and pcall(deleteFileFn, path) then
+			removed += 1
+		end
+	end
+	for _, path in ipairs(PURGE_PATHS) do
+		tryDelete(path)
+		for _, root in ipairs(PURGE_ROOTS) do
+			tryDelete(root .. path)
+		end
+	end
+	return removed
+end
+
+local function purgeAlleralWorkspace(fullScan)
 	local deleteFileFn = pick({ "delfile", "deletefile", "delete_file", "DeleteFile", "removefile", "RemoveFile" })
 	local isFileFn = pick({ "isfile", "is_file", "IsFile" })
 	local listFilesFn = pick({ "listfiles", "list_files", "ListFiles" })
@@ -401,7 +429,11 @@ local function purgeAlleralWorkspace()
 		return 0
 	end
 
-	local removed = 0
+	local removed = purgeKnownPaths(deleteFileFn, isFileFn)
+	if fullScan == false then
+		return removed
+	end
+
 	local seen = {}
 	local function tryDelete(path)
 		if type(path) ~= "string" or path == "" or seen[path] then
@@ -409,17 +441,8 @@ local function purgeAlleralWorkspace()
 		end
 		seen[path] = true
 		local okExists, exists = pcall(isFileFn, path)
-		if okExists and exists then
-			if pcall(deleteFileFn, path) then
-				removed += 1
-			end
-		end
-	end
-
-	for _, path in ipairs(PURGE_PATHS) do
-		tryDelete(path)
-		for _, root in ipairs(PURGE_ROOTS) do
-			tryDelete(root .. path)
+		if okExists and exists and pcall(deleteFileFn, path) then
+			removed += 1
 		end
 	end
 
@@ -492,17 +515,22 @@ local function Alleral_Bootstrap(reason)
 
 	pcall(checkGamePlaceUpdate)
 
-	local purged = purgeAlleralWorkspace()
+	-- Fast path purge only — full workspace scan runs after loader boots (avoids main-thread freeze).
+	local purged = purgeAlleralWorkspace(false)
 	if purged > 0 then
 		print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Purged " .. tostring(purged) .. " cached workspace file(s)")
 	end
 
+	print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Fetching release metadata…")
 	local meta, metaVia = fetchReleaseMeta()
 	local expectedLoader = meta.loader
 	local urls = buildLoaderUrls(meta)
 	local src, via = nil, metaVia
 	local lastReject = "no matching loader"
-	for _, entry in ipairs(urls) do
+	for i, entry in ipairs(urls) do
+		if i > 1 and typeof(task) == "table" and type(task.wait) == "function" then
+			pcall(task.wait)
+		end
 		local body, transport = httpGet(entry.url, 500)
 		if type(body) == "string" and #body >= 500 then
 			local ok, detail = loaderMatchesRelease(body, meta, entry.strictCommit == true)
@@ -542,7 +570,10 @@ local function Alleral_Bootstrap(reason)
 		return false, err
 	end
 	task.defer(function()
-		purgeAlleralWorkspace()
+		local extra = purgeAlleralWorkspace(true)
+		if extra > 0 then
+			print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Background purge removed " .. tostring(extra) .. " stale file(s)")
+		end
 	end)
 	return true, remoteVer
 end
