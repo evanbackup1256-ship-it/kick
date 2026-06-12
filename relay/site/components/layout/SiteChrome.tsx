@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { BlurFadeIn } from "@/components/ui/premium";
 
 const LINKS = [
   { href: "#home", id: "home", label: "Home" },
@@ -185,16 +186,11 @@ export function SectionHeader({
   desc?: string;
 }) {
   return (
-    <motion.header
-      initial={{ opacity: 0, y: 28 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-10%" }}
-      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      className="mb-14 text-center"
-    >
+    <BlurFadeIn className="mb-14 text-center">
       <p className="label-gradient mb-2 text-sm font-semibold uppercase tracking-[0.08em]">{label}</p>
       <h2 className="text-gradient text-[clamp(2rem,5vw,3rem)] font-bold tracking-tight">{title}</h2>
       {desc ? <p className="mx-auto mt-3.5 max-w-lg text-muted">{desc}</p> : null}
-    </motion.header>
+      <div className="mx-auto mt-4 h-px w-12 bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" aria-hidden />
+    </BlurFadeIn>
   );
 }

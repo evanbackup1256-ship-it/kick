@@ -1,12 +1,12 @@
 "use client";
 
 import clsx from "clsx";
-import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { fetchWeao } from "@/lib/api";
 import { resolveResourceUrl } from "@/lib/sanitize";
 import type { SitePayload, WeaoExploit } from "@/lib/types";
 import { SectionHeader } from "@/components/layout/SiteChrome";
+import { SpotlightCard } from "@/components/ui/premium";
 
 const FILTERS = ["all", "working", "not_working", "recommended", "detected", "outdated", "free"] as const;
 
@@ -80,7 +80,8 @@ export function ToolsSection({ site }: { site: SitePayload }) {
           ))}
         </div>
 
-        <div className="glass mb-4 rounded-[28px] p-6">
+        <SpotlightCard className="mb-4" spotlight="rgba(34,211,238,0.1)">
+          <div className="p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold">All executors</h3>
@@ -128,9 +129,11 @@ export function ToolsSection({ site }: { site: SitePayload }) {
               </p>
             )}
           </div>
-        </div>
+          </div>
+        </SpotlightCard>
 
-        <div className="glass rounded-[28px] p-6">
+        <SpotlightCard className="mb-4" spotlight="rgba(167,139,250,0.08)">
+          <div className="p-6">
           <h3 className="mb-4 text-lg font-semibold">Resources</h3>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(site.resources || []).map((item) => {
@@ -150,7 +153,8 @@ export function ToolsSection({ site }: { site: SitePayload }) {
               );
             })}
           </div>
-        </div>
+          </div>
+        </SpotlightCard>
       </div>
     </section>
   );

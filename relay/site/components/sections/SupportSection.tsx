@@ -5,6 +5,7 @@ import { useState } from "react";
 import { API_BASE } from "@/lib/config";
 import type { SitePayload } from "@/lib/types";
 import { SectionHeader } from "@/components/layout/SiteChrome";
+import { BlurFadeIn, GlowButton, SpotlightCard } from "@/components/ui/premium";
 
 export function SupportSection({ site }: { site: SitePayload }) {
   const [tab, setTab] = useState<"bug" | "feature" | "support">("bug");
@@ -71,12 +72,13 @@ export function SupportSection({ site }: { site: SitePayload }) {
           ))}
         </div>
 
+        <SpotlightCard className="mx-auto max-w-xl" spotlight="rgba(34,211,238,0.1)">
         <motion.form
           key={tab}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           onSubmit={submit}
-          className="glass mx-auto grid max-w-xl gap-4 rounded-[28px] p-8"
+          className="grid gap-4 p-8"
         >
           {tab === "bug" ? (
             <>
@@ -112,10 +114,9 @@ export function SupportSection({ site }: { site: SitePayload }) {
           ) : null}
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
           {ok ? <p className="text-sm text-green-400">Sent — thanks!</p> : null}
-          <button type="submit" className="rounded-full bg-gradient-to-br from-accent to-violet px-6 py-3 text-sm font-semibold text-[#030508]">
-            Submit
-          </button>
+          <GlowButton type="submit">Submit</GlowButton>
         </motion.form>
+        </SpotlightCard>
       </div>
     </section>
   );
@@ -142,13 +143,15 @@ function Field({
     <label className="grid gap-2 text-sm text-muted">
       {label}
       {select ? (
-        <select name={name} className={className} required={required}>
-          {(options || []).map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select name={name} className={className} required={required}>
+            {(options || []).map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        </div>
       ) : textarea ? (
         <textarea name={name} className={`${className} min-h-[100px]`} required={required} />
       ) : (
@@ -169,17 +172,21 @@ export function CreditsSection({ site }: { site: SitePayload }) {
           <div key={team.id || team.title}>
             <h3 className="mb-4 text-lg font-semibold">{team.title}</h3>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {(team.members || []).map((member) => (
-                <motion.article
-                  key={member.id || member.displayName}
-                  whileHover={{ y: -4 }}
-                  className="glass rounded-[28px] p-6"
-                  style={member.accent ? { boxShadow: `0 0 0 1px ${member.accent}33 inset` } : undefined}
-                >
-                  <strong className="block text-lg">{member.displayName}</strong>
-                  <span className="text-sm text-accent">{member.role}</span>
-                  {member.bio ? <p className="mt-3 text-sm text-muted">{member.bio}</p> : null}
-                </motion.article>
+              {(team.members || []).map((member, i) => (
+                <BlurFadeIn key={member.id || member.displayName} delay={i * 0.06}>
+                  <SpotlightCard
+                    as="article"
+                    spotlight={member.accent ? `${member.accent}22` : "rgba(167,139,250,0.08)"}
+                    className="transition-transform duration-300 hover:-translate-y-1"
+                    style={member.accent ? { boxShadow: `0 0 0 1px ${member.accent}33 inset` } : undefined}
+                  >
+                    <div className="p-6">
+                      <strong className="block text-lg">{member.displayName}</strong>
+                      <span className="text-sm text-accent">{member.role}</span>
+                      {member.bio ? <p className="mt-3 text-sm text-muted">{member.bio}</p> : null}
+                    </div>
+                  </SpotlightCard>
+                </BlurFadeIn>
               ))}
             </div>
           </div>

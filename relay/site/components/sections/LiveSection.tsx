@@ -1,10 +1,10 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { fetchLiveStatus } from "@/lib/api";
 import type { LiveStatusPayload } from "@/lib/types";
 import { SectionHeader } from "@/components/layout/SiteChrome";
+import { SpotlightCard } from "@/components/ui/premium";
 
 export function LiveSection() {
   const [data, setData] = useState<LiveStatusPayload | null>(null);
@@ -54,12 +54,8 @@ export function LiveSection() {
         desc="Versions, GitHub sync, inject health, and changelog — streaming every 15 seconds."
       />
 
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="glass rounded-[28px] p-6"
-      >
+      <SpotlightCard spotlight="rgba(34,211,238,0.1)">
+        <div className="p-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <span className={`inline-flex items-center gap-2 text-sm ${online ? "text-green-400" : "text-red-400"}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${online ? "bg-green-400" : "bg-red-400"}`} />
@@ -106,7 +102,8 @@ export function LiveSection() {
             )}
           </div>
         </div>
-      </motion.div>
+        </div>
+      </SpotlightCard>
     </section>
   );
 }

@@ -419,6 +419,7 @@
         return;
       }
       ids.forEach((id, i) => renderScriptCard(id, data.scripts[id], root, i));
+      window.AlleralSelect?.enhance(root);
     } catch (e) {
       errorEl.textContent = e.message;
       root.innerHTML = "";

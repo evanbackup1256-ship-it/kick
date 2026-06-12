@@ -2,10 +2,11 @@
 
 import clsx from "clsx";
 import { motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { gsap } from "gsap";
 import type { SitePayload } from "@/lib/types";
 import { HeroOrbit } from "@/components/effects/HeroOrbit";
+import { GlowButton, LightBeams, ShaderMesh, SpotlightCard } from "@/components/ui/premium";
 
 function SplitBrand({ text }: { text: string }) {
   return (
@@ -29,19 +30,17 @@ function MagneticButton({
   children,
   className,
   onClick,
-  type = "button",
 }: {
   children: React.ReactNode;
   className?: string;
   onClick?: () => void;
-  type?: "button" | "submit";
 }) {
   const ref = useRef<HTMLButtonElement>(null);
 
   return (
     <button
       ref={ref}
-      type={type}
+      type="button"
       onClick={onClick}
       onMouseMove={(e) => {
         const el = ref.current;
@@ -82,9 +81,14 @@ export function HeroSection({
   ].filter(Boolean);
 
   return (
-    <section id="home" className="section-wrap scroll-mt-24 pb-20 pt-[130px] min-h-[min(92vh,920px)]">
-      <div className="grid items-center gap-12 lg:grid-cols-2">
-        <div className="text-left lg:text-left">
+    <section id="home" className="relative scroll-mt-24 pb-20 pt-[130px] min-h-[min(92vh,920px)] overflow-hidden">
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        <ShaderMesh className="opacity-50" />
+        <LightBeams className="opacity-60" />
+      </div>
+
+      <div className="section-wrap relative z-10 grid items-center gap-12 lg:grid-cols-2">
+        <div className="text-left">
           {site.announcement ? (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
@@ -99,7 +103,7 @@ export function HeroSection({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="mb-3 text-xs font-medium uppercase tracking-[0.12em] text-muted-2"
+            className="shimmer-text mb-3 text-xs font-medium uppercase tracking-[0.12em]"
           >
             Roblox script hub · auto-synced
           </motion.p>
@@ -130,44 +134,45 @@ export function HeroSection({
             ))}
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="glass mt-6 overflow-hidden rounded-[28px]">
-            <div className="flex items-center justify-between border-b border-border bg-white/[0.02] px-5 py-3.5">
-              <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
-                loader.luau
-              </span>
-              <span className="text-xs text-muted-2">
-                v{site.loaderVersion || "—"}
-                {metaBits.length ? ` · ${metaBits.join(" · ")}` : ""}
-              </span>
-            </div>
-            <pre className="max-h-[120px] overflow-y-auto whitespace-pre-wrap break-all px-5 py-5 font-mono text-xs leading-relaxed text-[#b8c4d4]">
-              {site.loadstring || "Loading…"}
-            </pre>
-            <div className="flex flex-wrap gap-2.5 px-5 pb-5">
-              <MagneticButton
-                onClick={onCopy}
-                className="rounded-full bg-gradient-to-br from-accent to-violet px-6 py-3 text-sm font-semibold text-[#030508] shadow-[0_8px_32px_rgba(34,211,238,0.25)]"
-              >
-                Copy Script
-              </MagneticButton>
-              <MagneticButton
-                onClick={() => onNavigate("#games")}
-                className="rounded-full border border-border-strong px-6 py-3 text-sm font-medium text-text hover:bg-white/[0.04]"
-              >
-                View Games
-              </MagneticButton>
-            </div>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+            <SpotlightCard className="mt-6" spotlight="rgba(34,211,238,0.16)">
+              <div className="flex items-center justify-between border-b border-border bg-white/[0.02] px-5 py-3.5">
+                <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
+                  loader.luau
+                </span>
+                <span className="text-xs text-muted-2">
+                  v{site.loaderVersion || "—"}
+                  {metaBits.length ? ` · ${metaBits.join(" · ")}` : ""}
+                </span>
+              </div>
+              <pre className="max-h-[120px] overflow-y-auto whitespace-pre-wrap break-all px-5 py-5 font-mono text-xs leading-relaxed text-[#b8c4d4]">
+                {site.loadstring || "Loading…"}
+              </pre>
+              <div className="flex flex-wrap gap-2.5 px-5 pb-5">
+                <GlowButton onClick={onCopy}>Copy Script</GlowButton>
+                <MagneticButton
+                  onClick={() => onNavigate("#games")}
+                  className="rounded-full border border-border-strong px-6 py-3 text-sm font-medium text-text hover:bg-white/[0.04]"
+                >
+                  View Games
+                </MagneticButton>
+              </div>
+            </SpotlightCard>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }} className="glass mt-6 flex flex-wrap items-center gap-6 rounded-[28px] px-6 py-4">
-            <Stat value={games.length} label="Games" />
-            <Divider />
-            <Stat value={working} label="Working" />
-            <Divider />
-            <Stat text={site.scriptsUpdatedAt || "—"} label="Last sync" />
-            <Divider />
-            <Stat text="Live" label="Relay" accent />
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }}>
+            <SpotlightCard className="mt-6" spotlight="rgba(167,139,250,0.12)">
+              <div className="flex flex-wrap items-center gap-6 px-6 py-4">
+                <Stat value={games.length} label="Games" />
+                <Divider />
+                <Stat value={working} label="Working" />
+                <Divider />
+                <Stat text={site.scriptsUpdatedAt || "—"} label="Last sync" />
+                <Divider />
+                <Stat text="Live" label="Relay" accent />
+              </div>
+            </SpotlightCard>
           </motion.div>
         </div>
 

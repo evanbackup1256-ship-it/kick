@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchThumbnails } from "@/lib/api";
 import type { GameEntry, SitePayload } from "@/lib/types";
 import { SectionHeader } from "@/components/layout/SiteChrome";
+import { SpotlightCard } from "@/components/ui/premium";
 
 const STATUSES = ["all", "working", "testing", "maintenance", "broken"] as const;
 
@@ -79,35 +80,39 @@ export function GamesSection({ site }: { site: SitePayload }) {
           const placeId = game.placeIds?.[0] ? String(game.placeIds[0]) : null;
           const thumb = placeId ? thumbs[placeId] : null;
           return (
-            <motion.button
+            <motion.div
               key={game.id}
-              type="button"
               layout
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-5%" }}
               transition={{ delay: Math.min(i * 0.04, 0.3) }}
-              whileHover={{ y: -6 }}
-              onClick={() => setModal({ id: game.id, game })}
-              className="glass overflow-hidden rounded-[28px] text-left transition hover:border-cyan-400/20"
             >
-              <div className="relative h-40 overflow-hidden">
-                {thumb ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={thumb} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                ) : (
-                  <div className="absolute inset-0" style={{ background: gradientFor(game.id, i) }} />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-[rgba(12,16,24,1)] to-transparent" />
-              </div>
-              <div className="p-5">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <h3 className="text-lg font-semibold">{game.name || game.id}</h3>
-                  <StatusChip status={status} />
+              <SpotlightCard
+                as="button"
+                type="button"
+                onClick={() => setModal({ id: game.id, game })}
+                className="w-full text-left"
+                spotlight="rgba(34,211,238,0.11)"
+              >
+                <div className="relative h-40 overflow-hidden rounded-t-[27px]">
+                  {thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumb} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+                  ) : (
+                    <div className="absolute inset-0" style={{ background: gradientFor(game.id, i) }} />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[rgba(12,16,24,1)] to-transparent" />
                 </div>
-                <p className="line-clamp-2 text-sm text-muted">{game.description || game.message || "No description."}</p>
-              </div>
-            </motion.button>
+                <div className="p-5">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-semibold">{game.name || game.id}</h3>
+                    <StatusChip status={status} />
+                  </div>
+                  <p className="line-clamp-2 text-sm text-muted">{game.description || game.message || "No description."}</p>
+                </div>
+              </SpotlightCard>
+            </motion.div>
           );
         })}
       </div>

@@ -309,6 +309,9 @@
 
 /* ── Custom select dropdown ── */
 .select-wrap-enhanced { position: relative; }
+.select-wrap-enhanced::after {
+  display: none;
+}
 .select-wrap-enhanced .custom-select-native {
   position: absolute;
   opacity: 0;

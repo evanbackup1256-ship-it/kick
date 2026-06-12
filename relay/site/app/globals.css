@@ -17,7 +17,7 @@
   --color-yellow: #fbbf24;
   --color-red: #f87171;
   --color-purple: #c084fc;
-  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-outfit), "Outfit", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
@@ -28,11 +28,28 @@
 
   body {
     @apply bg-bg text-text antialiased overflow-x-hidden;
-    font-family: var(--font-sans);
+    font-family: var(--font-outfit), var(--font-sans);
   }
 
   ::selection {
     background: rgba(34, 211, 238, 0.25);
+  }
+
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    padding-right: 2.5rem;
+    background-image: linear-gradient(45deg, transparent 50%, rgb(139 149 168) 50%),
+      linear-gradient(135deg, rgb(139 149 168) 50%, transparent 50%);
+    background-position: calc(100% - 18px) calc(50% + 2px), calc(100% - 12px) calc(50% + 2px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+  }
+
+  select option {
+    background: rgb(12 16 24);
+    color: var(--color-text);
   }
 }
 
@@ -95,4 +112,46 @@ html.cf-gate-lock body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+@keyframes spin-border {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes beam-pulse {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scaleY(0.85);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scaleY(1);
+  }
+}
+
+.animate-beam {
+  animation-name: beam-pulse;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes shimmer-line {
+  0% {
+    background-position: 0% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg, var(--color-muted-2) 0%, var(--color-text) 45%, var(--color-accent) 50%, var(--color-text) 55%, var(--color-muted-2) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-line 8s linear infinite;
 }
