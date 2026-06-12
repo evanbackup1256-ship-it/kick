@@ -1,6 +1,6 @@
 return function(deps)
 	deps = type(deps) == "table" and deps or {}
-	local ALLERAL_UI_VERSION = "2.2.0-vendor"
+	local ALLERAL_UI_VERSION = "2.3.0-vendor"
 
 	local Maid = deps.Maid
 	local Spring = deps.Spring

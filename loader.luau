@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.0.0"
+local LOADER_VERSION = "8.1.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -44,18 +44,18 @@ local UI_BOOTSTRAP_MODULES = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.0.0",
-	core = "2.8.8",
+	loader = "8.1.0",
+	core = "2.8.9",
 	ui = "Alleral",
-	windui = "2.2.0-vendor",
-	alleral = "2.2.0-vendor",
+	windui = "2.3.0-vendor",
+	alleral = "2.3.0-vendor",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
-	weao = "1.0",
+	weao = "1.1",
 	security = "1.3",
 	access = "1.0",
-	commit = "c99d6b7",
+	commit = "3edad96",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
 }

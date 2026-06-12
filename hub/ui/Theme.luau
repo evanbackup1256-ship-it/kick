@@ -1,5 +1,5 @@
 local Theme = {}
-Theme.Version = "2.2.0-vendor"
+Theme.Version = "2.3.0-vendor"
 
 local function base()
 	return {

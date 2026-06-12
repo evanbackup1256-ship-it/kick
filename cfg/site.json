@@ -1,13 +1,14 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-12T00:05:26Z",
+  "updatedAt": "2026-06-12T02:30:00Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
-  "loaderVersion": "7.9.0",
-  "coreVersion": "2.8.8",
+  "loaderVersion": "8.1.0",
+  "coreVersion": "2.8.9",
   "uiLibrary": "Alleral",
+  "uiVersion": "2.3.0-vendor",
   "announcement": "",
-  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick()))()",
+  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
   "branch": "main",
   "features": [
@@ -50,6 +51,15 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-12",
+      "title": "Alleral UI 2.3.0-vendor bootstrap",
+      "items": [
+        "Loader 8.1.0 syncs hub/ui modules to executor workspace before UI load",
+        "Fixed remote UI bootstrap for Volt and other executor-only setups",
+        "Core 2.8.9 with vendored Fusion, OnyxUI, spr, and full Alleral UI stack"
+      ]
+    },
     {
       "date": "2026-06-11",
       "title": "WindUI revamp",

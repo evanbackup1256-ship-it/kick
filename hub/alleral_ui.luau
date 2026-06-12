@@ -1,7 +1,7 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "2.2.0-vendor"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "2.3.0-vendor"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Alleral"
 
