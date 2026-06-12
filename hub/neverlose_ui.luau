@@ -697,7 +697,8 @@ return function(Core)
 		function tab:CreateGroupbox(settings)
 			settings = settings or {}
 			local name = settings.Name or "Group"
-			local column = math.clamp(tonumber(settings.Column) or 1, 1, 2)
+			local pageColumns = math.max(1, tonumber(rawPage and rawPage.Columns) or 2)
+			local column = math.clamp(tonumber(settings.Column) or 1, 1, pageColumns)
 			if not rawPage or type(rawPage.Section) ~= "function" then
 				Core.logWarn("CreateGroupbox skipped — page missing for " .. tostring(name))
 				return Core.createStubUiGroup(name)
@@ -768,13 +769,15 @@ return function(Core)
 			Core.logWarn("buildUiTab skipped — window missing")
 			return Core.wrapUiTab(nil, type(section) == "table" and section._ui or nil, window)
 		end
+		local requested = math.max(1, tonumber(columns) or 2)
+		local pageColumns = math.max(2, requested)
 		local rawPage = window._rawWindow:Page({
 			Name = name,
 			Icon = iconId(icon),
-			Columns = math.max(1, tonumber(columns) or 2),
+			Columns = pageColumns,
 		})
 		local wrapped = Core.wrapUiTab(rawPage, window._ui or (type(section) == "table" and section._ui) or nil, window)
-		wrapped._columnCount = math.max(1, tonumber(columns) or 2)
+		wrapped._columnCount = requested
 		return wrapped
 	end
 

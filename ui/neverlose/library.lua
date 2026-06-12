@@ -4652,8 +4652,16 @@ Library.Watermark = function(self, Data)
  }
 
  local Items = { } do
+ local pageColumns = math.max(1, tonumber(Section.Page.Columns) or 2)
+ local sideIndex = math.clamp(tonumber(Section.Side) or 1, 1, pageColumns)
+ local columnHost = Section.Page.ColumnsData[sideIndex] or Section.Page.ColumnsData[1]
+ if not columnHost or not columnHost.Instance then
+  warn("[Neverlose] Missing page column " .. tostring(sideIndex) .. " for section " .. tostring(Section.Name))
+  return setmetatable(Section, Library.Sections)
+ end
+ Section.Side = sideIndex
  Items["Section"] = Instances:Create("Frame", {
- Parent = Section.Page.ColumnsData[Section.Side].Instance,
+ Parent = columnHost.Instance,
  Name = "\0",
  BorderColor3 = FromRGB(0, 0, 0),
  BackgroundTransparency = 0.6499999761581421,
