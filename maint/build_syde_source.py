@@ -23,6 +23,11 @@ def extract_block(text: str, start: str, end: str) -> str:
     return text[i:j]
 
 
+def replace_from(text: str, start: str, new_tail: str) -> str:
+    i = text.index(start)
+    return text[:i] + new_tail
+
+
 def replace_between(text: str, start: str, end: str, new_body: str) -> str:
     i = text.index(start)
     j = text.index(end, i)
@@ -167,6 +172,7 @@ def main() -> None:
         page_dropdown,
     )
 
+    footer_start = "\t\treturn initelement\n\n\n\tend\n\treturn tbdata"
     end_patch = """
 \t\tfunction initelement:Select()
 \t\t\tSwitchToTab(tdata.Title)
@@ -203,12 +209,9 @@ syde.__AlleralPatch = ALLERAL_SYDE_PATCH
 
 return syde
 """
-    body = replace_between(
-        body,
-        "\t\treturn initelement\n\n\n\tend\n\treturn tbdata",
-        "\nreturn syde\n",
-        end_patch,
-    )
+    if footer_start not in body:
+        raise RuntimeError("Syde Init footer anchor missing — upstream layout changed")
+    body = replace_from(body, footer_start, end_patch)
 
     OUT.write_text(body, encoding="utf-8")
     print(f"Wrote {OUT} ({len(body)} bytes, {body.count(chr(10)) + 1} lines)")

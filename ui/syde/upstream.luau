@@ -2389,8 +2389,16 @@ window.top.functions.close.interact.MouseButton1Click:Connect(function()
 		Content = 'Are You Sure You Want To Close This UI?',
 		ConfimCallBack = function()
 			mh = false
-			rs:Disconnect()
-			ss:Disconnect()
+			pcall(function()
+				if rs and typeof(rs.Disconnect) == "function" then
+					rs:Disconnect()
+				end
+			end)
+			pcall(function()
+				if ss and typeof(ss.Disconnect) == "function" then
+					ss:Disconnect()
+				end
+			end)
 			--	if not ui.Parent then return end
 			task.wait(1)
 			Library:Destroy()
