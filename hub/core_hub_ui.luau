@@ -100,7 +100,7 @@ function Core.buildHubActionsGroup(tab, column)
 			Core.notify("Alleral", "reloading...", 3)
 			task.defer(reload)
 		else
-			Core.notify("Alleral", "can't reload here — run the loadstring again", 5)
+			Core.notify("Alleral", "can't reload here — use getgenv().Alleral_Reload()", 5)
 		end
 	end, "Runs getgenv().Alleral_Reload().")
 

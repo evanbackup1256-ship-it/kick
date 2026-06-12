@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.17"
+local LOADER_VERSION = "8.2.18"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -27,7 +27,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.17",
+	loader = "8.2.18",
 	core = "2.9.4",
 	ui = "Syde",
 	windui = "4.0.0-syde",
@@ -185,7 +185,6 @@ local function notLoadedApi(name)
 end
 
 for _, apiName in ipairs({
-	"Alleral_Bootstrap",
 	"Alleral_Load",
 	"Alleral_PurgeCache",
 	"Alleral_CheckUpdate",
@@ -195,6 +194,9 @@ for _, apiName in ipairs({
 	"Alleral_SyncWeao",
 }) do
 	publishConsoleApi(apiName, notLoadedApi(apiName))
+end
+if type(ENV.Alleral_Bootstrap) ~= "function" then
+	publishConsoleApi("Alleral_Bootstrap", notLoadedApi("Alleral_Bootstrap"))
 end
 
 local function firstExecFunc(...)
@@ -3187,7 +3189,7 @@ local function installAutoexecRedirect()
 		"local placeOk = g._Alleral_LastPlaceId == game.PlaceId",
 		"if type(g._Alleral_SupportedPlaces) == 'table' and g._Alleral_SupportedPlaces[game.PlaceId] then placeOk = true end",
 		"if not placeOk and not g._Alleral_PendingRelaunch then return end",
-		"if type(g._Alleral_RunLoader) == 'function' then g._Alleral_RunLoader('autoexec') end",
+		BOOTSTRAP_LOADSTRING,
 		"",
 	}, "\n")
 	for _, dir in ipairs({ "autoexec", "Autoexec" }) do
@@ -3489,6 +3491,32 @@ local function markSupportedPlaces()
 	ENV._Alleral_SupportedPlaces = places
 end
 
+local function relaunchViaBootstrap(reason)
+	reason = reason or "relaunch"
+	stopAutoUpdater()
+	if type(ENV.Alleral_Bootstrap) == "function" then
+		local ok, result = ENV.Alleral_Bootstrap(reason)
+		return ok == true, result
+	end
+	local src, via = httpGet(GITHUB_RAW .. "/" .. BOOTSTRAP_REMOTE_PATH .. "?t=" .. tostring(tick()), 200)
+	if type(src) ~= "string" or #src < 200 then
+		return false, "bootstrap fetch failed (" .. tostring(via) .. ")"
+	end
+	ENV._Alleral_BootstrapSkipAutoRun = true
+	local ok, err = compileAndRun(src, "Alleral/bootstrap", loaderRunEnv())
+	if not ok then
+		ENV._Alleral_BootstrapSkipAutoRun = nil
+		return false, err
+	end
+	if type(ENV.Alleral_Bootstrap) == "function" then
+		local bootOk, bootResult = ENV.Alleral_Bootstrap(reason)
+		ENV._Alleral_BootstrapSkipAutoRun = nil
+		return bootOk == true, bootResult
+	end
+	ENV._Alleral_BootstrapSkipAutoRun = nil
+	return false, "bootstrap entry missing after load"
+end
+
 local function installGlobalBootstrap()
 	if ENV._Alleral_BootstrapInstalled then
 		return
@@ -3526,89 +3554,10 @@ local function installGlobalBootstrap()
 				g._Alleral_PendingRelaunch = true
 			end
 
-			local function pick(names)
-				for _, name in ipairs(names) do
-					local fn = g[name]
-					if type(fn) ~= "function" and _G then
-						fn = _G[name]
-					end
-					if type(fn) == "function" then
-						return fn
-					end
-				end
-				return nil
+			local ok, err = relaunchViaBootstrap(reason or "relaunch")
+			if not ok then
+				warn("[Alleral] Bootstrap relaunch failed: " .. tostring(err))
 			end
-
-			local readFileFn = pick({ "readfile", "ReadFile", "read_file" })
-			local isFileFn = pick({ "isfile", "IsFile", "is_file" })
-			local loadStringFn = pick({ "loadstring", "LoadString", "load" })
-
-			local function localLoaderFresh(src)
-				if type(src) ~= "string" or #src < 500 then
-					return false
-				end
-				local ver = extractFileVersion(src, "loader")
-				if type(ver) ~= "string" or ver == "" then
-					return false
-				end
-				local expected = g._Alleral_ExpectedVersions and g._Alleral_ExpectedVersions.loader
-				if type(expected) == "string" and expected ~= "" and versionLt(ver, expected) then
-					return false
-				end
-				return not versionLt(ver, LOADER_VERSION)
-			end
-
-			for _, path in ipairs(LOADER_LOCAL_PATHS) do
-				if isFileFn and readFileFn and isFileFn(path) then
-					local ok, src = pcall(readFileFn, path)
-					if ok and type(src) == "string" and #src > 500 and loadStringFn and localLoaderFresh(src) then
-						local compiled, compileErr = loadStringFn(src, "Alleral/loader")
-						if compiled then
-							if typeof(game) == "Instance" and typeof(g.game) ~= "Instance" then
-								g.game = game
-							end
-							if setfenv then
-								pcall(setfenv, compiled, g)
-							end
-							task.defer(compiled)
-							return
-						end
-						warn("[Alleral] Local loader compile failed: " .. tostring(compileErr))
-					end
-				end
-			end
-
-			local url = GITHUB_RAW .. "/loader.luau?t=" .. tostring(tick())
-			local src
-			pcall(function()
-				src = game:HttpGet(url, true)
-			end)
-			if type(src) ~= "string" or #src < 500 then
-				pcall(function()
-					src = game:HttpGet(url)
-				end)
-			end
-			if type(src) == "string" and #src > 500 and loadStringFn then
-				local compiled, compileErr = loadStringFn(src, "Alleral/loader")
-				if compiled then
-					local writeFileFn = pick({ "writefile", "WriteFile", "write_file" })
-					local makeFolderFn = pick({ "makefolder", "MakeFolder", "make_folder" })
-					if writeFileFn and makeFolderFn then
-						pcall(makeFolderFn, "kick")
-						pcall(writeFileFn, "loader.luau", src)
-					end
-					if typeof(game) == "Instance" and typeof(g.game) ~= "Instance" then
-						g.game = game
-					end
-					if setfenv then
-						pcall(setfenv, compiled, g)
-					end
-					task.defer(compiled)
-					return
-				end
-				warn("[Alleral] Remote loader compile failed: " .. tostring(compileErr))
-			end
-			warn("[Alleral] Could not relaunch loader after teleport")
 		end)
 	end
 
@@ -3804,24 +3753,31 @@ local function main()
 	end
 	refreshExpectedVersionsAsync()
 	if expectedVersions.loader and versionLt(LOADER_VERSION, expectedVersions.loader) then
-		local remoteLoaderMsg = "Remote loader is v"
-			.. tostring(expectedVersions.loader)
-			.. " but this session is v"
-			.. LOADER_VERSION
-			.. ". Re-run the GitHub loadstring once."
-		log(remoteLoaderMsg, true)
-		notify("Alleral", "Loader outdated — re-run GitHub loadstring", 12)
-		pcall(syncWorkspaceLoaderFromRemote)
+		log(
+			"Remote loader v"
+				.. tostring(expectedVersions.loader)
+				.. " available (session v"
+				.. LOADER_VERSION
+				.. ") — auto-updating via bootstrap"
+		)
+		ENV.Alleral_LoaderRunning = false
+		task.defer(function()
+			relaunchViaBootstrap("loader-version-sync")
+		end)
+		return
 	end
 	if expectedVersions.minLoader and versionLt(LOADER_VERSION, expectedVersions.minLoader) then
-		local msg = "Loader v"
-			.. LOADER_VERSION
-			.. " is below minimum v"
-			.. tostring(expectedVersions.minLoader)
-			.. ". Re-run the GitHub loadstring."
-		notify("Alleral", msg, 10)
-		log(msg, true)
+		log(
+			"Loader v"
+				.. LOADER_VERSION
+				.. " is below minimum v"
+				.. tostring(expectedVersions.minLoader)
+				.. " — fetching latest bootstrap"
+		)
 		ENV.Alleral_LoaderRunning = false
+		task.defer(function()
+			relaunchViaBootstrap("min-loader-sync")
+		end)
 		return
 	end
 
@@ -4046,19 +4002,19 @@ local function main()
 	log("ready")
 end
 
-publishConsoleApi("Alleral_Load", function()
-	if type(loadStringFn) ~= "function" then
-		warn("[Alleral v" .. LOADER_VERSION .. "] loadstring unavailable")
-		return false
-	end
-	local body, via = httpGet(GITHUB_RAW .. "/loader.luau?t=" .. tick(), 500)
-	if type(body) ~= "string" or #body < 500 then
-		warn("[Alleral v" .. LOADER_VERSION .. "] Could not download loader (" .. tostring(via) .. ")")
-		return false
-	end
-	local ok, err = compileAndRun(body, "Alleral/loader", loaderRunEnv())
+publishConsoleApi("Alleral_Bootstrap", function(reason)
+	local ok, err = relaunchViaBootstrap(reason or "manual-bootstrap")
 	if not ok then
-		warn("[Alleral v" .. LOADER_VERSION .. "] Loader failed: " .. tostring(err))
+		warn("[Alleral v" .. LOADER_VERSION .. "] Bootstrap failed: " .. tostring(err))
+		return false, err
+	end
+	return true, err
+end)
+
+publishConsoleApi("Alleral_Load", function()
+	local ok, err = relaunchViaBootstrap("manual-load")
+	if not ok then
+		warn("[Alleral v" .. LOADER_VERSION .. "] Load failed: " .. tostring(err))
 		return false
 	end
 	return true

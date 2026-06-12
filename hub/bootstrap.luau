@@ -1,6 +1,6 @@
 -- Alleral Bootstrap v1.0.0
--- Stable entry script: always pulls the latest loader.luau from GitHub.
--- Save this once (autoexec or loadstring) — it stays small while the hub updates remotely.
+-- Save this loadstring once in your executor — it always fetches the latest loader from GitHub.
+-- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=" .. tick(), true))()
 
 local BOOTSTRAP_VERSION = "1.0.0"
 local REPO = "evanbackup1256-ship-it/kick"
