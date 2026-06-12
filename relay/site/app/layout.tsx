@@ -1,7 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit, IBM_Plex_Mono } from "next/font/google";
-import { LenisProvider } from "@/components/providers/LenisProvider";
-import { HomePage } from "@/components/HomePage";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -18,17 +16,18 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Alleral",
-  description: "Roblox scripts with live status, auto-updates, and a cinematic hub experience.",
-  themeColor: "#030508",
+  title: "Alleral Platform",
+  description: "Premium telemetry platform for Alleral — live sync, inject health, and script operations.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#030406",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${outfit.variable} ${plexMono.variable}`}>
-      <body className="site-body">
-        <LenisProvider>{children}</LenisProvider>
-      </body>
+      <body className="site-body">{children}</body>
     </html>
   );
 }

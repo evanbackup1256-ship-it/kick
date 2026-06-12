@@ -1,5 +1,5 @@
-import { HomePage } from "@/components/HomePage";
+import { PlatformApp } from "@/components/platform/PlatformApp";
 
 export default function Page() {
-  return <HomePage />;
+  return <PlatformApp />;
 }
