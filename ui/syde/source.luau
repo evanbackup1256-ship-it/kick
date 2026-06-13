@@ -449,20 +449,8 @@ local function sydeShouldSkipNormalize(instance)
 end
 
 local function sydeNormalizeTemplateNames(root)
-	if not root then
-		return
-	end
-	for _, desc in ipairs(root:GetDescendants()) do
-		if sydeShouldSkipNormalize(desc) then
-			continue
-		end
-		local canonical = SYDE_CANONICAL_NAMES[desc.Name]
-		if canonical and canonical ~= desc.Name then
-			pcall(function()
-				desc.Name = canonical
-			end)
-		end
-	end
+	-- DISABLED: renaming PascalCase→lowercase breaks dot-notation access (e.g. window.clipframe, toggle.tog, Slider.slide)
+	return
 end
 
 local function sydePrepareAssetRoot(root)
