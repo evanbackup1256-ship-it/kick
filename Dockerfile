@@ -1,6 +1,7 @@
 FROM node:24-alpine AS site-build
 WORKDIR /site
-COPY backend/telemetry_relay.py backend/script_registry.py backend/ban_registry.py backend/site_registry.py backend/roblox_api.py backend/weao_api.py backend/auto_sync.py backend/manage_backend.py backend/security.py ./RUN npm install
+COPY relay/site/package.json relay/site/package-lock.json ./
+RUN npm install
 COPY relay/site ./
 ENV SKIP_BACKEND_SYNC=1
 RUN npm run build
