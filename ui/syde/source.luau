@@ -18,7 +18,7 @@ local player =          game:GetService('Players')
 local textservice =     game:GetService('TextService')
 local coregui =         game:GetService("CoreGui")
 
-local ALLERAL_SYDE_PATCH = 24
+local ALLERAL_SYDE_PATCH = 25
 
 -- update check
 local update = false
