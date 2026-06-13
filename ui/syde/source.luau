@@ -1913,21 +1913,6 @@ syde:HidePH(pages, 'page')
 
 function syde:Init(library)
 	ui.Enabled = true
-	-- CSS engine — intercept all cosmetic Tweens, set CSSTransition on element
-	local origTweenCreate = tweenservice.Create
-	tweenservice.Create = function(self, el, info, props)
-		if props and el and el:IsA("GuiObject") then
-			local hasCosmetic = false
-			for k, _ in pairs(props) do
-				if k == "BackgroundTransparency" or k == "TextTransparency" or k == "ImageTransparency"
-					or k == "BackgroundColor3" or k == "TextColor3" or k == "ImageColor3" or k == "BorderColor3" then
-					hasCosmetic = true
-				end
-			end
-			if hasCosmetic then el:SetAttribute("CSSTransition", info and info.Time or 0.3) end
-		end
-		return origTweenCreate(tweenservice, el, info, props)
-	end
 	if loaded == false then
 		local UI_TAG = "sydeUILoader"
 		local MARKER_NAME = "SYDEUIDetector"
