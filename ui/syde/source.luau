@@ -1346,9 +1346,12 @@ do
 		Config.Accent = Config.Accent or syde.theme.Accent
 		Config.HitBox = Config.HitBox or syde.theme.HitBox
 
-		LOADER.loader.profile.Title.TextTransparency = 1
+		local profileTitle = sydeFindChild(LOADER.loader.profile, "Title", "title")
 		LOADER.loader.profile.ImageTransparency = 1
-		LOADER.loader.profile.Title.Text = Config.Name
+		if profileTitle then
+			profileTitle.TextTransparency = 1
+			profileTitle.Text = Config.Name
+		end
 		--	LOADER.load.logo.stroke.UIStroke.Transparency = 1
 
 		local LoaderConfig = {
@@ -1363,7 +1366,7 @@ do
 
 		if LoaderConfig.Status == false then
 			--	LOADER.load.logo.stroke.UIStroke.Color = Color3.fromRGB(24, 24, 24)
-			LOADER.loader.profile.Title.Text = LoaderConfig.Name
+			if profileTitle then profileTitle.Text = LoaderConfig.Name end
 		end
 
 		local statusColors = {
@@ -1493,8 +1496,9 @@ do
 			end
 
 			-- Set Text (change if your text label has different name)
-			if clone:FindFirstChild("Title") then
-				clone.Title.Text = value
+			local cloneTitle = clone:FindFirstChild("Title") or clone:FindFirstChild("title")
+			if cloneTitle then
+				cloneTitle.Text = value
 			end
 
 			clone.interact.MouseButton1Click:Connect(function()
@@ -1529,7 +1533,8 @@ do
 		tweenservice:Create(logo, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
 		--	tweenservice:Create(logo, TweenInfo.new(1, Enum.EasingStyle.Quint), {Position = UDim2.new(0.5, 0,0, 105)}):Play()
 
-		tweenservice:Create(logo.Title, TweenInfo.new(2, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+		local logoTitle = sydeFindChild(logo, "Title", "title")
+		if logoTitle then tweenservice:Create(logoTitle, TweenInfo.new(2, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end
 		task.wait(1)
 
 
@@ -1955,7 +1960,7 @@ function syde:Notify(Notification)
 		local Notification = Library.Notification.Default:Clone()
 		Notification.Visible = true
 		Notification.Parent = Library.Notification
-		Notification.Title.Text = NotifData.Title
+		Notification.title.Text = NotifData.Title
 		Notification.Content.Text = NotifData.Content
 		Notification.Content.Size = UDim2.new(0, 200,0, Notification.Content.TextBounds.Y )
 		Notification.icon.Image = 'rbxassetid://'..NotifData.Icon
@@ -1971,7 +1976,7 @@ function syde:Notify(Notification)
 				tweenservice:Create(Notification.UIScale, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Scale = 0.9}):Play()
 				tweenservice:Create(Notification.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {ImageTransparency = 0.95}):Play()
 				tweenservice:Create(Notification, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.75}):Play()
-				--	tweenservice:Create(Notification.Title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0.5}):Play()
+				--	tweenservice:Create(Notification.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0.5}):Play()
 				tweenservice:Create(Notification.Content, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0.78}):Play()
 
 				task.wait(0.15)
@@ -1985,7 +1990,7 @@ function syde:Notify(Notification)
 		end
 
 		if NotifData.Animation == 'Wiggle' then
-			syde:WiggleText(Notification.Title)
+			syde:WiggleText(Notification.title)
 		end
 
 		if NotifData.Varient == 'Options' then
@@ -2011,7 +2016,7 @@ function syde:Notify(Notification)
 		--	Notification.UIScale.Scale = 0.9
 		Notification.close.ImageTransparency = 0.95
 		Notification.BackgroundTransparency = 0.75
-		--	Notification.Title.TextTransparency = 0.5
+		--	Notification.title.TextTransparency = 0.5
 		Notification.Content.TextTransparency = 0.78
 
 		Notification.Position = UDim2.new(0, 600, 0, 637)
@@ -2021,7 +2026,7 @@ function syde:Notify(Notification)
 		task.wait(0.45)
 
 		if NotifData.Icon ~= '' then
-			tweenservice:Create(Notification.Title, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 40,0, 10)}):Play()
+			tweenservice:Create(Notification.title, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 40,0, 10)}):Play()
 			task.wait(0.035)
 			tweenservice:Create(Notification.Content, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 40,0, 30)}):Play()
 
@@ -2032,7 +2037,7 @@ function syde:Notify(Notification)
 		tweenservice:Create(Notification.UIScale, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Scale = 1}):Play()
 		tweenservice:Create(Notification.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {ImageTransparency = 0.75}):Play()
 		tweenservice:Create(Notification, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-		--	tweenservice:Create(Notification.Title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+		--	tweenservice:Create(Notification.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 		tweenservice:Create(Notification.Content, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
 		Notification.close.MouseEnter:Connect(function()
@@ -2067,23 +2072,29 @@ function syde:Modal(Modal)
 
 		local ModalInstance = ui.main.modal:Clone()
 		local buttons = ModalInstance:FindFirstChild("Buttons") or ModalInstance:FindFirstChild("buttons") or Instance.new("Frame")
+		local confirmBtn = buttons and (buttons:FindFirstChild("Confirm") or buttons:FindFirstChild("confirm"))
+		local cancelBtn = buttons and (buttons:FindFirstChild("Cancel") or buttons:FindFirstChild("cancel"))
 		ModalInstance.Visible = true
 		ModalInstance.Parent = ui.main
-		ModalInstance.Title.Text = ModalData.Title
+		ModalInstance.title.Text = ModalData.Title
 		ModalInstance.Content.Text = ModalData.Content
 		--	ModalInstance.Content.Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)
 		ModalInstance.Size = UDim2.new(0, 350,0, 144)
 		ModalInstance.BackgroundTransparency = 1
-		ModalInstance.Title.TextTransparency = 1
+		ModalInstance.title.TextTransparency = 1
 		ModalInstance.Content.TextTransparency = 1
 
-		buttons.Confirm.BackgroundTransparency = 1
-					buttons.Confirm.TextLabel.TextTransparency = 1
-					--	buttons.Confirm.UIStroke.Transparency = 1
+		if confirmBtn then
+			confirmBtn.BackgroundTransparency = 1
+			confirmBtn.TextLabel.TextTransparency = 1
+			--	confirmBtn.UIStroke.Transparency = 1
+		end
 
-					buttons.Cancel.BackgroundTransparency = 1
-					buttons.Cancel.TextLabel.TextTransparency = 1
-					buttons.Cancel.UIStroke.Transparency = 1
+		if cancelBtn then
+			cancelBtn.BackgroundTransparency = 1
+			cancelBtn.TextLabel.TextTransparency = 1
+			cancelBtn.UIStroke.Transparency = 1
+		end
 
 		local function openModal()
 			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)}):Play()
@@ -2093,16 +2104,20 @@ function syde:Modal(Modal)
 
 			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+			tweenservice:Create(ModalInstance.title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 			tweenservice:Create(ModalInstance.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
-			tweenservice:Create(buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-						tweenservice:Create(buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-						--	tweenservice:Create(buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+			if confirmBtn then
+				tweenservice:Create(confirmBtn, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
+				tweenservice:Create(confirmBtn.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+				--	tweenservice:Create(confirmBtn.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+			end
 
-						tweenservice:Create(buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-						tweenservice:Create(buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-						tweenservice:Create(buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+			if cancelBtn then
+				tweenservice:Create(cancelBtn, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+				tweenservice:Create(cancelBtn.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+				tweenservice:Create(cancelBtn.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+			end
 
 		end
 		openModal()
@@ -2117,7 +2132,7 @@ function syde:Modal(Modal)
 			if confirmBtn then confirmBtn.Interactable = false end
 			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0, 147)}):Play()
 			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 
@@ -2153,7 +2168,8 @@ function syde:Modal(Modal)
 			}):Play()
 		end
 
-		buttons.Confirm.MouseButton1Click:Connect(function()
+		if confirmBtn then
+			confirmBtn.MouseButton1Click:Connect(function()
 			if typeof(ModalData.ConfirmCallBack) == "function" then
 				ModalData.ConfirmCallBack()
 			end
@@ -2168,8 +2184,10 @@ function syde:Modal(Modal)
 				ui.main.dim.Visible = false
 			end
 		end)
+	end
 
-		buttons.Cancel.MouseButton1Click:Connect(function()
+	if cancelBtn then
+			cancelBtn.MouseButton1Click:Connect(function()
 			closeModal()
 			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 				BackgroundTransparency = 1
@@ -2177,6 +2195,7 @@ function syde:Modal(Modal)
 			task.wait(0.7)
 			ui.main.dim.Visible = false
 		end)
+	end
 
 	end)
 end
@@ -5544,7 +5563,7 @@ function syde:Init(library)
 							Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", newValue, Options.Range[2])
 
 
-							tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+							tweenservice:Create(Slider.title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
 							local success, errorMsg = pcall(function()
 								Options.CallBack(newValue)
@@ -5568,7 +5587,7 @@ function syde:Init(library)
 					syde:AddConnection(userinput.InputEnded, function(input, processed)
 						if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
 							dragging = false
-							tweenservice:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+							tweenservice:Create(Slider.title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
 						end
 					end)
 
@@ -5632,7 +5651,7 @@ function syde:Init(library)
 						)
 
 						-- Tween title appearance
-						tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
+						tweenservice:Create(Slider.title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
 							TextTransparency = 0
 						}):Play()
 
@@ -6501,8 +6520,10 @@ function syde:Init(library)
 		Tab.title.Text = tdata.Title
 		Tab.Name = tdata.Title
 
+		local indicator = Tab:FindFirstChild("Indicator") or Tab:FindFirstChild("indicator")
+
 		Tab.title.TextTransparency = 1
-		Tab.indicator.BackgroundTransparency = 1
+		if indicator then indicator.BackgroundTransparency = 1 end
 
 		--[Page Setup]
 		local Page = pages.page:Clone()
@@ -6576,19 +6597,23 @@ function syde:Init(library)
 		if tbdata.first then
 			tweenservice:Create(Tab.title, TweenInfo.new(2, Enum.EasingStyle.Exponential), { TextTransparency = 0.52 }):Play()
 			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+			if indicator then
+				tweenservice:Create(indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(indicator.glow, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+			end
 			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 30,0, 35) }):Play()
-			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+			--	tweenservice:Create(indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 		else
 			tbdata.first = tdata.Title
 			tweenservice:Create(Tab.title, TweenInfo.new(2, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundColor3 = syde.theme.Accent }):Play()
-			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(2, Enum.EasingStyle.Exponential), { ImageColor3 = syde.theme.Accent }):Play()
+			if indicator then
+				tweenservice:Create(indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+				tweenservice:Create(indicator, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundColor3 = syde.theme.Accent }):Play()
+				tweenservice:Create(indicator.glow, TweenInfo.new(2, Enum.EasingStyle.Exponential), { ImageColor3 = syde.theme.Accent }):Play()
+			end
 			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 80,0, 35) }):Play()
-			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.6 }):Play()
+			--	tweenservice:Create(indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.6 }):Play()
 		end
 
 
@@ -6799,13 +6824,15 @@ function syde:Init(library)
 				if tbdata.first ~= tdata.Title then return end
 
 				-- live accent update
-				tweenservice:Create(Tab.indicator, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
-					BackgroundColor3 = color
-				}):Play()
+				if indicator then
+					tweenservice:Create(indicator, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
+						BackgroundColor3 = color
+					}):Play()
 
-				tweenservice:Create(Tab.indicator.glow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
-					ImageColor3 = color
-				}):Play()
+					tweenservice:Create(indicator.glow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
+						ImageColor3 = color
+					}):Play()
+				end
 			end
 		end)
 
@@ -7568,7 +7595,7 @@ function syde:Init(library)
 				}
 
 				Slider.Name = Options.Title
-				Slider.Title.Text = Options.Title
+				Slider.title.Text = Options.Title
 				Options.Value = Options.StarterValue
 
 				local dragging = false
@@ -7716,7 +7743,7 @@ function syde:Init(library)
 						-- Update the displayed value
 						Slider.v.Text = string.format("<font size='14'>%d</font><font color='#434343'>/%d</font>", newValue, Options.Range[2])
 
-						tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+						tweenservice:Create(Slider.title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
 						local success, errorMsg = pcall(function()
 							Options.CallBack(newValue)
@@ -7744,7 +7771,7 @@ function syde:Init(library)
 				syde:AddConnection(userinput.InputEnded, function(input, processed)
 					if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = false
-						tweenservice:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+						tweenservice:Create(Slider.title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
 					end
 				end)
 
@@ -7795,7 +7822,7 @@ function syde:Init(library)
 					Slider.v.Text = string.format("<font size='14'>%d</font><font color='#434343'>/%d</font>", tostring(NewVal), Options.Range[2])
 
 					-- Tween title appearance
-					tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
+					tweenservice:Create(Slider.title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
 						TextTransparency = 0
 					}):Play()
 
