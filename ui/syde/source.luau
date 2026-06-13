@@ -147,6 +147,48 @@ local function sydeFindChild(parent, ...)
 		return sydeFindChild(slider, "title", "Title")
 	end
 
+	-- Normalize template names: PascalCase → lowercase to match code access
+	local SYDE_CANONICAL_NAMES = {
+		Main = "main", Top = "top", Tabs = "tabs", Pages = "pages", Settings = "settings",
+		Dim = "dim", Modal = "modal", User = "user", Search = "search", Minihome = "minihome",
+		Toastholder = "toastholder", Toast = "toast", Title = "title", Sub = "sub",
+		Tog = "tog", Check = "check", Gradfr = "gradfr", Glow = "glow",
+		Interact = "interact", Configure = "configure", ClipFrame = "clipframe", Clipframe = "clipframe",
+		Separator = "separator", Desc = "desc", Icon = "icon", Timer = "timer",
+		Slide = "slide", SlideFrame = "slideframe", DropHolder = "dropholder", Drop = "drop",
+		Selected = "selected", Down = "down", Shadow = "shadow", Functions = "functions",
+		Resize = "resize", Wallpaper = "wallpaper", Homeicon = "homeicon",
+		Tb = "tb", Btn = "btn", Tab = "tab", Page = "page",
+		Indicator = "indicator", Buttons = "buttons", Confirm = "confirm", Cancel = "cancel",
+	}
+
+	local function sydeNormalizeTemplateNames(root)
+		if not root then return end
+		for _, desc in ipairs(root:GetDescendants()) do
+			local canonical = SYDE_CANONICAL_NAMES[desc.Name]
+			if canonical and canonical ~= desc.Name then
+				pcall(function() desc.Name = canonical end)
+			end
+		end
+	end
+
+	local function sydeSanitizeAssetRoot(root)
+		if not root then return end
+		for _, desc in ipairs(root:GetDescendants()) do
+			if desc:IsA("LocalScript") or desc:IsA("Script") or desc:IsA("ModuleScript") then
+				pcall(function() desc:Destroy() end)
+			end
+		end
+	end
+
+	local function sydePrepareAssetRoot(root)
+		sydeSanitizeAssetRoot(root)
+		sydeNormalizeTemplateNames(root)
+	end
+
+	sydePrepareAssetRoot(Library)
+	sydePrepareAssetRoot(Loader)
+
 	local function sydeDropSelectedLabel(drop)
 	if not drop then return nil end
 	local label = sydeFindChild(drop, "selected", "Selected", "select", "Select", "value", "Value", "placeholder", "Placeholder")
@@ -212,15 +254,6 @@ end
 
 local function sydeDropHasContainer(dropFrame)
 	return dropFrame ~= nil and sydeFindChild(dropFrame, "Container", "container") ~= nil
-end
-
-local function sydeSanitizeAssetRoot(root)
-	if not root then return end
-	for _, desc in ipairs(root:GetDescendants()) do
-		if desc:IsA("LocalScript") or desc:IsA("Script") or desc:IsA("ModuleScript") then
-			pcall(function() desc:Destroy() end)
-		end
-	end
 end
 
 local function sydeSanitizeUiClone(root)
