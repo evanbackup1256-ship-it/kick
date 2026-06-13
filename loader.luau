@@ -38,7 +38,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "917fb91",
+	commit = "49d4f87",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
 }
@@ -1312,6 +1312,20 @@ local function verifyBootstrapAttestation()
 	return true
 end
 
+local function loadAccessConfig()
+	local cfg = nil
+	local localRaw = readLocal({ CFG .. "/access.json", "config/access.json" }, 20)
+	if localRaw then
+		cfg = decodeJson(localRaw)
+	end
+	if not cfg then
+		cfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/access.json?t=" .. tick())))
+	end
+	cfg = type(cfg) == "table" and cfg or { mode = "public", publicKey = "PUBLIC" }
+	ENV.Alleral_OwnerAccess = cfg
+	return cfg
+end
+
 local function enforceExecutorPolicy()
 	loadAccessConfig()
 	if type(ENV.Alleral_Access) ~= "table" then
@@ -2450,20 +2464,6 @@ local function loadSecurityConfig()
 		end
 	end
 	ENV.Alleral_OwnerSecurity = cfg
-	return cfg
-end
-
-local function loadAccessConfig()
-	local cfg = nil
-	local localRaw = readLocal({ CFG .. "/access.json", "config/access.json" }, 20)
-	if localRaw then
-		cfg = decodeJson(localRaw)
-	end
-	if not cfg then
-		cfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/access.json?t=" .. tick())))
-	end
-	cfg = type(cfg) == "table" and cfg or { mode = "public", publicKey = "PUBLIC" }
-	ENV.Alleral_OwnerAccess = cfg
 	return cfg
 end
 

@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-12T22:34:20Z",
+  "updatedAt": "2026-06-13T00:20:54Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
   "loaderVersion": "8.2.24",
   "coreVersion": "2.9.4",
   "uiLibrary": "Syde",
   "uiVersion": "4.0.0-syde",
-  "sydePatch": 20,
+  "sydePatch": 24,
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
@@ -182,22 +182,86 @@
       "description": "Kick automation, plot tools, live roll filters, and full economy loops.",
       "uiTabs": ["Kick", "Plot", "Events", "Inventory", "Tools", "Settings"],
       "scriptFeatures": [
-        { "name": "Auto kick", "category": "Kick", "desc": "Runs to the pad, kicks, and resets when rolls don't match your filters." },
-        { "name": "Roll filters", "category": "Kick", "desc": "Filter by rarity, weight, style, and favorite-only rolls." },
-        { "name": "Humanize kicks", "category": "Kick", "desc": "Adds natural timing so kicks look less robotic." },
-        { "name": "Show what's rolling", "category": "Kick", "desc": "Live overlay of the current roll while farming." },
-        { "name": "Auto train", "category": "Plot", "desc": "Trains stats automatically on your plot." },
-        { "name": "Train + collect", "category": "Plot", "desc": "Trains and grabs rewards in one loop." },
-        { "name": "Auto place best", "category": "Plot", "desc": "Places your best blocks on the plot." },
-        { "name": "Protect slots", "category": "Plot", "desc": "Keeps important plot slots from being overwritten." },
-        { "name": "Auto upgrade pets", "category": "Plot", "desc": "Upgrades pets when you can afford it." },
-        { "name": "Auto upgrade plot", "category": "Plot", "desc": "Buys plot upgrades on a schedule." },
-        { "name": "Buy best weight", "category": "Economy", "desc": "Purchases the best weight upgrades automatically." },
-        { "name": "Auto rebirth", "category": "Economy", "desc": "Rebirths when requirements are met." },
-        { "name": "Favorite scanner", "category": "Inventory", "desc": "Scans backpack and favorites matching items." },
-        { "name": "Battle automation", "category": "Events", "desc": "Auto battle, mastery, and weather event helpers." },
-        { "name": "Discord webhooks", "category": "Tools", "desc": "Ping Discord when you hit rare rolls or milestones." },
-        { "name": "Config profiles", "category": "Settings", "desc": "Save/load settings and quiet mode toggles." }
+        {
+          "name": "Auto kick",
+          "category": "Kick",
+          "desc": "Runs to the pad, kicks, and resets when rolls don't match your filters."
+        },
+        {
+          "name": "Roll filters",
+          "category": "Kick",
+          "desc": "Filter by rarity, weight, style, and favorite-only rolls."
+        },
+        {
+          "name": "Humanize kicks",
+          "category": "Kick",
+          "desc": "Adds natural timing so kicks look less robotic."
+        },
+        {
+          "name": "Show what's rolling",
+          "category": "Kick",
+          "desc": "Live overlay of the current roll while farming."
+        },
+        {
+          "name": "Auto train",
+          "category": "Plot",
+          "desc": "Trains stats automatically on your plot."
+        },
+        {
+          "name": "Train + collect",
+          "category": "Plot",
+          "desc": "Trains and grabs rewards in one loop."
+        },
+        {
+          "name": "Auto place best",
+          "category": "Plot",
+          "desc": "Places your best blocks on the plot."
+        },
+        {
+          "name": "Protect slots",
+          "category": "Plot",
+          "desc": "Keeps important plot slots from being overwritten."
+        },
+        {
+          "name": "Auto upgrade pets",
+          "category": "Plot",
+          "desc": "Upgrades pets when you can afford it."
+        },
+        {
+          "name": "Auto upgrade plot",
+          "category": "Plot",
+          "desc": "Buys plot upgrades on a schedule."
+        },
+        {
+          "name": "Buy best weight",
+          "category": "Economy",
+          "desc": "Purchases the best weight upgrades automatically."
+        },
+        {
+          "name": "Auto rebirth",
+          "category": "Economy",
+          "desc": "Rebirths when requirements are met."
+        },
+        {
+          "name": "Favorite scanner",
+          "category": "Inventory",
+          "desc": "Scans backpack and favorites matching items."
+        },
+        {
+          "name": "Battle automation",
+          "category": "Events",
+          "desc": "Auto battle, mastery, and weather event helpers."
+        },
+        {
+          "name": "Discord webhooks",
+          "category": "Tools",
+          "desc": "Ping Discord when you hit rare rolls or milestones."
+        },
+        {
+          "name": "Config profiles",
+          "category": "Settings",
+          "desc": "Save/load settings and quiet mode toggles."
+        }
       ]
     },
     "speed_keyboard_escape": {
@@ -206,13 +270,41 @@
       "description": "Step farming, win routes, shop automation, and treadmill tweaks.",
       "uiTabs": ["Main", "Auto", "Shop", "Misc", "Settings"],
       "scriptFeatures": [
-        { "name": "Step farm", "category": "Auto", "desc": "Hits the purple step popup for you." },
-        { "name": "Win farm", "category": "Auto", "desc": "Picks a smart route and farms wins." },
-        { "name": "Lock in place", "category": "Main", "desc": "Stops sliding on the treadmill." },
-        { "name": "Auto rebirth", "category": "Main", "desc": "Rebirths when you can afford it." },
-        { "name": "Equip best gear", "category": "Shop", "desc": "Keeps your best items equipped." },
-        { "name": "Auto buy", "category": "Shop", "desc": "Buys whatever you picked in the shop list." },
-        { "name": "Anti AFK", "category": "Misc", "desc": "Prevents idle kicks while farming." }
+        {
+          "name": "Step farm",
+          "category": "Auto",
+          "desc": "Hits the purple step popup for you."
+        },
+        {
+          "name": "Win farm",
+          "category": "Auto",
+          "desc": "Picks a smart route and farms wins."
+        },
+        {
+          "name": "Lock in place",
+          "category": "Main",
+          "desc": "Stops sliding on the treadmill."
+        },
+        {
+          "name": "Auto rebirth",
+          "category": "Main",
+          "desc": "Rebirths when you can afford it."
+        },
+        {
+          "name": "Equip best gear",
+          "category": "Shop",
+          "desc": "Keeps your best items equipped."
+        },
+        {
+          "name": "Auto buy",
+          "category": "Shop",
+          "desc": "Buys whatever you picked in the shop list."
+        },
+        {
+          "name": "Anti AFK",
+          "category": "Misc",
+          "desc": "Prevents idle kicks while farming."
+        }
       ]
     },
     "slime_rng": {
@@ -222,42 +314,159 @@
       "description": "Slime rolls, crafting, pets, potions, and zone farming.",
       "uiTabs": ["Main", "Auto", "Inventory", "Misc", "Settings"],
       "scriptFeatures": [
-        { "name": "Farm best zone", "category": "Auto", "desc": "Farms your best unlocked zone." },
-        { "name": "Keep rolling", "category": "Auto", "desc": "Spins for slimes automatically." },
-        { "name": "Equip best", "category": "Auto", "desc": "Swaps to your best slime by filter." },
-        { "name": "Auto rebirth", "category": "Auto", "desc": "Rebirths when requirements are met." },
-        { "name": "Unlock machines", "category": "Auto", "desc": "Opens crafting and XP transfer when affordable." },
-        { "name": "Auto shoot", "category": "Combat", "desc": "Fires at enemies for you." },
-        { "name": "Upgrade tree", "category": "Progression", "desc": "Buys the cheapest skill node it can." },
-        { "name": "Auto craft", "category": "Inventory", "desc": "Trades slimes in for selected recipes." },
-        { "name": "Collect loot", "category": "Inventory", "desc": "Snags drops that match your filter." },
-        { "name": "Auto feed pets", "category": "Pets", "desc": "Feeds your selected slime + food combo." },
-        { "name": "Auto potion", "category": "Pets", "desc": "Drinks potions from your list." },
+        {
+          "name": "Farm best zone",
+          "category": "Auto",
+          "desc": "Farms your best unlocked zone."
+        },
+        {
+          "name": "Keep rolling",
+          "category": "Auto",
+          "desc": "Spins for slimes automatically."
+        },
+        {
+          "name": "Equip best",
+          "category": "Auto",
+          "desc": "Swaps to your best slime by filter."
+        },
+        {
+          "name": "Auto rebirth",
+          "category": "Auto",
+          "desc": "Rebirths when requirements are met."
+        },
+        {
+          "name": "Unlock machines",
+          "category": "Auto",
+          "desc": "Opens crafting and XP transfer when affordable."
+        },
+        {
+          "name": "Auto shoot",
+          "category": "Combat",
+          "desc": "Fires at enemies for you."
+        },
+        {
+          "name": "Upgrade tree",
+          "category": "Progression",
+          "desc": "Buys the cheapest skill node it can."
+        },
+        {
+          "name": "Auto craft",
+          "category": "Inventory",
+          "desc": "Trades slimes in for selected recipes."
+        },
+        {
+          "name": "Collect loot",
+          "category": "Inventory",
+          "desc": "Snags drops that match your filter."
+        },
+        {
+          "name": "Auto feed pets",
+          "category": "Pets",
+          "desc": "Feeds your selected slime + food combo."
+        },
+        {
+          "name": "Auto potion",
+          "category": "Pets",
+          "desc": "Drinks potions from your list."
+        },
         { "name": "Noclip", "category": "Misc", "desc": "Walk through walls." },
-        { "name": "Freecam", "category": "Misc", "desc": "Fly the camera with WASD + Q/E." },
-        { "name": "FPS boost", "category": "Misc", "desc": "Lowers graphics for smoother farming." }
+        {
+          "name": "Freecam",
+          "category": "Misc",
+          "desc": "Fly the camera with WASD + Q/E."
+        },
+        {
+          "name": "FPS boost",
+          "category": "Misc",
+          "desc": "Lowers graphics for smoother farming."
+        }
       ]
     },
     "build_a_ring_farm": {
       "placeIds": [107646426076756],
       "robloxUrl": "https://www.roblox.com/games/107646426076756",
       "description": "Full farm automation — planting, upgrades, pets, events, and honey.",
-      "uiTabs": ["Farm", "Seeds", "Upgrade", "Shop", "Events", "Pets", "Misc", "Settings"],
+      "uiTabs": [
+        "Farm",
+        "Seeds",
+        "Upgrade",
+        "Shop",
+        "Events",
+        "Pets",
+        "Misc",
+        "Settings"
+      ],
       "scriptFeatures": [
-        { "name": "Plant seeds", "category": "Farm", "desc": "Plants seeds from your bag onto empty plots." },
-        { "name": "Clear plants", "category": "Farm", "desc": "Removes unwanted plants automatically." },
-        { "name": "Upgrade plants", "category": "Farm", "desc": "Levels up what's already planted." },
-        { "name": "Unlock plots", "category": "Farm", "desc": "Buys new plot slots when affordable." },
-        { "name": "Expand farm", "category": "Farm", "desc": "Purchases the next farm expansion." },
-        { "name": "Sell crates", "category": "Farm", "desc": "Walks over and sells held crates." },
-        { "name": "Auto spray & fertilizer", "category": "Farm", "desc": "Keeps crops maintained on a loop." },
-        { "name": "Roll & buy seeds", "category": "Seeds", "desc": "Rolls and buys seeds from the shop." },
-        { "name": "Toss bad seeds", "category": "Seeds", "desc": "Discards seeds that don't match filters." },
-        { "name": "Stat upgrades", "category": "Upgrade", "desc": "Auto-upgrades roll, luck, plot, saw, and sprinkler stats." },
-        { "name": "Contracts", "category": "Shop", "desc": "Turns in and rerolls contracts." },
-        { "name": "Event combat", "category": "Events", "desc": "Shoots event mobs and collects rush/alien drops." },
-        { "name": "Honey farm", "category": "Events", "desc": "Runs honey minigame and rolls rewards." },
-        { "name": "Pet optimizer", "category": "Pets", "desc": "Feeds, equips best pets, and sells extras." },
+        {
+          "name": "Plant seeds",
+          "category": "Farm",
+          "desc": "Plants seeds from your bag onto empty plots."
+        },
+        {
+          "name": "Clear plants",
+          "category": "Farm",
+          "desc": "Removes unwanted plants automatically."
+        },
+        {
+          "name": "Upgrade plants",
+          "category": "Farm",
+          "desc": "Levels up what's already planted."
+        },
+        {
+          "name": "Unlock plots",
+          "category": "Farm",
+          "desc": "Buys new plot slots when affordable."
+        },
+        {
+          "name": "Expand farm",
+          "category": "Farm",
+          "desc": "Purchases the next farm expansion."
+        },
+        {
+          "name": "Sell crates",
+          "category": "Farm",
+          "desc": "Walks over and sells held crates."
+        },
+        {
+          "name": "Auto spray & fertilizer",
+          "category": "Farm",
+          "desc": "Keeps crops maintained on a loop."
+        },
+        {
+          "name": "Roll & buy seeds",
+          "category": "Seeds",
+          "desc": "Rolls and buys seeds from the shop."
+        },
+        {
+          "name": "Toss bad seeds",
+          "category": "Seeds",
+          "desc": "Discards seeds that don't match filters."
+        },
+        {
+          "name": "Stat upgrades",
+          "category": "Upgrade",
+          "desc": "Auto-upgrades roll, luck, plot, saw, and sprinkler stats."
+        },
+        {
+          "name": "Contracts",
+          "category": "Shop",
+          "desc": "Turns in and rerolls contracts."
+        },
+        {
+          "name": "Event combat",
+          "category": "Events",
+          "desc": "Shoots event mobs and collects rush/alien drops."
+        },
+        {
+          "name": "Honey farm",
+          "category": "Events",
+          "desc": "Runs honey minigame and rolls rewards."
+        },
+        {
+          "name": "Pet optimizer",
+          "category": "Pets",
+          "desc": "Feeds, equips best pets, and sells extras."
+        },
         { "name": "Fly", "category": "Misc", "desc": "Fly around the map." }
       ]
     },
@@ -267,21 +476,81 @@
       "description": "Zombie arena combat — kill aura, auto farm preset, ESP, and safe zones.",
       "uiTabs": ["Farm", "Combat", "Player", "Visual", "Misc", "Settings"],
       "scriptFeatures": [
-        { "name": "Auto farm preset", "category": "Farm", "desc": "One toggle for kill aura, god mode, skip, shoot, loot, and safe zone." },
-        { "name": "Auto skip wave", "category": "Farm", "desc": "Votes to skip waves automatically." },
-        { "name": "Collect pickups", "category": "Farm", "desc": "Teleports to shards, minerals, and credit drops." },
-        { "name": "Auto equip best gun", "category": "Farm", "desc": "Equips the strongest tool in your backpack." },
-        { "name": "Auto upgrade & buy", "category": "Farm", "desc": "Probes upgrade and shop remotes for gear." },
-        { "name": "Auto plant mine", "category": "Defense", "desc": "Places mines on cooldown." },
-        { "name": "Kill aura", "category": "Combat", "desc": "Instant zombie damage aura." },
-        { "name": "Instant kill", "category": "Combat", "desc": "Uses max damage per hit." },
-        { "name": "Auto shoot", "category": "Combat", "desc": "Keeps your weapon firing." },
-        { "name": "God mode", "category": "Combat", "desc": "Locks health at maximum." },
-        { "name": "Aimbot", "category": "Combat", "desc": "Snaps camera to nearest zombie while shooting." },
-        { "name": "Hitbox expander", "category": "Combat", "desc": "Enlarges zombie hitboxes." },
-        { "name": "Fly & noclip", "category": "Player", "desc": "WASD flight and walk-through-walls." },
-        { "name": "Teleport safe spot", "category": "Player", "desc": "Teleports to the classic safe corner." },
-        { "name": "Zombie ESP", "category": "Visual", "desc": "Highlights zombies through walls." }
+        {
+          "name": "Auto farm preset",
+          "category": "Farm",
+          "desc": "One toggle for kill aura, god mode, skip, shoot, loot, and safe zone."
+        },
+        {
+          "name": "Auto skip wave",
+          "category": "Farm",
+          "desc": "Votes to skip waves automatically."
+        },
+        {
+          "name": "Collect pickups",
+          "category": "Farm",
+          "desc": "Teleports to shards, minerals, and credit drops."
+        },
+        {
+          "name": "Auto equip best gun",
+          "category": "Farm",
+          "desc": "Equips the strongest tool in your backpack."
+        },
+        {
+          "name": "Auto upgrade & buy",
+          "category": "Farm",
+          "desc": "Probes upgrade and shop remotes for gear."
+        },
+        {
+          "name": "Auto plant mine",
+          "category": "Defense",
+          "desc": "Places mines on cooldown."
+        },
+        {
+          "name": "Kill aura",
+          "category": "Combat",
+          "desc": "Instant zombie damage aura."
+        },
+        {
+          "name": "Instant kill",
+          "category": "Combat",
+          "desc": "Uses max damage per hit."
+        },
+        {
+          "name": "Auto shoot",
+          "category": "Combat",
+          "desc": "Keeps your weapon firing."
+        },
+        {
+          "name": "God mode",
+          "category": "Combat",
+          "desc": "Locks health at maximum."
+        },
+        {
+          "name": "Aimbot",
+          "category": "Combat",
+          "desc": "Snaps camera to nearest zombie while shooting."
+        },
+        {
+          "name": "Hitbox expander",
+          "category": "Combat",
+          "desc": "Enlarges zombie hitboxes."
+        },
+        {
+          "name": "Fly & noclip",
+          "category": "Player",
+          "desc": "WASD flight and walk-through-walls."
+        },
+        {
+          "name": "Teleport safe spot",
+          "category": "Player",
+          "desc": "Teleports to the classic safe corner."
+        },
+        {
+          "name": "Zombie ESP",
+          "category": "Visual",
+          "desc": "Highlights zombies through walls."
+        }
       ]
     }
   },
@@ -295,11 +564,36 @@
   },
   "executors": [],
   "resources": [
-    { "title": "WEAO — Live executors", "desc": "WhatExpsAre.Online status feed (same data as Tools)", "url": "https://whatexpsare.online/", "icon": "pulse" },
-    { "title": "Loader source", "desc": "Raw loader.luau on GitHub", "urlKey": "loaderRaw", "icon": "code" },
-    { "title": "Repository", "desc": "Full project + game scripts", "urlKey": "github", "icon": "github" },
-    { "title": "Sync status", "desc": "Live GitHub auto-sync JSON", "url": "/api/sync/status", "icon": "sync" },
-    { "title": "Health check", "desc": "Relay uptime + commit hash", "url": "/health", "icon": "pulse" }
+    {
+      "title": "WEAO — Live executors",
+      "desc": "WhatExpsAre.Online status feed (same data as Tools)",
+      "url": "https://whatexpsare.online/",
+      "icon": "pulse"
+    },
+    {
+      "title": "Loader source",
+      "desc": "Raw loader.luau on GitHub",
+      "urlKey": "loaderRaw",
+      "icon": "code"
+    },
+    {
+      "title": "Repository",
+      "desc": "Full project + game scripts",
+      "urlKey": "github",
+      "icon": "github"
+    },
+    {
+      "title": "Sync status",
+      "desc": "Live GitHub auto-sync JSON",
+      "url": "/api/sync/status",
+      "icon": "sync"
+    },
+    {
+      "title": "Health check",
+      "desc": "Relay uptime + commit hash",
+      "url": "/health",
+      "icon": "pulse"
+    }
   ],
   "credits": {
     "headline": "Built by Sammy.",
