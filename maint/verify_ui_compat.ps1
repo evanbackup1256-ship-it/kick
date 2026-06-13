@@ -30,8 +30,39 @@ if ($alleralUi -match 'loadSyde') {
 $sydeSource = Join-Path $root "ui/syde/source.luau"
 if (Test-Path $sydeSource) {
     Pass "ui/syde source present"
+    $syde = Get-Content $sydeSource -Raw
 } else {
     Fail "ui/syde/source.luau missing"
+    $syde = ""
+}
+
+$sydeContracts = @(
+    @{ Pattern = 'ALLERAL_SYDE_PATCH = 28'; Message = 'Syde patch version is 28' },
+    @{ Pattern = 'function syde:DisconnectAll\(\)'; Message = 'Syde disconnects tracked runtime connections' },
+    @{ Pattern = 'function data:Refresh\(options, value\)'; Message = 'dropdown handles support Refresh' },
+    @{ Pattern = 'Options = sydeNormalizeSliderOptions\(Options\)'; Message = 'slider inputs are normalized' },
+    @{ Pattern = 'data\.Instance = textinput'; Message = 'text input handles expose their instance' },
+    @{ Pattern = 'data\.Instance = button'; Message = 'button handles expose their instance' }
+)
+
+foreach ($contract in $sydeContracts) {
+    if ($syde -match $contract.Pattern) {
+        Pass $contract.Message
+    } else {
+        Fail $contract.Message
+    }
+}
+
+if ($syde -notmatch 'ColorPicker\.Linkable = ColorPicker\.Linkable or true') {
+    Pass "ColorPicker preserves explicit Linkable=false"
+} else {
+    Fail "ColorPicker overwrites explicit Linkable=false"
+}
+
+if ($alleralUi -match 'pcall\(handle\.Refresh, handle, values, pick\)') {
+    Pass "adapter refreshes dropdown options and selection together"
+} else {
+    Fail "adapter dropdown Refresh contract missing"
 }
 
 if ($alleralUi -match 'function Core\.loadUi') {

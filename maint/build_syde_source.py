@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 import sys
+import hashlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -12,6 +13,7 @@ UPSTREAM = ROOT / "ui" / "syde" / "upstream.luau"
 COMPAT = ROOT / "ui" / "syde" / "compat.luau"
 PATCHES = ROOT / "ui" / "syde" / "patches"
 OUT = ROOT / "ui" / "syde" / "source.luau"
+UPSTREAM_SHA256 = "109eb48ed795597161a57a0cb0cf4808532c1d0b2bd2fa420e758e9792f5cedf"
 
 
 def read(path: Path) -> str:
@@ -96,37 +98,12 @@ def patch_dropdown_template(text: str) -> str:
     )
 
 
-def patch_dropdown_animations(text: str) -> str:
-    replacements = [
-        ("TweenInfo.new(1.34, Enum.EasingStyle.Quint)", "TweenInfo.new(0.38, Enum.EasingStyle.Quint)"),
-        ("TweenInfo.new(1.34, Enum.EasingStyle.Exponential)", "TweenInfo.new(0.38, Enum.EasingStyle.Exponential)"),
-        ("tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint)", "tweenservice:Create(dropdown, TweenInfo.new(0.32, Enum.EasingStyle.Quint)"),
-        ("tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint)", "tweenservice:Create(drop.Container, TweenInfo.new(0.32, Enum.EasingStyle.Quint)"),
-        ("tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(drop.search, TweenInfo.new(0.28, Enum.EasingStyle.Exponential)"),
-        ("tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(drop.search.UIStroke, TweenInfo.new(0.28, Enum.EasingStyle.Exponential)"),
-        ("tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(drop.search.TextBox, TweenInfo.new(0.28, Enum.EasingStyle.Exponential)"),
-        ("tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(0.28, Enum.EasingStyle.Exponential)"),
-        ("tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(drop.search.icon, TweenInfo.new(0.28, Enum.EasingStyle.Exponential)"),
-        ("tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential)", "tweenservice:Create(option, TweenInfo.new(0.25, Enum.EasingStyle.Exponential)"),
-        ("tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(option, TweenInfo.new(0.3, Enum.EasingStyle.Exponential)"),
-        ("tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint)", "tweenservice:Create(option, TweenInfo.new(0.22, Enum.EasingStyle.Quint)"),
-        ("tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(opt, TweenInfo.new(0.3, Enum.EasingStyle.Exponential)"),
-        ("task.delay(1.2, function()", "task.delay(0.45, function()"),
-        ("task.wait(0.6)\n\t\t\t\t\tdrop.Container.Visible = false", "task.wait(0.22)\n\t\t\t\t\tdrop.Container.Visible = false"),
-        ("task.wait(0.6)\n\t\t\t\tdrop.Container.Visible = false", "task.wait(0.22)\n\t\t\t\tdrop.Container.Visible = false"),
-        ("local tweenInfo = TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)", "local tweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)"),
-    ]
-    for old, new in replacements:
-        text = text.replace(old, new)
-    return text
-
-
 def patch_ui_main_access(text: str) -> str:
     text = text.replace("Library.main", "window")
     text = text.replace("ui.main.pages", "pages")
     text = text.replace(
         "tweenservice:Create(logo.Title, TweenInfo.new(2, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()",
-        "do local _logoTitle = sydeTitleLabel(logo); if _logoTitle then tweenservice:Create(_logoTitle, TweenInfo.new(0.45, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end end",
+        "do local _logoTitle = sydeTitleLabel(logo); if _logoTitle then tweenservice:Create(_logoTitle, TweenInfo.new(2, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end end",
     )
     return text
 
@@ -391,6 +368,35 @@ def patch_runtime_safety(text: str) -> str:
         1,
     )
     text = text.replace(
+        '''\t\t\t\tif isfolder and not isfolder(folderName) then
+\t\t\t\t\tlocal success, err = pcall(function()
+\t\t\t\t\t\tmakefolder(folderName)
+\t\t\t\t\tend)''',
+        '''\t\t\t\tif type(isfolder) == "function" and type(makefolder) == "function" and not isfolder(folderName) then
+\t\t\t\t\tlocal success, err = pcall(function()
+\t\t\t\t\t\tmakefolder(folderName)
+\t\t\t\t\tend)''',
+        1,
+    )
+    text = text.replace(
+        '''\t\t\t\tlocal success, err = pcall(function()
+\t\t\t\t\tif isfile and not isfile(fullPath) then
+\t\t\t\t\t\twritefile(fullPath, "-- Protected UI Configuration")
+\t\t\t\t\telse
+\t\t\t\t\t\tlocal content = readfile(fullPath)
+\t\t\t\t\tend
+\t\t\t\tend)''',
+        '''\t\t\t\tlocal success, err = pcall(function()
+\t\t\t\t\tif type(isfile) ~= "function" then return end
+\t\t\t\t\tif not isfile(fullPath) then
+\t\t\t\t\t\tif type(writefile) == "function" then writefile(fullPath, "-- Protected UI Configuration") end
+\t\t\t\t\telseif type(readfile) == "function" then
+\t\t\t\t\t\treadfile(fullPath)
+\t\t\t\t\tend
+\t\t\t\tend)''',
+        1,
+    )
+    text = text.replace(
         "\t\t\tif not syde.ConfigEnabled then return nil end\n\t\t\tif not isfile(FILE) then return nil end",
         "\t\t\tif not syde.ConfigEnabled or type(isfile) ~= \"function\" or type(readfile) ~= \"function\" then return nil end\n\t\t\tif not isfile(FILE) then return nil end",
         1,
@@ -398,6 +404,11 @@ def patch_runtime_safety(text: str) -> str:
     text = text.replace(
         "TeleportService:Teleport(placeId)",
         "TeleportService:Teleport(lastGame.PlaceId)",
+        1,
+    )
+    text = text.replace(
+        "\t\t\t\trs:Disconnect()\n\t\t\t\tss:Disconnect()",
+        "\t\t\t\tpcall(function() if rs then rs:Disconnect() end end)\n\t\t\t\tpcall(function() if ss then ss:Disconnect() end end)",
         1,
     )
     text = text.replace(
@@ -410,8 +421,53 @@ def patch_runtime_safety(text: str) -> str:
         'string.format("<font size=\'14\'>%d</font><font color=\'#434343\'>/%d</font>", NewVal, Options.Range[2])',
     )
     text = text.replace(
-        "if isfolder and not isfolder(syde.ConfigFolder) then\n\t\tmakefolder(syde.ConfigFolder)\n\tend",
-        "if type(isfolder) ~= \"function\" or type(makefolder) ~= \"function\" or type(writefile) ~= \"function\" then return end\n\tif not isfolder(syde.ConfigFolder) then\n\t\tmakefolder(syde.ConfigFolder)\n\tend",
+        "if makefolder and not isfolder(syde.ConfigFolder) then\n\t\tmakefolder(syde.ConfigFolder)\n\tend",
+        "if type(isfolder) == \"function\" and type(makefolder) == \"function\" and not isfolder(syde.ConfigFolder) then\n\t\tlocal folderOk, folderErr = pcall(makefolder, syde.ConfigFolder)\n\t\tif not folderOk then sydeWarn(\"Syde | Failed to create config folder:\", folderErr) end\n\tend",
+        1,
+    )
+    text = text.replace(
+        "if not syde.ConfigEnabled then return end\n\tif not writefile then return end",
+        "if not syde.ConfigEnabled or type(writefile) ~= \"function\" then return end",
+        1,
+    )
+    text = text.replace(
+        '''\t\tfunction syde:SaveSettingsConfig()
+\t\t\tlocal Data = {}''',
+        '''\t\tfunction syde:SaveSettingsConfig()
+\t\t\tif type(writefile) ~= "function" then
+\t\t\t\tsydeWarn("[SYDE] Settings cannot be saved: writefile is unavailable")
+\t\t\t\treturn false
+\t\t\tend
+\t\t\tlocal Data = {}''',
+        1,
+    )
+    text = text.replace(
+        '''\t\t\twritefile(path, encoded)
+
+\t\t\tsyde:Toast({''',
+        '''\t\t\tlocal saved, saveErr = pcall(writefile, path, encoded)
+\t\t\tif not saved then
+\t\t\t\tsydeWarn("[SYDE] Failed to save settings:", saveErr)
+\t\t\t\treturn false
+\t\t\tend
+
+\t\t\tsyde:Toast({''',
+        1,
+    )
+    text = text.replace(
+        '''\t\tfunction syde:LoadSettingsConfig()
+\t\t\tlocal path = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
+
+\t\t\tif not isfile(path) then''',
+        '''\t\tfunction syde:LoadSettingsConfig()
+\t\t\tlocal path = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
+
+\t\t\tif type(isfile) ~= "function" or type(readfile) ~= "function" or not isfile(path) then''',
+        1,
+    )
+    text = text.replace(
+        "if isfile and isfile(filePath) then\n\t\t\t\t\t\tloaded = LoadConfig(readfile(filePath))",
+        "if type(isfile) == \"function\" and type(readfile) == \"function\" and isfile(filePath) then\n\t\t\t\t\t\tloaded = LoadConfig(readfile(filePath))",
         1,
     )
     text = text.replace(
@@ -424,11 +480,308 @@ def patch_runtime_safety(text: str) -> str:
         "\t\t\t\telseif not success then\n\t\t\t\t\tsydeWarn(\"[SYDE] Configurations Error \" .. tostring(result))\n\t\t\t\telse\n\t\t\t\t\tsydeWarn(\"[SYDE] No valid save file was loaded\")",
         1,
     )
+    text = text.replace(
+        "local bounce = false\n\nfunction ToggleUI()",
+        "local bounce = false\nlocal layoutConnectionsBound = false\n\nfunction ToggleUI()",
+        1,
+    )
+    old_layout = '''\t\tworkspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+\t\t\tscreenSize = workspace.CurrentCamera.ViewportSize
+\t\t\tisMobile = userinput.TouchEnabled
+\t\t\tupdateLayout()
+\t\tend)
+
+\t\tupdateLayout()
+
+\t\tcamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateLayout)
+\t\tuserinput:GetPropertyChangedSignal("TouchEnabled"):Connect(updateLayout)'''
+    new_layout = '''\t\tif not layoutConnectionsBound then
+\t\t\tlayoutConnectionsBound = true
+\t\t\tsyde:AddConnection(camera:GetPropertyChangedSignal("ViewportSize"), function()
+\t\t\t\tscreenSize = camera.ViewportSize
+\t\t\t\tupdateLayout()
+\t\t\tend)
+\t\t\tsyde:AddConnection(userinput:GetPropertyChangedSignal("TouchEnabled"), updateLayout)
+\t\tend
+\t\tupdateLayout()'''
+    text = text.replace(old_layout, new_layout, 1)
+    text = text.replace(
+        "\t\t\t--\tif not ui.Parent then return end\n\t\t\ttask.wait(1)\n\t\t\tLibrary:Destroy()",
+        "\t\t\t--\tif not ui.Parent then return end\n\t\t\tsyde:DisconnectAll()\n\t\t\ttask.wait(1)\n\t\t\tLibrary:Destroy()",
+        1,
+    )
     return text
+
+
+def patch_control_contracts(text: str) -> str:
+    text = text.replace("ColorPicker.Linkable = ColorPicker.Linkable or true", "ColorPicker.Linkable = ColorPicker.Linkable ~= false")
+    text = text.replace("local success, errorMsg = pcall(c)", "local success, errorMsg = pcall(data.CallBack)")
+    text = text.replace(
+        "local sliderWidth = Slider.slide.AbsoluteSize.X\n",
+        "local sliderWidth = Slider.slide.AbsoluteSize.X\n\t\t\t\t\t\t\tif sliderWidth <= 0 then return end\n",
+    )
+    text = text.replace(
+        "local ColorX = math.clamp(mouse.X - SVPicker.AbsolutePosition.X, 0, SVPicker.AbsoluteSize.X) / SVPicker.AbsoluteSize.X",
+        "local pickerWidth = math.max(SVPicker.AbsoluteSize.X, 1)\n\t\t\t\t\t\tlocal pickerHeight = math.max(SVPicker.AbsoluteSize.Y, 1)\n\t\t\t\t\t\tlocal ColorX = math.clamp(mouse.X - SVPicker.AbsolutePosition.X, 0, pickerWidth) / pickerWidth",
+    )
+    text = text.replace(
+        "local ColorY = math.clamp(mouse.Y - SVPicker.AbsolutePosition.Y, 0, SVPicker.AbsoluteSize.Y) / SVPicker.AbsoluteSize.Y",
+        "local ColorY = math.clamp(mouse.Y - SVPicker.AbsolutePosition.Y, 0, pickerHeight) / pickerHeight",
+    )
+    text = text.replace(
+        "local ColorX = math.clamp(mouse.X - HUESlider.AbsolutePosition.X, 0, HUESlider.AbsoluteSize.X) / HUESlider.AbsoluteSize.X",
+        "local hueWidth = math.max(HUESlider.AbsoluteSize.X, 1)\n\t\t\t\t\t\tlocal ColorX = math.clamp(mouse.X - HUESlider.AbsolutePosition.X, 0, hueWidth) / hueWidth",
+    )
+    text = text.replace(
+        "local relX = (mouse.X - g.AbsolutePosition.X) / g.AbsoluteSize.X",
+        "local relX = (mouse.X - g.AbsolutePosition.X) / math.max(g.AbsoluteSize.X, 1)",
+    )
+    text = text.replace(
+        "ExternalGradient.Color = seq",
+        "if ExternalGradient then ExternalGradient.Color = seq end",
+    )
+    text = text.replace(
+        "local startCol = data.Color or ExternalGradient.Color.Keypoints[1].Value\n\t\t\t\t\tlocal endCol = data.Color2 or ExternalGradient.Color.Keypoints[#ExternalGradient.Color.Keypoints].Value",
+        "local externalKeypoints = ExternalGradient and ExternalGradient.Color.Keypoints\n\t\t\t\t\tlocal startCol = data.Color or (externalKeypoints and externalKeypoints[1].Value) or Color3.new(1, 1, 1)\n\t\t\t\t\tlocal endCol = data.Color2 or (externalKeypoints and externalKeypoints[#externalKeypoints].Value) or startCol",
+    )
+
+    text = text.replace(
+        "NewVal = math.floor((NewVal - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]",
+        "NewVal = math.clamp(tonumber(NewVal) or Options.StarterValue, Options.Range[1], Options.Range[2])\n\t\t\t\t\t\tNewVal = math.floor((NewVal - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]",
+    )
+    text = re.sub(
+        r"(local (\w+) = sydeClonePageTemplate\([^\n]+\)\n)(\s*)\2\.Visible",
+        r"\1\3if not \2 then return nil end\n\3\2.Visible",
+        text,
+    )
+    text = text.replace(
+        "table.remove(toasts, table.find(toasts, Toast))",
+        "local toastIndex = table.find(toasts, Toast)\n\t\t\tif toastIndex then table.remove(toasts, toastIndex) end",
+    )
+    add_connection_end = "\treturn Connection, Disconnect\nend\n"
+    disconnect_all = '''\treturn Connection, Disconnect
+end
+
+function syde:DisconnectAll()
+\tfor i = #self.Connections, 1, -1 do
+\t\tlocal item = self.Connections[i]
+\t\tlocal connection = item and (item.Connection or item.conn)
+\t\tif connection and connection.Connected then
+\t\t\tconnection:Disconnect()
+\t\tend
+\t\ttable.remove(self.Connections, i)
+\tend
+end
+'''
+    text = text.replace(add_connection_end, disconnect_all, 1)
+    text = text.replace(
+        '''function syde:StopWiggle(label)
+\tfor i, data in ipairs(self.Connections) do
+\t\tif data.label == label then
+\t\t\tdata.conn:Disconnect()
+\t\t\ttable.remove(self.Connections, i)
+\t\t\tbreak
+\t\tend
+\tend
+end''',
+        '''function syde:StopWiggle(label)
+\tif not label then return end
+\tlocal container = label:FindFirstChild("WiggleContainer")
+\tif container then container:Destroy() end
+\tlabel.TextTransparency = 0
+end''',
+        1,
+    )
+    return text
+
+
+def add_slider_handles(block: str) -> str:
+    block = block.replace(
+        "\t\t\t--[SLIDERS INITIALIZE]",
+        "\t\t\tlocal sliderHandles = {}\n\n\t\t\t--[SLIDERS INITIALIZE]",
+        1,
+    )
+    block = re.sub(
+        r"(\n\s+Options = \{.*?\n\s+\})(\n\s+Slider\.Name = Options\.Title)",
+        r"\1\n\t\t\t\tOptions = sydeNormalizeSliderOptions(Options)\2",
+        block,
+        count=1,
+        flags=re.DOTALL,
+    )
+    block = block.replace(
+        "\n\t\t\t\tif syde.ConfigEnabled then",
+        "\n\t\t\t\ttable.insert(sliderHandles, Options)\n\n\t\t\t\tif syde.ConfigEnabled then",
+        1,
+    )
+    block = re.sub(
+        r"(\n\s+function Options:Set\(.*?\n\s+end)(\n\s+if Options\.(?:SFlag|Flag))",
+        r"\1\n\n\t\t\t\ttable.insert(sliderHandles, Options)\2",
+        block,
+        count=1,
+        flags=re.DOTALL,
+    )
+    final = block.rfind("\n\t\tend")
+    if final == -1:
+        final = block.rfind("\n\t\t\tend")
+    if final == -1:
+        raise RuntimeError("Slider function footer missing")
+    indent = "\t\t" if block.startswith("\t\tfunction") else "\t\t\t"
+    addition = (
+        f"\n{indent}\tlocal handle = sliderHandles[1] or {{ Handles = sliderHandles }}\n"
+        f"{indent}\thandle.Instance = slider\n"
+        f"{indent}\thandle.Handles = sliderHandles\n"
+        f"{indent}\treturn handle\n"
+    )
+    return block[:final] + addition + block[final:]
+
+
+def add_text_input_handle(block: str) -> str:
+    final = block.rfind("\n\t\tend")
+    if final == -1:
+        final = block.rfind("\n\t\t\tend")
+    if final == -1:
+        raise RuntimeError("TextInput function footer missing")
+    indent = "\t\t" if block.startswith("\t\tfunction") else "\t\t\t"
+    addition = f'''\n{indent}\tfunction data:Set(value, skipCallback)
+{indent}\t\ttextBox.Text = tostring(value or "")
+{indent}\t\tif not skipCallback then sydeCall(data.CallBack, "TextInput " .. tostring(data.Title), textBox.Text) end
+{indent}\tend
+{indent}\tdata.Instance = textinput
+{indent}\treturn data
+'''
+    return block[:final] + addition + block[final:]
+
+
+def add_button_handle(block: str) -> str:
+    final = block.rfind("\n\t\tend")
+    if final == -1:
+        final = block.rfind("\n\t\t\tend")
+    if final == -1:
+        raise RuntimeError("Button function footer missing")
+    indent = "\t\t" if block.startswith("\t\tfunction") else "\t\t\t"
+    addition = f'''\n{indent}\tfunction data:Set(settings)
+{indent}\t\tif type(settings) == "function" then
+{indent}\t\t\tdata.CallBack = settings
+{indent}\t\telseif type(settings) == "table" then
+{indent}\t\t\tif settings.Callback or settings.CallBack then data.CallBack = settings.Callback or settings.CallBack end
+{indent}\t\t\tif settings.Name or settings.Title then
+{indent}\t\t\t\tdata.Title = settings.Name or settings.Title
+{indent}\t\t\t\tbutton.Name = data.Title
+{indent}\t\t\t\tbutton.title.Text = data.Title
+{indent}\t\t\tend
+{indent}\t\t\tif descLabel and (settings.Description or settings.Desc) then descLabel.Text = settings.Description or settings.Desc end
+{indent}\t\tend
+{indent}\tend
+{indent}\tdata.Instance = button
+{indent}\treturn data
+'''
+    return block[:final] + addition + block[final:]
+
+
+def add_dropdown_handle(block: str) -> str:
+    block = block.replace(
+        "local function SetDropdownOptions()\n",
+        '''local function SetDropdownOptions()
+\t\t\t\tfor _, child in ipairs(drop.Container:GetChildren()) do
+\t\t\t\t\tif child:IsA("Frame") and child ~= OptionButton then child:Destroy() end
+\t\t\t\tend
+\t\t\t\tSelectedOptions = {}
+\t\t\t\tSelectedOrder = {}
+\t\t\t\tlocal selectedContainer = drop.selectContainer and drop.selectContainer:FindFirstChild("ScrollingFrame")
+\t\t\t\tif selectedContainer then
+\t\t\t\t\tfor _, child in ipairs(selectedContainer:GetChildren()) do
+\t\t\t\t\t\tif child:IsA("Frame") and child.Name ~= "result" then child:Destroy() end
+\t\t\t\t\tend
+\t\t\t\tend
+\t\t\t\tlocal starterValues = {}
+\t\t\t\tif type(data.StarterOption) == "table" then
+\t\t\t\t\tfor _, value in ipairs(data.StarterOption) do starterValues[tostring(value)] = true end
+\t\t\t\telseif data.StarterOption ~= nil then
+\t\t\t\t\tstarterValues[tostring(data.StarterOption)] = true
+\t\t\t\tend
+''',
+        1,
+    )
+    block = re.sub(
+        r"if OptionText == data\.StarterOption and not starterSet then\s+starterSet = true\s+sydeSetDropSelectedText\(drop, OptionText\)\s+SelectedOptions = \{\[OptionText\] = true\}\s+SelectedOrder = \{OptionText\}",
+        "if starterValues[tostring(OptionText)] and (data.Multi or not starterSet) then\n\t\t\t\t\tstarterSet = true\n\t\t\t\t\tAddToSelected(OptionText)\n\t\t\t\t\tsydeSetDropSelectedText(drop, OptionText)",
+        block,
+    )
+    block = block.replace(
+        "if OptionText == data.StarterOption and not starterSet then",
+        "if starterValues[tostring(OptionText)] and (data.Multi or not starterSet) then",
+    )
+    block = re.sub(
+        r"(?P<indent>[ \t]+)SelectedOptions = \{\[OptionText\] = true\}\n(?P=indent)SelectedOrder = \{OptionText\}",
+        lambda match: f"{match.group('indent')}AddToSelected(OptionText)",
+        block,
+    )
+    block = block.replace("\n\t\t\tSetDropdownOptions()\n", "\n\t\t\tSetDropdownOptions()\n\t\t\tUpdateSelectedText()\n", 1)
+    final = block.rfind("\n\t\tend")
+    if final == -1:
+        final = block.rfind("\n\t\t\tend")
+    if final == -1:
+        raise RuntimeError("Dropdown function footer missing")
+    indent = "\t\t" if block.startswith("\t\tfunction") else "\t\t\t"
+    addition = f'''\n{indent}\tfunction data:Set(value, skipCallback)
+{indent}\t\tdata.StarterOption = value
+{indent}\t\tSetDropdownOptions()
+{indent}\t\tUpdateSelectedText()
+{indent}\t\tif not skipCallback then
+{indent}\t\t\tsydeCall(data.CallBack, "Dropdown " .. tostring(data.Title), data.Multi and table.clone(SelectedOrder) or SelectedOrder[1])
+{indent}\t\tend
+{indent}\tend
+{indent}\tfunction data:Refresh(options, value)
+{indent}\t\tdata.Options = type(options) == "table" and options or {{}}
+{indent}\t\tif value ~= nil then data.StarterOption = value end
+{indent}\t\tSetDropdownOptions()
+{indent}\t\tUpdateSelectedText()
+{indent}\tend
+{indent}\tdata.Instance = dropdown
+{indent}\treturn data
+'''
+    return block[:final] + addition + block[final:]
+
+
+def validate_output(body: str) -> None:
+    required_counts = {
+        "function syde:DisconnectAll()": 1,
+        "function data:Refresh(options, value)": 2,
+        "local sliderHandles = {}": 2,
+        "data.Instance = textinput": 2,
+        "data.Instance = button": 2,
+        "data.Instance = dropdown": 2,
+        "Options = sydeNormalizeSliderOptions(Options)": 2,
+        "TweenInfo.new(1.34, Enum.EasingStyle.Quint)": 2,
+        "TweenInfo.new(1.34, Enum.EasingStyle.Exponential)": 4,
+        "TweenInfo.new(2, Enum.EasingStyle.Exponential)": 7,
+        "TweenInfo.new(0.73, Enum.EasingStyle.Exponential)": 3,
+    }
+    for fragment, expected in required_counts.items():
+        actual = body.count(fragment)
+        if actual != expected:
+            raise RuntimeError(f"Generated Syde contract mismatch for {fragment!r}: expected {expected}, found {actual}")
+
+    forbidden = (
+        "ColorPicker.Linkable = ColorPicker.Linkable or true",
+        "table.remove(toasts, table.find(toasts, Toast))",
+        "table.remove(notifications, table.find(notifications, Notification))",
+        "if dragging and input.UserInputType == Enum.UserInputType.MouseMovement  or",
+        "if makefolder and not isfolder(syde.ConfigFolder)",
+        "SelectedOptions = {[OptionText] = true}",
+    )
+    for fragment in forbidden:
+        if fragment in body:
+            raise RuntimeError(f"Generated Syde still contains unsafe fragment: {fragment!r}")
 
 
 def main() -> None:
     upstream = read(UPSTREAM)
+    upstream_hash = hashlib.sha256(upstream.encode("utf-8")).hexdigest()
+    if upstream_hash != UPSTREAM_SHA256:
+        raise RuntimeError(
+            f"Syde upstream drifted from pinned essencejs/syde main: expected {UPSTREAM_SHA256}, found {upstream_hash}"
+        )
     compat = read(COMPAT)
     modal_block = adapt_modal(read(PATCHES / "modal.luau"))
 
@@ -481,6 +834,7 @@ def main() -> None:
         "window.settings.pages.page",
         "telement",
     )
+    settings_dropdown = add_dropdown_handle(settings_dropdown)
     body = replace_between(
         body,
         "function telement:Dropdown(Dropdown)",
@@ -493,11 +847,54 @@ def main() -> None:
         "pages.page",
         "initelement",
     )
+    page_dropdown = add_dropdown_handle(page_dropdown)
     body = replace_between(
         body,
         "function initelement:Dropdown(Dropdown)",
         "\n\t\t--@@Colorpicker",
         page_dropdown,
+    )
+
+    settings_button = add_button_handle(
+        extract_block(body, "function telement:Button(Button)", "\n\t\t\tfunction telement:Toggle")
+    )
+    body = replace_between(body, "function telement:Button(Button)", "\n\t\t\tfunction telement:Toggle", settings_button)
+    page_button = add_button_handle(
+        extract_block(body, "function initelement:Button(Button)", "\n\t\t--@@Toggle")
+    )
+    body = replace_between(body, "function initelement:Button(Button)", "\n\t\t--@@Toggle", page_button)
+
+    settings_slider = add_slider_handles(
+        extract_block(body, "function telement:Slider(Slider)", "\n\t\t\tfunction telement:Paragraph")
+    )
+    body = replace_between(
+        body,
+        "function telement:Slider(Slider)",
+        "\n\t\t\tfunction telement:Paragraph",
+        settings_slider,
+    )
+    page_slider = add_slider_handles(
+        extract_block(body, "function initelement:Slider(Slider)", "\n\t\t--@@KeyBind")
+    )
+    body = replace_between(body, "function initelement:Slider(Slider)", "\n\t\t--@@KeyBind", page_slider)
+
+    settings_input = add_text_input_handle(
+        extract_block(body, "function telement:TextInput(TextInput)", "\n\t\t\treturn telement")
+    )
+    body = replace_between(
+        body,
+        "function telement:TextInput(TextInput)",
+        "\n\t\t\treturn telement",
+        settings_input,
+    )
+    page_input = add_text_input_handle(
+        extract_block(body, "function initelement:TextInput(TextInput)", "\n\t\tfunction initelement:EnchancedView")
+    )
+    body = replace_between(
+        body,
+        "function initelement:TextInput(TextInput)",
+        "\n\t\tfunction initelement:EnchancedView",
+        page_input,
     )
 
     footer_start = "\t\treturn initelement\n\n\n\tend\n\treturn tbdata"
@@ -549,10 +946,11 @@ return syde
     body = patch_option_clicks(body)
     body = patch_normalized_labels(body)
     body = patch_dropdown_template(body)
-    body = patch_dropdown_animations(body)
     body = patch_ui_main_access(body)
     body = patch_runtime_safety(body)
+    body = patch_control_contracts(body)
     body = "\n".join(line.rstrip() for line in body.splitlines()) + "\n"
+    validate_output(body)
 
     if "--check" in sys.argv:
         current = OUT.read_text(encoding="utf-8") if OUT.exists() else ""

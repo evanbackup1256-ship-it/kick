@@ -1,6 +1,11 @@
 # Syde UI (vendored)
 
-Upstream: [essencejs/syde](https://github.com/essencejs/syde) (GPL-3.0)
+Upstream: [essencejs/syde](https://github.com/essencejs/syde) (GPL-3.0), pinned to
+commit `0002ee2af20051c83a8a5f4c5e51cc64b089e932`.
+
+The generated library preserves upstream colors, dimensions, assets, and
+animation timings exactly. Local patches are limited to runtime safety,
+executor compatibility, lifecycle cleanup, and control API correctness.
 
 - `upstream.luau` — unmodified essencejs/syde `main` (reference copy)
 - `compat.luau` — Alleral executor/asset compatibility helpers
@@ -25,4 +30,4 @@ The build keeps the **original Syde library body** and applies only Alleral bug 
 - Page template clone aliases (`Button`/`button`, etc.)
 - Alleral API: `InitTab("Name")`, `Init({ Keybind })`, `Toggle()` / `GetState()` / `SetState()`, `initelement:Select()`
 
-Patch version: `ALLERAL_SYDE_PATCH` in `compat.luau` (currently **v27**).
+Patch version: `ALLERAL_SYDE_PATCH` in `compat.luau` (currently **v28**).

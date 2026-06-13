@@ -1,7 +1,7 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 27
+local ALLERAL_SYDE_PATCH = 28
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -21,6 +21,38 @@ local function sydeSetClipboard(value)
 		return ok
 	end
 	return false
+end
+
+local function sydeCall(callback, context, ...)
+	if type(callback) ~= "function" then
+		return true
+	end
+	local ok, result = pcall(callback, ...)
+	if not ok then
+		sydeWarn("[Syde] " .. tostring(context or "callback") .. " failed: " .. tostring(result))
+	end
+	return ok, result
+end
+
+local function sydeNormalizeSliderOptions(options)
+	options = type(options) == "table" and options or {}
+	local range = type(options.Range) == "table" and options.Range or { 0, 100 }
+	local minimum = tonumber(range[1]) or 0
+	local maximum = tonumber(range[2]) or 100
+	if maximum < minimum then
+		minimum, maximum = maximum, minimum
+	end
+	if maximum == minimum then
+		maximum = minimum + 1
+	end
+	local increment = math.abs(tonumber(options.Increment) or 1)
+	if increment == 0 then increment = 1 end
+	local starter = math.clamp(tonumber(options.StarterValue) or minimum, minimum, maximum)
+	options.Range = { minimum, maximum }
+	options.Increment = increment
+	options.StarterValue = starter
+	options.Value = starter
+	return options
 end
 
 local SYDE_CANONICAL_NAMES = {

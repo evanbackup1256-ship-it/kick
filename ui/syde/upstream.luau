@@ -362,27 +362,29 @@ end
 -- Applies the `properties` table to bound parts.
 function syde:Modify(frame, properties)
 	local parts = syde:GetBoundParts(frame)
-	if not parts then
-		return
-	end
-	for propName, propValue in pairs(properties) do
-		for _, pt in pairs(parts) do
-			pt[propName] = propValue
+	if parts then
+		for propName, propValue in pairs(properties) do
+			for _, pt in pairs(parts) do
+				pt[propName] = propValue
+			end
 		end
+	else
+		warn(('No part bindings exist for %s'):format(frame:GetFullName()))
 	end
 end
 
 -- Removes the part binding from a gui object if one exists.
 function syde:UnbindFrame(frame)
 	local cb = binds[frame]
-	if not cb then
-		return
+	if cb then
+		RunService:UnbindFromRenderStep(cb.uid)
+		for _, v in pairs(cb.parts) do
+			v:Destroy()
+		end
+		binds[frame] = nil
+	else
+		warn(('No part bindings exist for %s'):format(frame:GetFullName()))
 	end
-	RunService:UnbindFromRenderStep(cb.uid)
-	for _, v in pairs(cb.parts) do
-		v:Destroy()
-	end
-	binds[frame] = nil
 end
 
 -- Returns true if a part binding exists for the gui object.
@@ -2387,16 +2389,8 @@ window.top.functions.close.interact.MouseButton1Click:Connect(function()
 		Content = 'Are You Sure You Want To Close This UI?',
 		ConfimCallBack = function()
 			mh = false
-			pcall(function()
-				if rs and typeof(rs.Disconnect) == "function" then
-					rs:Disconnect()
-				end
-			end)
-			pcall(function()
-				if ss and typeof(ss.Disconnect) == "function" then
-					ss:Disconnect()
-				end
-			end)
+			rs:Disconnect()
+			ss:Disconnect()
 			--	if not ui.Parent then return end
 			task.wait(1)
 			Library:Destroy()

@@ -3,7 +3,8 @@ function syde:Modal(Modal)
 		local ModalData = {
 			Title = Modal.Title;
 			Content = Modal.Content;
-			ConfirmCallBack = Modal.ConfimCallBack
+			ConfirmCallBack = Modal.ConfirmCallBack or Modal.ConfirmCallback or Modal.ConfimCallBack,
+			CancelCallBack = Modal.CancelCallBack or Modal.CancelCallback,
 		}
 
 		local modalTemplate = window and sydeFindChild(window, "modal", "Modal")
@@ -46,7 +47,7 @@ function syde:Modal(Modal)
 			if modalParts.Content then
 				tweenservice:Create(
 					modalParts.Content,
-					TweenInfo.new(0.35, Enum.EasingStyle.Quint),
+					TweenInfo.new(0.75, Enum.EasingStyle.Quint),
 					{ Size = UDim2.new(1, modalParts.Content.Size.X.Offset, 1, modalParts.Content.TextBounds.Y) }
 				):Play()
 			end
@@ -54,68 +55,68 @@ function syde:Modal(Modal)
 			local contentHeight = modalParts.Content and modalParts.Content.TextBounds.Y or 0
 			tweenservice:Create(
 				ModalInstance,
-				TweenInfo.new(0.32, Enum.EasingStyle.Quint),
+				TweenInfo.new(0.65, Enum.EasingStyle.Quint),
 				{ Size = UDim2.new(0, 350, 0, contentHeight + 150) }
 			):Play()
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
 			if modalParts.UIStroke then
-				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
+				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
 			end
 			if modalParts.Title then
-				tweenservice:Create(modalParts.Title, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(modalParts.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 			end
 			if modalParts.Content then
-				tweenservice:Create(modalParts.Content, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(modalParts.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 			end
 			if modalParts.Confirm then
-				tweenservice:Create(modalParts.Confirm, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.5 }):Play()
+				tweenservice:Create(modalParts.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.5 }):Play()
 			end
 			if modalParts.ConfirmLabel then
-				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 			end
 			if modalParts.Cancel then
-				tweenservice:Create(modalParts.Cancel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 			end
 			if modalParts.CancelLabel then
-				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 			end
 			if modalParts.CancelStroke then
-				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
+				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
 			end
 		end
 		openModal()
 
 		local function closeModal()
-			activeModals -= 1
+			activeModals = math.max(activeModals - 1, 0)
 			sydeSetInteractable(modalParts.Cancel, false)
 			sydeSetInteractable(modalParts.Confirm, false)
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.3, Enum.EasingStyle.Quint), { Size = UDim2.new(0, 350, 0, 147) }):Play()
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), { Size = UDim2.new(0, 350, 0, 147) }):Play()
+			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 			if modalParts.Title then
-				tweenservice:Create(modalParts.Title, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 			end
 			if modalParts.UIStroke then
-				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
 			end
 			if modalParts.Content then
-				tweenservice:Create(modalParts.Content, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 			end
 			if modalParts.Confirm then
-				tweenservice:Create(modalParts.Confirm, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 			end
 			if modalParts.ConfirmLabel then
-				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 			end
 			if modalParts.Cancel then
-				tweenservice:Create(modalParts.Cancel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 			end
 			if modalParts.CancelLabel then
-				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 			end
 			if modalParts.CancelStroke then
-				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
 			end
-			task.wait(0.22)
+			task.wait(0.6)
 			ModalInstance:Destroy()
 		end
 
@@ -123,7 +124,7 @@ function syde:Modal(Modal)
 
 		if activeModals == 1 and dimOverlay then
 			dimOverlay.Visible = true
-			tweenservice:Create(dimOverlay, TweenInfo.new(0.32, Enum.EasingStyle.Exponential), {
+			tweenservice:Create(dimOverlay, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 				BackgroundTransparency = 0.3
 			}):Play()
 		end
@@ -136,21 +137,24 @@ function syde:Modal(Modal)
 			closeModal()
 
 			if activeModals == 0 and dimOverlay then
-				tweenservice:Create(dimOverlay, TweenInfo.new(0.32, Enum.EasingStyle.Exponential), {
+				tweenservice:Create(dimOverlay, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 					BackgroundTransparency = 1
 				}):Play()
-				task.wait(0.25)
+				task.wait(0.6)
 				dimOverlay.Visible = false
 			end
 		end)
 
 		sydeConnectClick(modalParts.Cancel, function()
+			if typeof(ModalData.CancelCallBack) == "function" then
+				ModalData.CancelCallBack()
+			end
 			closeModal()
-			if dimOverlay then
-				tweenservice:Create(dimOverlay, TweenInfo.new(0.32, Enum.EasingStyle.Exponential), {
+			if activeModals == 0 and dimOverlay then
+				tweenservice:Create(dimOverlay, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 					BackgroundTransparency = 1
 				}):Play()
-				task.wait(0.25)
+				task.wait(0.6)
 				dimOverlay.Visible = false
 			end
 		end)

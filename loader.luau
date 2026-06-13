@@ -16,7 +16,7 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 27 -- Includes generated compat patches plus runtime lifecycle and input fixes
+local SYDE_PATCH_VERSION = 28 -- Includes stable control handles, refresh APIs, and lifecycle cleanup
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
@@ -47,7 +47,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "0f82885",
+	commit = "b059090",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
 }

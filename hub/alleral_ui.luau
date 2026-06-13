@@ -13,7 +13,7 @@ return function(Core)
 		"kick/kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 27
+	local SYDE_PATCH_VERSION = 28
 	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
@@ -761,10 +761,19 @@ return function(Core)
 				end,
 			})
 			return wrapElement(function(nextSettings)
+				local nextValues = nextSettings.Options or nextSettings.Values
 				local pick = nextSettings.CurrentOption or nextSettings.CurrentOptions
-				if pick == nil or not handle then
+				if not handle then
 					return
 				end
+				if type(nextValues) == "table" then
+					values = nextValues
+					if type(handle.Refresh) == "function" then
+						pcall(handle.Refresh, handle, values, pick)
+						return
+					end
+				end
+				if pick == nil then return end
 				if type(handle.Set) == "function" then
 					pcall(handle.Set, handle, pick)
 				end
