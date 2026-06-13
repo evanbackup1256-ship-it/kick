@@ -140,9 +140,14 @@ local function sydeFindChild(parent, ...)
 		if child then return child end
 	end
 	return nil
-end
+	end
 
-local function sydeDropSelectedLabel(drop)
+	local function sydeSliderLabel(slider)
+		if not slider then return nil end
+		return sydeFindChild(slider, "title", "Title")
+	end
+
+	local function sydeDropSelectedLabel(drop)
 	if not drop then return nil end
 	local label = sydeFindChild(drop, "selected", "Selected", "select", "Select", "value", "Value", "placeholder", "Placeholder")
 	if label then return label end
