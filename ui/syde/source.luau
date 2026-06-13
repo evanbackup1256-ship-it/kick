@@ -106,7 +106,35 @@ local syde = {
 	ConfigFile = 'Config';
 	Flags = {};
 	SettingsFlags = {};
-	}
+	DefaultCSS = [[
+.syde-window { background-color: #111111; border-radius: 12px; border-size: 0px; }
+.topbar { background-color: transparent; }
+.syde-tab { background-color: transparent; border-radius: 8px; font-size: 13px; transition: 0.3s; }
+.syde-tab:hover { background-color: #1a1a1a; }
+.syde-tab.active { background-color: #1c1c1c; }
+.sidebar { background-color: #0d0d0d; }
+.syde-toggle { background-color: #161616; border-radius: 10px; font-size: 13px; }
+.syde-toggle .tog { background-color: #1c1c1c; border-radius: 50%; transition: 0.3s; }
+.syde-toggle.on .tog { background-color: #ff97e3; }
+.syde-toggle .tog .check { opacity: 0; transition: 0.3s; }
+.syde-toggle.on .tog .check { opacity: 1; }
+.syde-btn { background-color: #161616; border-radius: 10px; font-size: 13px; transition: 0.2s; }
+.syde-btn:hover { background-color: #1e1e1e; }
+.syde-slider { background-color: #161616; border-radius: 10px; font-size: 12px; }
+.syde-dropdown { background-color: #161616; border-radius: 10px; font-size: 13px; }
+.syde-input { background-color: #161616; border-radius: 10px; border-color: #222222; border-size: 1px; }
+.syde-colorpicker { background-color: #161616; border-radius: 10px; }
+.syde-keybind { background-color: #161616; border-radius: 10px; }
+.syde-keybind .bind { background-color: #1c1c1c; border-radius: 6px; font-size: 12px; }
+.syde-paragraph { background-color: #141414; border-radius: 10px; font-size: 12px; }
+.syde-section { color: #888888; font-size: 11px; font-weight: bold; }
+.syde-label { color: #cccccc; font-size: 12px; }
+.syde-modal { background-color: #1a1a1a; border-radius: 14px; }
+.syde-notif { background-color: #1a1a1a; border-radius: 10px; }
+.syde-toast { background-color: #1a1a1a; border-radius: 8px; font-size: 12px; }
+.syde-minihome { background-color: #111111; border-radius: 12px; }
+]];
+}
 
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied after the original library body; keeps upstream logic intact.
@@ -1885,6 +1913,21 @@ syde:HidePH(pages, 'page')
 
 function syde:Init(library)
 	ui.Enabled = true
+	-- CSS engine — intercept all cosmetic Tweens, set CSSTransition on element
+	local origTweenCreate = tweenservice.Create
+	tweenservice.Create = function(self, el, info, props)
+		if props and el and el:IsA("GuiObject") then
+			local hasCosmetic = false
+			for k, _ in pairs(props) do
+				if k == "BackgroundTransparency" or k == "TextTransparency" or k == "ImageTransparency"
+					or k == "BackgroundColor3" or k == "TextColor3" or k == "ImageColor3" or k == "BorderColor3" then
+					hasCosmetic = true
+				end
+			end
+			if hasCosmetic then el:SetAttribute("CSSTransition", info and info.Time or 0.3) end
+		end
+		return origTweenCreate(tweenservice, el, info, props)
+	end
 	if loaded == false then
 		local UI_TAG = "sydeUILoader"
 		local MARKER_NAME = "SYDEUIDetector"
@@ -2263,20 +2306,9 @@ function syde:Init(library)
 				toggleConfiguration.Container.Clear.clear.ImageLabel.ImageTransparency = 1
 				toggleConfiguration.Size = UDim2.new(0, 75,0, 53)
 				if not data.Config then toggle.configure:Destroy() end
-				local toggleTween = TweenInfo.new(0.7, Enum.EasingStyle.Exponential)
-				local fadeTween = TweenInfo.new(0.57, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 				local function UpdateToggleUI(state)
-					local targetColor = state and syde.theme.HitBox or Color3.fromRGB(28, 28, 28)
-					local checkTransparency = state and 0 or 1
-					local gradientTransparency = state and 0 or 1
-					local glowTransparency = state and 0.7 or 1
-					local textTransparency = state and 0 or 0.5
-					tweenservice:Create(toggle.tog, toggleTween, {BackgroundColor3 = targetColor}):Play()
-					tweenservice:Create(toggle.tog.check, toggleTween, {ImageTransparency = checkTransparency}):Play()
-					tweenservice:Create(toggle.tog.gradfr, fadeTween, {BackgroundTransparency = gradientTransparency}):Play()
-					tweenservice:Create(toggle.tog.glow, toggleTween, {ImageTransparency = glowTransparency}):Play()
-					tweenservice:Create(toggle.tog.glow, toggleTween, {ImageColor3 = targetColor}):Play()
-					tweenservice:Create(toggle.title, toggleTween, {TextTransparency = textTransparency}):Play()
+					toggle:SetAttribute("Class", "syde-toggle" .. (state and " on" or ""))
+					syde:ReapplyCSS()
 				end
 				UpdateToggleUI(data.V)
 				toggle.interact.MouseButton1Click:Connect(function()
@@ -2812,16 +2844,8 @@ function syde:Init(library)
 			toggle:SetAttribute("Searchable", true)
 			if not data.Config then toggle.configure:Destroy() end
 			local function UpdateToggleUI(state)
-				local targetColor = state and syde.theme.HitBox or Color3.fromRGB(28, 28, 28)
-				local checkTransparency = state and 0 or 1
-				local gradientTransparency = state and 0 or 1
-				local glowTransparency = state and 0.7 or 1
-				local textTransparency = state and 0 or 0.5
-				tweenservice:Create(toggle.tog, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = targetColor}):Play()
-				tweenservice:Create(toggle.tog.check, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = checkTransparency}):Play()
-				tweenservice:Create(toggle.tog.gradfr, TweenInfo.new(0.57, Enum.EasingStyle.Exponential), {BackgroundTransparency = gradientTransparency}):Play()
-				tweenservice:Create(toggle.tog.glow, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = glowTransparency, ImageColor3 = targetColor}):Play()
-				tweenservice:Create(toggle.title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = textTransparency}):Play()
+				toggle:SetAttribute("Class", "syde-toggle" .. (state and " on" or ""))
+				syde:ReapplyCSS()
 			end
 			UpdateToggleUI(data.V)
 			toggle.interact.MouseButton1Click:Connect(function()
@@ -3399,8 +3423,112 @@ function syde:Init(library)
 		if state == true and uiclosed then ToggleUI()
 		elseif state == false and not uiclosed then ToggleUI() end
 	end
+	if syde.DefaultCSS then task.defer(function() syde:LoadCSS(syde.DefaultCSS) end) end
 	return tbdata
 end
 
 syde.__AlleralPatch = ALLERAL_SYDE_PATCH
-return syde
+
+-- CSS Engine — parse real CSS and apply to Syde UI
+function syde:LoadCSS(cssString)
+	if type(cssString) ~= "string" then return end
+	syde.LastCSS = cssString
+	local rules = {}
+	cssString = cssString:gsub("/%*.-%*/", "")
+	for selector, body in cssString:gmatch("([^{]+)%s*{(.-)}") do
+		selector = selector:gsub("^%s+", ""):gsub("%s+$", "")
+		local decls = {}
+		for prop, value in body:gmatch("([%w%-]+)%s*:%s*([^;]+);?") do
+			prop = prop:gsub("^%s+", ""):gsub("%s+$", ""):lower()
+			value = value:gsub("^%s+", ""):gsub("%s+$", "")
+			decls[prop] = value
+		end
+		table.insert(rules, {selector = selector, decls = decls})
+	end
+
+	local function matches(el, sel)
+		if not el or not el:IsA("GuiObject") then return false end
+		local name = el.Name:lower()
+		-- Auto-detect element type from parent template name
+		local detectedClass = el:GetAttribute("Class") or ""
+		if detectedClass == "" then
+			local parent = el.Parent
+			if parent and parent:IsA("Frame") then
+				local pn = parent.Name:lower()
+				if pn == "toggle" or pn == "button" or pn == "slider" or pn == "dropdown"
+					or pn == "keybind" or pn == "colorpicker" or pn == "input"
+					or pn == "paragraph" or pn == "section" or pn == "label" then
+					detectedClass = "syde-" .. pn
+				end
+			end
+		end
+		for part in sel:gmatch("[^%s]+") do
+			part = part:lower()
+			if part:sub(1,1) == "." then
+				local cls = " "..detectedClass:lower().." "
+				if not cls:find(" "..part:sub(2).." ") then return false end
+			elseif part:sub(1,1) == "#" then
+				local id = el:GetAttribute("ID") or ""
+				if id:lower() ~= part:sub(2) then return false end
+			elseif part ~= "*" and name ~= part then
+				return false
+			end
+		end
+		return true
+	end
+
+	local function apply(el, prop, value)
+		local n = tonumber(value:match("%d+"))
+		local t = el:GetAttribute("CSSTransition") or 0.3
+		local function tween(p, v) tweenservice:Create(el, TweenInfo.new(t, Enum.EasingStyle.Exponential), {[p] = v}):Play() end
+		if prop == "background-color" or prop == "background" then
+			if value:match("^#[%x]+") then tween("BackgroundColor3", Color3.fromHex(value)) end
+		elseif prop == "color" or prop == "text-color" then
+			if value:match("^#[%x]+") then tween("TextColor3", Color3.fromHex(value)) end
+		elseif prop == "border-color" then
+			if value:match("^#[%x]+") then tween("BorderColor3", Color3.fromHex(value)) end
+		elseif prop == "font-size" and n then
+			pcall(function() el.TextSize = n end)
+		elseif prop == "border-radius" and n then
+			local corner = el:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, n)
+			pcall(function() corner.Parent = el end)
+		elseif prop == "border-size" and n then
+			pcall(function() el.BorderSizePixel = n end)
+		elseif prop == "opacity" and n then
+			local o = 1 - math.clamp(n > 1 and n/100 or n, 0, 1)
+			tween("BackgroundTransparency", o)
+			tween("TextTransparency", o)
+			tween("ImageTransparency", o)
+		elseif prop == "transition" and n then
+			el:SetAttribute("CSSTransition", n)
+		elseif prop == "font-weight" and (value == "bold" or value == "700") then
+			pcall(function() el.RichText = true end)
+		end
+	end
+
+	local function walk(instance)
+		if not instance or not instance:IsA("GuiObject") then return end
+		for _, rule in ipairs(rules) do
+			if matches(instance, rule.selector) then
+				for prop, value in pairs(rule.decls) do
+					apply(instance, prop, value)
+				end
+			end
+		end
+		for _, child in ipairs(instance:GetChildren()) do
+			walk(child)
+		end
+	end
+
+	if ui and ui:IsA("Instance") then walk(ui) end
+	end
+
+	-- Re-apply CSS after class changes (lightweight, walks entire tree)
+	function syde:ReapplyCSS()
+		if syde.LastCSS and ui and ui:IsA("Instance") then
+			syde:LoadCSS(syde.LastCSS)
+		end
+	end
+
+	return syde
