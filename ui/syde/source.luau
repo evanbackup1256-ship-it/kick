@@ -1887,7 +1887,21 @@ end
 
 
 --@UiSetup
-local ui = Library
+local function wrapInstance(inst)
+	if not inst or not inst:IsA("Instance") then return inst end
+	return setmetatable({_raw = inst}, {
+		__index = function(_, key)
+			if key == "_raw" then return inst end
+			local child = inst:FindFirstChild(key)
+			if child then return wrapInstance(child) end
+			for _, c in ipairs(inst:GetChildren()) do
+				if c.Name:lower() == key:lower() then return wrapInstance(c) end
+			end
+		end,
+		__newindex = function(_, key, value) inst[key] = value end,
+	})
+end
+local ui = wrapInstance(Library)
 local window = ui.main
 local top = window.top
 local tabs = window.tabs.tab
