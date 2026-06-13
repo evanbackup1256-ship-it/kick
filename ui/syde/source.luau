@@ -3059,12 +3059,14 @@ function syde:Init(library)
 				lastTime = now
 				frames = 0
 
-				Minihome.info.fps.Text = fps .. " FPS"
+				local _mhFps = type(Minihome) == "table" and sydeFindChild(Minihome, "info", "Info") and sydeFindChild(sydeFindChild(Minihome, "info", "Info"), "fps", "Fps", "FPS")
+				if _mhFps then _mhFps.Text = fps .. " FPS" end
 			end
 
 			-- Time → 8:45
 			local hour = tonumber(os.date("%I"))
-			Minihome.info.time.Text = hour .. os.date(":%M")
+			local _mhTime = type(Minihome) == "table" and sydeFindChild(Minihome, "info", "Info") and sydeFindChild(sydeFindChild(Minihome, "info", "Info"), "time", "Time")
+			if _mhTime then _mhTime.Text = hour .. os.date(":%M") end
 		end)
 
 
@@ -6130,24 +6132,29 @@ function syde:Init(library)
 				local Para = sydeClonePageTemplate(window.settings.pages.page, "Paragraph")
 				Para.Visible = true
 				Para.Parent = Page
-				Para.Frame.title.Text = ParaData.Title
-				Para.Content.Text = ParaData.Content
+				local paraFrame = sydeFindChild(Para, "Frame", "frame")
+				local paraContent = sydeFindChild(Para, "Content", "content")
+				local paraFrameTitle = paraFrame and sydeFindChild(paraFrame, "title", "Title")
+				if paraFrameTitle then paraFrameTitle.Text = ParaData.Title end
+				if paraContent then paraContent.Text = ParaData.Content end
 
-				Para.Content.Size = UDim2.new(1, -20, 0, Para.Content.TextBounds.Y)
-				--	Para.Size = UDim2.new(1, -35, 0, Para.Content.Size.Y.Offset + 200)
+				if paraContent then
+					paraContent.Size = UDim2.new(1, -20, 0, paraContent.TextBounds.Y)
+				end
 
 				local function updateSize()
+					if not paraContent then return end
 					local textSize = textservice:GetTextSize(
-						Para.Content.Text,
-						Para.Content.TextSize,
-						Para.Content.Font,
-						Vector2.new(Para.Content.AbsoluteSize.X, math.huge) -- Allows vertical expansion
+						paraContent.Text,
+						paraContent.TextSize,
+						paraContent.Font,
+						Vector2.new(paraContent.AbsoluteSize.X, math.huge) -- Allows vertical expansion
 					)
 
 					local newDescSize = UDim2.new(1, -20, 0, textSize.Y)
 					local newButtonSize = UDim2.new(Para.Size.X.Scale, Para.Size.X.Offset, 0, textSize.Y + 120) -- Adding extra padding
 
-					local descTween = tweenservice:Create(Para.Content, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
+					local descTween = tweenservice:Create(paraContent, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
 					descTween:Play()
 
 					local buttonTween = tweenservice:Create(Para, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newButtonSize })
@@ -6156,13 +6163,18 @@ function syde:Init(library)
 
 				updateSize()
 
-				Para.Content:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
+				if paraContent then
+					paraContent:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
+				end
 
 				local ParagraphSettings = {}
 
 				function ParagraphSettings:Set(text, title)
-					Para.Frame.title.Text = title
-					Para.Content.Text = text
+					local _paraFrame = sydeFindChild(Para, "Frame", "frame")
+					local _paraTitle = _paraFrame and sydeFindChild(_paraFrame, "title", "Title")
+					local _paraContent = sydeFindChild(Para, "Content", "content")
+					if _paraTitle then _paraTitle.Text = title end
+					if _paraContent then _paraContent.Text = text end
 				end
 
 				ParagraphSettings.Instance = Para
@@ -8810,25 +8822,30 @@ function syde:Init(library)
 			local Para = sydeClonePageTemplate(pages.page, "Paragraph")
 			Para.Visible = true
 			Para.Parent = Page
-			Para.Frame.title.Text = ParaData.Title
-			Para.Content.Text = ParaData.Content
 			Para:SetAttribute("Searchable", true)
+			local paraFrame = sydeFindChild(Para, "Frame", "frame")
+			local paraContent = sydeFindChild(Para, "Content", "content")
+			local paraFrameTitle = paraFrame and sydeFindChild(paraFrame, "title", "Title")
+			if paraFrameTitle then paraFrameTitle.Text = ParaData.Title end
+			if paraContent then paraContent.Text = ParaData.Content end
 
-			Para.Content.Size = UDim2.new(1, -20, 0, Para.Content.TextBounds.Y)
-			--	Para.Size = UDim2.new(1, -35, 0, Para.Content.Size.Y.Offset + 200)
+			if paraContent then
+				paraContent.Size = UDim2.new(1, -20, 0, paraContent.TextBounds.Y)
+			end
 
 			local function updateSize()
+				if not paraContent then return end
 				local textSize = textservice:GetTextSize(
-					Para.Content.Text,
-					Para.Content.TextSize,
-					Para.Content.Font,
-					Vector2.new(Para.Content.AbsoluteSize.X, math.huge) -- Allows vertical expansion
+					paraContent.Text,
+					paraContent.TextSize,
+					paraContent.Font,
+					Vector2.new(paraContent.AbsoluteSize.X, math.huge) -- Allows vertical expansion
 				)
 
 				local newDescSize = UDim2.new(1, -20, 0, textSize.Y)
 				local newButtonSize = UDim2.new(Para.Size.X.Scale, Para.Size.X.Offset, 0, textSize.Y + 120) -- Adding extra padding
 
-				local descTween = tweenservice:Create(Para.Content, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
+				local descTween = tweenservice:Create(paraContent, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
 				descTween:Play()
 
 				local buttonTween = tweenservice:Create(Para, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newButtonSize })
@@ -8837,7 +8854,9 @@ function syde:Init(library)
 
 			updateSize()
 
-			Para.Content:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
+			if paraContent then
+				paraContent:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
+			end
 		end
 
 		function initelement:Label(Text, Alignment)

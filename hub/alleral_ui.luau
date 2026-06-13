@@ -936,6 +936,7 @@ return function(Core)
 			end
 		end
 
+		window:Toggle()
 		return window
 	end
 
