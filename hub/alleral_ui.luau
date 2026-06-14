@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 32
+	local SYDE_PATCH_VERSION = 33
 	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
@@ -595,7 +595,7 @@ return function(Core)
 		return bundle.Alleral or bundle.Library or bundle.Syde
 	end
 
-	function Core.createWindUiGroupbox(sydeTab, uiBundle)
+	function Core.createWindUiGroupbox(sydeTab, uiBundle, parent)
 		sydeTab = sydeTab or {}
 		uiBundle = uiBundle or {}
 		local serial = 0
@@ -642,8 +642,14 @@ return function(Core)
 		end
 
 		local groupbox = {}
+		local function selectParent()
+			if parent and type(sydeTab.SetParent) == "function" then
+				pcall(sydeTab.SetParent, sydeTab, parent)
+			end
+		end
 
 		function groupbox:CreateToggle(settings, id)
+			selectParent()
 			local handle = sydeTab:Toggle({
 				Title = settings.Name,
 				Value = settings.CurrentValue == true,
@@ -665,6 +671,7 @@ return function(Core)
 		end
 
 		function groupbox:CreateSlider(settings, id)
+			selectParent()
 			local range = settings.Range or { 0, 100 }
 			local minValue, maxValue = range[1], range[2]
 			local increment = tonumber(settings.Increment) or Core.sliderIncrement(minValue, maxValue, settings.Increment)
@@ -697,6 +704,7 @@ return function(Core)
 		end
 
 		function groupbox:CreateButton(settings, id)
+			selectParent()
 			local userCallback = settings.Callback or function() end
 			local handle = sydeTab:Button({
 				Title = settings.Name,
@@ -722,6 +730,7 @@ return function(Core)
 		end
 
 		function groupbox:CreateInput(settings, id)
+			selectParent()
 			local handle = sydeTab:TextInput({
 				Title = settings.Name,
 				PlaceHolder = settings.PlaceholderText or settings.Placeholder or "",
@@ -743,6 +752,7 @@ return function(Core)
 		end
 
 		function groupbox:CreateDropdown(settings, id)
+			selectParent()
 			local values = settings.Options or settings.Values or {}
 			local multi = settings.MultipleOptions == true or settings.Multi == true
 			local current = dropdownDefault(values, settings.CurrentOption, multi)
@@ -787,17 +797,15 @@ return function(Core)
 
 		function groupbox:CreateLabel(settings, id)
 			local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
-			local handle = sydeTab:Paragraph({
-				Title = "",
-				Content = text,
-			})
+			selectParent()
+			local handle = sydeTab:Label(text)
 			return {
 				_raw = handle,
 				Set = function(_, nextSettings)
 					local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text)
 						or tostring(nextSettings or "")
 					if handle and type(handle.Set) == "function" then
-						pcall(handle.Set, handle, nextText, "")
+						pcall(handle.Set, handle, nextText)
 					end
 				end,
 				SetVisible = function() end,
@@ -849,6 +857,58 @@ return function(Core)
 	end
 
 	Core._UiTabRegistry = Core._UiTabRegistry or {}
+	local COLUMN_GAP = 12
+	local GROUP_GAP = 8
+
+	local function ensureSydeColumns(tab)
+		if tab._layout then
+			return tab._layout
+		end
+		local rawTab = tab._sydeTab
+		local page = rawTab and rawTab.Page
+		if not page or not page:IsA("ScrollingFrame") then
+			return nil
+		end
+
+		local row = Instance.new("Frame")
+		row.Name = "AlleralColumns"
+		row.BackgroundTransparency = 1
+		row.Size = UDim2.new(1, 0, 0, 0)
+		row.AutomaticSize = Enum.AutomaticSize.Y
+		row.Parent = page
+
+		local rowLayout = Instance.new("UIListLayout")
+		rowLayout.FillDirection = Enum.FillDirection.Horizontal
+		rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		rowLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+		rowLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		rowLayout.Padding = UDim.new(0, COLUMN_GAP)
+		rowLayout.Parent = row
+
+		local function makeColumn(name, order)
+			local column = Instance.new("Frame")
+			column.Name = name
+			column.BackgroundTransparency = 1
+			column.Size = UDim2.new(0.5, -math.ceil(COLUMN_GAP / 2), 0, 0)
+			column.AutomaticSize = Enum.AutomaticSize.Y
+			column.LayoutOrder = order
+			column.Parent = row
+			local layout = Instance.new("UIListLayout")
+			layout.FillDirection = Enum.FillDirection.Vertical
+			layout.SortOrder = Enum.SortOrder.LayoutOrder
+			layout.Padding = UDim.new(0, GROUP_GAP)
+			layout.Parent = column
+			return column
+		end
+
+		tab._layout = {
+			row = row,
+			left = makeColumn("LeftColumn", 1),
+			right = makeColumn("RightColumn", 2),
+			orders = { 0, 0 },
+		}
+		return tab._layout
+	end
 
 	function Core.wrapUiTab(rawTab, uiBundle, window)
 		local tab = {
@@ -867,10 +927,32 @@ return function(Core)
 				Core.logWarn("CreateGroupbox skipped — tab missing for " .. tostring(name))
 				return Core.createStubUiGroup(name)
 			end
+			local layout = ensureSydeColumns(self)
+			local columnIndex = math.clamp(tonumber(settings.Column) or 1, 1, 2)
+			local column = layout and (columnIndex == 2 and layout.right or layout.left)
+			if not column then
+				return Core.createWindUiGroupbox(rawTab, uiBundle)
+			end
+
+			layout.orders[columnIndex] += 1
+			local group = Instance.new("Frame")
+			group.Name = "Group_" .. Core.uiElementId(name)
+			group.BackgroundTransparency = 1
+			group.Size = UDim2.new(1, 0, 0, 0)
+			group.AutomaticSize = Enum.AutomaticSize.Y
+			group.LayoutOrder = layout.orders[columnIndex]
+			group.Parent = column
+			local groupLayout = Instance.new("UIListLayout")
+			groupLayout.FillDirection = Enum.FillDirection.Vertical
+			groupLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			groupLayout.Padding = UDim.new(0, GROUP_GAP)
+			groupLayout.Parent = group
+
+			pcall(rawTab.SetParent, rawTab, group)
 			pcall(function()
 				rawTab:Section(name, optionalIconImage(settings.Icon))
 			end)
-			return Core.createWindUiGroupbox(rawTab, uiBundle)
+			return Core.createWindUiGroupbox(rawTab, uiBundle, group)
 		end
 
 		function tab:BuildThemeGroupbox(column)

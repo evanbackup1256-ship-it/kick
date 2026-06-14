@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 32
+local ALLERAL_SYDE_PATCH = 33
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -7610,7 +7610,7 @@ function syde:Init(library)
 
 				for _, page in ipairs(Pages:GetChildren()) do
 					if page:IsA("ScrollingFrame") then
-						for _, child in ipairs(page:GetChildren()) do
+						for _, child in ipairs(page:GetDescendants()) do
 							if child:IsA("Frame") and child:GetAttribute("Searchable") then
 								local name = child.Name:lower()
 								local ftype = getFunctionType(child):lower()
@@ -7679,7 +7679,7 @@ function syde:Init(library)
 			local button = sydeClonePageTemplate(pages.page, "Button")
 			if not button then return nil end
 			button.Visible = true
-			button.Parent = Page
+			button.Parent = defaultParent
 			button.title.Text = data.Title
 			button.Name = data.Title
 			button.title.Size = UDim2.new(0, button.title.TextBounds.X + 15,0, 35)
@@ -7878,7 +7878,7 @@ function syde:Init(library)
 			local toggle = sydeClonePageTemplate(pages.page, "Toggle")
 			if not toggle then return nil end
 			toggle.Visible = true
-			toggle.Parent = Page
+			toggle.Parent = defaultParent
 			toggle.title.Text = data.Title
 			toggle.Name = data.Title
 			toggle:SetAttribute("Searchable", true)
@@ -8206,7 +8206,7 @@ function syde:Init(library)
 			local slider = sydeClonePageTemplate(pages.page, "Slider")
 			if not slider then return nil end
 			slider.Visible = true
-			slider.Parent = Page
+			slider.Parent = defaultParent
 			slider.title.Text = data.Title
 			slider.Name = data.Title
 			slider.slideholder.slider.Visible = false
@@ -8539,7 +8539,7 @@ function syde:Init(library)
 			local KeyBind = sydeClonePageTemplate(pages.page, "KeyBind")
 			if not KeyBind then return nil end
 			KeyBind.Visible = true
-			KeyBind.Parent = Page
+			KeyBind.Parent = defaultParent
 			KeyBind.title.Text = data.Title
 			KeyBind.Name = data.Title
 			KeyBind:SetAttribute("Searchable", true)
@@ -8629,7 +8629,7 @@ function syde:Init(library)
 			local textinput = sydeClonePageTemplate(pages.page, "Input")
 			if not textinput then return nil end
 			textinput.Visible = true
-			textinput.Parent = Page
+			textinput.Parent = defaultParent
 			textinput.Name = data.Title
 			textinput.title.Text = data.Title
 			textinput.TextFrame.TextBox.PlaceholderText = data.PlaceHolder
@@ -8770,7 +8770,7 @@ function syde:Init(library)
 			local EnchancedView = sydeClonePageTemplate(pages.page, "3DView")
 			if not EnchancedView then return nil end
 			EnchancedView.Visible = true
-			EnchancedView.Parent = Page
+			EnchancedView.Parent = defaultParent
 			local viewTitle = sydeTitleLabel(EnchancedView)
 			if viewTitle then viewTitle.Text = Viewdata.Title end
 			EnchancedView:SetAttribute("Searchable", true)
@@ -9058,7 +9058,7 @@ function syde:Init(library)
 			local Para = sydeClonePageTemplate(pages.page, "Paragraph")
 			if not Para then return nil end
 			Para.Visible = true
-			Para.Parent = Page
+			Para.Parent = defaultParent
 			local paraTitle, paraContent = sydeParagraphParts(Para)
 			if paraTitle then paraTitle.Text = tostring(ParaData.Title or "") end
 			if not paraContent then
@@ -9099,7 +9099,7 @@ function syde:Init(library)
 			local Label = sydeClonePageTemplate(pages.page, "Label")
 			if not Label then return nil end
 			Label.Visible = true
-			Label.Parent = Page
+			Label.Parent = defaultParent
 			Label.text.Text = Text
 			Label:SetAttribute("Searchable", true)
 
@@ -9108,6 +9108,12 @@ function syde:Init(library)
 			elseif Alignment == 'Right' then
 				Label.text.TextXAlignment = Enum.TextXAlignment.Right
 			end
+
+			local data = { Instance = Label }
+			function data:Set(value)
+				Label.text.Text = tostring(value or "")
+			end
+			return data
 
 
 		end
@@ -9121,7 +9127,7 @@ function syde:Init(library)
 			Section.Visible = true
 			local sectionTitle = sydeTitleLabel(Section)
 			if sectionTitle then sectionTitle.Text = Title end
-			Section.Parent = Page
+			Section.Parent = defaultParent
 			if sectionTitle then sectionTitle.Position = UDim2.new(0, 0,0, 0) end
 
 			if Icon then
@@ -9146,7 +9152,7 @@ function syde:Init(library)
 			local dropdown = sydeClonePageTemplate(pages.page, "Dropdown")
 			if not dropdown then return nil end
 			dropdown.Visible = true
-			dropdown.Parent = Page
+			dropdown.Parent = defaultParent
 			dropdown.title.Text = data.Title
 			dropdown.Name = data.Title
 			local drop = sydePrepareDropdownDrop(dropdown)
@@ -9520,7 +9526,7 @@ function syde:Init(library)
 			local colorpicker = sydeClonePageTemplate(pages.page, "ColorPicker")
 			if not colorpicker then return nil end
 			colorpicker.Visible = true
-			colorpicker.Parent = Page
+			colorpicker.Parent = defaultParent
 			colorpicker.title.Text = data.Title
 			colorpicker.Name = data.Title
 			colorpicker:SetAttribute("Searchable", true)
@@ -10318,7 +10324,7 @@ function syde:Init(library)
 					-- colorpicker.HueValues.Link.Frame.Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260)
 					TweenService:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260) }):Play()
 
-					for _, otherPicker in pairs(Page:GetChildren()) do
+					for _, otherPicker in pairs(Page:GetDescendants()) do
 						if otherPicker:IsA("Frame") and otherPicker:FindFirstChild("isLinkable") and otherPicker.isLinkable.Value then
 							if isMouseOver(otherPicker) and otherPicker ~= draggedColorPicker then
 								TweenService:Create(otherPicker.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
@@ -10335,7 +10341,7 @@ function syde:Init(library)
 					linkDragging = false
 					local foundTarget = false
 
-					for _, otherPicker in pairs(Page:GetChildren()) do
+					for _, otherPicker in pairs(Page:GetDescendants()) do
 						if otherPicker:IsA("Frame") and otherPicker:FindFirstChild("isLinkable") and otherPicker.isLinkable.Value then
 							if isMouseOver(otherPicker) and otherPicker ~= draggedColorPicker then
 								otherPicker.HueSat.Value = draggedColorPicker.HueSat.Value
@@ -10476,6 +10482,12 @@ function syde:Init(library)
 		function initelement:Select()
 			SwitchToTab(tdata.Title)
 		end
+
+		function initelement:SetParent(parent)
+			setInternalParent(parent or Page)
+		end
+
+		initelement.Page = Page
 
 		return initelement
 

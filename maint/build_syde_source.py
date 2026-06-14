@@ -593,6 +593,41 @@ def patch_paragraph_contracts(text: str) -> str:
     return text
 
 
+def patch_page_parent_contracts(text: str) -> str:
+    start = text.index("function tbdata:InitTab(tab)")
+    end = text.index("\n\t\tfunction initelement:Select()", start)
+    block = text[start:end]
+    block = block.replace(".Parent = Page", ".Parent = defaultParent")
+    block = block.replace("for _, child in ipairs(page:GetChildren()) do", "for _, child in ipairs(page:GetDescendants()) do")
+    block = block.replace("for _, otherPicker in pairs(Page:GetChildren()) do", "for _, otherPicker in pairs(Page:GetDescendants()) do")
+    label_end = '''\t\t\tif Alignment == 'Center' then
+\t\t\t\tLabel.text.TextXAlignment = Enum.TextXAlignment.Center
+\t\t\telseif Alignment == 'Right' then
+\t\t\t\tLabel.text.TextXAlignment = Enum.TextXAlignment.Right
+\t\t\tend
+
+
+\t\tend'''
+    label_replacement = '''\t\t\tif Alignment == 'Center' then
+\t\t\t\tLabel.text.TextXAlignment = Enum.TextXAlignment.Center
+\t\t\telseif Alignment == 'Right' then
+\t\t\t\tLabel.text.TextXAlignment = Enum.TextXAlignment.Right
+\t\t\tend
+
+\t\t\tlocal data = { Instance = Label }
+\t\t\tfunction data:Set(value)
+\t\t\t\tLabel.text.Text = tostring(value or "")
+\t\t\tend
+\t\t\treturn data
+
+
+\t\tend'''
+    if label_end not in block:
+        raise RuntimeError("Syde page Label contract anchor missing")
+    block = block.replace(label_end, label_replacement, 1)
+    return text[:start] + block + text[end:]
+
+
 def patch_control_contracts(text: str) -> str:
     text = text.replace("ColorPicker.Linkable = ColorPicker.Linkable or true", "ColorPicker.Linkable = ColorPicker.Linkable ~= false")
     text = text.replace("local success, errorMsg = pcall(c)", "local success, errorMsg = pcall(data.CallBack)")
@@ -999,6 +1034,12 @@ def main() -> None:
 \t\t\tSwitchToTab(tdata.Title)
 \t\tend
 
+\t\tfunction initelement:SetParent(parent)
+\t\t\tsetInternalParent(parent or Page)
+\t\tend
+
+\t\tinitelement.Page = Page
+
 \t\treturn initelement
 
 
@@ -1058,6 +1099,7 @@ return syde
     body = patch_minihome_contracts(body)
     body = patch_control_contracts(body)
     body = patch_paragraph_contracts(body)
+    body = patch_page_parent_contracts(body)
     body = "\n".join(line.rstrip() for line in body.splitlines()) + "\n"
     validate_output(body)
     validate_visual_fidelity(upstream, body)

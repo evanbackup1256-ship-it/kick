@@ -37,13 +37,18 @@ if (Test-Path $sydeSource) {
 }
 
 $sydeContracts = @(
-    @{ Pattern = 'ALLERAL_SYDE_PATCH = 32'; Message = 'Syde patch version is 32' },
+    @{ Pattern = 'ALLERAL_SYDE_PATCH = 33'; Message = 'Syde patch version is 33' },
     @{ Pattern = 'local Minihome = sydeFindChild\(ui\._root'; Message = 'Minihome lookup tolerates missing executor assets' },
     @{ Pattern = 'local paraTitle, paraContent = sydeParagraphParts\(Para\)'; Message = 'paragraph templates use compatible child lookup' },
     @{ Pattern = 'return ui\._root\.Enabled ~= false and window\.Visible == true'; Message = 'window state reads the real ScreenGui visibility' },
     @{ Pattern = 'local needsOpen = window\.Visible ~= true or uiclosed'; Message = 'SetState detects initially hidden asset roots' },
     @{ Pattern = 'ui\._root\.Enabled = true\s+window\.Visible = true'; Message = 'SetState forces the real GUI root visible' },
     @{ Pattern = '__newindex = function\(_, key, value\)'; Message = 'UI proxy forwards ScreenGui property writes' },
+    @{ Pattern = 'function initelement:SetParent\(parent\)'; Message = 'Syde tabs expose scoped control parenting' },
+    @{ Pattern = '\.Parent = defaultParent'; Message = 'Syde controls honor scoped group parents' },
+    @{ Pattern = 'local data = \{ Instance = Label \}'; Message = 'native labels expose update handles' },
+    @{ Pattern = 'for _, child in ipairs\(page:GetDescendants\(\)\) do'; Message = 'search discovers controls inside grouped columns' },
+    @{ Pattern = 'for _, otherPicker in pairs\(Page:GetDescendants\(\)\) do'; Message = 'linked color pickers work across grouped columns' },
     @{ Pattern = 'function syde:DisconnectAll\(\)'; Message = 'Syde disconnects tracked runtime connections' },
     @{ Pattern = 'function data:Refresh\(options, value\)'; Message = 'dropdown handles support Refresh' },
     @{ Pattern = 'Options = sydeNormalizeSliderOptions\(Options\)'; Message = 'slider inputs are normalized' },
@@ -116,6 +121,20 @@ if ($alleralUi -match 'pcall\(rawWindow\.SetState, rawWindow, true\)' -and $alle
     Pass "Syde windows open explicitly without blind toggle"
 } else {
     Fail "Syde window creation can toggle an initially-open window closed"
+}
+
+if ($alleralUi -match 'row\.Name = "AlleralColumns"' -and
+    $alleralUi -match 'return Core\.createWindUiGroupbox\(rawTab, uiBundle, group\)') {
+    Pass "Syde adapter preserves requested two-column group layout"
+} else {
+    Fail "Syde adapter does not preserve requested group columns"
+}
+
+if ($alleralUi -match 'local handle = sydeTab:Label\(text\)' -and
+    $alleralUi -notmatch 'local handle = sydeTab:Paragraph\(\{\s*Title = "",\s*Content = text') {
+    Pass "status and divider rows use compact native labels"
+} else {
+    Fail "status rows still use oversized paragraph cards"
 }
 
 if ($alleralUi -match 'function Core\.createWindUiGroupbox') {
