@@ -1017,7 +1017,7 @@ task.spawn(function()
 		end
 		if not runtime.playerPlot then
 			attempts = attempts + 1
-			if attempts % 10 == 0 then
+			if attempts == 10 then
 				warn("[Alleral] Still searching for plot...")
 			end
 			task.wait(0.5)
@@ -1025,8 +1025,6 @@ task.spawn(function()
 	end
 	if runtime.playerPlot then
 		print("[Alleral] Plot locked:", runtime.playerPlot.Name)
-	else
-		warn("[Alleral] Failed to find plot")
 	end
 end)
 

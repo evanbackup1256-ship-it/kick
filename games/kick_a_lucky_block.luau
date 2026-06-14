@@ -456,9 +456,14 @@ local function logError(scope, err, details)
 end
 
 local function safeCall(scope, callback, notifyUser)
-	local ok, result = pcall(callback)
+	local ok, result = xpcall(callback, function(err)
+		if debug and type(debug.traceback) == "function" then
+			return debug.traceback(tostring(err), 2)
+		end
+		return tostring(err)
+	end)
 	if not ok then
-		local message = logError(scope, result)
+		local message = logError(scope, tostring(result):match("^[^\n]+") or result, result)
 		if notifyUser and state.NotifyOnError then
 			notify("Alleral", tostring(scope or "Runtime") .. ": " .. message, 4)
 		end
@@ -3270,7 +3275,13 @@ local function profilePath(name)
 end
 
 local function listProfiles()
-	if not listFiles then
+	if not listFiles or not isFolder then
+		return { "default" }
+	end
+	local okFolder, exists = safeCall("ListProfilesFolder", function()
+		return isFolder(profileFolder)
+	end)
+	if not okFolder or exists ~= true then
 		return { "default" }
 	end
 	local profiles = {}

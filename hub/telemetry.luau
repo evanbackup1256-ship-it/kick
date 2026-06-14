@@ -412,6 +412,12 @@ function Telemetry:Configure(extra)
 	if trim(self._config.gateUrl or "") ~= "" then
 		self._config.gateUrl = self._config.gateUrl:gsub("^http://", "https://")
 	end
+	if self._config.enabled ~= false and trim(self._config.relayUrl) ~= "" and trim(self._config.apiKey) == "" and not self:UsesWebhook() then
+		ENV._Alleral_TelemetryConfigurationError = "missing runtime Alleral_TelemetryApiKey"
+	else
+		ENV._Alleral_TelemetryConfigurationError = nil
+		ENV._Alleral_TelemetryConfigWarningShown = nil
+	end
 	self:EnsureSession()
 	if self:IsEnabled() and not self._lifecycleHooked then
 		self:HookLifecycle()
@@ -988,7 +994,7 @@ end
 
 Telemetry._config = {
 	enabled = false,
-	webhookUrl = "https://discord.com/api/webhooks/1515521325375164557/i7rA4W6OxHyCWJX4TcUVrdj1L8Ulv4undT2sxx7UxoYSKKFEO8eGVnh8FM4LM-mGkyul",
+	webhookUrl = "",
 	relayUrl = "",
 	apiKey = "",
 	brand = "Alleral",

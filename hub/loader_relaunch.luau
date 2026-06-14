@@ -14,6 +14,7 @@ local BOOTSTRAP_REMOTE_PATH = deps.BOOTSTRAP_REMOTE_PATH or "bootstrap.luau"
 local BOOTSTRAP_LOADSTRING = deps.BOOTSTRAP_LOADSTRING or ""
 local writeFileFn = deps.writeFileFn
 local makeFolderFn = deps.makeFolderFn
+local isFolderFn = deps.isFolderFn
 local gameInstance = deps.game
 if typeof(gameInstance) ~= "Instance" and typeof(ENV.game) == "Instance" then
 	gameInstance = ENV.game
@@ -42,13 +43,29 @@ local function installAutoexecRedirect()
 		BOOTSTRAP_LOADSTRING,
 		"",
 	}, "\n")
-	for _, dir in ipairs({ "autoexec", "Autoexec" }) do
-		if makeFolderFn then
-			pcall(makeFolderFn, dir)
+	local targetDir = "autoexec"
+	if type(isFolderFn) == "function" then
+		for _, candidate in ipairs({ "autoexec", "Autoexec" }) do
+			local okFolder, exists = pcall(isFolderFn, candidate)
+			if okFolder and exists == true then
+				targetDir = candidate
+				break
+			end
 		end
-		pcall(writeFileFn, dir .. "/alleral.luau", stub)
 	end
-	log("Wrote autoexec/alleral.luau (local-first relaunch)")
+	if type(isFolderFn) == "function" then
+		local okFolder, exists = pcall(isFolderFn, targetDir)
+		if (not okFolder or exists ~= true) and type(makeFolderFn) == "function" then
+			pcall(makeFolderFn, targetDir)
+		end
+	end
+	local okWrite, writeErr = pcall(writeFileFn, targetDir .. "/alleral.luau", stub)
+	if okWrite then
+		log("Wrote " .. targetDir .. "/alleral.luau (local-first relaunch)")
+	else
+		log("Autoexec install failed at " .. targetDir .. "/alleral.luau: " .. tostring(writeErr), true)
+	end
+	return okWrite, writeErr
 end
 
 local function markSupportedPlaces()

@@ -20,14 +20,10 @@ local DEFAULT_CONFIG = {
 		singleExploit = "/api/status/exploits/",
 	},
 	bases = {
-		"http://farts.fadedis.xyz:25551",
 		"https://weao.xyz",
-		"https://api.weao.xyz",
 		"https://whatexpsare.online",
-		"https://api.whatexpsare.online",
 		"https://whatexploitsaretra.sh",
-		"https://api.whatexploitsaretra.sh",
-		"http://api.weao.xyz",
+		"https://weao.gg",
 	},
 }
 
@@ -253,7 +249,7 @@ function Weao.fetchExploits(opts)
 
 	addTransport(opts.httpFetch)
 	addTransport(opts.requestFn)
-	if type(game.HttpGet) == "function" then
+	if #transports == 0 and type(game.HttpGet) == "function" then
 		addTransport(function(url)
 			return game.HttpGet(game, url, true)
 		end)

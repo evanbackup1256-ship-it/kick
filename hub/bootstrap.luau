@@ -285,6 +285,17 @@ local function purgeLegacyWorkspaceLoaders(deleteFileFn, isFileFn, readFileFn, l
 			return
 		end
 		dir = dir:gsub("^/", ""):gsub("/$", "")
+		if dir == "" then
+			return
+		end
+		if isFolderFn then
+			local okFolder, exists = pcall(isFolderFn, dir)
+			if not okFolder or exists ~= true then
+				return
+			end
+		else
+			return
+		end
 		local okList, entries = pcall(listFilesFn, dir)
 		if not okList or type(entries) ~= "table" then
 			return
@@ -450,6 +461,14 @@ local function purgeAlleralWorkspace(fullScan)
 			return
 		end
 		dir = dir:gsub("^/", ""):gsub("/$", "")
+		if isFolderFn then
+			local okFolder, exists = pcall(isFolderFn, dir)
+			if not okFolder or exists ~= true then
+				return
+			end
+		else
+			return
+		end
 		local okList, entries = pcall(listFilesFn, dir)
 		if not okList or type(entries) ~= "table" then
 			if deleteFolderFn then

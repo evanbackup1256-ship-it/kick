@@ -248,27 +248,12 @@ end
 local RunService = game:GetService("RunService")
 
 local function tryGameHttpGet(url)
-	local urls = { url .. "?t=" .. tostring(tick()), url }
-	for _, fetchUrl in ipairs(urls) do
-		if type(game.HttpGet) == "function" then
-			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
-			if type(body) == "string" and #body > 0 then
-				return body, "httpget"
-			end
-			ok, body = pcall(game.HttpGet, game, fetchUrl)
-			if type(body) == "string" and #body > 0 then
-				return body, "httpget"
-			end
-		end
-		local ok, body = pcall(function()
-			return game:HttpGet(fetchUrl, true)
-		end)
+	if type(game.HttpGet) == "function" then
+		local ok, body = pcall(game.HttpGet, game, url, true)
 		if ok and type(body) == "string" and #body > 0 then
 			return body, "httpget"
 		end
-		ok, body = pcall(function()
-			return game:HttpGet(fetchUrl)
-		end)
+		ok, body = pcall(game.HttpGet, game, url)
 		if ok and type(body) == "string" and #body > 0 then
 			return body, "httpget"
 		end
@@ -2555,6 +2540,11 @@ end
 
 local function wireTelemetry(profile)
 	if not ensureTelemetryLoaded() then
+		local configError = ENV._Alleral_TelemetryConfigurationError
+		if type(configError) == "string" and configError ~= "" and not ENV._Alleral_TelemetryConfigWarningShown then
+			ENV._Alleral_TelemetryConfigWarningShown = true
+			log("Telemetry disabled: " .. configError, true)
+		end
 		return
 	end
 	local telemetry = ENV.Alleral_Telemetry
@@ -3260,6 +3250,17 @@ local function forEachWorkspaceFile(callback, depthLimit)
 			return
 		end
 		dir = dir:gsub("^/", ""):gsub("/$", "")
+		if dir == "" or dir == "." then
+			return
+		end
+		if isFolderFn then
+			local okFolder, exists = pcall(isFolderFn, dir)
+			if not okFolder or exists ~= true then
+				return
+			end
+		else
+			return
+		end
 		local ok, entries = pcall(listFn, dir)
 		if not ok or type(entries) ~= "table" then
 			return
@@ -3286,9 +3287,6 @@ local function forEachWorkspaceFile(callback, depthLimit)
 		end
 	end
 
-	for _, root in ipairs({ "", ".", "workspace", "scripts" }) do
-		walk(root, 0)
-	end
 	for _, dir in ipairs(SCAN_DIRS) do
 		walk(dir, 0)
 	end
@@ -3388,6 +3386,14 @@ local function purgeDirectoryTree(dir, opts, removedCounter)
 		return
 	end
 	dir = dir:gsub("^/", ""):gsub("/$", "")
+	if isFolderFn then
+		local okFolder, exists = pcall(isFolderFn, dir)
+		if not okFolder or exists ~= true then
+			return
+		end
+	else
+		return
+	end
 	if not listFilesFn then
 		return
 	end
@@ -3635,6 +3641,7 @@ local function initRelaunchHooks()
 		BOOTSTRAP_LOADSTRING = BOOTSTRAP_LOADSTRING,
 		writeFileFn = writeFileFn,
 		makeFolderFn = makeFolderFn,
+		isFolderFn = isFolderFn,
 		game = game,
 	}
 	local commit = RELEASE_FALLBACK.commit or BRANCH

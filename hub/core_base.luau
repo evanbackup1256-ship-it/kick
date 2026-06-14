@@ -141,7 +141,15 @@ function Core.safeCall(scope, fn, ...)
 	if type(fn) ~= "function" then
 		return nil
 	end
-	local packed = table.pack(pcall(fn, ...))
+	local args = table.pack(...)
+	local packed = table.pack(xpcall(function()
+		return fn(table.unpack(args, 1, args.n))
+	end, function(err)
+		if debug and type(debug.traceback) == "function" then
+			return debug.traceback(tostring(err), 2)
+		end
+		return tostring(err)
+	end))
 	if packed[1] then
 		return table.unpack(packed, 2, packed.n)
 	end
@@ -186,6 +194,18 @@ end
 function Core.safeListFiles(path, listFiles)
 	listFiles = listFiles or Core.execFunction("listfiles")
 	if type(listFiles) ~= "function" then
+		return {}
+	end
+	path = tostring(path or ""):gsub("^/", ""):gsub("/$", "")
+	if path == "" then
+		return {}
+	end
+	local isFolder = Core.execFunction("isfolder")
+	if type(isFolder) ~= "function" then
+		return {}
+	end
+	local okFolder, exists = pcall(isFolder, path)
+	if not okFolder or exists ~= true then
 		return {}
 	end
 	local ok, files = pcall(listFiles, path)

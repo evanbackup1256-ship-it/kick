@@ -373,6 +373,29 @@ $legacyPatterns = @(
     'LOADER_VERSION = "4\.'
 )
 
+$secretPatterns = @(
+    'https://(?:discord(?:app)?\.com)/api/webhooks/\d+/[A-Za-z0-9_-]+',
+    '(?m)^\s*apiKey\s*=\s*"[^"\r\n]{24,}"'
+)
+
+foreach ($pattern in $secretPatterns)
+{
+    $matches = @()
+    git -C $root ls-files '*.luau' '*.lua' '*.json' | ForEach-Object {
+        $rel = $_
+        $full = Join-Path $root $rel
+        $text = Get-Content $full -Raw -ErrorAction SilentlyContinue
+        if ($text -and $text -match $pattern)
+        {
+            $matches += $rel
+        }
+    }
+    if ($matches.Count -gt 0)
+    {
+        Fail "committed client secret matched pattern $pattern in: $($matches -join ', ')"
+    }
+}
+
 foreach ($pattern in $legacyPatterns)
 {
     if ($loader -match $pattern)
