@@ -2452,6 +2452,7 @@ local top = window and sydeFindChild(window, "top", "Top")
 local tabsContainer = window and sydeFindChild(window, "tabs", "Tabs")
 local tabs = tabsContainer and sydeFindChild(tabsContainer, "tab", "Tab", "tb", "Tb")
 local pages = window and sydeFindChild(window, "pages", "Pages")
+local resize = window and sydeFindChild(window, "resize", "Resize")
 
 --
 
@@ -3024,7 +3025,9 @@ function openui()
 	end
 
 	tweenservice:Create(window.shadow.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.5 }):Play()
-	tweenservice:Create(window.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.3}):Play()
+	if resize then
+		tweenservice:Create(resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.3}):Play()
+	end
 
 	if glow == true then
 		for i, glow in pairs(window.clipframe:GetChildren()) do
@@ -3088,7 +3091,9 @@ function closeui()
 	tweenservice:Create(window.shadow.glow1, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
 
 	tweenservice:Create(window.shadow.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
-	tweenservice:Create(window.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
+	if resize then
+		tweenservice:Create(resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
+	end
 
 	closesettings()
 	closesearch()
@@ -3290,7 +3295,7 @@ function syde:Init(library)
 
 	--dragging
 	syde:AddDrag(top, window, true)
-	syde:MakeResizable(window.resize, window, Vector2.new(454, 228))
+	syde:MakeResizable(resize, window, Vector2.new(454, 228))
 
 	--initial transparency setup
 	if top:FindFirstChild("title") then
