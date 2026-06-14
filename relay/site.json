@@ -6,7 +6,7 @@
   "loaderVersion": "8.2.25",
   "coreVersion": "2.9.5",
   "uiLibrary": "Syde",
-  "uiVersion": "4.0.0-syde",
+  "uiVersion": "4.0.1-syde",
   "sydePatch": 34,
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=\" .. tick(), true))()",

@@ -1,7 +1,7 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "4.0.0-syde"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "4.0.1-syde"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Syde"
 
@@ -873,8 +873,12 @@ return function(Core)
 
 		-- Let the engine size the scroll canvas to the real content height so
 		-- groups can grow (descriptions, expanding sliders) without clipping.
-		page.CanvasSize = UDim2.new(0, 0, 0, 0)
-		page.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
+		-- AutomaticCanvasSize takes an Enum.AutomaticSize value; guard the whole
+		-- setup so an unsupported property can never break the group build.
+		pcall(function()
+			page.CanvasSize = UDim2.new(0, 0, 0, 0)
+			page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		end)
 
 		local row = Instance.new("Frame")
 		row.Name = "AlleralColumns"
