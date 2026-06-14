@@ -7,7 +7,7 @@
   "coreVersion": "2.9.5",
   "uiLibrary": "Syde",
   "uiVersion": "4.0.0-syde",
-  "sydePatch": 33,
+  "sydePatch": 34,
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",

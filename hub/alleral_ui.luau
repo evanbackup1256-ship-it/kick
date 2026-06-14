@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 33
+	local SYDE_PATCH_VERSION = 34
 	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
@@ -652,6 +652,7 @@ return function(Core)
 			selectParent()
 			local handle = sydeTab:Toggle({
 				Title = settings.Name,
+				Description = settings.Description or settings.Tooltip or "",
 				Value = settings.CurrentValue == true,
 				CallBack = settings.Callback or function() end,
 			})
@@ -677,7 +678,7 @@ return function(Core)
 			local increment = tonumber(settings.Increment) or Core.sliderIncrement(minValue, maxValue, settings.Increment)
 			local handle = sydeTab:Slider({
 				Title = settings.Name,
-				Description = settings.Description or "",
+				Description = settings.Description or settings.Tooltip or "",
 				Sliders = {
 					{
 						Title = settings.Name or "Value",
@@ -708,7 +709,7 @@ return function(Core)
 			local userCallback = settings.Callback or function() end
 			local handle = sydeTab:Button({
 				Title = settings.Name,
-				Description = settings.Description or "",
+				Description = settings.Description or settings.Tooltip or "",
 				CallBack = function()
 					userCallback()
 				end,
@@ -869,6 +870,11 @@ return function(Core)
 		if not page or not page:IsA("ScrollingFrame") then
 			return nil
 		end
+
+		-- Let the engine size the scroll canvas to the real content height so
+		-- groups can grow (descriptions, expanding sliders) without clipping.
+		page.CanvasSize = UDim2.new(0, 0, 0, 0)
+		page.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
 
 		local row = Instance.new("Frame")
 		row.Name = "AlleralColumns"

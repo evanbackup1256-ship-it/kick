@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 33
+local ALLERAL_SYDE_PATCH = 34
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -1701,90 +1701,88 @@ local function springTween(object, properties, config)
 	config = config or springPhysics.panel
 	local stiffness = config.stiffness
 	local damping = config.damping
-	
-	-- Cancel any existing spring tween for this object
-	if activeSpringTweens[object] then
-		activeSpringTweens[object] = false
-	end
-	
-	local initialProps = {}
-	for prop, _ in pairs(properties) do
-		initialProps[prop] = object[prop]
-	end
-	
-	local velocity = {}
-	for prop, _ in pairs(properties) do
-		velocity[prop] = 0
-	end
-	
-	local active = true
-	activeSpringTweens[object] = true
-	
-	local function update()
-		if not active then return end
-		
-		local allSettled = true
-		
-		for prop, targetValue in pairs(properties) do
-			local initial = initialProps[prop]
-			local current = object[prop]
-			local vel = velocity[prop]
-			
-			local diff, currentVal
-			if typeof(initial) == "UDim2" then
-				currentVal = current
-				diff = targetValue - current
-			elseif typeof(initial) == "number" then
-				currentVal = current
-				diff = targetValue - current
-			elseif typeof(initial) == "Color3" then
-				currentVal = current
-				diff = targetValue - current
-			else
-				continue
-			end
-			
-			-- Spring physics: acceleration = -stiffness * displacement - damping * velocity
-			local acceleration = -stiffness * diff - damping * vel
-			vel = vel + acceleration * 0.016
-			velocity[prop] = vel
-			
-			local newVal
-			if typeof(initial) == "UDim2" then
-				newVal = UDim2.new(
-					current.X.Scale + vel.X.Scale * 0.016,
-					current.X.Offset + vel.X.Offset * 0.016,
-					current.Y.Scale + vel.Y.Scale * 0.016,
-					current.Y.Offset + vel.Y.Offset * 0.016
-				)
-			elseif typeof(initial) == "number" then
-				newVal = current + vel * 0.016
-			elseif typeof(initial) == "Color3" then
-				newVal = Color3.new(
-					current.R + vel.R * 0.016,
-					current.G + vel.G * 0.016,
-					current.B + vel.B * 0.016
-				)
-			end
-			
-			object[prop] = newVal
-			
-			-- Check if settled
-			local settled = math.abs(vel) < 0.1 and math.abs(diff) < 0.1
-			if not settled then
-				allSettled = false
-			end
+	local dt = 1 / 60
+
+	-- Replacing any spring already animating this object stops the old loop.
+	local token = {}
+	activeSpringTweens[object] = token
+
+	-- Decompose each animated property into independent scalar components so the
+	-- integrator works uniformly for numbers, UDim2 and Color3 values.
+	local tracks = {}
+	for prop, target in pairs(properties) do
+		local current = object[prop]
+		local kind = typeof(current)
+		if kind == "UDim2" then
+			tracks[prop] = {
+				kind = kind,
+				value = { current.X.Scale, current.X.Offset, current.Y.Scale, current.Y.Offset },
+				goal = { target.X.Scale, target.X.Offset, target.Y.Scale, target.Y.Offset },
+				vel = { 0, 0, 0, 0 },
+			}
+		elseif kind == "Color3" then
+			tracks[prop] = {
+				kind = kind,
+				value = { current.R, current.G, current.B },
+				goal = { target.R, target.G, target.B },
+				vel = { 0, 0, 0 },
+			}
+		elseif kind == "number" then
+			tracks[prop] = {
+				kind = kind,
+				value = { current },
+				goal = { target },
+				vel = { 0 },
+			}
 		end
-		
-		if not allSettled then
-			task.wait(1/60)
-			update()
-		else
+	end
+
+	local function assemble(track)
+		if track.kind == "UDim2" then
+			return UDim2.new(track.value[1], track.value[2], track.value[3], track.value[4])
+		elseif track.kind == "Color3" then
+			return Color3.new(
+				math.clamp(track.value[1], 0, 1),
+				math.clamp(track.value[2], 0, 1),
+				math.clamp(track.value[3], 0, 1)
+			)
+		end
+		return track.value[1]
+	end
+
+	task.spawn(function()
+		while activeSpringTweens[object] == token do
+			local settled = true
+			for prop, track in pairs(tracks) do
+				local trackSettled = true
+				for i = 1, #track.value do
+					local displacement = track.value[i] - track.goal[i]
+					-- Spring acceleration: a = -stiffness * displacement - damping * velocity
+					local acceleration = -stiffness * displacement - damping * track.vel[i]
+					track.vel[i] = track.vel[i] + acceleration * dt
+					track.value[i] = track.value[i] + track.vel[i] * dt
+					if math.abs(track.vel[i]) > 0.05 or math.abs(displacement) > 0.05 then
+						trackSettled = false
+					end
+				end
+				if trackSettled then
+					for i = 1, #track.value do
+						track.value[i] = track.goal[i]
+					end
+				else
+					settled = false
+				end
+				object[prop] = assemble(track)
+			end
+			if settled then
+				break
+			end
+			task.wait(dt)
+		end
+		if activeSpringTweens[object] == token then
 			activeSpringTweens[object] = nil
 		end
-	end
-	
-	task.spawn(update)
+	end)
 end
 
 -- Real-time auto-scaler to prevent overlapping elements
