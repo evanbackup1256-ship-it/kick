@@ -1492,8 +1492,8 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			resizing = true
 			startPosition = getInputPos(input)
 			startSize = Object.AbsoluteSize
-			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 15,0, 15)}):Play()
-			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+			tweenservice:Create(Dragger, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 15,0, 15)}):Play()
+			tweenservice:Create(Dragger, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 		end
 	end
 
@@ -1531,8 +1531,8 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			isResizing = false
 			resizing = false
 			startPosition, startSize = nil, nil
-			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 20,0, 20)}):Play()
-			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(53, 53, 53)}):Play()
+			tweenservice:Create(Dragger, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 20,0, 20)}):Play()
+			tweenservice:Create(Dragger, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(53, 53, 53)}):Play()
 		end
 	end
 
@@ -7242,7 +7242,18 @@ function syde:Init(library)
 		local Tab = tabs.btn:Clone()
 		Tab.Visible = true
 		Tab.Parent = tabs
-		Tab.title.Text = tdata.Title
+		-- Add nice emojis/icons to tab labels for better visual identity
+		local emojiMap = {
+			["Kick"] = "👟 ",
+			["Plot"] = "🏠 ",
+			["Events"] = "🎉 ",
+			["Inventory"] = "🎒 ",
+			["Tools"] = "🔧 ",
+			["Settings"] = "⚙️ ",
+			["Configs"] = "📋 ",
+			["Home"] = "🏠 ",
+		}
+		Tab.title.Text = (emojiMap[tdata.Title] or "• ") .. tdata.Title
 		Tab.Name = tdata.Title
 
 		Tab.title.TextTransparency = 1
@@ -7365,10 +7376,11 @@ function syde:Init(library)
 		local function ApplyTabStyle(tabButton, isSelected)
 			local targetTextTransparency = isSelected and 0 or 0.6
 			local targetBackgroundTransparency = isSelected and 0 or 0.45
-			local targetTransparency = isSelected and 0 or 1
 			local targetColor = isSelected and syde.theme.Accent or Color3.fromRGB(29, 29, 29)
-			local targetSize = isSelected and UDim2.new(0, tabButton.title.TextBounds.X + 80,0, 35) or UDim2.new(0, tabButton.title.TextBounds.X + 50,0, 35)
-
+			-- Enhanced active/selected indicators: larger size + stronger glow when selected
+			local targetSize = isSelected 
+				and UDim2.new(0, tabButton.title.TextBounds.X + 95,0, 38) 
+				or UDim2.new(0, tabButton.title.TextBounds.X + 55,0, 34)
 
 			if isInit then
 				task.spawn(function()
@@ -7381,20 +7393,17 @@ function syde:Init(library)
 						end
 					end
 				end)
-
 			end
 
-
+			-- Smoother tab switching animations (Quart for size/position, Exponential for colors)
 			tweenservice:Create(tabButton, positionTweenInfo, { Size = targetSize }):Play()
-			tweenservice:Create(tabButton, colorTweenInfo, { BackgroundTransparency = targetBackgroundTransparency, }):Play()
+			tweenservice:Create(tabButton, colorTweenInfo, { BackgroundTransparency = targetBackgroundTransparency }):Play()
 			tweenservice:Create(tabButton.title, colorTweenInfo, { TextTransparency = targetTextTransparency }):Play()
 			tweenservice:Create(tabButton.indicator.glow, colorTweenInfo, { ImageColor3 = targetColor }):Play()
-			tweenservice:Create(tabButton.indicator.glow, colorTweenInfo, { ImageTransparency = isSelected and 0.78 or 1 }):Play()
+			tweenservice:Create(tabButton.indicator.glow, colorTweenInfo, { ImageTransparency = isSelected and 0.6 or 1 }):Play()  -- Stronger glow on active
 
 			tweenservice:Create(tabButton.indicator, colorTweenInfo, { BackgroundColor3 = targetColor }):Play()
 			tweenservice:Create(tabButton.indicator, colorTweenInfo, { BackgroundTransparency = isSelected and 0 or 1 }):Play()
-
-
 		end
 		ApplyTabStyle(Tab, isFirstTab)
 
@@ -7403,6 +7412,24 @@ function syde:Init(library)
 		else
 			ApplyTabStyle(Tab, isFirstTab)
 		end
+
+		-- === Enhanced Hover States for Sidebar/Tabs ===
+		Tab.interact.MouseEnter:Connect(function()
+			if tbdata.selectedTab == Tab then return end -- don't override active
+			tweenservice:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+				Size = UDim2.new(0, Tab.title.TextBounds.X + 75, 0, 37),
+				BackgroundTransparency = 0.25
+			}):Play()
+			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), {
+				ImageTransparency = 0.4,
+				ImageColor3 = syde.theme.Accent
+			}):Play()
+		end)
+
+		Tab.interact.MouseLeave:Connect(function()
+			if tbdata.selectedTab == Tab then return end
+			ApplyTabStyle(Tab, false) -- revert to normal inactive style
+		end)
 
 		local function ShowHome()
 			tbdata.homeActive = true
