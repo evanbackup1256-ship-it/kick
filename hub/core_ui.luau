@@ -618,7 +618,11 @@ local function refreshTabScrollCanvas(rawTab)
 	if not scroll or not scroll:IsA("ScrollingFrame") then
 		return
 	end
-	scroll.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
+	-- AutomaticCanvasSize takes an Enum.AutomaticSize value; guard it so an
+	-- unsupported property can never break the tab refresh.
+	pcall(function()
+		scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	end)
 	local columns = scroll:FindFirstChild("AlleralColumns")
 	if columns and columns:IsA("GuiObject") then
 		columns.Size = UDim2.new(1, 0, 0, 0)
