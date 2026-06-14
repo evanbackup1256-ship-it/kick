@@ -1689,57 +1689,98 @@ end
 
 -- Spring physics animation system (inspired by React Framer Motion)
 local springPhysics = {
-	snappy = {stiffness = 960, damping = 68, mass = 0.36},
-	soft = {stiffness = 560, damping = 60, mass = 0.475},
-	panel = {stiffness = 680, damping = 72, mass = 0.44},
-	layout = {stiffness = 760, damping = 76, mass = 0.45},
+	snappy = {stiffness = 400, damping = 25},
+	soft = {stiffness = 200, damping = 20},
+	panel = {stiffness = 300, damping = 25},
+	layout = {stiffness = 350, damping = 30},
 }
+
+local activeSpringTweens = {}
 
 local function springTween(object, properties, config)
 	config = config or springPhysics.panel
 	local stiffness = config.stiffness
 	local damping = config.damping
-	local mass = config.mass
+	
+	-- Cancel any existing spring tween for this object
+	if activeSpringTweens[object] then
+		activeSpringTweens[object] = false
+	end
 	
 	local initialProps = {}
 	for prop, _ in pairs(properties) do
 		initialProps[prop] = object[prop]
 	end
 	
-	local startTime = tick()
-	local duration = 0.3
+	local velocity = {}
+	for prop, _ in pairs(properties) do
+		velocity[prop] = 0
+	end
+	
+	local active = true
+	activeSpringTweens[object] = true
 	
 	local function update()
-		local elapsed = tick() - startTime
-		local progress = math.min(elapsed / duration, 1)
+		if not active then return end
 		
-		-- Spring physics simulation
-		local t = progress
-		local springT = 1 - math.exp(-stiffness * t / mass) * math.cos(damping * t / mass)
+		local allSettled = true
 		
 		for prop, targetValue in pairs(properties) do
 			local initial = initialProps[prop]
+			local current = object[prop]
+			local vel = velocity[prop]
+			
+			local diff, currentVal
 			if typeof(initial) == "UDim2" then
-				object[prop] = UDim2.new(
-					initial.X.Scale + (targetValue.X.Scale - initial.X.Scale) * springT,
-					initial.X.Offset + (targetValue.X.Offset - initial.X.Offset) * springT,
-					initial.Y.Scale + (targetValue.Y.Scale - initial.Y.Scale) * springT,
-					initial.Y.Offset + (targetValue.Y.Offset - initial.Y.Offset) * springT
+				currentVal = current
+				diff = targetValue - current
+			elseif typeof(initial) == "number" then
+				currentVal = current
+				diff = targetValue - current
+			elseif typeof(initial) == "Color3" then
+				currentVal = current
+				diff = targetValue - current
+			else
+				continue
+			end
+			
+			-- Spring physics: acceleration = -stiffness * displacement - damping * velocity
+			local acceleration = -stiffness * diff - damping * vel
+			vel = vel + acceleration * 0.016
+			velocity[prop] = vel
+			
+			local newVal
+			if typeof(initial) == "UDim2" then
+				newVal = UDim2.new(
+					current.X.Scale + vel.X.Scale * 0.016,
+					current.X.Offset + vel.X.Offset * 0.016,
+					current.Y.Scale + vel.Y.Scale * 0.016,
+					current.Y.Offset + vel.Y.Offset * 0.016
 				)
 			elseif typeof(initial) == "number" then
-				object[prop] = initial + (targetValue - initial) * springT
+				newVal = current + vel * 0.016
 			elseif typeof(initial) == "Color3" then
-				object[prop] = Color3.new(
-					initial.R + (targetValue.R - initial.R) * springT,
-					initial.G + (targetValue.G - initial.G) * springT,
-					initial.B + (targetValue.B - initial.B) * springT
+				newVal = Color3.new(
+					current.R + vel.R * 0.016,
+					current.G + vel.G * 0.016,
+					current.B + vel.B * 0.016
 				)
+			end
+			
+			object[prop] = newVal
+			
+			-- Check if settled
+			local settled = math.abs(vel) < 0.1 and math.abs(diff) < 0.1
+			if not settled then
+				allSettled = false
 			end
 		end
 		
-		if progress < 1 then
+		if not allSettled then
 			task.wait(1/60)
 			update()
+		else
+			activeSpringTweens[object] = nil
 		end
 	end
 	
