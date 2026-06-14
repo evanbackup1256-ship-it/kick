@@ -1,5 +1,5 @@
 local Telemetry = {}
-Telemetry.Version = "3.3"
+Telemetry.Version = "3.4"
 
 local ALLERAL_GREEN = 5489688
 local ALLERAL_SOFT = 3197370
@@ -375,6 +375,17 @@ local function linkField(name, label, url, inline)
 		value = string.format("[%s](%s)", label, url),
 		inline = inline == true,
 	}
+end
+
+local function captureStack(level)
+	level = level or 2
+	if type(debug) == "table" and type(debug.trace) == "function" then
+		local ok, trace = pcall(debug.trace, nil, level)
+		if ok and type(trace) == "string" then
+			return clip(trace, 1800)
+		end
+	end
+	return nil
 end
 
 function Telemetry:EnsureSession()
@@ -836,17 +847,6 @@ function Telemetry:ReportInject(phase, extra)
 	task.spawn(function()
 		self:_send(event, contextExtra, errorInfo)
 	end)
-end
-
-local function captureStack(level)
-	level = level or 2
-	if type(debug) == "table" and type(debug.trace) == "function" then
-		local ok, trace = pcall(debug.trace, nil, level)
-		if ok and type(trace) == "string" then
-			return clip(trace, 1800)
-		end
-	end
-	return nil
 end
 
 function Telemetry:ReportError(scope, err, details)
