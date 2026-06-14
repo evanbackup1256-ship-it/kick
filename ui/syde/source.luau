@@ -1687,6 +1687,65 @@ function syde:updateLayout(container, spacing)
 	container.CanvasSize = UDim2.new(0, 0, 0, yOffset)
 end
 
+-- Spring physics animation system (inspired by React Framer Motion)
+local springPhysics = {
+	snappy = {stiffness = 960, damping = 68, mass = 0.36},
+	soft = {stiffness = 560, damping = 60, mass = 0.475},
+	panel = {stiffness = 680, damping = 72, mass = 0.44},
+	layout = {stiffness = 760, damping = 76, mass = 0.45},
+}
+
+local function springTween(object, properties, config)
+	config = config or springPhysics.panel
+	local stiffness = config.stiffness
+	local damping = config.damping
+	local mass = config.mass
+	
+	local initialProps = {}
+	for prop, _ in pairs(properties) do
+		initialProps[prop] = object[prop]
+	end
+	
+	local startTime = tick()
+	local duration = 0.3
+	
+	local function update()
+		local elapsed = tick() - startTime
+		local progress = math.min(elapsed / duration, 1)
+		
+		-- Spring physics simulation
+		local t = progress
+		local springT = 1 - math.exp(-stiffness * t / mass) * math.cos(damping * t / mass)
+		
+		for prop, targetValue in pairs(properties) do
+			local initial = initialProps[prop]
+			if typeof(initial) == "UDim2" then
+				object[prop] = UDim2.new(
+					initial.X.Scale + (targetValue.X.Scale - initial.X.Scale) * springT,
+					initial.X.Offset + (targetValue.X.Offset - initial.X.Offset) * springT,
+					initial.Y.Scale + (targetValue.Y.Scale - initial.Y.Scale) * springT,
+					initial.Y.Offset + (targetValue.Y.Offset - initial.Y.Offset) * springT
+				)
+			elseif typeof(initial) == "number" then
+				object[prop] = initial + (targetValue - initial) * springT
+			elseif typeof(initial) == "Color3" then
+				object[prop] = Color3.new(
+					initial.R + (targetValue.R - initial.R) * springT,
+					initial.G + (targetValue.G - initial.G) * springT,
+					initial.B + (targetValue.B - initial.B) * springT
+				)
+			end
+		end
+		
+		if progress < 1 then
+			task.wait(1/60)
+			update()
+		end
+	end
+	
+	task.spawn(update)
+end
+
 -- Real-time auto-scaler to prevent overlapping elements
 local autoScaleEnabled = true
 local autoScaleConnections = {}
@@ -1701,7 +1760,7 @@ function syde:enableAutoScale(container)
 		if not autoScaleEnabled then return end
 		if autoScaleDebounce[container] then return end
 		autoScaleDebounce[container] = true
-		task.delay(0.05, function() autoScaleDebounce[container] = false end)
+		task.delay(0.03, function() autoScaleDebounce[container] = false end)
 		
 		local children = {}
 		for _, child in ipairs(container:GetChildren()) do
@@ -1712,7 +1771,10 @@ function syde:enableAutoScale(container)
 		
 		local yOffset = 0
 		for i, child in ipairs(children) do
-			child.Position = UDim2.new(0, 5, 0, yOffset)
+			local targetPos = UDim2.new(0, 5, 0, yOffset)
+			if child.Position ~= targetPos then
+				springTween(child, {Position = targetPos}, springPhysics.layout)
+			end
 			yOffset = yOffset + child.AbsoluteSize.Y + 5
 		end
 		
@@ -2961,60 +3023,62 @@ function openui()
 		})
 		tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.45 }):Play()
 	else
-		tweenservice:Create(window, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 0 }):Play()
+		springTween(window, {BackgroundTransparency = 0}, springPhysics.panel)
 	end
 	
 	local viewport = game:GetService("GuiService"):GetViewportSize()
 	local uiWidth = math.min(700, viewport.X * 0.9)
 	local uiHeight = math.min(560, viewport.Y * 0.85)
-	tweenservice:Create(window, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, uiWidth, 0, uiHeight)}):Play()
+	springTween(window, {Size = UDim2.new(0, uiWidth, 0, uiHeight)}, springPhysics.panel)
 
-	tweenservice:Create(window.top.separator, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 0 }):Play()
+	springTween(window.top.separator, {BackgroundTransparency = 0}, springPhysics.panel)
 	if window.top:FindFirstChild("title") then
-		tweenservice:Create(window.top.title, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {TextTransparency = 0 }):Play()
+		springTween(window.top.title, {TextTransparency = 0}, springPhysics.panel)
 		if window.top.title:FindFirstChild("sub") then
-			tweenservice:Create(window.top.title.sub, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {TextTransparency = 0 }):Play()
+			springTween(window.top.title.sub, {TextTransparency = 0}, springPhysics.panel)
 		end
 	end
 
-	tweenservice:Create(window.top.functions, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 0 }):Play()
+	springTween(window.top.functions, {BackgroundTransparency = 0}, springPhysics.panel)
 
 	if window.wallpaper.ison.Value  then
-		tweenservice:Create(window.wallpaper, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {ImageTransparency = 0.84 }):Play()
+		springTween(window.wallpaper, {ImageTransparency = 0.84}, springPhysics.panel)
 	end
 
-
+	local staggerDelay = 0
 	for i,v in pairs(window.top.functions:GetChildren()) do
 		if v:IsA("Frame") then
-			tweenservice:Create(v, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 0.8 }):Play()
-			v.Visible = true
-			for i,v2 in pairs(v:GetChildren()) do
-				if v2:IsA("ImageLabel") then
-					tweenservice:Create(v2, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {ImageTransparency = 0 }):Play()
-					v2.Visible = true
+			task.delay(staggerDelay, function()
+				springTween(v, {BackgroundTransparency = 0.8}, springPhysics.panel)
+				v.Visible = true
+				for i,v2 in pairs(v:GetChildren()) do
+					if v2:IsA("ImageLabel") then
+						springTween(v2, {ImageTransparency = 0}, springPhysics.panel)
+						v2.Visible = true
+					end
 				end
-			end
-			if v:FindFirstChild("rainbow") then
-				tweenservice:Create(v.rainbow, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {ImageTransparency = 1 }):Play()
-			end
-
+				if v:FindFirstChild("rainbow") then
+					springTween(v.rainbow, {ImageTransparency = 1}, springPhysics.panel)
+				end
+			end)
+			staggerDelay = staggerDelay + 0.02
 		end
 	end
 
-	tweenservice:Create(window.shadow.ImageLabel, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {ImageTransparency = 0.5 }):Play()
+	springTween(window.shadow.ImageLabel, {ImageTransparency = 0.5}, springPhysics.panel)
 	if resize then
-		tweenservice:Create(resize, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {ImageTransparency = 0.3}):Play()
+		springTween(resize, {ImageTransparency = 0.3}, springPhysics.panel)
 	end
 
 	if glow == true then
 		for i, glow in pairs(window.clipframe:GetChildren()) do
 			if glow:IsA("ImageLabel") then
-				tweenservice:Create(glow, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out),{ImageTransparency = 0.8}):Play()
+				springTween(glow, {ImageTransparency = 0.8}, springPhysics.panel)
 			end
 		end
 
-		tweenservice:Create(window.shadow.glow, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out),{ImageTransparency = 0.9}):Play()
-		tweenservice:Create(window.shadow.glow1, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out),{ImageTransparency = 0.9}):Play()
+		springTween(window.shadow.glow, {ImageTransparency = 0.9}, springPhysics.panel)
+		springTween(window.shadow.glow1, {ImageTransparency = 0.9}, springPhysics.panel)
 	end
 
 
@@ -3025,51 +3089,55 @@ function closeui()
 	window.tabs.Visible = false
 	window.user.Visible = false
 
-	tweenservice:Create(window, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {BackgroundTransparency = 1 }):Play()
-	tweenservice:Create(window, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 200) }):Play()
+	springTween(window, {BackgroundTransparency = 1}, springPhysics.snappy)
+	springTween(window, {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 200)}, springPhysics.snappy)
 
-	tweenservice:Create(window.top.separator, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {BackgroundTransparency = 1 }):Play()
+	springTween(window.top.separator, {BackgroundTransparency = 1}, springPhysics.snappy)
 	if window.top:FindFirstChild("title") then
-		tweenservice:Create(window.top.title, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {TextTransparency = 1 }):Play()
+		springTween(window.top.title, {TextTransparency = 1}, springPhysics.snappy)
 		if window.top.title:FindFirstChild("sub") then
-			tweenservice:Create(window.top.title.sub, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {TextTransparency = 1 }):Play()
+			springTween(window.top.title.sub, {TextTransparency = 1}, springPhysics.snappy)
 		end
 	end
 
 	if window.wallpaper.ison.Value  then
-		tweenservice:Create(window.wallpaper, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {ImageTransparency = 1 }):Play()
+		springTween(window.wallpaper, {ImageTransparency = 1}, springPhysics.snappy)
 	end
 
 
 	syde:UnbindFrame(window)
 
 
-	tweenservice:Create(window.top.functions, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {BackgroundTransparency = 1 }):Play()
+	springTween(window.top.functions, {BackgroundTransparency = 1}, springPhysics.snappy)
+	local staggerDelay = 0
 	for i,v in pairs(window.top.functions:GetChildren()) do
 		if v:IsA("Frame") then
-			tweenservice:Create(v, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {BackgroundTransparency = 1 }):Play()
-			v.Visible = false
-			for i,v2 in pairs(v:GetChildren()) do
-				if v2:IsA("ImageLabel") then
-					tweenservice:Create(v2, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {ImageTransparency = 1 }):Play()
-					v2.Visible = false
+			task.delay(staggerDelay, function()
+				springTween(v, {BackgroundTransparency = 1}, springPhysics.snappy)
+				v.Visible = false
+				for i,v2 in pairs(v:GetChildren()) do
+					if v2:IsA("ImageLabel") then
+						springTween(v2, {ImageTransparency = 1}, springPhysics.snappy)
+						v2.Visible = false
+					end
 				end
-			end
+			end)
+			staggerDelay = staggerDelay + 0.015
 		end
 	end
 
 	for i, glow in pairs(window.clipframe:GetChildren()) do
 		if glow:IsA("ImageLabel") then
-			tweenservice:Create(glow, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In),{ImageTransparency = 1}):Play()
+			springTween(glow, {ImageTransparency = 1}, springPhysics.snappy)
 		end
 	end
 
-	tweenservice:Create(window.shadow.glow, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In),{ImageTransparency = 1}):Play()
-	tweenservice:Create(window.shadow.glow1, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In),{ImageTransparency = 1}):Play()
+	springTween(window.shadow.glow, {ImageTransparency = 1}, springPhysics.snappy)
+	springTween(window.shadow.glow1, {ImageTransparency = 1}, springPhysics.snappy)
 
-	tweenservice:Create(window.shadow.ImageLabel, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {ImageTransparency = 1 }):Play()
+	springTween(window.shadow.ImageLabel, {ImageTransparency = 1}, springPhysics.snappy)
 	if resize then
-		tweenservice:Create(resize, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {ImageTransparency = 1 }):Play()
+		springTween(resize, {ImageTransparency = 1}, springPhysics.snappy)
 	end
 
 	closesettings()
