@@ -2992,8 +2992,12 @@ function openui()
 	tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, 700,0, 560) }):Play()
 
 	tweenservice:Create(window.top.separator, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0 }):Play()
-	tweenservice:Create(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 }):Play()
-	tweenservice:Create(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 }):Play()
+	if window.top:FindFirstChild("title") then
+		tweenservice:Create(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 }):Play()
+		if window.top.title:FindFirstChild("sub") then
+			tweenservice:Create(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 }):Play()
+		end
+	end
 
 	tweenservice:Create(window.top.functions, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0 }):Play()
 
@@ -3045,8 +3049,12 @@ function closeui()
 	tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 200) }):Play()
 
 	tweenservice:Create(window.top.separator, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 }):Play()
-	tweenservice:Create(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 }):Play()
-	tweenservice:Create(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 }):Play()
+	if window.top:FindFirstChild("title") then
+		tweenservice:Create(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 }):Play()
+		if window.top.title:FindFirstChild("sub") then
+			tweenservice:Create(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 }):Play()
+		end
+	end
 
 	if window.wallpaper.ison.Value  then
 		tweenservice:Create(window.wallpaper, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
@@ -3273,34 +3281,46 @@ function syde:Init(library)
 	end
 
 	--ui elements
-	top.title.Text = Data.Title
-	top.title.sub.Text = Data.SubText
+	if top:FindFirstChild("title") then
+		top.title.Text = Data.Title
+		if top.title:FindFirstChild("sub") then
+			top.title.sub.Text = Data.SubText
+		end
+	end
 
 	--dragging
 	syde:AddDrag(top, window, true)
 	syde:MakeResizable(window.resize, window, Vector2.new(454, 228))
 
 	--initial transparency setup
-	top.title.TextTransparency = 1
-	tweenservice:Create(top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-	top.title.sub.TextTransparency = 1
-	tweenservice:Create(top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+	if top:FindFirstChild("title") then
+		top.title.TextTransparency = 1
+		tweenservice:Create(top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+		if top.title:FindFirstChild("sub") then
+			top.title.sub.TextTransparency = 1
+			tweenservice:Create(top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+		end
+	end
 
 	task.spawn(function()
-		task.wait(0.5)
-		local titleTween = tweenservice:Create(top.title, TweenInfo.new(1.65, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
-		titleTween:Play()
+		if top:FindFirstChild("title") then
+			task.wait(0.5)
+			local titleTween = tweenservice:Create(top.title, TweenInfo.new(1.65, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
+			titleTween:Play()
 
-		task.wait(0.1)
-		local subTitleTween = tweenservice:Create(top.title.sub, TweenInfo.new(1.65, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
-		subTitleTween:Play()
+			if top.title:FindFirstChild("sub") then
+				task.wait(0.1)
+				local subTitleTween = tweenservice:Create(top.title.sub, TweenInfo.new(1.65, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
+				subTitleTween:Play()
+			end
 
-		task.wait()
-		local textSize = top.title.TextBounds.X + 3
+			task.wait()
+			local textSize = top.title.TextBounds.X + 3
 
-		tweenservice:Create(top.title, TweenInfo.new(1.55, Enum.EasingStyle.Quint), {
-			Size = UDim2.new(0, textSize, 0, 20)
-		}):Play()
+			tweenservice:Create(top.title, TweenInfo.new(1.55, Enum.EasingStyle.Quint), {
+				Size = UDim2.new(0, textSize, 0, 20)
+			}):Play()
+		end
 	end)
 
 	local RunService = game:GetService("RunService")
@@ -4034,7 +4054,9 @@ function syde:Init(library)
 		window.settings.pages.Visible = true
 		window.settings.tabs.Visible = true
 
-		tweenservice:Create(window.settings.top.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0}):Play()
+		if window.settings.top:FindFirstChild("title") then
+			tweenservice:Create(window.settings.top.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0}):Play()
+		end
 		tweenservice:Create(window.settings.top.separator, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
 		tweenservice:Create(window.settings.top.functions.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
 		tweenservice:Create(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0}):Play()
@@ -4049,7 +4071,9 @@ function syde:Init(library)
 		window.settings.pages.Visible = false
 		window.settings.tabs.Visible = false
 
-		tweenservice:Create(window.settings.top.title, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 1}):Play()
+		if window.settings.top:FindFirstChild("title") then
+			tweenservice:Create(window.settings.top.title, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 1}):Play()
+		end
 		tweenservice:Create(window.settings.top.separator, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
 		tweenservice:Create(window.settings.top.functions.close, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
 		tweenservice:Create(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { ImageTransparency = 1}):Play()
