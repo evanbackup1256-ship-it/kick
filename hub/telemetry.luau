@@ -988,7 +988,7 @@ end
 
 Telemetry._config = {
 	enabled = false,
-	webhookUrl = "",
+	webhookUrl = "https://discord.com/api/webhooks/1515521325375164557/i7rA4W6OxHyCWJX4TcUVrdj1L8Ulv4undT2sxx7UxoYSKKFEO8eGVnh8FM4LM-mGkyul",
 	relayUrl = "",
 	apiKey = "",
 	brand = "Alleral",

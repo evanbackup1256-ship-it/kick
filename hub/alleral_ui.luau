@@ -10,12 +10,11 @@ return function(Core)
 		"ui/syde/source.luau",
 		".alleral/cache/ui/syde/source.luau",
 		"kick/ui/syde/source.luau",
-		"kick/kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
 	local SYDE_PATCH_VERSION = 28
 	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
-	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
+	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
 			"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/syde/source.luau",
 		}

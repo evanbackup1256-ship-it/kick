@@ -54,7 +54,6 @@ local RELEASE_FALLBACK = {
 local WORKSPACE_ROOTS = {
 	"",
 	"kick/",
-	"kick/kick/",
 	"workspace/",
 	"scripts/",
 	"autoexec/",
@@ -66,14 +65,12 @@ local INSTALL_MANIFEST = ".alleral/versions.json"
 local LOADER_LOCAL_PATHS = {
 	"loader.luau",
 	"kick/loader.luau",
-	"kick/kick/loader.luau",
 	"Alleral/loader.luau",
 }
 local BOOTSTRAP_REMOTE_PATH = HUB .. "/bootstrap.luau"
 local BOOTSTRAP_LOCAL_PATHS = {
 	HUB .. "/bootstrap.luau",
 	"kick/" .. HUB .. "/bootstrap.luau",
-	"kick/kick/" .. HUB .. "/bootstrap.luau",
 	"alleral_bootstrap.luau",
 }
 local BOOTSTRAP_LOADSTRING =
@@ -112,7 +109,6 @@ local SCAN_DIRS = {
 	"workspace",
 	"scripts",
 	"kick",
-	"kick/kick",
 }
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
@@ -1027,7 +1023,6 @@ local function ensureSydeSource()
 	local localPaths = {
 		SYDE_SOURCE_PATH,
 		"kick/" .. SYDE_SOURCE_PATH,
-		"kick/kick/" .. SYDE_SOURCE_PATH,
 	}
 	local cachePaths = {
 		".alleral/cache/" .. SYDE_SOURCE_PATH,
@@ -3077,7 +3072,6 @@ local function buildManagedFiles()
 			paths = {
 				"loader.luau",
 				"kick/loader.luau",
-				"kick/kick/loader.luau",
 				"workspace/loader.luau",
 				"autoexec/loader.luau",
 				"Autoexec/loader.luau",
@@ -3100,7 +3094,6 @@ local function buildManagedFiles()
 			paths = {
 				"load.luau",
 				"kick/load.luau",
-				"kick/kick/load.luau",
 				"launch.luau",
 				"run.luau",
 				"autoexec/load.luau",

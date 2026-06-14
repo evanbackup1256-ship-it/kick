@@ -185,8 +185,8 @@ local function buildLoaderUrls(meta)
 	}
 end
 
-local PURGE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/", "autoexec/", "Autoexec/" }
-local SCAN_DIRS = { "", "autoexec", "Autoexec", "autoexecute", "AutoExecute", "workspace", "scripts", "kick", "kick/kick" }
+local PURGE_ROOTS = { "", "kick/", "workspace/", "scripts/", "autoexec/", "Autoexec/" }
+local SCAN_DIRS = { "", "autoexec", "Autoexec", "autoexecute", "AutoExecute", "workspace", "scripts", "kick" }
 local LEGACY_LOADER_MARKERS = {
 	"[Alleral Loader v",
 	"Alleral loader 3.",
@@ -212,7 +212,6 @@ local LEGACY_ENTRY_NAMES = {
 local PURGE_PATHS = {
 	"loader.luau",
 	"kick/loader.luau",
-	"kick/kick/loader.luau",
 	"Alleral/loader.luau",
 	"hub/bootstrap.luau",
 	"hub/loader_relaunch.luau",

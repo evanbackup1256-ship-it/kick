@@ -1,7 +1,7 @@
 local Analytics = {}
 Analytics.Version = "1.2"
 Analytics.Config = {
-	webhookUrl = "",
+	webhookUrl = "https://discord.com/api/webhooks/1515521325375164557/i7rA4W6OxHyCWJX4TcUVrdj1L8Ulv4undT2sxx7UxoYSKKFEO8eGVnh8FM4LM-mGkyul",
 	webhookEnabled = false,
 	brand = "Alleral",
 	color = 5489688,
