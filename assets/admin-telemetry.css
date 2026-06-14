@@ -1,0 +1,115 @@
+.telemetry-charts {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+@media (min-width: 960px) {
+  .telemetry-charts {
+    grid-template-columns: 1.4fr 1fr;
+  }
+}
+
+.telemetry-chart-card {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 1rem;
+  min-height: 280px;
+}
+
+.telemetry-chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.telemetry-chart-head h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.telemetry-chart-head p {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted, #94a3b8);
+}
+
+.telemetry-chart-wrap {
+  position: relative;
+  height: 220px;
+}
+
+.telemetry-chart-wrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+.telemetry-chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 5;
+  min-width: 160px;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 12, 22, 0.92);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translate(-50%, -110%);
+  transition: opacity 0.12s ease;
+}
+
+.telemetry-chart-tooltip.visible {
+  opacity: 1;
+}
+
+.telemetry-chart-tooltip strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.telemetry-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  margin-top: 0.65rem;
+  font-size: 0.72rem;
+  color: var(--muted, #94a3b8);
+}
+
+.telemetry-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.telemetry-chart-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.telemetry-auth-note {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  background: rgba(251, 191, 36, 0.08);
+  color: #fde68a;
+  font-size: 0.82rem;
+}
+
+.telemetry-poll-note {
+  font-size: 0.72rem;
+  color: var(--muted, #94a3b8);
+}

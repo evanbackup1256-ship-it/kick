@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alleral Admin</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232997ff'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='18' fill='white' font-family='sans-serif'%3EA%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/style.css" />
+  <link rel="stylesheet" href="/assets/animations.css" />
+  <link rel="stylesheet" href="/assets/admin.css" />
+  <link rel="stylesheet" href="/assets/admin-telemetry.css" />
+  <script src="/assets/config.js"></script>
+</head>
+<body class="admin-page">
+  <div class="aurora" aria-hidden="true"></div>
+  <header class="nav-shell admin-nav">
+    <nav class="nav-bar wrap">
+      <a class="nav-logo" href="/admin">Alleral Admin</a>
+      <div class="nav-links">
+        <a href="/">Public Site</a>
+        <a href="/health" target="_blank" rel="noopener">Health</a>
+        <a href="/api/v1/bans/docs" target="_blank" rel="noopener">Ban API Docs</a>
+      </div>
+      <div class="nav-actions">
+        <span id="adminStatus" class="status-pill"><span class="status-dot"></span>Ready</span>
+        <button id="signOutAdmin" class="btn btn-outline btn-sm hidden" type="button">Sign Out</button>
+      </div>
+    </nav>
+  </header>
+
+  <main class="admin-main wrap">
+    <header class="admin-hero reveal visible">
+      <p class="section-label">Control Panel</p>
+      <h1>Hub Administration</h1>
+      <p class="section-desc admin-desc">Manage scripts, Roblox bans, and public site content.</p>
+    </header>
+
+    <div class="panel admin-key-panel reveal visible">
+      <p class="auto-banner">Status, versions, and site content are <strong>100% auto-managed</strong> — synced from GitHub every 30s and scored from live player telemetry. No manual updates needed.</p>
+      <form class="form admin-key-form" onsubmit="return false">
+        <label>Admin API Key
+          <input id="adminKey" class="field-input" type="password" placeholder="ADMIN_API_KEY from Railway" autocomplete="off" />
+        </label>
+        <div class="admin-key-actions">
+          <button id="saveKey" class="btn btn-outline" type="button">Remember Key</button>
+          <button id="signInAdmin" class="btn btn-fill" type="button">Sign In</button>
+          <button id="reload" class="btn btn-outline" type="button">Reload Tab</button>
+        </div>
+      </form>
+      <label class="checkbox-label"><input id="rememberAdmin" type="checkbox" checked /> Stay signed in on this device (365 days)</label>
+      <div class="admin-session-bar">
+        <div class="admin-session-meta">
+          <span>Session:</span>
+          <strong id="sessionLabel">Not signed in</strong>
+          <span id="sessionExpiry" class="muted-inline"></span>
+        </div>
+        <div class="admin-auth-actions">
+          <button id="refreshSession" class="btn btn-outline btn-sm hidden" type="button">Refresh Session</button>
+        </div>
+      </div>
+      <div id="error" class="form-error"></div>
+    </div>
+
+    <div class="support-tabs admin-tabs reveal visible">
+      <button class="active" data-tab="scripts" type="button">Scripts</button>
+      <button data-tab="bans" type="button">Ban API</button>
+      <button data-tab="stats" type="button">Stats</button>
+      <button data-tab="site" type="button">Site Content</button>
+    </div>
+
+    <section data-tab-panel="scripts" class="admin-panel tab-panel-enter">
+      <div id="scriptsGrid" class="admin-grid"></div>
+    </section>
+
+    <section data-tab-panel="bans" class="admin-panel hidden">
+      <div class="admin-ban-subtabs">
+        <button type="button" class="active" data-ban-subtab="manage">Manage bans</button>
+        <button type="button" data-ban-subtab="partner">Partner API v1</button>
+      </div>
+
+      <div data-ban-subpanel="manage">
+      <div id="playerPreview" class="player-preview hidden" aria-live="polite">
+        <img id="playerPreviewAvatar" src="" alt="" width="56" height="56" />
+        <div class="player-preview-meta">
+          <h4 id="playerPreviewName">Player</h4>
+          <p id="playerPreviewMeta">@username · UserId</p>
+        </div>
+        <div class="player-preview-actions">
+          <a id="playerPreviewProfile" class="btn btn-outline btn-sm" href="#" target="_blank" rel="noopener">Open Profile</a>
+          <button id="playerPreviewCopyId" class="btn btn-outline btn-sm" type="button">Copy UserId</button>
+          <button id="playerPreviewClear" class="btn btn-outline btn-sm" type="button">Clear</button>
+        </div>
+      </div>
+
+      <div class="admin-split">
+        <div class="panel admin-card">
+          <h3>Ban Roblox Player</h3>
+          <p class="admin-card-lead">Start typing a username — matching players appear in a dropdown. Select one to auto-fill UserId.</p>
+          <form class="form" onsubmit="return false">
+            <label class="player-lookup">Roblox Username
+              <input id="robloxUsername" class="field-input" placeholder="Search username…" autocomplete="off" spellcheck="false" />
+              <div id="playerLookupDropdown" class="player-lookup-dropdown hidden" role="listbox" aria-label="Player search results"></div>
+            </label>
+            <label>Roblox UserId <span class="muted-inline">optional</span><input id="robloxUserId" class="field-input" placeholder="123456789" inputmode="numeric" /></label>
+            <div class="form-row">
+              <label>HWID<input id="robloxHwid" class="field-input" placeholder="Optional HWID" /></label>
+              <label>Fingerprint<input id="robloxFingerprint" class="field-input" placeholder="Optional fingerprint" /></label>
+            </div>
+            <label>Reason</label>
+            <div class="admin-quick-reasons">
+              <button type="button" data-reason="Exploiting / cheating">Exploiting</button>
+              <button type="button" data-reason="Harassment / toxicity">Harassment</button>
+              <button type="button" data-reason="Ban evasion">Ban evasion</button>
+              <button type="button" data-reason="Abuse of hub systems">Hub abuse</button>
+            </div>
+            <textarea id="robloxReason" class="field-textarea" placeholder="Why is this player banned?"></textarea>
+            <label class="checkbox-label"><input id="robloxCascade" type="checkbox" checked /> Cascade ban across UserId, username, and hardware identifiers</label>
+            <button id="banRobloxPlayer" class="btn btn-fill" type="button">Ban Player</button>
+          </form>
+        </div>
+
+        <div class="panel admin-card">
+          <h3>Manual Ban Entry</h3>
+          <form class="form" onsubmit="return false">
+            <label>Type
+              <div class="select-wrap">
+                <select id="banType" class="field-select">
+                  <option value="userid">Roblox UserId</option>
+                  <option value="username">Roblox Username</option>
+                  <option value="hwid">HWID</option>
+                  <option value="fingerprint">Fingerprint</option>
+                  <option value="ip">IP Address</option>
+                  <option value="executor">Executor</option>
+                </select>
+              </div>
+            </label>
+            <label>Value<input id="banValue" class="field-input" placeholder="UserId, username, HWID, IP…" /></label>
+            <label>Player Label<input id="banPlayer" class="field-input" placeholder="Display name for admin list" /></label>
+            <label>Reason<textarea id="banReason" class="field-textarea" placeholder="Ban reason"></textarea></label>
+            <button id="addBan" class="btn btn-outline" type="button">Add Ban</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="admin-ban-toolbar">
+        <p id="banCountLabel" class="admin-ban-count">Active bans: <strong>—</strong></p>
+        <div id="banTypeFilters" class="admin-filter-row">
+          <button class="admin-filter-chip active" data-ban-filter="all" type="button">All</button>
+          <button class="admin-filter-chip" data-ban-filter="userid" type="button">UserId</button>
+          <button class="admin-filter-chip" data-ban-filter="username" type="button">Username</button>
+          <button class="admin-filter-chip" data-ban-filter="hwid" type="button">HWID</button>
+          <button class="admin-filter-chip" data-ban-filter="fingerprint" type="button">Fingerprint</button>
+          <button class="admin-filter-chip" data-ban-filter="ip" type="button">IP</button>
+          <button class="admin-filter-chip" data-ban-filter="executor" type="button">Executor</button>
+        </div>
+      </div>
+
+      <div class="panel admin-card admin-search-card">
+        <label>Search Bans<input id="banSearch" class="field-input" placeholder="Search by value, username, reason…" autocomplete="off" /></label>
+      </div>
+      <div id="bansGrid" class="admin-grid"></div>
+      </div>
+
+      <div data-ban-subpanel="partner" class="hidden">
+        <div class="panel admin-card admin-partner-intro">
+          <h3>Third-Party Ban API v1</h3>
+          <p class="admin-card-lead">REST endpoints for partners to check and manage Alleral bans. Your admin session can call authenticated routes — no separate partner key required in this panel.</p>
+          <p class="admin-card-lead muted-inline">Partner keys auto-provision on first boot. Copy yours below after sign-in, or set <code>BAN_PARTNER_API_KEY</code> to override. Docs: <a id="partnerDocsLink" href="/api/v1/bans/docs" target="_blank" rel="noopener">/api/v1/bans/docs</a></p>
+          <div id="partnerKeyRow" class="admin-partner-key hidden">
+            <form class="admin-partner-key-form" autocomplete="off" onsubmit="return false">
+              <label>Partner API Key
+                <div class="admin-partner-key-row">
+                  <input id="partnerApiKey" class="field-input field-mono" type="text" readonly autocomplete="off" spellcheck="false" />
+                  <button id="partnerRevealKey" class="btn btn-outline btn-sm" type="button">Show</button>
+                  <button id="partnerCopyKey" class="btn btn-outline btn-sm" type="button">Copy</button>
+                </div>
+              </label>
+            </form>
+          </div>
+          <div class="admin-partner-actions">
+            <button id="partnerCopyDocs" class="btn btn-outline btn-sm" type="button">Copy docs URL</button>
+            <button id="partnerReloadDocs" class="btn btn-outline btn-sm" type="button">Reload docs</button>
+          </div>
+        </div>
+
+        <div id="partnerBanApiStatus" class="ban-api-stats"></div>
+
+        <div class="ban-api-grid admin-ban-api-grid">
+          <div class="panel admin-card">
+            <div class="ban-api-panel-head">
+              <h3>Endpoints</h3>
+            </div>
+            <div id="partnerBanApiEndpoints" class="ban-api-endpoints"></div>
+          </div>
+
+          <div class="panel admin-card">
+            <h3>Live ban check</h3>
+            <p class="admin-card-lead">Uses your signed-in admin token. External apps should send <code>X-Ban-Api-Key</code> instead.</p>
+            <form class="form ban-api-test-form" onsubmit="return false">
+              <label>Roblox UserId<input id="partnerBanUserId" class="field-input" placeholder="123456789" inputmode="numeric" /></label>
+              <label>Roblox Username<input id="partnerBanUsername" class="field-input" placeholder="Optional username" autocomplete="off" /></label>
+              <button id="partnerBanTestBtn" class="btn btn-fill" type="button">Run check</button>
+            </form>
+            <pre id="partnerBanTestResult" class="ban-api-result">Results appear here.</pre>
+            <h4 class="ban-api-subhead">Example request body</h4>
+            <pre id="partnerBanApiExample" class="ban-api-example field-mono">Loading…</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab-panel="stats" class="admin-panel hidden">
+      <div id="statsGrid" class="stats-grid"></div>
+      <div id="telemetryCharts" class="telemetry-charts"></div>
+      <p id="telemetryAuthNote" class="telemetry-auth-note hidden">Sign in with your admin API key to view inject telemetry charts and the live feed.</p>
+      <section class="card card-enter" style="margin-top:1.25rem">
+        <div class="card-head">
+          <h3>Live telemetry feed</h3>
+          <p class="muted">Admin-only — recent injects, errors, and game place updates.</p>
+        </div>
+        <div id="telemetryFeed" class="telemetry-feed"></div>
+      </section>
+    </section>
+
+    <section data-tab-panel="site" class="admin-panel hidden">
+      <div class="panel admin-card">
+        <h3>Public Site Content</h3>
+        <form class="form" onsubmit="return false">
+          <label>Tagline<input id="siteTagline" class="field-input" /></label>
+          <label>Announcement Banner<input id="siteAnnouncement" class="field-input" placeholder="Shown on public homepage" /></label>
+          <label>Loader Version Label<input id="siteLoaderVersion" class="field-input" /></label>
+          <label>Loadstring<textarea id="siteLoadstring" class="field-textarea field-mono" style="min-height:100px;"></textarea></label>
+          <label>Features <span class="muted-inline">one per line</span><textarea id="siteFeatures" class="field-textarea"></textarea></label>
+          <label>FAQ JSON<textarea id="siteFaq" class="field-textarea field-mono" style="min-height:180px;"></textarea></label>
+          <button id="saveSite" class="btn btn-fill" type="button">Save Site Content</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="/assets/select-ui.js"></script>
+  <script src="/assets/effects.js"></script>
+  <script src="/assets/admin-telemetry.js"></script>
+  <script src="/assets/admin.js"></script>
+</body>
+</html>
