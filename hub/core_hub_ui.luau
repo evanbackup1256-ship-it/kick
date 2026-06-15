@@ -1436,6 +1436,47 @@ function Core.buildCustomizationStudioGroup(tab, options)
 		Core.notify("Alleral V2", "Layout: " .. tostring(selected), 2, "success")
 	end, "Device-aware spacing and scale presets.")
 
+	group:CreateToggle("Smart auto resize", ENV.Alleral_UiAutoResize ~= false, "AI-fit the menu to your screen and rotation.", function(value)
+		ENV.Alleral_UiAutoResize = value ~= false
+		if type(windUi.SetAutoResize) == "function" then
+			pcall(function()
+				windUi:SetAutoResize(value)
+			end)
+		end
+		local info = type(windUi.GetLayoutInfo) == "function" and windUi:GetLayoutInfo() or nil
+		if info and info.profile then
+			Core.notify("Alleral", "Fit: " .. tostring(info.profile) .. " · " .. string.format("%.0f%%", (info.scale or 1) * 100), 2, "info")
+		end
+	end)
+
+	group:CreateSlider("UI scale boost", 85, 115, math.floor((tonumber(ENV.Alleral_UiScale) or 1) * 100), function(value)
+		ENV.Alleral_UiScale = value / 100
+		if type(windUi.SetUiScale) == "function" then
+			pcall(function()
+				windUi:SetUiScale(value / 100)
+			end)
+		end
+	end, "Fine-tune on top of smart auto resize.", 1)
+
+	group:CreateButton("Recalculate layout", function()
+		if type(windUi.ApplyProfile) == "function" then
+			local ok, profile = pcall(function()
+				return windUi:ApplyProfile(ENV.Alleral_UiProfile or "auto")
+			end)
+			local info = type(windUi.GetLayoutInfo) == "function" and windUi:GetLayoutInfo() or nil
+			if ok and info then
+				Core.notify(
+					"Alleral",
+					string.format("%s · %dx%d · scale %.0f%%", tostring(profile or info.profile), info.viewport.X, info.viewport.Y, (info.scale or 1) * 100),
+					3,
+					"success"
+				)
+			else
+				Core.notify("Alleral", "Layout refreshed.", 2, "info")
+			end
+		end
+	end, "Re-run the smart fit for your current viewport.")
+
 	group:CreateDropdown("Motion feel", motionProfiles, (type(windUi.GetMotionProfile) == "function" and windUi:GetMotionProfile()) or "fluid", function(selected)
 		if type(windUi.SetMotionProfile) == "function" then
 			windUi:SetMotionProfile(selected)
@@ -1486,6 +1527,69 @@ function Core.buildCustomizationStudioGroup(tab, options)
 		ENV.Alleral_SectionLift = value ~= false
 		if type(windUi.SetSectionLift) == "function" then
 			windUi:SetSectionLift(value)
+		end
+	end)
+
+	group:CreateToggle("UIStroke glow", ENV.Alleral_StrokeGlow ~= false, "Animated accent pulse on borders.", function(value)
+		ENV.Alleral_StrokeGlow = value ~= false
+		if type(windUi.SetStrokeGlow) == "function" then
+			windUi:SetStrokeGlow(value)
+		end
+	end)
+
+	group:CreateSlider("Glow intensity", 0, 100, math.floor((tonumber(ENV.Alleral_StrokeGlowIntensity) or 0.65) * 100), function(value)
+		ENV.Alleral_StrokeGlowIntensity = value / 100
+		if type(windUi.SetStrokeGlowIntensity) == "function" then
+			windUi:SetStrokeGlowIntensity(value / 100)
+		end
+	end, "How strong the UIStroke pulse feels.", 1)
+
+	group:CreateToggle("Dropdown animations", ENV.Alleral_DropdownAnimations ~= false, "Smooth expand/collapse on menus.", function(value)
+		ENV.Alleral_DropdownAnimations = value ~= false
+		if type(windUi.SetDropdownAnimations) == "function" then
+			windUi:SetDropdownAnimations(value)
+		end
+	end)
+
+	group:CreateToggle("Slider animations", ENV.Alleral_SliderAnimations ~= false, "Glow and thumb bounce while dragging.", function(value)
+		ENV.Alleral_SliderAnimations = value ~= false
+		if type(windUi.SetSliderAnimations) == "function" then
+			windUi:SetSliderAnimations(value)
+		end
+	end)
+
+	group:CreateToggle("Toggle animations", ENV.Alleral_ToggleAnimations ~= false, "Springy switch motion.", function(value)
+		ENV.Alleral_ToggleAnimations = value ~= false
+		if type(windUi.SetToggleAnimations) == "function" then
+			windUi:SetToggleAnimations(value)
+		end
+	end)
+
+	group:CreateToggle("Button hover FX", ENV.Alleral_ButtonHover ~= false, "Highlight labels on hover.", function(value)
+		ENV.Alleral_ButtonHover = value ~= false
+		if type(windUi.SetButtonHoverEffects) == "function" then
+			windUi:SetButtonHoverEffects(value)
+		end
+	end)
+
+	group:CreateToggle("Button click FX", ENV.Alleral_ButtonClick ~= false, "Press scale on buttons.", function(value)
+		ENV.Alleral_ButtonClick = value ~= false
+		if type(windUi.SetButtonClickEffects) == "function" then
+			windUi:SetButtonClickEffects(value)
+		end
+	end)
+
+	group:CreateToggle("Tab switch FX", ENV.Alleral_TabSwitchAnimation ~= false, "Slide/fade when changing tabs.", function(value)
+		ENV.Alleral_TabSwitchAnimation = value ~= false
+		if type(windUi.SetTabSwitchAnimation) == "function" then
+			windUi:SetTabSwitchAnimation(value)
+		end
+	end)
+
+	group:CreateToggle("Notification FX", ENV.Alleral_NotificationAnimations ~= false, "Slide and scale on toasts.", function(value)
+		ENV.Alleral_NotificationAnimations = value ~= false
+		if type(windUi.SetNotificationAnimations) == "function" then
+			windUi:SetNotificationAnimations(value)
 		end
 	end)
 

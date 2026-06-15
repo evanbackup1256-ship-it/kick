@@ -1,7 +1,7 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "5.3.0-maclib"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "5.5.0-maclib"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Maclib"
 
@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/maclib/source.luau",
 	}
 	local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-	local MACLIB_VERSION = 3
+	local MACLIB_VERSION = 5
 	local MACLIB_REQUIRED_FN = "function MacLib:Window"
 	local MACLIB_MIN_BYTES = 150000
 	local MACLIB_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
@@ -327,48 +327,108 @@ return function(Core)
 			return true
 		end
 
-		function Library:ListThemeNames()
-			return { "Maclib", "Default" }
+		local function forwardMac(method)
+			return function(self, ...)
+				if MacLib and type(MacLib[method]) == "function" then
+					local ok, result = pcall(MacLib[method], MacLib, ...)
+					if ok then
+						return result
+					end
+				end
+				return true
+			end
 		end
 
-		function Library:SetTheme(_name)
+		Library.SetSpringMotion = forwardMac("SetSpringMotion")
+		Library.SetReducedMotion = forwardMac("SetReducedMotion")
+		Library.SetStartupEffect = forwardMac("SetStartupEffect")
+		Library.SetTouchFeedback = forwardMac("SetTouchFeedback")
+		Library.SetAmbientGlow = forwardMac("SetAmbientGlow")
+		Library.SetTabAurora = forwardMac("SetTabAurora")
+		Library.SetSectionLift = forwardMac("SetSectionLift")
+		Library.SetStrokeGlow = forwardMac("SetStrokeGlow")
+		Library.SetStrokeGlowIntensity = forwardMac("SetStrokeGlowIntensity")
+		Library.SetDropdownAnimations = forwardMac("SetDropdownAnimations")
+		Library.SetSliderAnimations = forwardMac("SetSliderAnimations")
+		Library.SetToggleAnimations = forwardMac("SetToggleAnimations")
+		Library.SetButtonHoverEffects = forwardMac("SetButtonHoverEffects")
+		Library.SetButtonClickEffects = forwardMac("SetButtonClickEffects")
+		Library.SetTabSwitchAnimation = forwardMac("SetTabSwitchAnimation")
+		Library.SetNotificationAnimations = forwardMac("SetNotificationAnimations")
+		Library.SetNotificationStyle = forwardMac("SetNotificationStyle")
+		Library.SetNotificationCompact = forwardMac("SetNotificationCompact")
+		Library.FlashAccent = forwardMac("FlashAccent")
+		Library.SetAutoResize = forwardMac("SetAutoResize")
+		Library.SetUiScale = forwardMac("SetUiScale")
+		Library.ApplyProfile = forwardMac("ApplyProfile")
+		Library.RegisterLayoutRefresh = forwardMac("RegisterLayoutRefresh")
+
+		function Library:GetAutoResize()
+			if MacLib and type(MacLib.GetAutoResize) == "function" then
+				return MacLib:GetAutoResize()
+			end
+			return ENV.Alleral_UiAutoResize ~= false
+		end
+
+		function Library:GetUiScale()
+			if MacLib and type(MacLib.GetUiScale) == "function" then
+				return MacLib:GetUiScale()
+			end
+			return tonumber(ENV.Alleral_UiScale) or 1
+		end
+
+		function Library:ListProfiles()
+			if MacLib and type(MacLib.ListProfiles) == "function" then
+				local ok, list = pcall(MacLib.ListProfiles, MacLib)
+				if ok and type(list) == "table" then
+					return list
+				end
+			end
+			return { "auto", "desktop", "mobile", "compact", "performance" }
+		end
+
+		function Library:GetLayoutInfo()
+			if MacLib and type(MacLib.GetLayoutInfo) == "function" then
+				local ok, info = pcall(MacLib.GetLayoutInfo, MacLib)
+				if ok then
+					return info
+				end
+			end
+			return nil
+		end
+
+		function Library:GetSpringMotion()
+			if MacLib and type(MacLib.GetEffect) == "function" then
+				return MacLib:GetEffect("springMotion") ~= false
+			end
 			return true
 		end
 
-		function Library:CycleTheme(_step)
-			return { Name = "Maclib" }
+		function Library:GetNotificationStyle()
+			if MacLib and type(MacLib.GetNotificationStyle) == "function" then
+				return MacLib:GetNotificationStyle()
+			end
+			return ENV.Alleral_NotificationStyle or "glass"
 		end
 
-		function Library:ListMotionProfiles()
-			return { "fluid" }
+		function Library:SetNotifyDedupe(_enabled)
+			return true
 		end
 
-		function Library:GetMotionProfile()
-			return "fluid"
+		function Library:SetHaptics(_enabled)
+			return true
 		end
 
 		function Library:SetMotionProfile(_name)
 			return true
 		end
 
-		function Library:SetSpringMotion(_enabled)
-			return true
+		function Library:GetMotionProfile()
+			return "fluid"
 		end
 
-		function Library:SetReducedMotion(_enabled)
-			return true
-		end
-
-		function Library:GetSpringMotion()
-			return true
-		end
-
-		function Library:ListProfiles()
-			return { "auto" }
-		end
-
-		function Library:ApplyProfile(_name)
-			return true
+		function Library:ListMotionProfiles()
+			return { "fluid" }
 		end
 
 		function Library:GetGlassIntensity()
@@ -391,32 +451,20 @@ return function(Core)
 			return true
 		end
 
-		function Library:GetNotificationStyle()
-			return "glass"
-		end
-
-		function Library:SetNotificationStyle(_style)
-			return true
-		end
-
-		function Library:SetAmbientGlow(_enabled)
-			return true
-		end
-
-		function Library:SetTabAurora(_enabled)
-			return true
-		end
-
-		function Library:SetSectionLift(_enabled)
-			return true
-		end
-
 		function Library:ApplyAccentPreset(_name)
 			return true
 		end
 
-		function Library:FlashAccent()
+		function Library:ListThemeNames()
+			return { "Maclib", "Default" }
+		end
+
+		function Library:SetTheme(_name)
 			return true
+		end
+
+		function Library:CycleTheme(_step)
+			return { Name = "Maclib" }
 		end
 
 		function Library:CreateWindow(settings)
@@ -453,6 +501,12 @@ return function(Core)
 
 			activeWindow = macWindow
 			Library.Window = macWindow
+			if type(Library.ApplyProfile) == "function" then
+				pcall(Library.ApplyProfile, Library, ENV.Alleral_UiProfile or "auto")
+			end
+			if ENV.Alleral_UiAutoResize ~= false and type(Library.SetAutoResize) == "function" then
+				pcall(Library.SetAutoResize, Library, true)
+			end
 			flushPendingNotifies()
 			return macWindow
 		end
@@ -487,6 +541,9 @@ return function(Core)
 		if not MacLib then
 			Core.logWarn("Alleral UI load failed: " .. tostring(err or "MacLib missing"))
 			return nil, err or "MacLib missing"
+		end
+		if type(MacLib.ApplyEffectsFromEnv) == "function" then
+			pcall(MacLib.ApplyEffectsFromEnv, MacLib, ENV)
 		end
 
 		local Library = wrapLibrary(MacLib)

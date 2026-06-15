@@ -1093,6 +1093,15 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 			performance = "Performance",
 		}
 		local currentProfile = ENV.Alleral_UiProfile or "auto"
+		group:CreateToggle("Smart auto resize", ENV.Alleral_UiAutoResize ~= false, "Fits the menu to your screen size and rotation.", function(value)
+			ENV.Alleral_UiAutoResize = value ~= false
+			if windUi and type(windUi.SetAutoResize) == "function" then
+				pcall(function()
+					windUi:SetAutoResize(value ~= false)
+				end)
+			end
+		end)
+
 		group:CreateDropdown("Layout profile", profileNames, currentProfile, function(selected)
 			ENV.Alleral_UiProfile = selected
 			if windUi and type(windUi.ApplyProfile) == "function" then
@@ -1110,7 +1119,16 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 					windUi:SetUiScale(value)
 				end)
 			end
-		end, "Shrink or enlarge the whole menu.")
+		end, "Multiplier on top of smart auto resize.")
+
+		group:CreateButton("Recalculate layout", function()
+			if windUi and type(windUi.ApplyProfile) == "function" then
+				pcall(function()
+					windUi:ApplyProfile(ENV.Alleral_UiProfile or "auto")
+				end)
+				Core.notify("UI", "Layout recalculated for your screen.", 2, "info")
+			end
+		end, "Re-run smart fit now.")
 
 		group:CreateToggle("Reduced motion", ENV.Alleral_UiReducedMotion == true, "Disables animations.", function(value)
 			ENV.Alleral_UiReducedMotion = value == true

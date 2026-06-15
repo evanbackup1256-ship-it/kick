@@ -1,5 +1,5 @@
--- Alleral vendored MacLib 1.2.6 (Alleral patch v3)
-local ALLERAL_MACLIB_VERSION = 3
+-- Alleral vendored MacLib 1.2.6 (Alleral patch v5)
+local ALLERAL_MACLIB_VERSION = 5
 
 local function formatSliderPrecision(value, precision)
 	local digits = tonumber(precision)
@@ -60,6 +60,639 @@ local assets = {
 	sliderhead = "rbxassetid://18772834246",
 }
 
+local Effects = {
+	config = {
+		reducedMotion = false,
+		springMotion = true,
+		startupAnimation = true,
+		touchFeedback = true,
+		ambientGlow = true,
+		tabAurora = true,
+		sectionLift = true,
+		strokeGlow = true,
+		strokeGlowIntensity = 0.65,
+		dropdownAnimations = true,
+		sliderAnimations = true,
+		toggleAnimations = true,
+		buttonHover = true,
+		buttonClick = true,
+		tabSwitchAnimation = true,
+		notificationAnimations = true,
+		notificationStyle = "glass",
+		notifyCompact = false,
+	},
+	glowTargets = {},
+	accentColor = Color3.fromRGB(120, 170, 255),
+	_pulseConn = nil,
+	_windowRefs = {},
+}
+
+function Effects.enabled(key)
+	if Effects.config.reducedMotion then
+		return false
+	end
+	local value = Effects.config[key]
+	return value ~= false
+end
+
+function Effects.tweenInfo(duration, style, direction)
+	if Effects.config.reducedMotion then
+		return TweenInfo.new(0)
+	end
+	duration = duration or 0.2
+	if Effects.config.springMotion and style == nil then
+		style = Enum.EasingStyle.Quint
+	end
+	return TweenInfo.new(duration, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out)
+end
+
+function Effects.play(instance, duration, props, style, direction)
+	if not instance or not props then
+		return nil
+	end
+	local info = Effects.tweenInfo(duration, style, direction)
+	local tw = TweenService:Create(instance, info, props)
+	tw:Play()
+	return tw
+end
+
+function Effects.registerGlow(stroke, opts)
+	if not stroke or not stroke:IsA("UIStroke") then
+		return
+	end
+	opts = type(opts) == "table" and opts or {}
+	local base = opts.baseTransparency
+	if base == nil then
+		base = stroke.Transparency
+	end
+	table.insert(Effects.glowTargets, {
+		stroke = stroke,
+		base = base,
+		phase = opts.phase or math.random() * math.pi * 2,
+		useAccent = opts.useAccent ~= false,
+	})
+	Effects.ensurePulse()
+end
+
+function Effects.ensurePulse()
+	if Effects._pulseConn or not Effects.enabled("strokeGlow") then
+		return
+	end
+	Effects._pulseConn = RunService.Heartbeat:Connect(function()
+		if not Effects.enabled("strokeGlow") then
+			return
+		end
+		local intensity = math.clamp(tonumber(Effects.config.strokeGlowIntensity) or 0.65, 0, 1)
+		local now = tick()
+		for index = #Effects.glowTargets, 1, -1 do
+			local entry = Effects.glowTargets[index]
+			local stroke = entry.stroke
+			if not stroke or not stroke.Parent then
+				table.remove(Effects.glowTargets, index)
+			else
+				local wave = (math.sin(now * 2.35 + entry.phase) + 1) * 0.5
+				stroke.Transparency = math.clamp(entry.base - wave * intensity * 0.22, 0, 1)
+				if entry.useAccent then
+					stroke.Color = Effects.accentColor
+				end
+			end
+		end
+	end)
+end
+
+function Effects.stopPulse()
+	if Effects._pulseConn then
+		Effects._pulseConn:Disconnect()
+		Effects._pulseConn = nil
+	end
+end
+
+function Effects.bindButton(buttonInteract, buttonImage, stroke)
+	if not buttonInteract then
+		return
+	end
+	local defaultText = 0.5
+	local hoverText = 0.3
+	local function setIdle()
+		if not Effects.enabled("buttonHover") then
+			return
+		end
+		Effects.play(buttonInteract, 0.18, { TextTransparency = defaultText })
+		if buttonImage then
+			Effects.play(buttonImage, 0.18, { ImageTransparency = defaultText })
+		end
+		if stroke then
+			Effects.play(stroke, 0.22, { Transparency = 0.92 })
+		end
+	end
+	local function setHover()
+		if not Effects.enabled("buttonHover") then
+			return
+		end
+		Effects.play(buttonInteract, 0.16, { TextTransparency = hoverText })
+		if buttonImage then
+			Effects.play(buttonImage, 0.16, { ImageTransparency = hoverText })
+		end
+		if stroke then
+			Effects.play(stroke, 0.18, { Transparency = 0.72, Color = Effects.accentColor })
+		end
+	end
+	buttonInteract.MouseEnter:Connect(setHover)
+	buttonInteract.MouseLeave:Connect(setIdle)
+	buttonInteract.MouseButton1Down:Connect(function()
+		if not Effects.enabled("buttonClick") and not Effects.enabled("touchFeedback") then
+			return
+		end
+		local parent = buttonInteract.Parent
+		local scale = parent and parent:FindFirstChildOfClass("UIScale")
+		if not scale and parent then
+			scale = Instance.new("UIScale")
+			scale.Name = "AlleralClickScale"
+			scale.Parent = parent
+		end
+		if scale then
+			Effects.play(scale, 0.08, { Scale = 0.97 }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		end
+		if stroke then
+			Effects.play(stroke, 0.1, { Transparency = 0.45, Color = Effects.accentColor })
+		end
+	end)
+	buttonInteract.MouseButton1Up:Connect(function()
+		local parent = buttonInteract.Parent
+		local scale = parent and parent:FindFirstChild("AlleralClickScale")
+		if scale then
+			Effects.play(scale, 0.14, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		end
+		setHover()
+	end)
+end
+
+function Effects.animateToggle(toggle1, togglerHead, state, tweenInfo)
+	if not Effects.enabled("toggleAnimations") then
+		return tweenInfo
+	end
+	local style = Effects.config.springMotion and Enum.EasingStyle.Back or Enum.EasingStyle.Quad
+	return TweenInfo.new(tweenInfo.Time or 0.15, style, Enum.EasingDirection.Out)
+end
+
+function Effects.setupWindow(base, baseStroke, baseScale)
+	if not base or not baseStroke then
+		return
+	end
+	Effects.registerGlow(baseStroke, { baseTransparency = 0.9, useAccent = true })
+	if Effects.enabled("ambientGlow") then
+		local halo = Instance.new("Frame")
+		halo.Name = "AlleralAmbientGlow"
+		halo.AnchorPoint = Vector2.new(0.5, 0.5)
+		halo.BackgroundColor3 = Effects.accentColor
+		halo.BackgroundTransparency = 0.82
+		halo.BorderSizePixel = 0
+		halo.Position = UDim2.fromScale(0.5, 0.5)
+		halo.Size = UDim2.new(1, 36, 1, 36)
+		halo.ZIndex = base.ZIndex - 1
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 14)
+		corner.Parent = halo
+		local haloStroke = Instance.new("UIStroke")
+		haloStroke.Color = Effects.accentColor
+		haloStroke.Transparency = 0.55
+		haloStroke.Thickness = 2
+		haloStroke.Parent = halo
+		halo.Parent = base.Parent
+		Effects.registerGlow(haloStroke, { baseTransparency = 0.55, useAccent = true, phase = 1.2 })
+		task.spawn(function()
+			while halo.Parent and base.Parent do
+				if Effects.enabled("ambientGlow") then
+					local wave = (math.sin(tick() * 1.6) + 1) * 0.5
+					halo.BackgroundTransparency = 0.78 + wave * 0.12
+				end
+				task.wait(0.05)
+			end
+		end)
+	end
+	if Effects.enabled("startupAnimation") and baseScale then
+		local autoResizeOn = MacLib.Resizer and MacLib.Resizer.config.autoResize ~= false
+		if not autoResizeOn then
+			baseScale.Scale = 0.94
+			Effects.play(baseScale, 0.32, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		end
+	end
+end
+
+function Effects.applyNotificationStyle(notification, stroke, style)
+	style = style or Effects.config.notificationStyle or "glass"
+	if style == "rail" then
+		notification.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+		stroke.Thickness = 2
+		stroke.Color = Effects.accentColor
+	elseif style == "banner" then
+		notification.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+		stroke.Transparency = 0.55
+	elseif style == "pill" then
+		local corner = notification:FindFirstChildOfClass("UICorner")
+		if corner then
+			corner.CornerRadius = UDim.new(1, 0)
+		end
+		notification.BackgroundTransparency = 0.08
+	else
+		notification.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+	end
+	if Effects.enabled("strokeGlow") then
+		Effects.registerGlow(stroke, { baseTransparency = stroke.Transparency, useAccent = true })
+	end
+end
+
+function Effects.setConfig(key, value)
+	if Effects.config[key] == nil then
+		return false
+	end
+	Effects.config[key] = value
+	if key == "reducedMotion" and value == true then
+		Effects.stopPulse()
+	elseif key == "strokeGlow" and value == true then
+		Effects.ensurePulse()
+	end
+	return true
+end
+
+function Effects.getConfig(key)
+	return Effects.config[key]
+end
+
+function Effects.applyEnv(env)
+	env = type(env) == "table" and env or {}
+	local map = {
+		reducedMotion = env.Alleral_UiReducedMotion,
+		springMotion = env.Alleral_UiSpringMotion,
+		startupAnimation = env.Alleral_UiStartup,
+		touchFeedback = env.Alleral_UiTouchFeedback,
+		ambientGlow = env.Alleral_AmbientGlow,
+		tabAurora = env.Alleral_TabAurora,
+		sectionLift = env.Alleral_SectionLift,
+		strokeGlow = env.Alleral_StrokeGlow,
+		strokeGlowIntensity = env.Alleral_StrokeGlowIntensity,
+		dropdownAnimations = env.Alleral_DropdownAnimations,
+		sliderAnimations = env.Alleral_SliderAnimations,
+		toggleAnimations = env.Alleral_ToggleAnimations,
+		buttonHover = env.Alleral_ButtonHover,
+		buttonClick = env.Alleral_ButtonClick,
+		tabSwitchAnimation = env.Alleral_TabSwitchAnimation,
+		notificationAnimations = env.Alleral_NotificationAnimations,
+		notificationStyle = env.Alleral_NotificationStyle,
+		notifyCompact = env.Alleral_NotifyCompact,
+	}
+	for key, value in pairs(map) do
+		if value ~= nil then
+			if type(value) == "boolean" or type(value) == "number" or type(value) == "string" then
+				Effects.config[key] = value
+			end
+		end
+	end
+	if type(env.Alleral_AccentColor) == "Color3" then
+		Effects.accentColor = env.Alleral_AccentColor
+	end
+end
+
+MacLib.Effects = Effects
+
+local Resizer = {
+	config = {
+		autoResize = true,
+		profile = "auto",
+		userScaleMultiplier = 1,
+	},
+	windows = {},
+	layoutRefresh = {},
+	baseDesignSize = Vector2.new(868, 650),
+	_watchConn = nil,
+	_viewportConn = nil,
+	_lastViewport = nil,
+}
+
+function Resizer.viewport()
+	local camera = workspace.CurrentCamera
+	return camera and camera.ViewportSize or Vector2.new(1920, 1080)
+end
+
+function Resizer.inferProfile()
+	local vp = Resizer.viewport()
+	local shortSide = math.min(vp.X, vp.Y)
+	local longSide = math.max(vp.X, vp.Y)
+	local touchFirst = UserInputService.TouchEnabled
+		and (not UserInputService.KeyboardEnabled or shortSide < 820)
+
+	if touchFirst or shortSide < 520 then
+		return "mobile"
+	end
+	if shortSide < 760 or longSide < 1100 then
+		return "compact"
+	end
+	if longSide >= 1900 and shortSide >= 1040 then
+		return "desktop"
+	end
+	return "desktop"
+end
+
+function Resizer.resolveProfile(name)
+	if name == nil or name == "" or name == "auto" then
+		return Resizer.inferProfile()
+	end
+	return tostring(name)
+end
+
+function Resizer.computeLayout(profileName)
+	local profile = Resizer.resolveProfile(profileName or Resizer.config.profile)
+	local vp = Resizer.viewport()
+	local marginX, marginY = 24, 40
+	local availW = math.max(300, vp.X - marginX * 2)
+	local availH = math.max(220, vp.Y - marginY * 2)
+	local design = Resizer.baseDesignSize
+	local targetW, targetH = design.X, design.Y
+	local profileScale = 1
+
+	if profile == "mobile" then
+		targetW = math.min(design.X, availW)
+		targetH = math.min(design.Y, math.floor(availH * 0.94))
+		profileScale = 0.9
+	elseif profile == "compact" then
+		targetW = math.min(780, availW)
+		targetH = math.min(560, availH)
+		profileScale = 0.86
+	elseif profile == "performance" then
+		targetW = math.min(820, availW)
+		targetH = math.min(600, availH)
+		profileScale = 0.92
+	else
+		targetW = math.min(design.X, availW)
+		targetH = math.min(design.Y, availH)
+		profileScale = 1
+	end
+
+	local fitScale = math.min(availW / targetW, availH / targetH, 1.1) * profileScale
+	fitScale = fitScale * (tonumber(Resizer.config.userScaleMultiplier) or 1)
+	fitScale = math.clamp(fitScale, 0.72, 1.14)
+
+	return {
+		profile = profile,
+		size = UDim2.fromOffset(math.floor(targetW + 0.5), math.floor(targetH + 0.5)),
+		scale = fitScale,
+		viewport = vp,
+	}
+end
+
+function Resizer.applyWindow(ref, animate)
+	if not ref or not ref.base or not ref.base.Parent or not ref.baseUIScale then
+		return nil
+	end
+	if Resizer.config.autoResize == false then
+		local manual = tonumber(Resizer.config.userScaleMultiplier) or 1
+		ref.baseUIScale.Scale = math.clamp(manual, 0.72, 1.14)
+		return nil
+	end
+
+	local layout = Resizer.computeLayout(Resizer.config.profile)
+	if animate and Effects.enabled("startupAnimation") then
+		Effects.play(ref.baseUIScale, 0.22, { Scale = layout.scale }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	else
+		ref.baseUIScale.Scale = layout.scale
+	end
+	ref.base.Size = layout.size
+	ref._lastLayout = layout
+	return layout
+end
+
+function Resizer.applyAll(animate)
+	for _, ref in ipairs(Resizer.windows) do
+		Resizer.applyWindow(ref, animate)
+	end
+	for _, callback in pairs(Resizer.layoutRefresh) do
+		pcall(callback)
+	end
+end
+
+function Resizer.registerWindow(ref)
+	if not ref then
+		return
+	end
+	table.insert(Resizer.windows, ref)
+	Resizer.ensureWatch()
+	Resizer.applyWindow(ref, false)
+end
+
+function Resizer.ensureWatch()
+	if Resizer._watchConn then
+		return
+	end
+	local function bindCamera(camera)
+		if Resizer._viewportConn then
+			Resizer._viewportConn:Disconnect()
+			Resizer._viewportConn = nil
+		end
+		if camera then
+			Resizer._lastViewport = camera.ViewportSize
+			Resizer._viewportConn = camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+				if Resizer.config.autoResize == false then
+					return
+				end
+				local vp = camera.ViewportSize
+				local last = Resizer._lastViewport
+				if last and math.abs(last.X - vp.X) < 2 and math.abs(last.Y - vp.Y) < 2 then
+					return
+				end
+				Resizer._lastViewport = vp
+				task.defer(function()
+					Resizer.applyAll(true)
+				end)
+			end)
+		end
+	end
+	bindCamera(workspace.CurrentCamera)
+	Resizer._watchConn = workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+		bindCamera(workspace.CurrentCamera)
+		if Resizer.config.autoResize ~= false then
+			task.defer(function()
+				Resizer.applyAll(false)
+			end)
+		end
+	end)
+end
+
+function Resizer.applyEnv(env)
+	env = type(env) == "table" and env or {}
+	if env.Alleral_UiAutoResize ~= nil then
+		Resizer.config.autoResize = env.Alleral_UiAutoResize ~= false
+	end
+	if env.Alleral_UiProfile ~= nil then
+		Resizer.config.profile = tostring(env.Alleral_UiProfile)
+	end
+	if env.Alleral_UiScale ~= nil then
+		Resizer.config.userScaleMultiplier = tonumber(env.Alleral_UiScale) or 1
+	end
+end
+
+MacLib.Resizer = Resizer
+
+function MacLib:SetAutoResize(enabled)
+	Resizer.config.autoResize = enabled ~= false
+	Resizer.applyAll(true)
+	return true
+end
+
+function MacLib:GetAutoResize()
+	return Resizer.config.autoResize ~= false
+end
+
+function MacLib:SetUiScale(value)
+	Resizer.config.userScaleMultiplier = tonumber(value) or 1
+	Resizer.applyAll(false)
+	return true
+end
+
+function MacLib:GetUiScale()
+	return tonumber(Resizer.config.userScaleMultiplier) or 1
+end
+
+function MacLib:ApplyProfile(name)
+	if type(name) == "string" and name ~= "" then
+		Resizer.config.profile = name
+	end
+	local resolved = Resizer.resolveProfile(Resizer.config.profile)
+	Resizer.applyAll(true)
+	return resolved
+end
+
+function MacLib:ListProfiles()
+	return { "auto", "desktop", "mobile", "compact", "performance" }
+end
+
+function MacLib:RegisterLayoutRefresh(id, callback)
+	if type(id) ~= "string" or type(callback) ~= "function" then
+		return false
+	end
+	Resizer.layoutRefresh[id] = callback
+	return true
+end
+
+function MacLib:GetLayoutInfo()
+	local layout = Resizer.computeLayout(Resizer.config.profile)
+	return {
+		profile = layout.profile,
+		scale = layout.scale,
+		size = layout.size,
+		viewport = layout.viewport,
+		autoResize = Resizer.config.autoResize ~= false,
+	}
+end
+
+function MacLib:SetEffect(key, value)
+	return Effects.setConfig(key, value)
+end
+
+function MacLib:GetEffect(key)
+	return Effects.getConfig(key)
+end
+
+function MacLib:SetReducedMotion(enabled)
+	Effects.setConfig("reducedMotion", enabled == true)
+end
+
+function MacLib:SetSpringMotion(enabled)
+	Effects.setConfig("springMotion", enabled ~= false)
+end
+
+function MacLib:SetStartupEffect(enabled)
+	Effects.setConfig("startupAnimation", enabled ~= false)
+end
+
+function MacLib:SetTouchFeedback(enabled)
+	Effects.setConfig("touchFeedback", enabled ~= false)
+	Effects.setConfig("buttonClick", enabled ~= false)
+end
+
+function MacLib:SetAmbientGlow(enabled)
+	Effects.setConfig("ambientGlow", enabled ~= false)
+end
+
+function MacLib:SetTabAurora(enabled)
+	Effects.setConfig("tabAurora", enabled ~= false)
+end
+
+function MacLib:SetSectionLift(enabled)
+	Effects.setConfig("sectionLift", enabled ~= false)
+end
+
+function MacLib:SetStrokeGlow(enabled)
+	Effects.setConfig("strokeGlow", enabled ~= false)
+	if enabled ~= false then
+		Effects.ensurePulse()
+	else
+		Effects.stopPulse()
+	end
+end
+
+function MacLib:SetStrokeGlowIntensity(value)
+	Effects.setConfig("strokeGlowIntensity", math.clamp(tonumber(value) or 0.65, 0, 1))
+end
+
+function MacLib:SetDropdownAnimations(enabled)
+	Effects.setConfig("dropdownAnimations", enabled ~= false)
+end
+
+function MacLib:SetSliderAnimations(enabled)
+	Effects.setConfig("sliderAnimations", enabled ~= false)
+end
+
+function MacLib:SetToggleAnimations(enabled)
+	Effects.setConfig("toggleAnimations", enabled ~= false)
+end
+
+function MacLib:SetButtonHoverEffects(enabled)
+	Effects.setConfig("buttonHover", enabled ~= false)
+end
+
+function MacLib:SetButtonClickEffects(enabled)
+	Effects.setConfig("buttonClick", enabled ~= false)
+end
+
+function MacLib:SetTabSwitchAnimation(enabled)
+	Effects.setConfig("tabSwitchAnimation", enabled ~= false)
+end
+
+function MacLib:SetNotificationAnimations(enabled)
+	Effects.setConfig("notificationAnimations", enabled ~= false)
+end
+
+function MacLib:SetNotificationStyle(style)
+	if type(style) == "string" and style ~= "" then
+		Effects.setConfig("notificationStyle", style)
+	end
+end
+
+function MacLib:GetNotificationStyle()
+	return Effects.getConfig("notificationStyle") or "glass"
+end
+
+function MacLib:SetNotificationCompact(enabled)
+	Effects.setConfig("notifyCompact", enabled == true)
+end
+
+function MacLib:FlashAccent()
+	for _, entry in ipairs(Effects.glowTargets) do
+		if entry.stroke and entry.stroke.Parent then
+			Effects.play(entry.stroke, 0.25, { Transparency = math.max(0, entry.base - 0.35), Color = Effects.accentColor })
+		end
+	end
+	return true
+end
+
+function MacLib:ApplyEffectsFromEnv(env)
+	Effects.applyEnv(env)
+	Resizer.applyEnv(env)
+	if Effects.enabled("strokeGlow") then
+		Effects.ensurePulse()
+	end
+end
+
 --// Functions
 local function GetGui()
 	local newGui = Instance.new("ScreenGui")
@@ -83,6 +716,13 @@ end
 
 --// Library Functions
 function MacLib:Window(Settings)
+	local envOk, env = pcall(function()
+		return getgenv and getgenv() or {}
+	end)
+	if envOk then
+		MacLib:ApplyEffectsFromEnv(env)
+	end
+
 	local WindowFunctions = {Settings = Settings}
 	if Settings.AcrylicBlur ~= nil then
 		acrylicBlur = Settings.AcrylicBlur
@@ -127,6 +767,9 @@ function MacLib:Window(Settings)
 	base.BorderSizePixel = 0
 	base.Position = UDim2.fromScale(0.5, 0.5)
 	base.Size = Settings.Size or UDim2.fromOffset(868, 650)
+	if base.Size.Offset.X > 0 and base.Size.Offset.Y > 0 then
+		Resizer.baseDesignSize = Vector2.new(base.Size.Offset.X, base.Size.Offset.Y)
+	end
 
 	local baseUIScale = Instance.new("UIScale")
 	baseUIScale.Name = "BaseUIScale"
@@ -143,6 +786,11 @@ function MacLib:Window(Settings)
 	baseUIStroke.Color = Color3.fromRGB(255, 255, 255)
 	baseUIStroke.Transparency = 0.9
 	baseUIStroke.Parent = base
+	Effects.setupWindow(base, baseUIStroke, baseUIScale)
+	Resizer.registerWindow({
+		base = base,
+		baseUIScale = baseUIScale,
+	})
 
 	local sidebar = Instance.new("Frame")
 	sidebar.Name = "Sidebar"
@@ -1432,6 +2080,9 @@ function MacLib:Window(Settings)
 			tabSwitcherUIStroke.Color = Color3.fromRGB(255, 255, 255)
 			tabSwitcherUIStroke.Transparency = 1
 			tabSwitcherUIStroke.Parent = tabSwitcher
+			if Effects.enabled("tabAurora") then
+				Effects.registerGlow(tabSwitcherUIStroke, { baseTransparency = 1, useAccent = true, phase = tabIndex * 0.7 })
+			end
 
 			local tabSwitcherUIListLayout = Instance.new("UIListLayout")
 			tabSwitcherUIListLayout.Name = "TabSwitcherUIListLayout"
@@ -1599,6 +2250,9 @@ function MacLib:Window(Settings)
 				sectionUIStroke.Color = Color3.fromRGB(255, 255, 255)
 				sectionUIStroke.Transparency = 0.95
 				sectionUIStroke.Parent = section
+				if Effects.enabled("sectionLift") then
+					Effects.registerGlow(sectionUIStroke, { baseTransparency = 0.95, useAccent = true })
+				end
 
 				local sectionUIListLayout = Instance.new("UIListLayout")
 				sectionUIListLayout.Name = "SectionUIListLayout"
@@ -1664,24 +2318,40 @@ function MacLib:Window(Settings)
 					}
 
 					local function ChangeState(State)
+						if not Effects.enabled("buttonHover") then
+							if State == "Idle" then
+								buttonInteract.TextTransparency = TweenSettings.DefaultTransparency
+								buttonImage.ImageTransparency = TweenSettings.DefaultTransparency
+							else
+								buttonInteract.TextTransparency = TweenSettings.HoverTransparency
+								buttonImage.ImageTransparency = TweenSettings.HoverTransparency
+							end
+							return
+						end
 						if State == "Idle" then
-							Tween(buttonInteract, TweenInfo.new(0.2, TweenSettings.EasingStyle), {
-								TextTransparency = TweenSettings.DefaultTransparency
-							}):Play()
-							Tween(buttonImage, TweenInfo.new(0.2, TweenSettings.EasingStyle), {
-								ImageTransparency = TweenSettings.DefaultTransparency
-							}):Play()
+							Effects.play(buttonInteract, 0.2, { TextTransparency = TweenSettings.DefaultTransparency }, TweenSettings.EasingStyle)
+							Effects.play(buttonImage, 0.2, { ImageTransparency = TweenSettings.DefaultTransparency }, TweenSettings.EasingStyle)
 						elseif State == "Hover" then
-							Tween(buttonInteract, TweenInfo.new(0.2, TweenSettings.EasingStyle), {
-								TextTransparency = TweenSettings.HoverTransparency
-							}):Play()
-							Tween(buttonImage, TweenInfo.new(0.2, TweenSettings.EasingStyle), {
-								ImageTransparency = TweenSettings.HoverTransparency
-							}):Play()
+							Effects.play(buttonInteract, 0.18, { TextTransparency = TweenSettings.HoverTransparency }, TweenSettings.EasingStyle)
+							Effects.play(buttonImage, 0.18, { ImageTransparency = TweenSettings.HoverTransparency }, TweenSettings.EasingStyle)
 						end
 					end
 
 					local function Callback()
+						if Effects.enabled("buttonClick") or Effects.enabled("touchFeedback") then
+							local scale = button:FindFirstChild("AlleralClickScale")
+							if not scale then
+								scale = Instance.new("UIScale")
+								scale.Name = "AlleralClickScale"
+								scale.Parent = button
+							end
+							Effects.play(scale, 0.07, { Scale = 0.965 }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+							task.delay(0.08, function()
+								if scale.Parent then
+									Effects.play(scale, 0.16, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+								end
+							end)
+						end
 						if ButtonFunctions.Settings.Callback then
 							ButtonFunctions.Settings.Callback()
 						end
@@ -1784,7 +2454,7 @@ function MacLib:Window(Settings)
 					local togglerHeadTransparency = {Enabled = 0, Disabled = 0.85}
 
 					local TweenSettings = {
-						Info = TweenInfo.new(0.15, Enum.EasingStyle.Quad),
+						Info = Effects.animateToggle(toggle1, togglerHead, togglebool, TweenInfo.new(0.15, Enum.EasingStyle.Quad)),
 
 						EnabledPosition = UDim2.new(1, 0, 0.5, 0),
 						DisabledPosition = UDim2.new(0.5, 0, 0.5, 0),
@@ -2027,6 +2697,13 @@ function MacLib:Window(Settings)
 					sliderHead.InputBegan:Connect(function(input)
 						if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 							dragging = true
+							if Effects.enabled("sliderAnimations") then
+								Effects.play(sliderValueUIStroke, 0.14, {
+									Transparency = 0.55,
+									Color = Effects.accentColor,
+								})
+								Effects.play(sliderHead, 0.12, { Size = UDim2.fromOffset(17, 17) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+							end
 							SetValue(input)
 						end
 					end)
@@ -2034,6 +2711,10 @@ function MacLib:Window(Settings)
 					sliderHead.InputEnded:Connect(function(input)
 						if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 							dragging = false
+							if Effects.enabled("sliderAnimations") then
+								Effects.play(sliderValueUIStroke, 0.18, { Transparency = 0.9, Color = Color3.fromRGB(255, 255, 255) })
+								Effects.play(sliderHead, 0.14, { Size = UDim2.fromOffset(15, 15) }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+							end
 							if SliderFunctions.Settings.onInputComplete then
 								SliderFunctions.Settings.onInputComplete(finalValue)
 							end
@@ -2737,13 +3418,21 @@ function MacLib:Window(Settings)
 						local defaultDropdownSize = 38
 						local isDropdownOpen = not dropped
 						local targetSize = isDropdownOpen and UDim2.new(1, 0, 0, CalculateDropdownSize()) or UDim2.new(1, 0, 0, defaultDropdownSize)
+						local dropDuration = Effects.enabled("dropdownAnimations") and 0.28 or 0.2
+						local dropStyle = Effects.config.springMotion and Enum.EasingStyle.Back or Enum.EasingStyle.Exponential
 
-						local dropTween = Tween(dropdown, TweenInfo.new(0.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+						local dropTween = Tween(dropdown, Effects.tweenInfo(dropDuration, dropStyle, Enum.EasingDirection.Out), {
 							Size = targetSize
 						})
-						local iconTween = Tween(dropdownImage, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						local iconTween = Tween(dropdownImage, Effects.tweenInfo(dropDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 							Rotation = isDropdownOpen and -90 or 0
 						})
+						if dropdownUIStroke and Effects.enabled("dropdownAnimations") then
+							Effects.play(dropdownUIStroke, dropDuration, {
+								Transparency = isDropdownOpen and 0.72 or 0.9,
+								Color = isDropdownOpen and Effects.accentColor or Color3.fromRGB(255, 255, 255),
+							})
+						end
 
 						dropTween:Play()
 						iconTween:Play()
@@ -4605,36 +5294,50 @@ function MacLib:Window(Settings)
 			end
 
 			local function SelectCurrentTab()
-				local easetime = 0.15
+				local easetime = Effects.enabled("tabSwitchAnimation") and 0.24 or 0.15
+				local easeStyle = Effects.config.springMotion and Enum.EasingStyle.Quint or Enum.EasingStyle.Sine
 
 				if currentTabInstance then
+					if Effects.enabled("tabSwitchAnimation") then
+						Effects.play(currentTabInstance, easetime * 0.85, {
+							Position = UDim2.fromOffset(-12, currentTabInstance.Position.Y.Offset),
+						}, easeStyle, Enum.EasingDirection.In)
+					end
 					currentTabInstance.Parent = nil
 				end
 
 				for i, tabInfo in pairs(tabs) do
-					Tween(i, TweenInfo.new(easetime, Enum.EasingStyle.Sine), {
+					Effects.play(i, Effects.tweenInfo(easetime, easeStyle), {
 						BackgroundTransparency = (i == tabSwitcher and 0.98 or 1)
-					}):Play()
+					})
 
 					if tabInfo.tabStroke then
-						Tween(tabInfo.tabStroke, TweenInfo.new(easetime, Enum.EasingStyle.Sine), {
-							Transparency = (i == tabSwitcher and 0.95 or 1)
-						}):Play()
+						Effects.play(tabInfo.tabStroke, Effects.tweenInfo(easetime, easeStyle), {
+							Transparency = (i == tabSwitcher and 0.95 or 1),
+							Color = i == tabSwitcher and Effects.accentColor or Color3.fromRGB(255, 255, 255),
+						})
 					end
 					if tabInfo.switcherImage then
-						Tween(tabInfo.switcherImage, TweenInfo.new(easetime, Enum.EasingStyle.Sine), {
+						Effects.play(tabInfo.switcherImage, Effects.tweenInfo(easetime, easeStyle), {
 							ImageTransparency = (i == tabSwitcher and 0.1 or 0.5)
-						}):Play()
+						})
 					end
 					if tabInfo.switcherName then
-						Tween(tabInfo.switcherName, TweenInfo.new(easetime, Enum.EasingStyle.Sine), {
+						Effects.play(tabInfo.switcherName, Effects.tweenInfo(easetime, easeStyle), {
 							TextTransparency = (i == tabSwitcher and 0.1 or 0.5)
-						}):Play()
+						})
 					end
 				end
 
-				tabs[tabSwitcher].tabContent.Parent = content
-				currentTabInstance = tabs[tabSwitcher].tabContent
+				local nextContent = tabs[tabSwitcher].tabContent
+				if Effects.enabled("tabSwitchAnimation") then
+					nextContent.Position = UDim2.fromOffset(16, 0)
+				end
+				nextContent.Parent = content
+				if Effects.enabled("tabSwitchAnimation") then
+					Effects.play(nextContent, easetime, { Position = UDim2.fromOffset(0, 0) }, easeStyle, Enum.EasingDirection.Out)
+				end
+				currentTabInstance = nextContent
 				currentTab.Text = Settings.Name
 			end
 
@@ -4808,6 +5511,7 @@ function MacLib:Window(Settings)
 		notificationUIStroke.Color = Color3.fromRGB(255, 255, 255)
 		notificationUIStroke.Transparency = 0.9
 		notificationUIStroke.Parent = notification
+		Effects.applyNotificationStyle(notification, notificationUIStroke, Effects.getConfig("notificationStyle"))
 
 		local notificationUICorner = Instance.new("UICorner")
 		notificationUICorner.Name = "NotificationUICorner"
@@ -4932,14 +5636,20 @@ function MacLib:Window(Settings)
 
 		notificationControls.Parent = notification
 
+		local notifyInDuration = Effects.enabled("notificationAnimations") and 0.28 or 0.2
+		local notifyStyle = Effects.config.springMotion and Enum.EasingStyle.Back or Enum.EasingStyle.Exponential
 		local tweens = {
-			In = Tween(notificationUIScale, TweenInfo.new(0.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+			In = Tween(notificationUIScale, Effects.tweenInfo(notifyInDuration, notifyStyle, Enum.EasingDirection.Out), {
 				Scale = Settings.Scale or 1
 			}),
-			Out = Tween(notificationUIScale, TweenInfo.new(0.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+			Out = Tween(notificationUIScale, Effects.tweenInfo(0.22, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
 				Scale = 0
 			}),
 		}
+		if Effects.enabled("notificationAnimations") then
+			notification.Position = UDim2.new(1.05, 0, 0.5, 0)
+			Effects.play(notification, notifyInDuration, { Position = UDim2.fromScale(0.5, 0.5) }, notifyStyle, Enum.EasingDirection.Out)
+		end
 
 		local styles = {
 			None = function() interactable:Destroy() end,
@@ -5266,8 +5976,29 @@ function MacLib:Window(Settings)
 	end
 
 	function WindowFunctions:SetState(State)
+		if Effects.enabled("startupAnimation") and baseUIScale then
+			if State then
+				base.Visible = true
+				if baseUIScale.Scale >= 0.99 then
+					baseUIScale.Scale = 0.94
+				end
+				Effects.play(baseUIScale, 0.26, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			else
+				local tw = Effects.play(baseUIScale, 0.18, { Scale = 0.94 }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+				if tw then
+					tw.Completed:Connect(function()
+						if not windowState then
+							base.Visible = false
+							baseUIScale.Scale = 1
+						end
+					end)
+				end
+			end
+		end
 		windowState = State
-		base.Visible = State
+		if State or not Effects.enabled("startupAnimation") then
+			base.Visible = State
+		end
 	end
 
 	function WindowFunctions:GetState()
