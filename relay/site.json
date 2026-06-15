@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-15T22:43:56Z",
+  "updatedAt": "2026-06-15T22:56:24Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
   "loaderVersion": "8.7.0",
@@ -14,7 +14,7 @@
   "branch": "main",
   "features": [
     "Finds the right script when you inject",
-    "Rayfield UI (Apple-themed) with live status on each game",
+    "MacLib UI with live status on each game",
     "Site and scripts pull from GitHub automatically",
     "Game status comes from real inject data, not guesses",
     "Updates land within about a minute of a push",
