@@ -3,6 +3,7 @@ WORKDIR /site
 COPY relay/site/package.json relay/site/package-lock.json ./
 RUN npm install
 COPY relay/site ./
+COPY cfg/site.json /cfg/site.json
 ENV SKIP_BACKEND_SYNC=1
 RUN npm run build
 
