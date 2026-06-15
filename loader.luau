@@ -47,7 +47,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "8bda62d",
+	commit = "97e84d0",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
