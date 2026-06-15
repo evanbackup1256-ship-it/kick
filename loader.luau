@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.3.4"
+local LOADER_VERSION = "8.6.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -13,21 +13,21 @@ local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
-local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
-local SYDE_SOURCE_MIN_BYTES = 5000
-local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 42 -- Guard GuiObject layout signals (AbsoluteSize spam fix)
+local RAYFIELD_SOURCE_PATH = UI .. "/rayfield/source.luau"
+local RAYFIELD_ICONS_PATH = UI .. "/rayfield/icons.luau"
+local RAYFIELD_SOURCE_MIN_BYTES = 50000
+local RAYFIELD_VERSION_MARKER = "ALLERAL_RAYFIELD_VERSION"
+local RAYFIELD_VERSION = 2
+local RAYFIELD_REQUIRED_FN = "function RayfieldLibrary:CreateWindow"
+local RAYFIELD_PATCHED_OVERRIDE_PATHS = {
+	"rayfield_patched.luau",
+	"patched_rayfield.luau",
+	".alleral/rayfield_patched.luau",
+	"kick/rayfield_patched.luau",
+	"workspace/rayfield_patched.luau",
+}
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
-local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
-local SYDE_SEARCH_GUARD_FN = "sydeWindowSearch"
-local SYDE_PATCHED_OVERRIDE_PATHS = {
-	"syde_patched.luau",
-	"patched_syde.luau",
-	".alleral/syde_patched.luau",
-	"kick/syde_patched.luau",
-	"workspace/syde_patched.luau",
-}
 local CP = {
 	base = HUB .. "/core_base.luau",
 	legacy = HUB .. "/core.luau",
@@ -37,11 +37,12 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.3.4",
+	loader = "8.6.0",
 	core = "2.9.5",
-	ui = "Syde",
-	windui = "4.1.0-studio",
-	alleral = "4.1.0-studio",
+	ui = "Rayfield",
+	windui = "5.2.0-rayfield",
+	alleral = "5.2.0-rayfield",
+	rayfieldVersion = 2,
 	analytics = "1.2",
 	telemetry = "3.4",
 	helpers = "1.4",
@@ -921,78 +922,67 @@ local function cacheRemote(relativePath, src)
 	pcall(writeFileFn, relativePath, src)
 end
 
-local function requiredSydePatch()
+local function requiredRayfieldVersion()
 	local expected = ENV._Alleral_ExpectedVersions
 	if type(expected) == "table" then
-		local patch = tonumber(expected.sydePatch)
-		if patch then
-			return patch
+		local version = tonumber(expected.rayfieldVersion)
+		if version then
+			return version
 		end
 	end
-	return SYDE_PATCH_VERSION
+	return RAYFIELD_VERSION
 end
 
-local function sydePatchFromSource(src)
+local function rayfieldVersionFromSource(src)
 	if type(src) ~= "string" then
 		return nil
 	end
-	local last
-	for patch in src:gmatch("ALLERAL_SYDE_PATCH%s*=%s*(%d+)") do
-		last = tonumber(patch)
-	end
-	return last
+	return tonumber(src:match("ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)"))
 end
 
-local function sydeSourceValid(src)
+local function rayfieldSourceValid(src)
 	if type(src) ~= "string"
-		or #src < SYDE_SOURCE_MIN_BYTES
-		or not src:find("sydeFindChild", 1, true)
-		or not src:find(SYDE_PATCH_MARKER, 1, true)
-		or not src:find("sydePrepareDropdownDrop", 1, true)
-		or not src:find(SYDE_PATCH_REQUIRED_FN, 1, true)
-		or not src:find(SYDE_SEARCH_GUARD_FN, 1, true)
+		or #src < RAYFIELD_SOURCE_MIN_BYTES
+		or src:find("<!DOCTYPE", 1, true)
+		or not src:find(RAYFIELD_VERSION_MARKER, 1, true)
+		or not src:find(RAYFIELD_REQUIRED_FN, 1, true)
+		or not src:find("function RayfieldLibrary:Notify", 1, true)
 		or not looksLikeLua(src) then
 		return false
 	end
-	local patch = sydePatchFromSource(src)
-	local need = requiredSydePatch()
-	return type(patch) == "number" and patch == need
+	local version = rayfieldVersionFromSource(src)
+	local need = requiredRayfieldVersion()
+	return type(version) == "number" and version == need
 end
 
-local function sydeSourceRejectReason(src)
+local function rayfieldSourceRejectReason(src)
 	if type(src) ~= "string" then
 		return "no body"
 	end
-	if #src < SYDE_SOURCE_MIN_BYTES then
-		return "too small (" .. tostring(#src) .. "b, need " .. tostring(SYDE_SOURCE_MIN_BYTES) .. "+)"
+	if #src < RAYFIELD_SOURCE_MIN_BYTES then
+		return "too small (" .. tostring(#src) .. "b, need " .. tostring(RAYFIELD_SOURCE_MIN_BYTES) .. "+)"
 	end
 	if not looksLikeLua(src) then
 		return "not lua (" .. tostring(#src) .. "b)"
 	end
-	if not src:find("sydeFindChild", 1, true) then
-		return "missing sydeFindChild"
+	if not src:find(RAYFIELD_VERSION_MARKER, 1, true) then
+		return "missing version marker"
 	end
-	if not src:find(SYDE_PATCH_MARKER, 1, true) then
-		return "missing patch marker"
+	if not src:find(RAYFIELD_REQUIRED_FN, 1, true) then
+		return "missing " .. RAYFIELD_REQUIRED_FN
 	end
-	if not src:find("sydePrepareDropdownDrop", 1, true) then
-		return "missing sydePrepareDropdownDrop"
+	if not src:find("function RayfieldLibrary:Notify", 1, true) then
+		return "missing RayfieldLibrary:Notify"
 	end
-	if not src:find(SYDE_PATCH_REQUIRED_FN, 1, true) then
-		return "missing " .. SYDE_PATCH_REQUIRED_FN
-	end
-	if not src:find(SYDE_SEARCH_GUARD_FN, 1, true) then
-		return "missing " .. SYDE_SEARCH_GUARD_FN
-	end
-	local patch = sydePatchFromSource(src)
-	local need = requiredSydePatch()
-	if type(patch) ~= "number" or patch ~= need then
-		return "patch v" .. tostring(patch or "?") .. " != required v" .. tostring(need)
+	local version = rayfieldVersionFromSource(src)
+	local need = requiredRayfieldVersion()
+	if type(version) ~= "number" or version ~= need then
+		return "version v" .. tostring(version or "?") .. " != required v" .. tostring(need)
 	end
 	return "ok"
 end
 
-local function sydeRemoteBases()
+local function rayfieldRemoteBases()
 	local bases = { GITHUB_RAW, GITHUB_WEB }
 	local expected = ENV._Alleral_ExpectedVersions
 	local commit = type(expected) == "table" and expected.commit
@@ -1003,16 +993,16 @@ local function sydeRemoteBases()
 	return bases
 end
 
-local function fetchRemoteSyde()
+local function fetchRemoteRayfield()
 	local lastReason = "no response"
 	for attempt = 1, 3 do
-		for _, base in ipairs(sydeRemoteBases()) do
-			local body, via = httpGet(base .. "/" .. SYDE_SOURCE_PATH, SYDE_SOURCE_MIN_BYTES)
-			if type(body) == "string" and #body >= SYDE_SOURCE_MIN_BYTES then
-				if sydeSourceValid(body) then
+		for _, base in ipairs(rayfieldRemoteBases()) do
+			local body, via = httpGet(base .. "/" .. RAYFIELD_SOURCE_PATH, RAYFIELD_SOURCE_MIN_BYTES)
+			if type(body) == "string" and #body >= RAYFIELD_SOURCE_MIN_BYTES then
+				if rayfieldSourceValid(body) then
 					return body, base .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
 				end
-				lastReason = sydeSourceRejectReason(body)
+				lastReason = rayfieldSourceRejectReason(body)
 					.. " ("
 					.. tostring(#body)
 					.. "b via "
@@ -1031,36 +1021,43 @@ local function fetchRemoteSyde()
 	return nil, lastReason
 end
 
-local function clearStaleSydeRuntime()
+local function clearStaleRayfieldRuntime()
 	local env = genv()
-	if type(env) ~= "table" or type(env._AlleralSyde) ~= "table" then
+	if type(env) ~= "table" or type(env._AlleralRayfield) ~= "table" then
 		return
 	end
-	local patch = env._AlleralSyde.__AlleralPatch
-	if type(patch) ~= "number" or patch < requiredSydePatch() then
-		env._AlleralSyde = nil
-		env._AlleralSydeSourceKey = nil
+	local version = env._AlleralRayfield.__AlleralPatch
+	if type(version) ~= "number" or version < requiredRayfieldVersion() then
+		env._AlleralRayfield = nil
+		env._AlleralRayfieldSourceKey = nil
 	end
 end
 
-local function purgeInvalidSydeSources()
-	local need = requiredSydePatch()
+local function purgeInvalidRayfieldSources()
+	local need = requiredRayfieldVersion()
 	local paths = {
-		SYDE_SOURCE_PATH,
-		"kick/" .. SYDE_SOURCE_PATH,
-		".alleral/cache/" .. SYDE_SOURCE_PATH,
+		RAYFIELD_SOURCE_PATH,
+		"kick/" .. RAYFIELD_SOURCE_PATH,
+		".alleral/cache/" .. RAYFIELD_SOURCE_PATH,
+		UI .. "/syde/source.luau",
+		"kick/" .. UI .. "/syde/source.luau",
+		".alleral/cache/" .. UI .. "/syde/source.luau",
 	}
 	for _, path in ipairs(paths) do
 		local src = readLocal({ path }, 100)
-		if src then
-			local patch = sydePatchFromSource(src)
-			if type(patch) ~= "number" or patch ~= need then
-				deleteWorkspaceFile(path, { silent = true, label = "stale Syde" })
+		if path:find("/syde/", 1, true) or path:find("/studio/", 1, true) then
+			if src then
+				deleteWorkspaceFile(path, { silent = true, label = "legacy UI source" })
+			end
+		elseif src then
+			local version = rayfieldVersionFromSource(src)
+			if type(version) ~= "number" or version ~= need then
+				deleteWorkspaceFile(path, { silent = true, label = "stale Rayfield" })
 				log(
-					"Purged stale Syde source "
+					"Purged stale Rayfield source "
 						.. path
 						.. " (v"
-						.. tostring(patch or "?")
+						.. tostring(version or "?")
 						.. " != v"
 						.. tostring(need)
 						.. ")",
@@ -1071,88 +1068,102 @@ local function purgeInvalidSydeSources()
 	end
 end
 
-local function ensureSydeSource()
-	clearStaleSydeRuntime()
-	purgeInvalidSydeSources()
+local function ensureRayfieldSource()
+	clearStaleRayfieldRuntime()
+	purgeInvalidRayfieldSources()
 
-	-- 1. Check for user-provided patched override (highest priority for local fixes)
-	for _, overridePath in ipairs(SYDE_PATCHED_OVERRIDE_PATHS) do
-		local src, path = readLocal({ overridePath }, SYDE_SOURCE_MIN_BYTES)
-		if src and sydeSourceValid(src) then
-			local patch = sydePatchFromSource(src)
-			log("Using local patched Syde override: " .. tostring(path) .. " (patch v" .. tostring(patch or "?") .. ")")
-			ENV._AlleralSydeSource = src
-			ENV._AlleralSydeSourcePatch = patch
-			ENV._AlleralSydeSourceLabel = "override:" .. tostring(path)
-			ENV._AlleralSydeSourceReady = true
-			cacheRemote(SYDE_SOURCE_PATH, src)
-			cacheRemote(".alleral/cache/" .. SYDE_SOURCE_PATH, src)
-			return true, "override:" .. tostring(path) .. ", patch v" .. tostring(patch or "?")
+	for _, overridePath in ipairs(RAYFIELD_PATCHED_OVERRIDE_PATHS) do
+		local src, path = readLocal({ overridePath }, RAYFIELD_SOURCE_MIN_BYTES)
+		if src and rayfieldSourceValid(src) then
+			local version = rayfieldVersionFromSource(src)
+			log("Using local patched Rayfield override: " .. tostring(path) .. " (v" .. tostring(version or "?") .. ")")
+			ENV._AlleralRayfieldSource = src
+			ENV._AlleralRayfieldSourceVersion = version
+			ENV._AlleralRayfieldSourceLabel = "override:" .. tostring(path)
+			ENV._AlleralRayfieldSourceReady = true
+			ENV._AlleralRayfieldSource = src
+			ENV._AlleralRayfieldSourceReady = true
+			cacheRemote(RAYFIELD_SOURCE_PATH, src)
+			cacheRemote(".alleral/cache/" .. RAYFIELD_SOURCE_PATH, src)
+			return true, "override:" .. tostring(path) .. ", v" .. tostring(version or "?")
 		end
 	end
 
 	local localPaths = {
-		SYDE_SOURCE_PATH,
-		"kick/" .. SYDE_SOURCE_PATH,
+		RAYFIELD_SOURCE_PATH,
+		"kick/" .. RAYFIELD_SOURCE_PATH,
 	}
 	local cachePaths = {
-		".alleral/cache/" .. SYDE_SOURCE_PATH,
+		".alleral/cache/" .. RAYFIELD_SOURCE_PATH,
 	}
 
-	local function adoptSyde(src, label)
-		if not src or not sydeSourceValid(src) then
+	local function adoptRayfield(src, label)
+		if not src or not rayfieldSourceValid(src) then
 			return nil
 		end
-		cacheRemote(SYDE_SOURCE_PATH, src)
-		cacheRemote(".alleral/cache/" .. SYDE_SOURCE_PATH, src)
-		local patch = sydePatchFromSource(src)
-		ENV._AlleralSydeSource = src
-		ENV._AlleralSydeSourcePatch = patch
-		ENV._AlleralSydeSourceLabel = label
-		ENV._AlleralSydeSourceReady = true
-		return true, label .. ", patch v" .. tostring(patch or "?")
+		cacheRemote(RAYFIELD_SOURCE_PATH, src)
+		cacheRemote(".alleral/cache/" .. RAYFIELD_SOURCE_PATH, src)
+		local iconsPaths = {
+			RAYFIELD_ICONS_PATH,
+			"kick/" .. RAYFIELD_ICONS_PATH,
+			".alleral/cache/" .. RAYFIELD_ICONS_PATH,
+		}
+		local iconsSrc = readLocal(iconsPaths, 100)
+		if type(iconsSrc) == "string" and #iconsSrc > 100 then
+			ENV._AlleralRayfieldIconsSource = iconsSrc
+			cacheRemote(RAYFIELD_ICONS_PATH, iconsSrc)
+			cacheRemote(".alleral/cache/" .. RAYFIELD_ICONS_PATH, iconsSrc)
+		end
+		local version = rayfieldVersionFromSource(src)
+		ENV._AlleralRayfieldSource = src
+		ENV._AlleralRayfieldSourceVersion = version
+		ENV._AlleralRayfieldSourceLabel = label
+		ENV._AlleralRayfieldSourceReady = true
+		ENV._AlleralRayfieldSource = src
+		ENV._AlleralRayfieldSourceReady = true
+		return true, label .. ", v" .. tostring(version or "?")
 	end
 
-	local cacheSrc, cachePath = readLocal(cachePaths, SYDE_SOURCE_MIN_BYTES)
-	local cacheOk = cacheSrc and sydeSourceValid(cacheSrc)
-	local cachePatch = sydePatchFromSource(cacheSrc)
+	local cacheSrc, cachePath = readLocal(cachePaths, RAYFIELD_SOURCE_MIN_BYTES)
+	local cacheOk = cacheSrc and rayfieldSourceValid(cacheSrc)
+	local cacheVersion = rayfieldVersionFromSource(cacheSrc)
 
-	local remoteSrc, remoteVia = fetchRemoteSyde()
-	local remoteOk = remoteSrc and sydeSourceValid(remoteSrc)
-	local remotePatch = sydePatchFromSource(remoteSrc)
+	local remoteSrc, remoteVia = fetchRemoteRayfield()
+	local remoteOk = remoteSrc and rayfieldSourceValid(remoteSrc)
+	local remoteVersion = rayfieldVersionFromSource(remoteSrc)
 
-	local localSrc, localPath = readLocal(localPaths, SYDE_SOURCE_MIN_BYTES)
-	local localOk = localSrc and sydeSourceValid(localSrc)
-	local localPatch = sydePatchFromSource(localSrc)
+	local localSrc, localPath = readLocal(localPaths, RAYFIELD_SOURCE_MIN_BYTES)
+	local localOk = localSrc and rayfieldSourceValid(localSrc)
+	local localVersion = rayfieldVersionFromSource(localSrc)
 
 	if remoteOk then
-		if localOk and localPath and (localPatch or 0) ~= (remotePatch or 0) then
+		if localOk and localPath and (localVersion or 0) ~= (remoteVersion or 0) then
 			log(
-				"Replacing stale Syde source (local v"
-					.. tostring(localPatch or "?")
+				"Replacing stale Rayfield source (local v"
+					.. tostring(localVersion or "?")
 					.. " != remote v"
-					.. tostring(remotePatch or "?")
+					.. tostring(remoteVersion or "?")
 					.. ")",
 				true
 			)
 			deleteWorkspaceFile(localPath)
 		end
-		if cacheOk and cachePath and (cachePatch or 0) ~= (remotePatch or 0) then
-			deleteWorkspaceFile(cachePath, { silent = true, label = "stale Syde cache" })
+		if cacheOk and cachePath and (cacheVersion or 0) ~= (remoteVersion or 0) then
+			deleteWorkspaceFile(cachePath, { silent = true, label = "stale Rayfield cache" })
 		end
-		return adoptSyde(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
+		return adoptRayfield(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
 	end
 
 	if localOk then
-		return adoptSyde(localSrc, "local:" .. tostring(localPath))
+		return adoptRayfield(localSrc, "local:" .. tostring(localPath))
 	end
 
 	if cacheOk then
-		return adoptSyde(cacheSrc, "cache:" .. tostring(cachePath))
+		return adoptRayfield(cacheSrc, "cache:" .. tostring(cachePath))
 	end
 
-	local fetchDetail = type(remoteVia) == "string" and remoteVia or sydeSourceRejectReason(remoteSrc)
-	return false, "patched Syde source unavailable (need v" .. tostring(requiredSydePatch()) .. "): " .. tostring(fetchDetail)
+	local fetchDetail = type(remoteVia) == "string" and remoteVia or rayfieldSourceRejectReason(remoteSrc)
+	return false, "Rayfield source unavailable (need v" .. tostring(requiredRayfieldVersion()) .. "): " .. tostring(fetchDetail)
 end
 
 local function usesLegacyHttpHash(src)
@@ -1665,13 +1676,10 @@ local function alleralUiValid(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return false
 	end
-	if not src:find("Syde", 1, true) then
+	if not src:find("Rayfield", 1, true) then
 		return false
 	end
-	if not src:find("loadSyde", 1, true) then
-		return false
-	end
-	if not src:find("ALLERAL_SYDE_PATCH", 1, true) then
+	if not src:find("loadRayfield", 1, true) then
 		return false
 	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then
@@ -1791,14 +1799,14 @@ local function alleralUiRejectReason(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return "missing Alleral UI layer marker"
 	end
-	if not src:find("Syde", 1, true) then
-		return "missing Syde integration"
+	if not src:find("Rayfield", 1, true) then
+		return "missing Rayfield integration"
 	end
-	if not src:find("loadSyde", 1, true) then
-		return "missing loadSyde bootstrap"
+	if not src:find("loadRayfield", 1, true) then
+		return "missing loadRayfield bootstrap"
 	end
-	if not src:find("ALLERAL_SYDE_PATCH", 1, true) then
-		return "missing ALLERAL_SYDE_PATCH marker"
+	if not src:find("ALLERAL_RAYFIELD_VERSION", 1, true) then
+		return "missing ALLERAL_RAYFIELD_VERSION marker"
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua body"
@@ -1831,8 +1839,8 @@ local function extractFileVersion(src, kind)
 	if type(src) ~= "string" then
 		return nil
 	end
-	if kind == "syde" then
-		return src:match("ALLERAL_SYDE_PATCH%s*=%s*(%d+)")
+	if kind == "rayfield" then
+		return src:match("ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)")
 	end
 	if kind == "alleral" then
 		return src:match('Core%.ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
@@ -2229,12 +2237,12 @@ local function loadCore()
 		return false, alleralUiLabel or "Alleral UI layer download failed"
 	end
 
-	if not ENV._AlleralSydeSourceReady then
-		local sydeOk, sydeLabel = ensureSydeSource()
-		if sydeOk then
-			log("Syde source ready (" .. tostring(sydeLabel) .. ")")
+	if not ENV._AlleralRayfieldSourceReady then
+		local studioOk, studioLabel = ensureRayfieldSource()
+		if studioOk then
+			log("Rayfield source ready (" .. tostring(studioLabel) .. ")")
 		else
-			log("Syde source not cached yet: " .. tostring(sydeLabel), true)
+			log("Rayfield source not cached yet: " .. tostring(studioLabel), true)
 		end
 	end
 
@@ -2910,6 +2918,7 @@ local function fetchExpectedVersionsFast()
 		weao = RELEASE_FALLBACK.weao,
 		alleral = RELEASE_FALLBACK.alleral,
 		windui = RELEASE_FALLBACK.windui,
+		rayfieldVersion = RELEASE_FALLBACK.rayfieldVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -2957,6 +2966,7 @@ fetchExpectedVersions = function(forceRefresh)
 		weao = RELEASE_FALLBACK.weao,
 		alleral = RELEASE_FALLBACK.alleral,
 		windui = RELEASE_FALLBACK.windui,
+		rayfieldVersion = RELEASE_FALLBACK.rayfieldVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -2981,7 +2991,7 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.windui = release.windui or expected.alleral or expected.windui
 		expected.commit = release.commit or expected.commit
 		expected.updatedAt = release.updatedAt or expected.updatedAt
-		expected.sydePatch = tonumber(release.sydePatch) or expected.sydePatch
+		expected.rayfieldVersion = tonumber(release.rayfieldVersion) or expected.rayfieldVersion
 		expected.minLoader = release.minLoader or expected.minLoader
 		expected.minCore = release.minCore or expected.minCore
 		if type(release.updatePollSeconds) == "number" then
@@ -3037,7 +3047,7 @@ local function buildUpdateFingerprint(expected, profile)
 		"helpers=" .. tostring(expected.helpers or ""),
 		"weao=" .. tostring(expected.weao or ""),
 		"weaoCfg=" .. tostring((ENV.Alleral_WeaoConfig or {}).version or ""),
-		"sydePatch=" .. tostring(expected.sydePatch or SYDE_PATCH_VERSION),
+		"rayfieldVersion=" .. tostring(expected.rayfieldVersion or RAYFIELD_VERSION),
 	}
 	if profile and profile.id then
 		table.insert(parts, "game=" .. tostring(profile.id) .. "@" .. tostring(expected.games and expected.games[profile.id] or profile.version or ""))
@@ -3089,12 +3099,12 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				UI .. "/syde/source.luau",
-				".alleral/cache/" .. UI .. "/syde/source.luau",
+				UI .. "/rayfield/source.luau",
+				".alleral/cache/" .. UI .. "/rayfield/source.luau",
 			},
-			expectedKey = "syde",
-			extract = "syde",
-			isValid = sydeSourceValid,
+			expectedKey = "rayfieldVersion",
+			extract = "rayfield",
+			isValid = rayfieldSourceValid,
 		},
 		{
 			paths = {
@@ -3255,14 +3265,14 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 	elseif entry.purgeOnLoaderChange then
 		local installedLoader = installedManifest and installedManifest.loader
 		return type(installedLoader) == "string" and installedLoader ~= expected.loader
-	elseif entry.extract == "syde" then
-		expectedVersion = tostring(SYDE_PATCH_VERSION)
+	elseif entry.extract == "rayfield" then
+		expectedVersion = tostring(RAYFIELD_VERSION)
 	else
 		expectedVersion = expected[entry.expectedKey]
 	end
 
 	if type(expectedVersion) ~= "string" or expectedVersion == "" then
-		return entry.extract == "syde" or false
+		return entry.extract == "rayfield" or false
 	end
 
 	if type(src) ~= "string" or src == "" then
@@ -3279,10 +3289,10 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 
 	local foundVersion = extractFileVersion(src, entry.extract)
 	if type(foundVersion) == "string" and foundVersion ~= "" and type(expectedVersion) == "string" and expectedVersion ~= "" then
-		if entry.extract == "syde" then
-			local foundPatch = tonumber(foundVersion) or 0
-			local needPatch = tonumber(expectedVersion) or SYDE_PATCH_VERSION
-			return foundPatch < needPatch
+		if entry.extract == "rayfield" then
+			local foundNum = tonumber(foundVersion) or 0
+			local needVersion = tonumber(expectedVersion) or RAYFIELD_VERSION
+			return foundNum < needVersion
 		end
 		return foundVersion ~= expectedVersion
 	end
@@ -3714,8 +3724,8 @@ local function checkForRemoteUpdate(profile, quiet)
 		reason = "commit " .. tostring(expected.commit)
 	elseif expected.loader and not previous:find("loader=" .. tostring(expected.loader), 1, true) then
 		reason = "loader v" .. tostring(expected.loader)
-	elseif expected.sydePatch and not previous:find("sydePatch=" .. tostring(expected.sydePatch), 1, true) then
-		reason = "syde patch v" .. tostring(expected.sydePatch)
+	elseif expected.rayfieldVersion and not previous:find("rayfieldVersion=" .. tostring(expected.rayfieldVersion), 1, true) then
+		reason = "studio v" .. tostring(expected.rayfieldVersion)
 	elseif profile and expected.games and expected.games[profile.id] then
 		reason = profile.name .. " v" .. tostring(expected.games[profile.id])
 	end
@@ -3922,11 +3932,11 @@ local function main()
 	purgeAlleralWorkspace({ reason = "boot" })
 	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
 	ENV.Alleral_HTTP.get = httpGet
-	local sydePrefetchOk, sydePrefetchLabel = ensureSydeSource()
-	if sydePrefetchOk then
-		log("Syde source ready (" .. tostring(sydePrefetchLabel) .. ")")
+	local studioPrefetchOk, studioPrefetchLabel = ensureRayfieldSource()
+	if studioPrefetchOk then
+		log("Rayfield source ready (" .. tostring(studioPrefetchLabel) .. ")")
 	else
-		log("Syde source not cached yet: " .. tostring(sydePrefetchLabel), true)
+		log("Rayfield source not cached yet: " .. tostring(studioPrefetchLabel), true)
 	end
 	refreshExpectedVersionsAsync()
 	if expectedVersions.loader and versionLt(LOADER_VERSION, expectedVersions.loader) then
@@ -3983,13 +3993,13 @@ local function main()
 				.. " — continuing (bootstrap may refresh on next relaunch)"
 		)
 	end
-	local needSydePatch = tonumber(expectedVersions.sydePatch) or SYDE_PATCH_VERSION
-	if needSydePatch ~= SYDE_PATCH_VERSION then
+	local needRayfieldVersion = tonumber(expectedVersions.rayfieldVersion) or RAYFIELD_VERSION
+	if needRayfieldVersion ~= RAYFIELD_VERSION then
 		log(
-			"Embedded syde patch v"
-				.. tostring(SYDE_PATCH_VERSION)
+			"Embedded rayfield v"
+				.. tostring(RAYFIELD_VERSION)
 				.. " != release v"
-				.. tostring(needSydePatch)
+				.. tostring(needRayfieldVersion)
 				.. " — auto-updating via bootstrap"
 		)
 		ENV.Alleral_LoaderRunning = false
@@ -3997,11 +4007,11 @@ local function main()
 			local count = tonumber(ENV._Alleral_RelaunchCount) or 0
 			local last = tonumber(ENV._Alleral_LastRelaunch) or 0
 			if count >= MAX_RELAUNCHES or os.time() - last < RELAUNCH_COOLDOWN then
-				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping syde-patch relaunch (count=" .. count .. ")")
+				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping studio-version relaunch (count=" .. count .. ")")
 				pcall(function()
 					game:GetService("StarterGui"):SetCore("SendNotification", {
 						Title = "Alleral",
-						Text = "Syde patch mismatch — reload the script to update UI.",
+						Text = "Rayfield UI version mismatch — reload the script to update UI.",
 						Duration = 8,
 					})
 				end)
@@ -4010,7 +4020,7 @@ local function main()
 			ENV._Alleral_RelaunchCount = count + 1
 			ENV._Alleral_LastRelaunch = os.time()
 			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
-				ENV._Alleral_RelaunchViaBootstrap("syde-patch-sync")
+				ENV._Alleral_RelaunchViaBootstrap("studio-version-sync")
 			end
 		end)
 		return

@@ -65,44 +65,44 @@ if ($loader -match 'LOADER_VERSION = "([^"]+)"')
     Fail "loader.luau missing LOADER_VERSION"
 }
 
-if ($release.sydePatch)
+if ($release.rayfieldVersion)
 {
-    if ($loader -match 'local SYDE_PATCH_VERSION = (\d+)')
+    if ($loader -match 'local RAYFIELD_VERSION = (\d+)')
     {
-        $sydePatch = [int]$Matches[1]
-        if ($sydePatch -ne [int]$release.sydePatch)
+        $rayfieldVersion = [int]$Matches[1]
+        if ($rayfieldVersion -ne [int]$release.rayfieldVersion)
         {
-            Fail "loader SYDE_PATCH_VERSION ($sydePatch) != release.json ($($release.sydePatch))"
+            Fail "loader RAYFIELD_VERSION ($rayfieldVersion) != release.json ($($release.rayfieldVersion))"
         } else
         {
-            Pass "loader syde patch $sydePatch"
+            Pass "loader rayfield version $rayfieldVersion"
         }
     } else
     {
-        Fail "loader.luau missing SYDE_PATCH_VERSION"
+        Fail "loader.luau missing RAYFIELD_VERSION"
     }
 
-    $sydeSourcePath = Join-Path $root "ui/syde/source.luau"
-    if (Test-Path $sydeSourcePath)
+    $rayfieldSourcePath = Join-Path $root "ui/rayfield/source.luau"
+    if (Test-Path $rayfieldSourcePath)
     {
-        $sydeSource = Get-Content $sydeSourcePath -Raw
-        if ($sydeSource -match 'ALLERAL_SYDE_PATCH = (\d+)')
+        $rayfieldSource = Get-Content $rayfieldSourcePath -Raw
+        if ($rayfieldSource -match 'ALLERAL_RAYFIELD_VERSION = (\d+)')
         {
-            $sourcePatch = [int]$Matches[1]
-            if ($sourcePatch -ne [int]$release.sydePatch)
+            $sourceVersion = [int]$Matches[1]
+            if ($sourceVersion -ne [int]$release.rayfieldVersion)
             {
-                Fail "ui/syde/source.luau ALLERAL_SYDE_PATCH ($sourcePatch) != release.json ($($release.sydePatch))"
+                Fail "ui/rayfield/source.luau ALLERAL_RAYFIELD_VERSION ($sourceVersion) != release.json ($($release.rayfieldVersion))"
             } else
             {
-                Pass "syde source patch $sourcePatch"
+                Pass "rayfield source version $sourceVersion"
             }
         } else
         {
-            Fail "ui/syde/source.luau missing ALLERAL_SYDE_PATCH"
+            Fail "ui/rayfield/source.luau missing ALLERAL_RAYFIELD_VERSION"
         }
     } else
     {
-        Fail "ui/syde/source.luau missing"
+        Fail "ui/rayfield/source.luau missing"
     }
 }
 
@@ -291,12 +291,12 @@ if ($site.coreVersion -ne $release.core)
 {
     Pass "site coreVersion $($site.coreVersion)"
 }
-if ($release.sydePatch -and $site.sydePatch -ne $release.sydePatch)
+if ($release.rayfieldVersion -and $site.rayfieldVersion -ne $release.rayfieldVersion)
 {
-    Fail "site.json sydePatch ($($site.sydePatch)) != release.json ($($release.sydePatch))"
-} elseif ($release.sydePatch)
+    Fail "site.json rayfieldVersion ($($site.rayfieldVersion)) != release.json ($($release.rayfieldVersion))"
+} elseif ($release.rayfieldVersion)
 {
-    Pass "site sydePatch $($site.sydePatch)"
+    Pass "site rayfieldVersion $($site.rayfieldVersion)"
 }
 
 $analyticsPath = Join-Path $root "hub/analytics.luau"

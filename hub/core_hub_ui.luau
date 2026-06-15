@@ -426,6 +426,12 @@ function Core.releaseUiWindow()
 			end)
 		end
 	end
+	local rayfield = ENV._AlleralRayfield
+	if type(rayfield) == "table" and type(rayfield.Destroy) == "function" then
+		pcall(rayfield.Destroy, rayfield)
+	end
+	ENV._AlleralRayfield = nil
+	ENV._AlleralRayfieldSourceKey = nil
 	ENV._AlleralSyde = nil
 	ENV._AlleralSydeSourceKey = nil
 	ENV._AlleralUiLibrary = nil
@@ -1105,7 +1111,7 @@ function Core.setupHubKeybinds(options)
 	local panicKey = options.panicKey or Enum.KeyCode.Delete
 	local uiKey = options.uiKey or Enum.KeyCode.RightControl
 	local insertKey = options.insertKey or Enum.KeyCode.Insert
-	local sydeUi = Core.UI_LIBRARY == "Syde"
+	local libraryHandlesUiKeybind = Core.UI_LIBRARY == "Rayfield" or Core.UI_LIBRARY == "Syde"
 	ENV._Alleral_KeybindConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or input.UserInputType ~= Enum.UserInputType.Keyboard then
 			return
@@ -1113,7 +1119,7 @@ function Core.setupHubKeybinds(options)
 		if input.KeyCode == panicKey then
 			Core.stateHubStop()
 			Core.notify("Alleral", "everything stopped", 4)
-		elseif input.KeyCode == insertKey or (not sydeUi and input.KeyCode == uiKey) then
+		elseif input.KeyCode == insertKey or (not libraryHandlesUiKeybind and input.KeyCode == uiKey) then
 			if Core.toggleUiVisibility() then
 				Core.notify("Alleral", "UI toggled.", 2)
 			end
@@ -1370,7 +1376,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	local group = Core.buildUiGroup(tab, "Customization V2", column, nil, nil, "CustomizationV2")
 
 	if not windUi or type(windUi.SetMotionProfile) ~= "function" then
-		group:CreateLabel("Syde UI layer unavailable — re-run the loader.")
+		group:CreateLabel("Rayfield UI layer unavailable — re-run the loader.")
 		return group
 	end
 

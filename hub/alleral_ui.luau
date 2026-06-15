@@ -1,24 +1,24 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "4.1.0-studio"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "5.2.0-rayfield"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
-	Core.UI_LIBRARY = "Syde"
+	Core.UI_LIBRARY = "Rayfield"
 
-	local SYDE_SOURCE_PATH = "ui/syde/source.luau"
-	local SYDE_SOURCE_PATHS = {
-		"ui/syde/source.luau",
-		".alleral/cache/ui/syde/source.luau",
-		"kick/ui/syde/source.luau",
+	local RAYFIELD_SOURCE_PATH = "ui/rayfield/source.luau"
+	local RAYFIELD_ICONS_PATH = "ui/rayfield/icons.luau"
+	local RAYFIELD_SOURCE_PATHS = {
+		"ui/rayfield/source.luau",
+		".alleral/cache/ui/rayfield/source.luau",
+		"kick/ui/rayfield/source.luau",
 	}
-	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 42
-	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
-	local SYDE_SEARCH_GUARD_FN = "sydeWindowSearch"
-	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
-	local SYDE_RAW_URLS = {
-			"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/syde/source.luau",
-		}
+	local RAYFIELD_VERSION_MARKER = "ALLERAL_RAYFIELD_VERSION"
+	local RAYFIELD_VERSION = 2
+	local RAYFIELD_REQUIRED_FN = "function RayfieldLibrary:CreateWindow"
+	local RAYFIELD_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
+	local RAYFIELD_RAW_URLS = {
+		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/rayfield/source.luau",
+	}
 
 	local THEME_ACCENTS = {
 		Maclib = Color3.fromRGB(83, 252, 18),
@@ -81,55 +81,48 @@ return function(Core)
 		return iconImage(icon)
 	end
 
-	local function requiredSydePatch()
+	local function requiredRayfieldVersion()
 		local expected = ENV._Alleral_ExpectedVersions
 		if type(expected) == "table" then
-			local patch = tonumber(expected.sydePatch)
-			if patch then
-				return patch
+			local version = tonumber(expected.rayfieldVersion)
+			if version then
+				return version
 			end
 		end
-		return SYDE_PATCH_VERSION
+		return RAYFIELD_VERSION
 	end
 
-	local function sydePatchFromSource(src)
+	local function rayfieldVersionFromSource(src)
 		if type(src) ~= "string" then
 			return nil
 		end
-		local last
-		for patch in src:gmatch("ALLERAL_SYDE_PATCH%s*=%s*(%d+)") do
-			last = tonumber(patch)
-		end
-		return last
+		return tonumber(src:match("ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)"))
 	end
 
-	local function sydeSourceValid(src)
+	local function rayfieldSourceValid(src)
 		if type(src) ~= "string"
-			or #src < 5000
+			or #src < 50000
 			or src:find("<!DOCTYPE", 1, true)
-			or not src:find("sydeFindChild", 1, true)
-			or not src:find(SYDE_PATCH_MARKER, 1, true)
-			or not src:find("sydePrepareDropdownDrop", 1, true)
-			or not src:find(SYDE_PATCH_REQUIRED_FN, 1, true)
-			or not src:find(SYDE_SEARCH_GUARD_FN, 1, true) then
+			or not src:find(RAYFIELD_VERSION_MARKER, 1, true)
+			or not src:find(RAYFIELD_REQUIRED_FN, 1, true)
+			or not src:find("function RayfieldLibrary:Notify", 1, true) then
 			return false
 		end
-		local patch = sydePatchFromSource(src)
-		local need = requiredSydePatch()
-		return type(patch) == "number" and patch == need
+		local version = rayfieldVersionFromSource(src)
+		return type(version) == "number" and version == requiredRayfieldVersion()
 	end
 
-	local function sydeIoFn(name)
+	local function rayfieldIoFn(name)
 		if type(Core.execFunction) == "function" then
 			return Core.execFunction(name)
 		end
 		return nil
 	end
 
-	local function purgeInvalidSydeFile(path)
-		local isFile = sydeIoFn("isfile")
-		local readFile = sydeIoFn("readfile")
-		local deleteFile = sydeIoFn("delfile") or sydeIoFn("deletefile")
+	local function purgeInvalidRayfieldFile(path)
+		local isFile = rayfieldIoFn("isfile")
+		local readFile = rayfieldIoFn("readfile")
+		local deleteFile = rayfieldIoFn("delfile") or rayfieldIoFn("deletefile")
 		if type(isFile) ~= "function" or type(readFile) ~= "function" or type(deleteFile) ~= "function" then
 			return
 		end
@@ -138,15 +131,15 @@ return function(Core)
 			return
 		end
 		local okRead, src = pcall(readFile, path)
-		if okRead and sydeSourceValid(src) then
+		if okRead and rayfieldSourceValid(src) then
 			return
 		end
 		pcall(deleteFile, path)
 	end
 
-	local function readSydeFileAt(path)
-		local readFile = sydeIoFn("readfile")
-		local isFile = sydeIoFn("isfile")
+	local function readRayfieldFileAt(path)
+		local readFile = rayfieldIoFn("readfile")
+		local isFile = rayfieldIoFn("isfile")
 		if type(readFile) ~= "function" or type(isFile) ~= "function" then
 			return Core.readFile and Core.readFile(path)
 		end
@@ -158,18 +151,18 @@ return function(Core)
 		return okRead and src or nil
 	end
 
-	local function tryReadSydePath(relPath)
-		for _, root in ipairs(SYDE_WORKSPACE_ROOTS) do
+	local function tryReadRayfieldPath(relPath)
+		for _, root in ipairs(RAYFIELD_WORKSPACE_ROOTS) do
 			local full = root .. relPath
-			local src = readSydeFileAt(full)
-			if sydeSourceValid(src) then
+			local src = readRayfieldFileAt(full)
+			if rayfieldSourceValid(src) then
 				return src, "local:" .. full
 			end
 		end
 		return nil
 	end
 
-	local function sydeRawUrls()
+	local function rayfieldRawUrls()
 		local urls = {}
 		local seen = {}
 		local function add(url)
@@ -178,49 +171,88 @@ return function(Core)
 				table.insert(urls, url)
 			end
 		end
-		for _, url in ipairs(SYDE_RAW_URLS) do
+		for _, url in ipairs(RAYFIELD_RAW_URLS) do
 			add(url)
 		end
 		local bases = (type(Core._UiRemoteBases) == "table" and Core._UiRemoteBases)
 			or (type(ENV.Alleral_Core) == "table" and ENV.Alleral_Core._UiRemoteBases)
 		if type(bases) == "table" then
 			for _, base in ipairs(bases) do
-				add(tostring(base) .. "/ui/syde/source.luau")
+				add(tostring(base) .. "/ui/rayfield/source.luau")
 			end
 		end
 		return urls
 	end
 
-	local function readSydeSource()
-		local bestSrc, bestLabel, bestPatch = nil, nil, -1
+	local function loadRayfieldIcons()
+		if type(ENV._AlleralRayfieldIcons) == "table" then
+			return ENV._AlleralRayfieldIcons
+		end
+		local iconsSrc = ENV._AlleralRayfieldIconsSource
+		if type(iconsSrc) ~= "string" then
+			for _, path in ipairs({
+				RAYFIELD_ICONS_PATH,
+				"kick/" .. RAYFIELD_ICONS_PATH,
+				".alleral/cache/" .. RAYFIELD_ICONS_PATH,
+			}) do
+				iconsSrc = readRayfieldFileAt(path)
+				if type(iconsSrc) == "string" and #iconsSrc > 100 then
+					break
+				end
+			end
+		end
+		if type(iconsSrc) ~= "string" then
+			return nil
+		end
+		local loadFn = Core.loadStringFn and Core.loadStringFn() or loadstring
+		if type(loadFn) ~= "function" then
+			return nil
+		end
+		local chunk, err = loadFn(iconsSrc, "@Rayfield/icons")
+		if not chunk then
+			return nil
+		end
+		local ok, icons = pcall(chunk)
+		if ok and type(icons) == "table" then
+			ENV._AlleralRayfieldIcons = icons
+			if getgenv then
+				getgenv()._AlleralRayfieldIcons = icons
+			end
+			return icons
+		end
+		return nil
+	end
+
+	local function readRayfieldSource()
+		local bestSrc, bestLabel, bestVersion = nil, nil, -1
 
 		local function consider(src, label)
-			if not sydeSourceValid(src) then
+			if not rayfieldSourceValid(src) then
 				return
 			end
-			local patch = sydePatchFromSource(src) or 0
-			if patch > bestPatch then
-				bestSrc, bestLabel, bestPatch = src, label, patch
+			local version = rayfieldVersionFromSource(src) or 0
+			if version > bestVersion then
+				bestSrc, bestLabel, bestVersion = src, label, version
 			end
 		end
 
-		if type(ENV._AlleralSydeSource) == "string" then
-			consider(ENV._AlleralSydeSource, ENV._AlleralSydeSourceLabel or "memory:loader")
+		if type(ENV._AlleralRayfieldSource) == "string" then
+			consider(ENV._AlleralRayfieldSource, ENV._AlleralRayfieldSourceLabel or "memory:loader")
 		end
 
-		for _, path in ipairs(SYDE_SOURCE_PATHS) do
-			purgeInvalidSydeFile(path)
-			local src, label = tryReadSydePath(path)
+		for _, path in ipairs(RAYFIELD_SOURCE_PATHS) do
+			purgeInvalidRayfieldFile(path)
+			local src, label = tryReadRayfieldPath(path)
 			consider(src, label)
 		end
 
-		for _, baseUrl in ipairs(sydeRawUrls()) do
+		for _, baseUrl in ipairs(rayfieldRawUrls()) do
 			local url = baseUrl .. "?t=" .. tostring(tick())
 			local src
 			if type(Core.httpGet) == "function" then
 				src = Core.httpGet(url)
 			end
-			if not sydeSourceValid(src) then
+			if not rayfieldSourceValid(src) then
 				local http = ENV.Alleral_HTTP
 				if type(http) == "table" and type(http.get) == "function" then
 					src = http.get(url, 8000)
@@ -229,74 +261,73 @@ return function(Core)
 			consider(src, "remote:" .. baseUrl)
 		end
 
-		if not bestSrc or bestPatch ~= requiredSydePatch() then
+		if not bestSrc or bestVersion ~= requiredRayfieldVersion() then
 			return nil, nil
 		end
 
 		if bestLabel and bestLabel:find("^remote:", 1, false) and type(Core.writeFile) == "function" then
-			pcall(Core.writeFile, SYDE_SOURCE_PATH, bestSrc)
-			pcall(Core.writeFile, ".alleral/cache/" .. SYDE_SOURCE_PATH, bestSrc)
+			pcall(Core.writeFile, RAYFIELD_SOURCE_PATH, bestSrc)
+			pcall(Core.writeFile, ".alleral/cache/" .. RAYFIELD_SOURCE_PATH, bestSrc)
 		end
 
 		return bestSrc, bestLabel
 	end
 
-	local function loadSyde()
-		if type(ENV._AlleralSyde) == "table" then
-			local patch = ENV._AlleralSyde.__AlleralPatch
-			local need = requiredSydePatch()
-			if type(patch) ~= "number" or patch ~= need then
-				ENV._AlleralSyde = nil
-				ENV._AlleralSydeSourceKey = nil
+	local function loadRayfield()
+		if type(ENV._AlleralRayfield) == "table" then
+			local version = ENV._AlleralRayfield.__AlleralPatch
+			local need = requiredRayfieldVersion()
+			if type(version) ~= "number" or version ~= need then
+				ENV._AlleralRayfield = nil
+				ENV._AlleralRayfieldSourceKey = nil
 			end
 		end
 
-		local source, sourceLabel = readSydeSource()
+		loadRayfieldIcons()
+
+		local source, sourceLabel = readRayfieldSource()
 		if not source then
-			return nil, "Syde source missing (need patched ui/syde/source.luau v" .. tostring(requiredSydePatch()) .. ")"
+			return nil, "Rayfield source missing (need ui/rayfield/source.luau v" .. tostring(requiredRayfieldVersion()) .. ")"
 		end
 		local sourceKey = tostring(#source) .. ":" .. tostring(sourceLabel or "unknown")
-		if ENV._AlleralSydeSourceKey == sourceKey and type(ENV._AlleralSyde) == "table" and type(ENV._AlleralSyde.Init) == "function" then
-			local patch = ENV._AlleralSyde.__AlleralPatch
-			if type(patch) == "number" and patch == requiredSydePatch() then
-				return ENV._AlleralSyde
+		if ENV._AlleralRayfieldSourceKey == sourceKey and type(ENV._AlleralRayfield) == "table" and type(ENV._AlleralRayfield.CreateWindow) == "function" then
+			local version = ENV._AlleralRayfield.__AlleralPatch
+			if type(version) == "number" and version == requiredRayfieldVersion() then
+				return ENV._AlleralRayfield
 			end
 		end
-		ENV._AlleralSyde = nil
+		ENV._AlleralRayfield = nil
 		local loadFn = Core.loadStringFn()
 		if not loadFn then
 			return nil, "load unavailable"
 		end
-		local chunk, err = loadFn(source, "@Syde/source")
+		local chunk, err = loadFn(source, "@Rayfield/source")
 		if not chunk then
-			return nil, tostring(err or "Syde compile failed")
+			return nil, tostring(err or "Rayfield compile failed")
 		end
-		local ok, Syde = pcall(chunk)
-		if not ok or type(Syde) ~= "table" or type(Syde.Init) ~= "function" then
-			return nil, tostring(Syde or "Syde runtime failed")
+		local ok, RayfieldLib = pcall(chunk)
+		if not ok or type(RayfieldLib) ~= "table" or type(RayfieldLib.CreateWindow) ~= "function" then
+			return nil, tostring(RayfieldLib or "Rayfield runtime failed")
 		end
-		if type(Syde.__AlleralPatch) ~= "number" or Syde.__AlleralPatch ~= requiredSydePatch() then
-			ENV._AlleralSyde = nil
-			ENV._AlleralSydeSourceKey = nil
-			return nil, "Syde patch outdated (need v" .. tostring(requiredSydePatch()) .. ")"
+		if type(RayfieldLib.__AlleralPatch) ~= "number" or RayfieldLib.__AlleralPatch ~= requiredRayfieldVersion() then
+			ENV._AlleralRayfield = nil
+			ENV._AlleralRayfieldSourceKey = nil
+			return nil, "Rayfield version outdated (need v" .. tostring(requiredRayfieldVersion()) .. ")"
 		end
-		ENV._AlleralSydeSourceKey = sourceKey
-		ENV._AlleralSyde = Syde
+		ENV._AlleralRayfieldSourceKey = sourceKey
+		ENV._AlleralRayfield = RayfieldLib
 		if type(Core.say) == "function" then
-			Core.say("Syde patch v" .. tostring(Syde.__AlleralPatch) .. " from " .. tostring(sourceLabel or "unknown"))
+			Core.say("Rayfield v" .. tostring(RayfieldLib.__AlleralPatch) .. " from " .. tostring(sourceLabel or "unknown"))
 		end
-		return Syde
+		return RayfieldLib
 	end
 
-	local function applyAccent(Syde, themeName)
-		local accent = THEME_ACCENTS[themeName] or THEME_ACCENTS.Default
-		if type(Syde.UpdateTheme) == "function" then
-			pcall(Syde.UpdateTheme, Syde, {
-				Accent = accent,
-				HitBox = accent,
-			})
+	local function applyAccent(RayfieldLib, themeName, rfWindow)
+		themeName = tostring(themeName or "Default")
+		if type(rfWindow) == "table" and type(rfWindow.ModifyTheme) == "function" then
+			pcall(rfWindow.ModifyTheme, rfWindow, themeName)
 		end
-		return accent
+		return THEME_ACCENTS[themeName] or THEME_ACCENTS.Default
 	end
 
 	Core._UiTabRegistry = Core._UiTabRegistry or {}
@@ -371,6 +402,65 @@ return function(Core)
 		return findChildLoose(tabsContainer, "tab", "Tab", "tb", "Tb") or tabsContainer
 	end
 
+	local function findTitleLabel(guiObject)
+		if not guiObject then
+			return nil
+		end
+		return guiObject:FindFirstChild("title") or guiObject:FindFirstChild("Title")
+	end
+
+	local function findInteractButton(guiObject)
+		if not guiObject then
+			return nil
+		end
+		return guiObject:FindFirstChild("interact") or guiObject:FindFirstChild("Interact")
+	end
+
+	local function styleRayfieldTabButton(tabButton, selected)
+		if not tabButton or not tabButton:IsA("GuiObject") then
+			return
+		end
+		local title = findTitleLabel(tabButton)
+		ensureCorner(tabButton, 10)
+		tabButton.BackgroundTransparency = selected and 0 or 0.35
+		tabButton.BackgroundColor3 = selected and STUDIO.colors.pillActive or STUDIO.colors.pill
+		if title and title:IsA("TextLabel") then
+			title.Font = selected and Enum.Font.GothamMedium or Enum.Font.Gotham
+			title.TextSize = 13
+			title.TextColor3 = selected and STUDIO.colors.pillTextActive or STUDIO.colors.pillText
+		end
+	end
+
+	local function styleRayfieldTabList(tabList)
+		if not tabList or not tabList:IsA("GuiObject") or tabList:GetAttribute("AlleralRayfieldTabsHooked") then
+			return
+		end
+		tabList:SetAttribute("AlleralRayfieldTabsHooked", true)
+		tabList.BackgroundTransparency = 0.35
+		tabList.BackgroundColor3 = STUDIO.colors.segmentBg
+		ensureCorner(tabList, 14)
+		local function refreshSelection(activeName)
+			for _, child in ipairs(tabList:GetChildren()) do
+				if child:IsA("GuiObject") and child.Name ~= "Template" and child.Name ~= "Placeholder" and findTitleLabel(child) then
+					styleRayfieldTabButton(child, child.Name == activeName)
+				end
+			end
+		end
+		tabList.ChildAdded:Connect(function(child)
+			task.defer(function()
+				local interact = findInteractButton(child)
+				if interact and interact:IsA("GuiButton") then
+					interact.MouseButton1Click:Connect(function()
+						tabList:SetAttribute("AlleralActiveTab", child.Name)
+						refreshSelection(child.Name)
+					end)
+				end
+				refreshSelection(tabList:GetAttribute("AlleralActiveTab"))
+			end)
+		end)
+		refreshSelection(tabList:GetAttribute("AlleralActiveTab"))
+	end
+
 	local function ensureCorner(instance, radius)
 		if not instance or not instance:IsA("GuiObject") then
 			return
@@ -388,7 +478,7 @@ return function(Core)
 		if not tabButton or not tabButton:IsA("GuiObject") then
 			return
 		end
-		local title = tabButton:FindFirstChild("title")
+		local title = findTitleLabel(tabButton)
 		local indicator = tabButton:FindFirstChild("indicator")
 		if indicator and indicator:IsA("GuiObject") then
 			indicator.Visible = false
@@ -428,7 +518,7 @@ return function(Core)
 		end
 		activeName = activeName or tabStrip:GetAttribute("AlleralActiveTab")
 		for _, child in ipairs(tabStrip:GetChildren()) do
-			if child:IsA("GuiObject") and child:FindFirstChild("title") then
+			if child:IsA("GuiObject") and findTitleLabel(child) then
 				styleStudioTabPill(child, child.Name == activeName)
 			end
 		end
@@ -442,16 +532,14 @@ return function(Core)
 			tabStrip:SetAttribute("AlleralStripHooked", true)
 			tabStrip.ChildAdded:Connect(function(child)
 				task.defer(function()
-					if child:IsA("GuiObject") and child:FindFirstChild("interact") then
-						local interact = child.interact
-						if interact:IsA("GuiButton") then
-							interact.MouseButton1Click:Connect(function()
-								tabStrip:SetAttribute("AlleralActiveTab", child.Name)
-								task.defer(function()
-									refreshStudioTabSelection(tabStrip, child.Name)
-								end)
+					local interact = findInteractButton(child)
+					if interact and interact:IsA("GuiButton") then
+						interact.MouseButton1Click:Connect(function()
+							tabStrip:SetAttribute("AlleralActiveTab", child.Name)
+							task.defer(function()
+								refreshStudioTabSelection(tabStrip, child.Name)
 							end)
-						end
+						end)
 					end
 					refreshStudioTabSelection(tabStrip)
 				end)
@@ -468,10 +556,11 @@ return function(Core)
 		layout.SortOrder = Enum.SortOrder.LayoutOrder
 		layout.Padding = UDim.new(0, STUDIO.segmentGap)
 		for _, child in ipairs(tabStrip:GetChildren()) do
-			if child:IsA("GuiObject") and child:FindFirstChild("title") then
-				if child:FindFirstChild("interact") and child.interact:IsA("GuiButton") and not child:GetAttribute("AlleralPillHooked") then
+			if child:IsA("GuiObject") and findTitleLabel(child) then
+				local interact = findInteractButton(child)
+				if interact and interact:IsA("GuiButton") and not child:GetAttribute("AlleralPillHooked") then
 					child:SetAttribute("AlleralPillHooked", true)
-					child.interact.MouseButton1Click:Connect(function()
+					interact.MouseButton1Click:Connect(function()
 						tabStrip:SetAttribute("AlleralActiveTab", child.Name)
 						task.defer(function()
 							refreshStudioTabSelection(tabStrip, child.Name)
@@ -551,7 +640,7 @@ return function(Core)
 		end
 	end
 
-	local function stretchSydePages(pagesFrame)
+	local function stretchStudioPages(pagesFrame)
 		if not pagesFrame or not pagesFrame:IsA("GuiObject") then
 			return
 		end
@@ -643,14 +732,76 @@ return function(Core)
 		end
 		return {
 			main = main,
-			tabs = findChildLoose(main, "tabs", "Tabs"),
-			pages = findChildLoose(main, "pages", "Pages"),
-			top = findChildLoose(main, "top", "Top"),
+			tabs = findChildLoose(main, "tabs", "Tabs", "TabList"),
+			pages = findChildLoose(main, "pages", "Pages", "Elements"),
+			top = findChildLoose(main, "top", "Top", "Topbar"),
 			user = findChildLoose(main, "user", "User"),
 		}
 	end
 
+	function AlleralLayout.applyRayfieldLayout(rawWindow, profile, animated)
+		local nodes = AlleralLayout.findNodes(rawWindow)
+		if not nodes or not nodes.main then
+			return false
+		end
+		profile = profile or AlleralLayout.getProfile()
+		local pad = STUDIO.pad
+		applyAppleChrome(nodes.main, nodes)
+
+		if nodes.top and nodes.top:IsA("GuiObject") then
+			local topSize = UDim2.new(1, -(pad * 2), 0, STUDIO.topBar)
+			local topPos = UDim2.new(0, pad, 0, 8)
+			if animated then
+				tweenGui(nodes.top, MOTION_LAYOUT, { Size = topSize, Position = topPos })
+			else
+				nodes.top.Size = topSize
+				nodes.top.Position = topPos
+			end
+		end
+
+		if nodes.tabs and nodes.tabs:IsA("GuiObject") then
+			local tabY = STUDIO.topBar + 14
+			local tabPos = UDim2.new(0, pad, 0, tabY)
+			local tabSize = UDim2.new(1, -(pad * 2), 0, 36)
+			if animated then
+				tweenGui(nodes.tabs, MOTION_LAYOUT, { Position = tabPos, Size = tabSize })
+			else
+				nodes.tabs.Position = tabPos
+				nodes.tabs.Size = tabSize
+			end
+			if nodes.tabs:IsA("ScrollingFrame") then
+				pcall(function()
+					nodes.tabs.ScrollBarThickness = 0
+					nodes.tabs.AutomaticCanvasSize = Enum.AutomaticSize.X
+					nodes.tabs.ScrollingDirection = Enum.ScrollingDirection.X
+					nodes.tabs.CanvasSize = UDim2.new(0, 0, 0, 0)
+				end)
+			end
+			styleRayfieldTabList(nodes.tabs)
+		end
+
+		if nodes.pages and nodes.pages:IsA("GuiObject") then
+			local contentTop = STUDIO.topBar + 58
+			local pagesPos = UDim2.new(0, pad, 0, contentTop)
+			local pagesSize = UDim2.new(1, -(pad * 2), 1, -(contentTop + 12))
+			if animated then
+				tweenGui(nodes.pages, MOTION_LAYOUT, { Position = pagesPos, Size = pagesSize })
+			else
+				nodes.pages.Position = pagesPos
+				nodes.pages.Size = pagesSize
+			end
+			nodes.pages.ClipsDescendants = true
+		end
+
+		rawWindow._alleralRailLayout = true
+		rawWindow._alleralLayoutMode = "rayfield"
+		return true
+	end
+
 	function AlleralLayout.applyRailLayout(rawWindow, profile, animated)
+		if type(rawWindow) == "table" and rawWindow._rayfieldTabGroup then
+			return AlleralLayout.applyRayfieldLayout(rawWindow, profile, animated)
+		end
 		local nodes = AlleralLayout.findNodes(rawWindow)
 		if not nodes or not nodes.tabs or not nodes.pages then
 			return false
@@ -727,7 +878,7 @@ return function(Core)
 			nodes.pages.Position = pagesPos
 			nodes.pages.Size = pagesSize
 		end
-		stretchSydePages(nodes.pages)
+		stretchStudioPages(nodes.pages)
 		hidePageChrome(nodes.pages)
 
 		rawWindow._alleralRailLayout = true
@@ -743,7 +894,12 @@ return function(Core)
 			if layout and layout.row and layout.left and layout.right then
 				layout.row.Size = UDim2.new(1, 0, 0, 0)
 				layout.row.AutomaticSize = Enum.AutomaticSize.Y
-				local width = layout.row.AbsoluteSize.X
+				local width = 0
+				pcall(function()
+					if layout.row.Parent and layout.row:IsDescendantOf(game) then
+						width = layout.row.AbsoluteSize.X
+					end
+				end)
 				if width <= 0 then
 					task.defer(function()
 						AlleralLayout.relayoutColumns(false)
@@ -760,13 +916,20 @@ return function(Core)
 					layout.right.AutomaticSize = Enum.AutomaticSize.Y
 				end
 				pcall(function()
-					local rawTab = tab._rawTab or tab._sydeTab
-					if rawTab and rawTab.Page then
+					local rawTab = tab._rawTab or tab._rayfieldTab or tab._sydeTab
+					if rawTab and rawTab.Page and rawTab.Page:IsA("ScrollingFrame") then
 						local page = rawTab.Page
 						local columns = page:FindFirstChild("AlleralColumns", true)
 						if columns then
-							local y = columns.AbsoluteSize.Y + 16
-							page.CanvasSize = UDim2.new(0, 0, 0, y)
+							local y = 0
+							pcall(function()
+								if columns.Parent then
+									y = columns.AbsoluteSize.Y + 16
+								end
+							end)
+							if y > 0 then
+								page.CanvasSize = UDim2.new(0, 0, 0, y)
+							end
 						end
 					end
 				end)
@@ -809,12 +972,12 @@ return function(Core)
 		AlleralLayout.relayoutColumns(false)
 	end
 
-	function AlleralLayout.wrapSydeWindowLifecycle(rawWindow, window, settings)
+	function AlleralLayout.wrapStudioWindowLifecycle(rawWindow, window, settings)
 		if rawWindow._alleralLifecycleWrapped then
 			return
 		end
 		rawWindow._alleralLifecycleWrapped = true
-		local openDelay = 0.62
+		local openDelay = rawWindow._rayfieldTabGroup and 0.12 or 0.62
 		local origSetState = rawWindow.SetState
 		local origToggle = rawWindow.Toggle
 
@@ -861,7 +1024,7 @@ return function(Core)
 			return
 		end
 		settings = type(settings) == "table" and settings or {}
-		AlleralLayout.wrapSydeWindowLifecycle(rawWindow, window, settings)
+		AlleralLayout.wrapStudioWindowLifecycle(rawWindow, window, settings)
 		if rawWindow._alleralResizeHooked then
 			AlleralLayout.applyLayoutOnly(rawWindow, false)
 			return
@@ -900,14 +1063,14 @@ return function(Core)
 		end
 	end
 
-	local function wrapLibrary(Syde)
-		local themes = { "Default", "Maclib", "Private", "Dark", "Light", "Linoria", "Obsidian" }
+	local function wrapLibrary(RayfieldLib)
+		local themes = { "Default", "Ocean", "Amethyst", "DarkBlue", "Green", "Red" }
 		local activeTheme = "Default"
 		local activeWindow = nil
 		local notificationsEnabled = true
 
 		local Library = {
-			Syde = Syde,
+			Rayfield = RayfieldLib,
 			Window = nil,
 			Version = Core.ALLERAL_UI_VERSION,
 			ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION,
@@ -922,7 +1085,7 @@ return function(Core)
 			while #Library._pendingNotifies > 0 do
 				local payload = table.remove(Library._pendingNotifies, 1)
 				pcall(function()
-					Syde:Notify({
+					RayfieldLib:Notify({
 						Title = payload.Title or "Alleral",
 						Content = payload.Description or "",
 						Duration = payload.Lifetime or 4,
@@ -943,7 +1106,7 @@ return function(Core)
 			end
 			if activeWindow then
 				pcall(function()
-					Syde:Notify({
+					RayfieldLib:Notify({
 						Title = payload.Title,
 						Content = payload.Description,
 						Duration = payload.Lifetime,
@@ -1006,7 +1169,7 @@ return function(Core)
 		function Library:SetTheme(name)
 			activeTheme = tostring(name or activeTheme)
 			ENV.Alleral_ActiveTheme = activeTheme
-			applyAccent(Syde, activeTheme)
+			applyAccent(RayfieldLib, activeTheme, activeWindow)
 		end
 
 		function Library:CycleTheme(step)
@@ -1110,33 +1273,32 @@ return function(Core)
 
 			local themeName = settings.Theme or activeTheme
 			activeTheme = themeName
-			applyAccent(Syde, themeName)
+			local profile = AlleralLayout.getProfile()
+			local alleralSize = settings.Size or AlleralLayout.computeSize(profile, 4, nil)
 
-			local sydeWindow = Syde:Init({
-				Title = settings.Title or settings.Name or "Alleral",
-				SubText = settings.Subtitle or settings.SubName or "",
-				Home = { Enabled = false },
-				Keybind = menuKey,
+			local icon = settings.Icon and iconImage(settings.Icon) or nil
+			local rfWindow = RayfieldLib:CreateWindow({
+				Name = settings.Title or settings.Name or "Alleral",
+				LoadingTitle = settings.Title or settings.Name or "Alleral",
+				LoadingSubtitle = settings.Subtitle or settings.SubName or "",
+				ToggleUIKeybind = menuKey,
+				Theme = themeName,
+				Icon = icon and tonumber(icon) or 0,
+				DisableRayfieldPrompts = true,
+				DisableBuildWarnings = true,
+				ConfigurationSaving = { Enabled = false },
+				AlleralSize = alleralSize,
 			})
 
-			if not sydeWindow then
+			if not rfWindow then
 				return nil
 			end
 
-			sydeWindow._sydeTabGroup = {
-				Tab = function(_, opts)
-					opts = type(opts) == "table" and opts or { Name = tostring(opts or "Tab") }
-					return sydeWindow:InitTab({
-						Title = opts.Name or "Tab",
-						Icon = opts.Image and iconImage(opts.Image) or nil,
-					})
-				end,
-			}
-
-			activeWindow = sydeWindow
-			Library.Window = sydeWindow
+			applyAccent(RayfieldLib, themeName, rfWindow)
+			activeWindow = rfWindow
+			Library.Window = rfWindow
 			flushPendingNotifies()
-			return sydeWindow
+			return rfWindow
 		end
 
 		return Library
@@ -1165,13 +1327,13 @@ return function(Core)
 			ENV.Alleral_UI = nil
 		end
 
-		local Syde, err = loadSyde()
-		if not Syde then
-			Core.logWarn("Alleral UI load failed: " .. tostring(err or "Syde missing"))
-			return nil, err or "Syde missing"
+		local RayfieldLib, err = loadRayfield()
+		if not RayfieldLib then
+			Core.logWarn("Alleral UI load failed: " .. tostring(err or "Rayfield missing"))
+			return nil, err or "Rayfield missing"
 		end
 
-		local Library = wrapLibrary(Syde)
+		local Library = wrapLibrary(RayfieldLib)
 		ENV._AlleralUiLibrary = Library
 		Core.clearUiStateBindings()
 
@@ -1179,7 +1341,7 @@ return function(Core)
 			Library = Library,
 			Alleral = Library,
 			WindUI = Library,
-			Syde = Syde,
+			Rayfield = RayfieldLib,
 			CreateWindow = function(_, settings)
 				return Library:CreateWindow(settings)
 			end,
@@ -1187,7 +1349,7 @@ return function(Core)
 				Library:Notification(info)
 			end,
 		}
-		Core.say("Alleral UI " .. tostring(Library:GetAlleralVersion()) .. " (Syde)")
+		Core.say("Alleral UI " .. tostring(Library:GetAlleralVersion()) .. " (Rayfield)")
 		return cacheUi(bundle)
 	end
 
@@ -1197,7 +1359,7 @@ return function(Core)
 
 	Core.releaseAlleralRuntime = function()
 		ENV._AlleralUiLibrary = nil
-		ENV._AlleralSyde = nil
+		ENV._AlleralRayfield = nil
 		ENV._AlleralMaclib = nil
 	end
 
@@ -1205,11 +1367,11 @@ return function(Core)
 		if type(bundle) ~= "table" then
 			return nil
 		end
-		return bundle.Alleral or bundle.Library or bundle.Syde
+		return bundle.Alleral or bundle.Library or bundle.Rayfield
 	end
 
-	function Core.createWindUiGroupbox(sydeTab, uiBundle, parent)
-		sydeTab = sydeTab or {}
+	function Core.createWindUiGroupbox(rfTab, uiBundle, parent)
+		rfTab = rfTab or {}
 		uiBundle = uiBundle or {}
 		local serial = 0
 
@@ -1256,18 +1418,19 @@ return function(Core)
 
 		local groupbox = {}
 		local function selectParent()
-			if parent and type(sydeTab.SetParent) == "function" then
-				pcall(sydeTab.SetParent, sydeTab, parent)
+			if parent and type(rfTab.SetParent) == "function" then
+				pcall(rfTab.SetParent, rfTab, parent)
 			end
 		end
 
 		function groupbox:CreateToggle(settings, id)
 			selectParent()
-			local handle = sydeTab:Toggle({
-				Title = settings.Name,
-				Description = settings.Description or settings.Tooltip or "",
-				Value = settings.CurrentValue == true,
-				CallBack = settings.Callback or function() end,
+			local flag = nextFlag(settings.Name, id)
+			local handle = rfTab:CreateToggle({
+				Name = settings.Name,
+				CurrentValue = settings.CurrentValue == true,
+				Flag = flag,
+				Callback = settings.Callback or function() end,
 			})
 			return wrapElement(function(nextSettings)
 				if nextSettings.CurrentValue == nil or not handle then
@@ -1275,7 +1438,7 @@ return function(Core)
 				end
 				local value = nextSettings.CurrentValue == true
 				if type(handle.Set) == "function" then
-					pcall(handle.Set, handle, value, true)
+					pcall(handle.Set, handle, value)
 				end
 			end, {
 				raw = handle,
@@ -1289,24 +1452,18 @@ return function(Core)
 			local range = settings.Range or { 0, 100 }
 			local minValue, maxValue = range[1], range[2]
 			local increment = tonumber(settings.Increment) or Core.sliderIncrement(minValue, maxValue, settings.Increment)
-			local handle = sydeTab:Slider({
-				Title = settings.Name,
-				Description = settings.Description or settings.Tooltip or "",
-				Sliders = {
-					{
-						Title = " ",
-						Range = { minValue, maxValue },
-						Increment = increment,
-						StarterValue = tonumber(settings.CurrentValue) or minValue,
-						CallBack = settings.Callback or function() end,
-					},
-				},
+			local handle = rfTab:CreateSlider({
+				Name = settings.Name,
+				Range = { minValue, maxValue },
+				Increment = increment,
+				CurrentValue = tonumber(settings.CurrentValue) or minValue,
+				Flag = nextFlag(settings.Name, id),
+				Callback = settings.Callback or function() end,
 			})
 			return wrapElement(function(nextSettings)
 				if nextSettings.CurrentValue == nil then
 					return
 				end
-				-- Syde slider handles are internal; best-effort via stored slider row if present
 				if handle and type(handle.Set) == "function" then
 					pcall(handle.Set, handle, tonumber(nextSettings.CurrentValue))
 				end
@@ -1320,10 +1477,9 @@ return function(Core)
 		function groupbox:CreateButton(settings, id)
 			selectParent()
 			local userCallback = settings.Callback or function() end
-			local handle = sydeTab:Button({
-				Title = settings.Name,
-				Description = settings.Description or settings.Tooltip or "",
-				CallBack = function()
+			local handle = rfTab:CreateButton({
+				Name = settings.Name,
+				Callback = function()
 					userCallback()
 				end,
 			})
@@ -1334,9 +1490,6 @@ return function(Core)
 				if nextSettings.Callback then
 					userCallback = nextSettings.Callback
 				end
-				if handle and type(handle.Set) == "function" then
-					pcall(handle.Set, handle, nextSettings)
-				end
 			end, {
 				raw = handle,
 				kind = "button",
@@ -1345,11 +1498,12 @@ return function(Core)
 
 		function groupbox:CreateInput(settings, id)
 			selectParent()
-			local handle = sydeTab:TextInput({
-				Title = settings.Name,
-				PlaceHolder = settings.PlaceholderText or settings.Placeholder or "",
-				NumberOnly = settings.AcceptedCharacters == "Numeric",
-				CallBack = settings.Callback or function() end,
+			local handle = rfTab:CreateInput({
+				Name = settings.Name,
+				PlaceholderText = settings.PlaceholderText or settings.Placeholder or "",
+				CurrentValue = tostring(settings.CurrentValue or ""),
+				Flag = nextFlag(settings.Name, id),
+				Callback = settings.Callback or function() end,
 			})
 			return wrapElement(function(nextSettings)
 				if nextSettings.CurrentValue == nil then
@@ -1370,13 +1524,13 @@ return function(Core)
 			local values = settings.Options or settings.Values or {}
 			local multi = settings.MultipleOptions == true or settings.Multi == true
 			local current = dropdownDefault(values, settings.CurrentOption, multi)
-			local starter = multi and current or tostring(current or values[1] or "")
-			local handle = sydeTab:Dropdown({
-				Title = settings.Name,
+			local handle = rfTab:CreateDropdown({
+				Name = settings.Name,
 				Options = values,
-				StarterOption = starter,
-				Multi = multi,
-				CallBack = function(selection)
+				CurrentOption = multi and current or tostring(current or values[1] or ""),
+				MultipleOptions = multi,
+				Flag = nextFlag(settings.Name, id),
+				Callback = function(selection)
 					local userCallback = settings.Callback or function() end
 					if multi then
 						userCallback(Core.normalizeMultiSelection(selection))
@@ -1391,14 +1545,12 @@ return function(Core)
 				if not handle then
 					return
 				end
-				if type(nextValues) == "table" then
-					values = nextValues
-					if type(handle.Refresh) == "function" then
-						pcall(handle.Refresh, handle, values, pick)
-						return
-					end
+				if type(nextValues) == "table" and type(handle.Refresh) == "function" then
+					pcall(handle.Refresh, handle, nextValues)
 				end
-				if pick == nil then return end
+				if pick == nil then
+					return
+				end
 				if type(handle.Set) == "function" then
 					pcall(handle.Set, handle, pick)
 				end
@@ -1412,15 +1564,12 @@ return function(Core)
 		function groupbox:CreateLabel(settings, id)
 			local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
 			selectParent()
-			local handle = sydeTab:Label(text)
+			rfTab:CreateLabel(text)
 			return {
-				_raw = handle,
 				Set = function(_, nextSettings)
 					local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text)
 						or tostring(nextSettings or "")
-					if handle and type(handle.Set) == "function" then
-						pcall(handle.Set, handle, nextText)
-					end
+					rfTab:CreateLabel(nextText)
 				end,
 				SetVisible = function() end,
 			}
@@ -1470,13 +1619,16 @@ return function(Core)
 		return groupbox
 	end
 
-	local function ensureSydeColumns(tab)
+	local function ensureStudioColumns(tab)
 		if tab._layout then
 			return tab._layout
 		end
-		local rawTab = tab._sydeTab
+		local rawTab = tab._rayfieldTab or tab._sydeTab or tab._rawTab
 		local page = rawTab and rawTab.Page
-		if not page or not page:IsA("ScrollingFrame") then
+		if not page or not page:IsA("GuiObject") then
+			return nil
+		end
+		if not page:IsA("ScrollingFrame") then
 			return nil
 		end
 
@@ -1548,6 +1700,7 @@ return function(Core)
 	function Core.wrapUiTab(rawTab, uiBundle, window)
 		local tab = {
 			_rawTab = rawTab,
+			_rayfieldTab = rawTab,
 			_sydeTab = rawTab,
 			_macTab = rawTab,
 			_ui = uiBundle,
@@ -1559,11 +1712,11 @@ return function(Core)
 		function tab:CreateGroupbox(settings)
 			settings = settings or {}
 			local name = settings.Name or "Group"
-			if not rawTab or type(rawTab.Section) ~= "function" then
+			if not rawTab or (type(rawTab.Section) ~= "function" and type(rawTab.CreateSection) ~= "function") then
 				Core.logWarn("CreateGroupbox skipped — tab missing for " .. tostring(name))
 				return Core.createStubUiGroup(name)
 			end
-			local layout = ensureSydeColumns(self)
+			local layout = ensureStudioColumns(self)
 			local columnIndex = math.clamp(tonumber(settings.Column) or 1, 1, 2)
 			local column = layout and (columnIndex == 2 and layout.right or layout.left)
 			if not column then
@@ -1611,7 +1764,7 @@ return function(Core)
 				end
 				ENV.Alleral_ActiveTheme = selected
 				Core.notify("Theme", "Applied " .. tostring(selected), 2, "success")
-			end, "Syde accent themes.")
+			end, "Rayfield theme presets.")
 			group:CreateButton("Next theme", function()
 				if lib and type(lib.CycleTheme) == "function" then
 					local ok, nextTheme = pcall(function()
@@ -1646,7 +1799,7 @@ return function(Core)
 		end
 		local rawWindow = lib:CreateWindow(settings)
 		if not rawWindow then
-			Core.logWarn("Syde window create failed")
+			Core.logWarn("Rayfield window create failed")
 			return nil
 		end
 		local window = {
@@ -1655,7 +1808,7 @@ return function(Core)
 			_ui = ui,
 			_library = lib,
 			_initialized = false,
-			_tabGroup = rawWindow._sydeTabGroup or rawWindow._macTabGroup,
+			_tabGroup = rawWindow._rayfieldTabGroup or rawWindow._sydeTabGroup or rawWindow._macTabGroup,
 			_alleralSettings = settings,
 		}
 		Core.registerUiWindow(window)
@@ -1673,7 +1826,7 @@ return function(Core)
 			if not tabGroup or type(tabGroup.Tab) ~= "function" then
 				return nil
 			end
-			return tabGroup:Tab({ Name = name, Image = icon and iconImage(icon) or nil })
+			return tabGroup:Tab({ Name = name, Image = icon and tonumber(iconImage(icon)) or nil })
 		end
 
 		function window:Toggle()
@@ -1702,12 +1855,12 @@ return function(Core)
 			Core.logWarn("buildUiTab skipped — window missing")
 			return Core.wrapUiTab(nil, type(section) == "table" and section._ui or nil, window)
 		end
-		local tabGroup = window._tabGroup or window._rawWindow._sydeTabGroup
+		local tabGroup = window._tabGroup or window._rawWindow._rayfieldTabGroup or window._rawWindow._sydeTabGroup
 		if not tabGroup or type(tabGroup.Tab) ~= "function" then
 			Core.logWarn("buildUiTab skipped — tab group missing")
 			return Core.wrapUiTab(nil, window._ui, window)
 		end
-		local rawTab = tabGroup:Tab({ Name = name, Image = icon and iconImage(icon) or nil })
+		local rawTab = tabGroup:Tab({ Name = name, Image = icon and tonumber(iconImage(icon)) or nil })
 		local wrapped = Core.wrapUiTab(rawTab, window._ui or (type(section) == "table" and section._ui) or nil, window)
 		wrapped._columnCount = math.max(1, tonumber(columns) or 2)
 		if not window._defaultTab then

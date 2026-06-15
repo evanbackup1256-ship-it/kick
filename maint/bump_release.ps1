@@ -41,9 +41,9 @@ $loaderPath = Join-Path $root "loader.luau"
 $loaderRaw = Get-Content $loaderPath -Raw -Encoding UTF8
 $loaderRaw = [regex]::Replace($loaderRaw, 'local LOADER_VERSION = "[^"]+"', ('local LOADER_VERSION = "' + $release.loader + '"'))
 $loaderRaw = [regex]::Replace($loaderRaw, '(?m)^\tloader = "[^"]+"', ("`tloader = `"$($release.loader)`""), 1)
-if ($null -ne $release.sydePatch) {
-    $sydePatchVal = [int]$release.sydePatch
-    $loaderRaw = [regex]::Replace($loaderRaw, 'local SYDE_PATCH_VERSION = \d+', ('local SYDE_PATCH_VERSION = ' + $sydePatchVal))
+if ($null -ne $release.rayfieldVersion) {
+    $rayfieldVersionVal = [int]$release.rayfieldVersion
+    $loaderRaw = [regex]::Replace($loaderRaw, 'local RAYFIELD_VERSION = \d+', ('local RAYFIELD_VERSION = ' + $rayfieldVersionVal))
 }
 $fallbackFields = @(
     @{ Key = "core"; Prop = "core" },
@@ -88,19 +88,19 @@ $siteSrc = Join-Path $root "cfg/site.json"
 $siteRaw = Get-Content $siteSrc -Raw -Encoding UTF8
 $siteRaw = [regex]::Replace($siteRaw, '"loaderVersion"\s*:\s*"[^"]*"', ('"loaderVersion": "' + $release.loader + '"'))
 $siteRaw = [regex]::Replace($siteRaw, '"coreVersion"\s*:\s*"[^"]*"', ('"coreVersion": "' + $release.core + '"'))
-$uiLibrary = if ($release.ui) { $release.ui } else { "Syde" }
+$uiLibrary = if ($release.ui) { $release.ui } else { "Rayfield" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiLibrary"\s*:\s*"[^"]*"', ('"uiLibrary": "' + $uiLibrary + '"'))
-$uiVersion = if ($release.alleral) { $release.alleral } elseif ($release.windui) { $release.windui } else { "4.0.0-syde" }
+$uiVersion = if ($release.alleral) { $release.alleral } elseif ($release.windui) { $release.windui } else { "5.2.0-rayfield" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiVersion"\s*:\s*"[^"]*"', ('"uiVersion": "' + $uiVersion + '"'))
-if ($null -ne $release.sydePatch) {
-    $sydePatchVal = [int]$release.sydePatch
-    if ($siteRaw -match '"sydePatch"\s*:\s*\d+') {
-        $siteRaw = [regex]::Replace($siteRaw, '"sydePatch"\s*:\s*\d+', ('"sydePatch": ' + $sydePatchVal))
+if ($null -ne $release.rayfieldVersion) {
+    $rayfieldVersionVal = [int]$release.rayfieldVersion
+    if ($siteRaw -match '"rayfieldVersion"\s*:\s*\d+') {
+        $siteRaw = [regex]::Replace($siteRaw, '"rayfieldVersion"\s*:\s*\d+', ('"rayfieldVersion": ' + $rayfieldVersionVal))
     } else {
         $siteRaw = [regex]::Replace(
             $siteRaw,
             '("uiVersion"\s*:\s*"[^"]*"\s*,)',
-            ('$1' + "`n  ""sydePatch"": " + $sydePatchVal + ",")
+            ('$1' + "`n  ""rayfieldVersion"": " + $rayfieldVersionVal + ",")
         )
     }
 }

@@ -1,12 +1,12 @@
--- Alleral Bootstrap v1.0.6
+-- Alleral Bootstrap v1.0.8
 -- Save this loadstring once in your executor — it always fetches the latest loader from GitHub.
 -- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=" .. tick(), true))()
 
-local BOOTSTRAP_VERSION = "1.0.6"
+local BOOTSTRAP_VERSION = "1.0.9"
 local HTTP_GET_TIMEOUT = 12
 local FALLBACK_RELEASE = {
-	loader = "8.3.4",
-	sydePatch = 42,
+	loader = "8.6.0",
+	rayfieldVersion = 2,
 }
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
@@ -161,7 +161,7 @@ local function parseReleaseJson(src)
 	return {
 		loader = src:match('"loader"%s*:%s*"([^"]+)"'),
 		commit = src:match('"commit"%s*:%s*"([^"]+)"'),
-		sydePatch = tonumber(src:match('"sydePatch"%s*:%s*(%d+)')),
+		rayfieldVersion = tonumber(src:match('"rayfieldVersion"%s*:%s*(%d+)')),
 	}
 end
 
@@ -172,11 +172,11 @@ local function loaderCommitFromSource(src)
 	return src:match('commit = "([^"]+)"')
 end
 
-local function loaderSydePatchFromSource(src)
+local function loaderRayfieldVersionFromSource(src)
 	if type(src) ~= "string" then
 		return nil
 	end
-	return tonumber(src:match("local SYDE_PATCH_VERSION = (%d+)"))
+	return tonumber(src:match("local RAYFIELD_VERSION = (%d+)"))
 end
 
 local function loaderMatchesRelease(src, meta, strictCommit)
@@ -195,10 +195,10 @@ local function loaderMatchesRelease(src, meta, strictCommit)
 			return false, "embedded commit " .. tostring(embedded or "?") .. " != release " .. meta.commit
 		end
 	end
-	if strictCommit and type(meta.sydePatch) == "number" then
-		local patch = loaderSydePatchFromSource(src)
-		if patch ~= meta.sydePatch then
-			return false, "syde patch v" .. tostring(patch or "?") .. " != release v" .. tostring(meta.sydePatch)
+	if strictCommit and type(meta.rayfieldVersion) == "number" then
+		local version = loaderRayfieldVersionFromSource(src)
+		if version ~= meta.rayfieldVersion then
+			return false, "rayfield v" .. tostring(version or "?") .. " != release v" .. tostring(meta.rayfieldVersion)
 		end
 	end
 	return true, remoteVer
@@ -235,7 +235,7 @@ local function fetchReleaseMeta()
 	return {
 		loader = FALLBACK_RELEASE.loader,
 		commit = BRANCH,
-		sydePatch = FALLBACK_RELEASE.sydePatch,
+		rayfieldVersion = FALLBACK_RELEASE.rayfieldVersion,
 	}, "fallback"
 end
 
@@ -286,6 +286,7 @@ local PURGE_PATHS = {
 	"hub/core_hub_ui.luau",
 	"core/alleral_core.luau",
 	"alleral_core.luau",
+	"ui/rayfield/source.luau",
 	"ui/syde/source.luau",
 	"obfusctated_uilibrary.luau",
 	".alleral/versions.json",
