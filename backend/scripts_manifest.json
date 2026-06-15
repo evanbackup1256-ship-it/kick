@@ -5,8 +5,8 @@
     "kick_a_lucky_block": {
       "name": "Kick a Lucky Block",
       "status": "working",
-      "version": "7.2.4",
-      "message": "Fix MacLib slider format crash and stop game module compile hangs on Xeno.",
+      "version": "7.2.5",
+      "message": "Registry-only game module loading on Xeno; remote-first kick like Luxy Hub.",
       "updatedAt": "2026-06-15T21:00:00+00:00",
       "updatedBy": "system"
     },

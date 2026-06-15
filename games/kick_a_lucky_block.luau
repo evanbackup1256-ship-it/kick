@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "7.2.4"
+local VERSION = "7.2.5"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -410,6 +410,16 @@ end
 
 local function trim(value)
 	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
+end
+
+local function rollPayloadString(value)
+	if type(value) == "string" then
+		return value
+	end
+	if value == nil or value == false then
+		return ""
+	end
+	return tostring(value)
 end
 
 local function notify(title, text, duration, notifyType)
@@ -1207,7 +1217,7 @@ local function loadModule(key, label, resolver, optional)
 
 	local ok, result
 	local requireFn = entry.optional and gameRequireModuleWithTimeout or gameRequireModule
-	local requireTimeout = entry.optional and 8 or nil
+	local requireTimeout = entry.optional and 18 or nil
 	if entry.optional then
 		ok, result = pcall(function()
 			return requireFn(target, requireTimeout)
@@ -1285,7 +1295,7 @@ end
 
 loadModule("entitiesData", "EntitiesData", function()
 	return rsChild("Shared", "Data", "EntitiesData")
-end, false)
+end, true)
 loadModule("mutationData", "MutationData", function()
 	return rsChild("Shared", "Data", "MutationData")
 end, true)
@@ -1301,7 +1311,7 @@ loadModule("sacrificeData", "SacrificeData", function()
 end, true)
 loadModule("kickService", "KickServiceClient", function()
 	return rsChild("Modules", "ServicesLoader", "KickServiceClient")
-end, false)
+end, true)
 loadModule("rebirthData", "RebirthData", function()
 	return rsChild("Shared", "Data", "RebirthData")
 end, true)
@@ -1332,7 +1342,7 @@ task.spawn(function()
 		return
 	end
 	player:WaitForChild("PlayerScripts", 45)
-	task.wait(3)
+	task.wait(5)
 	if G.invalidateGameRequire then
 		G.invalidateGameRequire()
 	end
@@ -1793,6 +1803,7 @@ local function sendHighlightRollWebhook(name, mutation, rarity)
 end
 
 local function handleInGameRoll(inGame)
+	inGame = rollPayloadString(inGame)
 	if inGame == "" then
 		return
 	end
@@ -2017,17 +2028,17 @@ local function currentBattleStatus()
 		return runtime.cachedBattleStatus
 	end
 	local status = nil
-	safeCall("BattleStatus", function()
-		local m = gameRequireModule(ReplicatedStorage.Modules.UILoader.KickBattlesUI)
-		if m and m.CurrentStatus ~= nil then
-			status = tostring(m.CurrentStatus)
-		end
-	end)
+	local attr = LocalPlayer:GetAttribute("BattleStatus")
+	if attr ~= nil then
+		status = tostring(attr)
+	end
 	if not status then
-		local attr = LocalPlayer:GetAttribute("BattleStatus")
-		if attr ~= nil then
-			status = tostring(attr)
-		end
+		safeCall("BattleStatus", function()
+			local m = gameRequireModule(ReplicatedStorage.Modules.UILoader.KickBattlesUI)
+			if m and m.CurrentStatus ~= nil then
+				status = tostring(m.CurrentStatus)
+			end
+		end)
 	end
 	if status == "None" or status == "" then
 		status = nil
@@ -2180,7 +2191,7 @@ local function stabilizeOnKickPad(root, humanoid, kickReady)
 end
 
 local function currentRollPayload()
-	local inGame = LocalPlayer:GetAttribute("InGame") or ""
+	local inGame = rollPayloadString(LocalPlayer:GetAttribute("InGame"))
 	if inGame ~= "" then
 		return inGame
 	end
@@ -4974,7 +4985,7 @@ end)
 
 track(
 	LocalPlayer:GetAttributeChangedSignal("InGame"):Connect(function()
-		handleInGameRoll(LocalPlayer:GetAttribute("InGame") or "")
+		handleInGameRoll(LocalPlayer:GetAttribute("InGame"))
 	end),
 	"InGameRoll"
 )
