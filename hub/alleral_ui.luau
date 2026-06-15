@@ -304,6 +304,22 @@ return function(Core)
 	local AlleralLayout = {}
 	AlleralLayout._resizeToken = 0
 	AlleralLayout._activeTweens = {}
+	AlleralLayout._suspendUntil = 0
+
+	function AlleralLayout.suspendResize(seconds)
+		AlleralLayout._suspendUntil = math.max(AlleralLayout._suspendUntil, tick() + (tonumber(seconds) or 0.6))
+	end
+
+	function AlleralLayout.canAutoResize()
+		return tick() >= (AlleralLayout._suspendUntil or 0)
+	end
+
+	function AlleralLayout.normalizeResizeOpts(opts)
+		if type(opts) == "boolean" then
+			return opts and { forceSize = true } or {}
+		end
+		return type(opts) == "table" and opts or {}
+	end
 
 	local function findChildLoose(parent, ...)
 		if not parent then
@@ -327,21 +343,19 @@ return function(Core)
 		return nil
 	end
 
-	local function fitSydeRailTabs(tabsFrame, railWidth)
+	local function fitSydeRailTabs(tabsFrame)
 		if not tabsFrame or not tabsFrame:IsA("GuiObject") then
 			return
 		end
 		for _, tabButton in ipairs(tabsFrame:GetChildren()) do
-			if tabButton:IsA("GuiObject") and tabButton:FindFirstChild("title") then
+			if tabButton:IsA("GuiObject") and tabButton:FindFirstChild("title") and not tabButton:GetAttribute("AlleralRailFit") then
 				local title = tabButton.title
-				tabButton.Size = UDim2.new(1, -6, 0, 36)
 				if title:IsA("TextLabel") then
-					title.Size = UDim2.new(1, -10, 1, 0)
-					title.Position = UDim2.new(0, 5, 0, 0)
 					title.TextXAlignment = Enum.TextXAlignment.Left
 					title.TextTruncate = Enum.TextTruncate.AtEnd
 					title.TextWrapped = false
 				end
+				tabButton:SetAttribute("AlleralRailFit", true)
 			end
 		end
 	end
@@ -350,19 +364,16 @@ return function(Core)
 		if not pagesFrame or not pagesFrame:IsA("GuiObject") then
 			return
 		end
+		if pagesFrame:GetAttribute("AlleralStretched") then
+			return
+		end
+		pagesFrame:SetAttribute("AlleralStretched", true)
 		pagesFrame.ClipsDescendants = true
 		local clip = findChildLoose(pagesFrame, "clipframe", "ClipFrame", "clip")
 		if clip and clip:IsA("GuiObject") then
 			clip.AnchorPoint = Vector2.new(0, 0)
 			clip.Position = UDim2.new(0, 0, 0, 0)
 			clip.Size = UDim2.new(1, 0, 1, 0)
-		end
-		for _, page in ipairs(pagesFrame:GetChildren()) do
-			if page:IsA("ScrollingFrame") then
-				page.Size = UDim2.new(1, 0, 1, 0)
-				page.Position = UDim2.new(0, 0, 0, 0)
-				page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-			end
 		end
 	end
 
@@ -476,7 +487,7 @@ return function(Core)
 			nodes.tabs.ScrollingDirection = Enum.ScrollingDirection.Y
 			nodes.tabs.CanvasSize = UDim2.new(0, 0, 0, 0)
 		end
-		fitSydeRailTabs(nodes.tabs, rail)
+		fitSydeRailTabs(nodes.tabs)
 		local tabList = nodes.tabs:FindFirstChildOfClass("UIListLayout")
 		if tabList then
 			tabList.FillDirection = Enum.FillDirection.Vertical
@@ -559,21 +570,85 @@ return function(Core)
 		end
 	end
 
-	function AlleralLayout.smartResize(window, rawWindow, settings, instant)
+	function AlleralLayout.applyLayoutOnly(rawWindow, animated)
+		if not AlleralLayout.canAutoResize() then
+			return
+		end
+		AlleralLayout.applyRailLayout(rawWindow, AlleralLayout.getProfile(), animated == true)
+		AlleralLayout.relayoutColumns(false)
+	end
+
+	function AlleralLayout.smartResize(window, rawWindow, settings, opts)
+		opts = AlleralLayout.normalizeResizeOpts(opts)
 		if type(rawWindow) ~= "table" or not rawWindow.Main then
+			return
+		end
+		if not AlleralLayout.canAutoResize() and not opts.forceSize and not opts.layoutOnly then
 			return
 		end
 		local profile = AlleralLayout.getProfile()
 		local tabCount = #(Core._UiTabRegistry or {})
 		local target = AlleralLayout.computeSize(profile, tabCount, settings and settings.Size)
 		local main = rawWindow.Main
-		if main and main:IsA("GuiObject") then
-			main.Size = target
+		if main and main:IsA("GuiObject") and opts.forceSize and not opts.layoutOnly then
+			if opts.animated then
+				tweenGui(main, MOTION_PANEL, { Size = target })
+			else
+				main.Size = target
+			end
+			rawWindow._alleralTargetSize = target
 		end
-		AlleralLayout.applyRailLayout(rawWindow, profile, false)
-		AlleralLayout.relayoutColumns(false)
 		if type(window) == "table" then
 			window._alleralLastSize = target
+		end
+		AlleralLayout.applyRailLayout(rawWindow, profile, opts.animated == true)
+		AlleralLayout.relayoutColumns(false)
+	end
+
+	function AlleralLayout.wrapSydeWindowLifecycle(rawWindow, window, settings)
+		if rawWindow._alleralLifecycleWrapped then
+			return
+		end
+		rawWindow._alleralLifecycleWrapped = true
+		local openDelay = 0.62
+		local origSetState = rawWindow.SetState
+		local origToggle = rawWindow.Toggle
+
+		local function afterOpenMotion()
+			task.delay(openDelay, function()
+				AlleralLayout.applyLayoutOnly(rawWindow, true)
+				if settings and settings.Size and rawWindow.Main then
+					local profile = AlleralLayout.getProfile()
+					local target = AlleralLayout.computeSize(profile, #(Core._UiTabRegistry or {}), settings.Size)
+					if rawWindow._alleralTargetSize ~= target then
+						tweenGui(rawWindow.Main, MOTION_PANEL, { Size = target })
+						rawWindow._alleralTargetSize = target
+					end
+				end
+			end)
+		end
+
+		if type(origSetState) == "function" then
+			function rawWindow:SetState(state)
+				AlleralLayout.suspendResize(openDelay + 0.12)
+				local result = origSetState(self, state)
+				if state == true then
+					afterOpenMotion()
+				end
+				return result
+			end
+		end
+
+		if type(origToggle) == "function" then
+			function rawWindow:Toggle()
+				local wasOpen = type(rawWindow.GetState) == "function" and rawWindow:GetState() == true
+				AlleralLayout.suspendResize(openDelay + 0.12)
+				local result = origToggle(self)
+				if not wasOpen then
+					afterOpenMotion()
+				end
+				return result
+			end
 		end
 	end
 
@@ -582,41 +657,41 @@ return function(Core)
 			return
 		end
 		settings = type(settings) == "table" and settings or {}
-		AlleralLayout.smartResize(window, rawWindow, settings, true)
+		AlleralLayout.wrapSydeWindowLifecycle(rawWindow, window, settings)
 		if rawWindow._alleralResizeHooked then
+			AlleralLayout.applyLayoutOnly(rawWindow, false)
 			return
 		end
 		rawWindow._alleralResizeHooked = true
-		AlleralLayout._resizeToken += 1
-		local token = AlleralLayout._resizeToken
-		local function schedule()
-			if token ~= AlleralLayout._resizeToken then
-				return
-			end
-			task.defer(function()
-				if token ~= AlleralLayout._resizeToken then
+		AlleralLayout.applyLayoutOnly(rawWindow, false)
+
+		local layoutDebounce = 0
+		local function scheduleLayout()
+			layoutDebounce += 1
+			local token = layoutDebounce
+			task.delay(0.35, function()
+				if token ~= layoutDebounce or not AlleralLayout.canAutoResize() then
 					return
 				end
-				AlleralLayout.smartResize(window, rawWindow, settings)
+				AlleralLayout.applyLayoutOnly(rawWindow, true)
 			end)
 		end
+
 		local camera = workspace.CurrentCamera
 		if camera then
 			pcall(function()
-				camera:GetPropertyChangedSignal("ViewportSize"):Connect(schedule)
+				camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+					if not AlleralLayout.canAutoResize() then
+						return
+					end
+					AlleralLayout.smartResize(window, rawWindow, settings, { forceSize = true, animated = true })
+				end)
 			end)
 		end
 		local nodes = AlleralLayout.findNodes(rawWindow)
-		if nodes and nodes.main then
-			pcall(function()
-				nodes.main:GetPropertyChangedSignal("AbsoluteSize"):Connect(schedule)
-			end)
-		end
 		if nodes and nodes.pages then
 			pcall(function()
-				nodes.pages:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-					AlleralLayout.relayoutColumns()
-				end)
+				nodes.pages:GetPropertyChangedSignal("AbsoluteSize"):Connect(scheduleLayout)
 			end)
 		end
 	end
@@ -706,14 +781,16 @@ return function(Core)
 
 		function Library:RepairWindow(window)
 			window = window or activeWindow or Library.Window
-			if window and type(window.SetState) == "function" then
-				pcall(window.SetState, window, true)
-			elseif window and type(window.Toggle) == "function" then
-				pcall(window.Toggle, window)
+			local rawWindow = type(window) == "table" and (window._rawWindow or window.Main and window) or nil
+			if rawWindow and type(rawWindow.SetState) == "function" then
+				AlleralLayout.suspendResize(0.72)
+				pcall(rawWindow.SetState, rawWindow, true)
+			elseif rawWindow and type(rawWindow.Toggle) == "function" then
+				AlleralLayout.suspendResize(0.72)
+				pcall(rawWindow.Toggle, rawWindow)
 			end
-			if window then
-				AlleralLayout.applyRailLayout(window, AlleralLayout.getProfile())
-				AlleralLayout.relayoutColumns()
+			if rawWindow then
+				AlleralLayout.applyLayoutOnly(rawWindow, true)
 			end
 			return true
 		end
@@ -855,9 +932,6 @@ return function(Core)
 			activeWindow = sydeWindow
 			Library.Window = sydeWindow
 			flushPendingNotifies()
-			task.defer(function()
-				AlleralLayout.install(nil, sydeWindow, settings)
-			end)
 			return sydeWindow
 		end
 
@@ -1374,6 +1448,13 @@ return function(Core)
 		Core.registerUiWindow(window)
 		Core.flushPendingNotifications()
 
+		local initialSize = settings.Size or AlleralLayout.computeSize(profile, 4, nil)
+		if rawWindow.Main and rawWindow.Main:IsA("GuiObject") then
+			rawWindow.Main.Size = initialSize
+			rawWindow._alleralTargetSize = initialSize
+		end
+		AlleralLayout.install(window, rawWindow, settings)
+
 		function window:AddTab(name, icon)
 			local tabGroup = self._tabGroup
 			if not tabGroup or type(tabGroup.Tab) ~= "function" then
@@ -1383,6 +1464,7 @@ return function(Core)
 		end
 
 		function window:Toggle()
+			AlleralLayout.suspendResize(0.72)
 			if self._rawWindow and type(self._rawWindow.Toggle) == "function" then
 				pcall(self._rawWindow.Toggle, self._rawWindow)
 			elseif self._rawWindow and type(self._rawWindow.SetState) == "function" then
@@ -1391,11 +1473,12 @@ return function(Core)
 		end
 
 		if type(rawWindow.SetState) == "function" then
+			AlleralLayout.suspendResize(0.72)
 			pcall(rawWindow.SetState, rawWindow, true)
 		elseif type(rawWindow.GetState) == "function" and rawWindow:GetState() == false and type(rawWindow.Toggle) == "function" then
+			AlleralLayout.suspendResize(0.72)
 			pcall(rawWindow.Toggle, rawWindow)
 		end
-		AlleralLayout.install(window, rawWindow, settings)
 		return window
 	end
 
@@ -1444,15 +1527,19 @@ return function(Core)
 				pcall(function()
 					local rawWindow = window._rawWindow
 					if rawWindow and type(rawWindow.SetState) == "function" then
+						AlleralLayout.suspendResize(0.72)
 						rawWindow:SetState(true)
 					elseif rawWindow and type(rawWindow.GetState) == "function" and rawWindow:GetState() == false and type(rawWindow.Toggle) == "function" then
+						AlleralLayout.suspendResize(0.72)
 						rawWindow:Toggle()
 					end
 					local defaultTab = window._defaultTab
 					if defaultTab and type(defaultTab.Select) == "function" then
 						defaultTab:Select()
 					end
-					AlleralLayout.smartResize(window, rawWindow, options, true)
+					task.delay(0.75, function()
+						AlleralLayout.smartResize(window, rawWindow, options, { forceSize = true, animated = true })
+					end)
 				end)
 			end)
 		end
@@ -1484,9 +1571,8 @@ return function(Core)
 		if type(rawWindow.SetState) == "function" then
 			pcall(rawWindow.SetState, rawWindow, true)
 		end
-		AlleralLayout.applyRailLayout(rawWindow, AlleralLayout.getProfile())
-		AlleralLayout.relayoutColumns()
-		AlleralLayout.smartResize(window, rawWindow, window._alleralSettings)
+		AlleralLayout.applyLayoutOnly(rawWindow, true)
+		AlleralLayout.smartResize(window, rawWindow, window._alleralSettings, { forceSize = true, animated = true })
 		return true
 	end
 
@@ -1494,7 +1580,7 @@ return function(Core)
 		AlleralLayout.relayoutColumns()
 		local window = ENV.Alleral_UiWindow
 		if type(window) == "table" and window._rawWindow then
-			AlleralLayout.applyRailLayout(window._rawWindow, AlleralLayout.getProfile())
+			AlleralLayout.applyLayoutOnly(window._rawWindow, false)
 		end
 		return true
 	end
