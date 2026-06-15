@@ -37,7 +37,7 @@ if (Test-Path $sydeSource) {
 }
 
 $sydeContracts = @(
-    @{ Pattern = 'ALLERAL_SYDE_PATCH = 38'; Message = 'Syde patch version is 38' },
+    @{ Pattern = 'ALLERAL_SYDE_PATCH = 39'; Message = 'Syde patch version is 39' },
     @{ Pattern = 'local Minihome = sydeFindChild\(ui\._root'; Message = 'Minihome lookup tolerates missing executor assets' },
     @{ Pattern = 'local paraTitle, paraContent = sydeParagraphParts\(Para\)'; Message = 'paragraph templates use compatible child lookup' },
     @{ Pattern = 'return ui\._root\.Enabled ~= false and window\.Visible == true'; Message = 'window state reads the real ScreenGui visibility' },

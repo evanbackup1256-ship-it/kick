@@ -81,6 +81,29 @@ if ($release.sydePatch)
     {
         Fail "loader.luau missing SYDE_PATCH_VERSION"
     }
+
+    $sydeSourcePath = Join-Path $root "ui/syde/source.luau"
+    if (Test-Path $sydeSourcePath)
+    {
+        $sydeSource = Get-Content $sydeSourcePath -Raw
+        if ($sydeSource -match 'ALLERAL_SYDE_PATCH = (\d+)')
+        {
+            $sourcePatch = [int]$Matches[1]
+            if ($sourcePatch -ne [int]$release.sydePatch)
+            {
+                Fail "ui/syde/source.luau ALLERAL_SYDE_PATCH ($sourcePatch) != release.json ($($release.sydePatch))"
+            } else
+            {
+                Pass "syde source patch $sourcePatch"
+            }
+        } else
+        {
+            Fail "ui/syde/source.luau missing ALLERAL_SYDE_PATCH"
+        }
+    } else
+    {
+        Fail "ui/syde/source.luau missing"
+    }
 }
 
 foreach ($field in @("telemetry", "analytics", "helpers", "security", "access", "weao", "core", "alleral", "windui", "ui"))
