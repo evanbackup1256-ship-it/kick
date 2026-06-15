@@ -86,7 +86,7 @@ if ($release.maclibVersion)
     if (Test-Path $maclibSourcePath)
     {
         $maclibSource = Get-Content $maclibSourcePath -Raw
-        if ($maclibSource -match 'ALLERAL_MACLIB_VERSION = (\d+)')
+        if ($maclibSource -match 'local ALLERAL_MACLIB_VERSION = (\d+)')
         {
             $sourceVersion = [int]$Matches[1]
             if ($sourceVersion -ne [int]$release.maclibVersion)

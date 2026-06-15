@@ -1,4 +1,4 @@
--- Alleral vendored MacLib 1.2.6 — ALLERAL_MACLIB_VERSION = 1
+-- Alleral vendored MacLib 1.2.6 (Alleral patch v2)
 local ALLERAL_MACLIB_VERSION = 2
 
 local MacLib = { 

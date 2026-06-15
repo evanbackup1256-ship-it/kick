@@ -956,7 +956,9 @@ local function maclibVersionFromSource(src)
 	if type(src) ~= "string" then
 		return nil
 	end
-	return tonumber(src:match("ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
+	return tonumber(src:match("local%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
+		or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
+		or tonumber(src:match("ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
 end
 
 local function maclibSourceValid(src)
@@ -1846,7 +1848,9 @@ local function extractFileVersion(src, kind)
 		return nil
 	end
 	if kind == "maclib" then
-		return src:match("ALLERAL_MACLIB_VERSION%s*=%s*(%d+)")
+		return src:match("local%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)")
+			or src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)")
+			or src:match("ALLERAL_MACLIB_VERSION%s*=%s*(%d+)")
 	end
 	if kind == "alleral" then
 		return src:match('Core%.ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
