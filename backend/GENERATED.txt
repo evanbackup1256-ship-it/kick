@@ -1,4 +1,4 @@
 GENERATED - do not edit files in backend/ directly.
 Edit relay/ and cfg/, then run: maint/sync_repo.ps1
-Synced at: 2026-06-15T23:36:12Z
-Commit: 81585f1
+Synced at: 2026-06-15T23:39:20Z
+Commit: 326d41d
