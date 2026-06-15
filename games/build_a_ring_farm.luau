@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.4.0"
+local VERSION = "1.4.1"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -27,6 +27,13 @@ if not Core or not ui then
 end
 
 local G = Core.Game or getgenv().Alleral_GameHelpers or {}
+
+local function regMod(moduleScript, timeout)
+	if G.registryGameModule then
+		return G.registryGameModule(moduleScript, timeout or 15)
+	end
+	return nil
+end
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -181,42 +188,46 @@ local UnequipPetRemote = PetsRemotes and PetsRemotes:FindFirstChild("UnequipPet"
 local SellPetRemote = PetsRemotes and PetsRemotes:FindFirstChild("SellPet")
 local PlantRushBuyRemote = Remotes and Remotes:FindFirstChild("PlantRush") and Remotes.PlantRush:FindFirstChild("BuyShopItem")
 
-local DataReplicator, Configuration, SharedUtils, EconomyTuning
-pcall(function()
-	DataReplicator = require(ReplicatedStorage.Packages.DataReplicator)
-	Configuration = require(ReplicatedStorage.Shared.Configuration)
-	SharedUtils = require(ReplicatedStorage.Shared.SharedUtils)
-	EconomyTuning = require(ReplicatedStorage.Shared.EconomyTuning)
-end)
+local DataReplicator, Configuration, SharedUtils, EconomyTuning, DataAggregation, CompostCooldownClient, PlantRushShooter
 
-local DataAggregation
-pcall(function()
-	local playerScripts = LocalPlayer:WaitForChild("PlayerScripts", 10)
-	local clientLoader = playerScripts and playerScripts:WaitForChild("ClientLoader", 10)
-	local modules = clientLoader and clientLoader:WaitForChild("Modules", 10)
-	local dataAgg = modules and modules:WaitForChild("DataAggregation", 10)
+local function bootstrapGameModules()
+	DataReplicator = regMod(ReplicatedStorage.Packages.DataReplicator, 18)
+	Configuration = regMod(ReplicatedStorage.Shared.Configuration, 18)
+	SharedUtils = regMod(ReplicatedStorage.Shared.SharedUtils, 18)
+	EconomyTuning = regMod(ReplicatedStorage.Shared.EconomyTuning, 18)
+
+	local playerScripts = LocalPlayer:FindFirstChild("PlayerScripts")
+	local clientLoader = playerScripts and playerScripts:FindFirstChild("ClientLoader")
+	local modules = clientLoader and clientLoader:FindFirstChild("Modules")
+	local dataAgg = modules and modules:FindFirstChild("DataAggregation")
 	if dataAgg then
-		DataAggregation = require(dataAgg)
+		DataAggregation = regMod(dataAgg, 18)
 	end
-end)
 
-local CompostCooldownClient
-pcall(function()
-	local playerScripts = LocalPlayer:WaitForChild("PlayerScripts", 10)
-	local clientLoader = playerScripts and playerScripts:WaitForChild("ClientLoader", 10)
-	local handlers = clientLoader and clientLoader:WaitForChild("Handlers", 10)
-	local mod = handlers and handlers:FindFirstChild("CompostCooldownClient")
-	if mod then
-		CompostCooldownClient = require(mod)
+	local handlers = clientLoader and clientLoader:FindFirstChild("Handlers")
+	local compostMod = handlers and handlers:FindFirstChild("CompostCooldownClient")
+	if compostMod then
+		CompostCooldownClient = regMod(compostMod, 18)
 	end
-end)
 
-local PlantRushShooter
-pcall(function()
-	local rushConfig = require(ReplicatedStorage.Shared.Registry.PlantRushConfig)
+	local rushConfig = regMod(ReplicatedStorage.Shared.Registry.PlantRushConfig, 18)
 	if rushConfig and rushConfig.Shooter then
 		PlantRushShooter = rushConfig.Shooter
 	end
+end
+
+task.spawn(function()
+	LocalPlayer:WaitForChild("PlayerScripts", 45)
+	task.wait(3)
+	if G.invalidateGameRequire then
+		G.invalidateGameRequire()
+	end
+	bootstrapGameModules()
+	task.wait(5)
+	if G.invalidateGameRequire then
+		G.invalidateGameRequire()
+	end
+	bootstrapGameModules()
 end)
 
 local function getRegistryModule(moduleName)
@@ -224,10 +235,7 @@ local function getRegistryModule(moduleName)
 	if registry then
 		local mod = registry:FindFirstChild(moduleName)
 		if mod and mod:IsA("ModuleScript") then
-			local ok, result = pcall(require, mod)
-			if ok then
-				return result
-			end
+			return regMod(mod, 0)
 		end
 	end
 	local shared = ReplicatedStorage:FindFirstChild("Shared")
@@ -236,18 +244,12 @@ local function getRegistryModule(moduleName)
 		if sharedRegistry then
 			local mod = sharedRegistry:FindFirstChild(moduleName)
 			if mod and mod:IsA("ModuleScript") then
-				local ok, result = pcall(require, mod)
-				if ok then
-					return result
-				end
+				return regMod(mod, 0)
 			end
 		end
 		local direct = shared:FindFirstChild(moduleName)
 		if direct and direct:IsA("ModuleScript") then
-			local ok, result = pcall(require, direct)
-			if ok then
-				return result
-			end
+			return regMod(direct, 0)
 		end
 	end
 	return nil

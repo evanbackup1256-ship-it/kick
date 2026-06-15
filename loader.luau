@@ -44,7 +44,7 @@ local RELEASE_FALLBACK = {
 	maclibVersion = 3,
 	analytics = "1.2",
 	telemetry = "3.4",
-	helpers = "1.7",
+	helpers = "1.8",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
@@ -2760,7 +2760,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "7.2.6",
+		version = "7.2.7",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
@@ -2802,7 +2802,7 @@ local GAMES = {
 	{
 		id = "slime_rng",
 		name = "Slime RNG",
-		version = "1.5.0",
+		version = "1.5.1",
 		placeIds = { 92416421522960 },
 		universeIds = { 9792947201 },
 		scriptFiles = { "games/slime_rng.luau", "slime_rng.luau" },
@@ -2820,7 +2820,7 @@ local GAMES = {
 	{
 		id = "build_a_ring_farm",
 		name = "Build A Ring Farm",
-		version = "1.4.0",
+		version = "1.4.1",
 		placeIds = { 107646426076756 },
 		scriptFiles = { "games/build_a_ring_farm.luau", "build_a_ring_farm.luau" },
 		scriptUrl = "games/build_a_ring_farm.luau",
@@ -2839,7 +2839,7 @@ local GAMES = {
 	{
 		id = "survive_a_zombie_arena",
 		name = "Survive a Zombie Arena",
-		version = "2.3.0",
+		version = "2.3.1",
 		placeIds = { 114204398207377 },
 		scriptFiles = { "games/survive_a_zombie_arena.luau", "survive_a_zombie_arena.luau" },
 		scriptUrl = "games/survive_a_zombie_arena.luau",

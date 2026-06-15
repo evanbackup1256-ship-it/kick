@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "2.3.0"
+local VERSION = "2.3.1"
 local state = getgenv().Alleral_State
 local G = (Core and Core.Game) or getgenv().Alleral_GameHelpers or {}
 local connections = {}
@@ -146,7 +146,10 @@ local function resolveZombieTable()
 		if not zombieClient then
 			return nil
 		end
-		return require(zombieClient)
+		if G.registryGameModule then
+			return G.registryGameModule(zombieClient, 12)
+		end
+		return nil
 	end)
 	if ok and client and type(client.Zombies) == "table" then
 		runtime.zombieTable = client.Zombies

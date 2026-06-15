@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "7.2.6"
+local VERSION = "7.2.7"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -1002,6 +1002,54 @@ local function withAny(options)
 	return output
 end
 
+local gameDataDropdowns = {}
+
+local function registerGameDataDropdown(handle, valuesKey)
+	if handle and valuesKey then
+		table.insert(gameDataDropdowns, { handle = handle, key = valuesKey })
+	end
+	return handle
+end
+
+local function refreshGameDataDropdowns()
+	for _, entry in ipairs(gameDataDropdowns) do
+		local values = gameData[entry.key]
+		if values and entry.handle and entry.handle.Refresh then
+			safeCall("RefreshGameDataDropdown", function()
+				entry.handle:Refresh(values)
+			end)
+		end
+	end
+end
+
+local function syncGameDataFromModules()
+	local changed = false
+	if modules.entitiesData and modules.entitiesData.Brainrots then
+		gameData.RarityMap = gameData.RarityMap or {}
+		local names = {}
+		local seen = {}
+		for name, entry in pairs(modules.entitiesData.Brainrots) do
+			if entry and entry.Rarity then
+				gameData.RarityMap[name] = entry.Rarity
+			end
+			if not seen[name] then
+				seen[name] = true
+				table.insert(names, name)
+			end
+		end
+		table.sort(names)
+		gameData.BrainrotOptions = withAny(names)
+		changed = true
+	end
+	if modules.mutationData and modules.mutationData.ValidMutations then
+		gameData.MutationOptions = withAny(modules.mutationData.ValidMutations)
+		changed = true
+	end
+	if changed then
+		refreshGameDataDropdowns()
+	end
+end
+
 local function listFromSelection(selection)
 	if Core and Core.normalizeMultiSelection then
 		return Core.normalizeMultiSelection(selection)
@@ -1255,6 +1303,7 @@ local function retryMissingModules()
 	if modules.entitiesData and not next(runtime.brainrotCpsCache) then
 		refreshBrainrotCpsCache()
 	end
+	syncGameDataFromModules()
 	bindProgressionModules()
 end
 
@@ -1335,10 +1384,7 @@ end
 if modules.entitiesData then
 	refreshBrainrotCpsCache()
 end
-
-if modules.mutationData and modules.mutationData.ValidMutations then
-	gameData.MutationOptions = modules.mutationData.ValidMutations
-end
+syncGameDataFromModules()
 gameData.BrainrotOptions = withAny(gameData.BrainrotOptions)
 gameData.RarityOptions = withAny(gameData.RarityOptions)
 gameData.MutationOptions = withAny(gameData.MutationOptions)
@@ -1481,7 +1527,15 @@ function rarityFor(name, fallback)
 		return fallback
 	end
 	local brainrots = modules.entitiesData and modules.entitiesData.Brainrots
-	return (brainrots and brainrots[name] and brainrots[name].Rarity) or fallback or "Unknown"
+	local fromModule = brainrots and brainrots[name] and brainrots[name].Rarity
+	if fromModule then
+		return fromModule
+	end
+	local fromMap = gameData.RarityMap and gameData.RarityMap[name]
+	if fromMap then
+		return fromMap
+	end
+	return fallback or "Unknown"
 end
 
 local RARITY_RANK = {
@@ -3765,7 +3819,7 @@ ballGroup:CreateToggle(
 	end,
 	"AAutoBuyShopCup"
 )
-ballGroup:AddDropdown("BallUpgrade", {
+registerGameDataDropdown(ballGroup:AddDropdown("BallUpgrade", {
 	Text = "Upgrade pick",
 	Values = gameData.RarityOptions or { "Any" },
 	Default = state.TBallUpgrade,
@@ -3775,7 +3829,7 @@ ballGroup:AddDropdown("BallUpgrade", {
 		state.TBallUpgrade = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
-})
+}), "RarityOptions")
 ballGroup:AddDropdown("PotionType", {
 	Text = "Potion type",
 	Values = { "Any", "Luck", "Speed", "Power", "Coins" },
@@ -3796,7 +3850,7 @@ ballGroup:AddDropdown("ShopCup", {
 		saveSettings()
 	end,
 })
-ballGroup:AddDropdown("BallFilterA", {
+registerGameDataDropdown(ballGroup:AddDropdown("BallFilterA", {
 	Text = "Ball filter A",
 	Values = gameData.BrainrotOptions or { "Any" },
 	Default = state.TBallFilter1,
@@ -3806,8 +3860,8 @@ ballGroup:AddDropdown("BallFilterA", {
 		state.TBallFilter1 = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
-})
-ballGroup:AddDropdown("BallFilterB", {
+}), "BrainrotOptions")
+registerGameDataDropdown(ballGroup:AddDropdown("BallFilterB", {
 	Text = "Ball filter B",
 	Values = gameData.RarityOptions or { "Any" },
 	Default = state.TBallFilter2,
@@ -3816,7 +3870,7 @@ ballGroup:AddDropdown("BallFilterB", {
 		state.TBallFilter2 = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
-})
+}), "RarityOptions")
 
 configGroup:CreateToggle(
 	"Quiet mode",
@@ -4080,7 +4134,7 @@ kickGroup:CreateButton(
 	end,
 	"Starts the timer over from zero."
 )
-filterGroup:AddDropdown("FilterBrainrot", {
+registerGameDataDropdown(filterGroup:AddDropdown("FilterBrainrot", {
 	Text = "Keep these",
 	Values = gameData.BrainrotOptions,
 	Default = state.TBrainrot,
@@ -4091,8 +4145,8 @@ filterGroup:AddDropdown("FilterBrainrot", {
 		state.TBrainrot = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
-})
-filterGroup:AddDropdown("FilterRarity", {
+}), "BrainrotOptions")
+registerGameDataDropdown(filterGroup:AddDropdown("FilterRarity", {
 	Text = "Rarity floor",
 	Values = gameData.RarityOptions,
 	Default = state.TRarity,
@@ -4103,8 +4157,8 @@ filterGroup:AddDropdown("FilterRarity", {
 		state.TRarity = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
-})
-filterGroup:AddDropdown("FilterMutation", {
+}), "RarityOptions")
+registerGameDataDropdown(filterGroup:AddDropdown("FilterMutation", {
 	Text = "Mutations",
 	Values = gameData.MutationOptions,
 	Default = state.TMutation,
@@ -4115,7 +4169,7 @@ filterGroup:AddDropdown("FilterMutation", {
 		state.TMutation = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
-})
+}), "MutationOptions")
 filterGroup:CreateDivider()
 filterGroup:CreateToggle(
 	"Notify on rares",
@@ -4448,7 +4502,7 @@ favoriteGroup:CreateToggle(
 	"AAutoFav"
 )
 favoriteGroup:CreateDivider()
-favoriteGroup:AddDropdown("FavoriteBrainrot", {
+registerGameDataDropdown(favoriteGroup:AddDropdown("FavoriteBrainrot", {
 	Text = "Star these",
 	Values = gameData.BrainrotOptions,
 	Default = state.TSSellBrainrot,
@@ -4462,8 +4516,8 @@ favoriteGroup:AddDropdown("FavoriteBrainrot", {
 		end
 		saveSettings()
 	end,
-})
-favoriteGroup:AddDropdown("FavoriteRarity", {
+}), "BrainrotOptions")
+registerGameDataDropdown(favoriteGroup:AddDropdown("FavoriteRarity", {
 	Text = "Star rarity",
 	Values = gameData.RarityOptions,
 	Default = state.TSSellRarity,
@@ -4477,8 +4531,8 @@ favoriteGroup:AddDropdown("FavoriteRarity", {
 		end
 		saveSettings()
 	end,
-})
-favoriteGroup:AddDropdown("FavoriteMutation", {
+}), "RarityOptions")
+registerGameDataDropdown(favoriteGroup:AddDropdown("FavoriteMutation", {
 	Text = "Star mutation",
 	Values = gameData.MutationOptions,
 	Default = state.TSSellMutation,
@@ -4492,7 +4546,7 @@ favoriteGroup:AddDropdown("FavoriteMutation", {
 		end
 		saveSettings()
 	end,
-})
+}), "MutationOptions")
 favoriteGroup:CreateDivider()
 favoriteGroup:CreateButton(
 	"Sell unstarred",
@@ -4717,7 +4771,7 @@ webhookGroup:CreateInput(
 	"Channel settings, integrations, webhooks, copy URL."
 )
 webhookGroup:CreateDivider()
-webhookGroup:AddDropdown("WebhookBrainrot", {
+registerGameDataDropdown(webhookGroup:AddDropdown("WebhookBrainrot", {
 	Text = "Ping for name",
 	Values = gameData.BrainrotOptions,
 	Default = state.WBBrainrot,
@@ -4728,8 +4782,8 @@ webhookGroup:AddDropdown("WebhookBrainrot", {
 		state.WBBrainrot = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
-})
-webhookGroup:AddDropdown("WebhookRarity", {
+}), "BrainrotOptions")
+registerGameDataDropdown(webhookGroup:AddDropdown("WebhookRarity", {
 	Text = "Ping for rarity",
 	Values = gameData.RarityOptions,
 	Default = state.WBRarity,
@@ -4740,8 +4794,8 @@ webhookGroup:AddDropdown("WebhookRarity", {
 		state.WBRarity = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
-})
-webhookGroup:AddDropdown("WebhookMutation", {
+}), "RarityOptions")
+registerGameDataDropdown(webhookGroup:AddDropdown("WebhookMutation", {
 	Text = "Ping for mutation",
 	Values = gameData.MutationOptions,
 	Default = state.WBMutation,
@@ -4752,9 +4806,9 @@ webhookGroup:AddDropdown("WebhookMutation", {
 		state.WBMutation = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
-})
+}), "MutationOptions")
 webhookGroup:CreateDivider()
-webhookGroup:AddDropdown("TrackerBrainrot", {
+registerGameDataDropdown(webhookGroup:AddDropdown("TrackerBrainrot", {
 	Text = "Brainrot tracker filter",
 	Values = gameData.BrainrotOptions,
 	Default = state.TrackerFilterBrainrot,
@@ -4767,8 +4821,8 @@ webhookGroup:AddDropdown("TrackerBrainrot", {
 		syncTrackerConfig()
 		saveSettings()
 	end,
-})
-webhookGroup:AddDropdown("TrackerRarity", {
+}), "BrainrotOptions")
+registerGameDataDropdown(webhookGroup:AddDropdown("TrackerRarity", {
 	Text = "Rarity tracker filter",
 	Values = gameData.RarityOptions,
 	Default = state.TrackerFilterRarity,
@@ -4781,7 +4835,7 @@ webhookGroup:AddDropdown("TrackerRarity", {
 		syncTrackerConfig()
 		saveSettings()
 	end,
-})
+}), "RarityOptions")
 webhookGroup:CreateDivider()
 webhookGroup:CreateToggle(
 	"Bag check-ins",
@@ -4847,11 +4901,18 @@ if not uiHandles or not uiHandles.window then
 	return
 end
 
+if Core.syncUiState then
+	pcall(Core.syncUiState, state)
+end
+
 local function startRuntime()
 	if state.AAutoLoadConfig then
 		local ok, err = loadProfile(state.AutoLoadProfile or profileNameInput or "default")
 		if not ok and err then
 			notify("Config", tostring(err), 3)
+		end
+		if Core.syncUiState then
+			pcall(Core.syncUiState, state)
 		end
 	end
 	syncTrackerConfig()

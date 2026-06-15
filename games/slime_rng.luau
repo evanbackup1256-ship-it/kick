@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.5.0"
+local VERSION = "1.5.1"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -24,6 +24,15 @@ if not Core or not ui then
 		warn("[Alleral] " .. tostring(msg))
 	end
 	return
+end
+
+local G = Core.Game or getgenv().Alleral_GameHelpers or {}
+
+local function regMod(moduleScript, timeout)
+	if G.registryGameModule then
+		return G.registryGameModule(moduleScript, timeout or 15)
+	end
+	return nil
 end
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -132,8 +141,59 @@ local function getRemoteFunction(serviceName)
 end
 
 local dataClient
-pcall(function()
-	dataClient = require(ReplicatedStorage.Packages.DataService).client
+local Zones
+local UpgradeServiceUtils
+local GoopGunServiceClient
+local UpgradeTree
+local GameplayServiceClient
+local Mutations
+local InventoryServiceUtils
+local XpTransferServiceUtils
+local CraftingServiceUtils
+local InventoryItemUtils
+local SlimeUpgradeTree
+local Slimes
+local Recipes
+local Food
+local Fruits
+local LootServiceUtils
+local IndexRewards
+
+local function bootstrapSlimeModules(timeout)
+	timeout = timeout or 18
+	local dataServiceMod = regMod(ReplicatedStorage.Packages.DataService, timeout)
+	if dataServiceMod and dataServiceMod.client then
+		dataClient = dataServiceMod.client
+	end
+	Zones = regMod(ReplicatedStorage.Source.Game.Items.Zones, timeout) or Zones
+	UpgradeServiceUtils = regMod(ReplicatedStorage.Source.Features.Upgrades.UpgradeServiceUtils, timeout) or UpgradeServiceUtils
+	GoopGunServiceClient = regMod(ReplicatedStorage.Source.Features.GoopGun.GoopGunServiceClient, timeout) or GoopGunServiceClient
+	UpgradeTree = regMod(ReplicatedStorage.Source.Features.Upgrades.UpgradeTree, timeout) or UpgradeTree
+	GameplayServiceClient = regMod(ReplicatedStorage.Source.Features.Gameplay.GameplayServiceClient, timeout) or GameplayServiceClient
+	Mutations = regMod(ReplicatedStorage.Source.Features.Mutations.Mutations, timeout) or Mutations
+	InventoryServiceUtils = regMod(ReplicatedStorage.Source.Features.Inventory.InventoryServiceUtils, timeout) or InventoryServiceUtils
+	XpTransferServiceUtils = regMod(ReplicatedStorage.Source.Features.XpTransfer.XpTransferServiceUtils, timeout) or XpTransferServiceUtils
+	CraftingServiceUtils = regMod(ReplicatedStorage.Source.Features.Crafting.CraftingServiceUtils, timeout) or CraftingServiceUtils
+	InventoryItemUtils = regMod(ReplicatedStorage.Source.Features.Inventory.InventoryItemUtils, timeout) or InventoryItemUtils
+	SlimeUpgradeTree = regMod(ReplicatedStorage.Source.Features.Upgrades.SlimeUpgradeTree, timeout) or SlimeUpgradeTree
+	Slimes = regMod(ReplicatedStorage.Source.Game.Items.Slimes, timeout) or Slimes
+	Recipes = regMod(ReplicatedStorage.Source.Features.Crafting.Recipes, timeout) or Recipes
+	Food = regMod(ReplicatedStorage.Source.Game.Items.Food, timeout) or Food
+	Fruits = regMod(ReplicatedStorage.Source.Game.Items.Fruits, timeout) or Fruits
+	LootServiceUtils = regMod(ReplicatedStorage.Source.Features.Loot.LootServiceUtils, timeout) or LootServiceUtils
+	IndexRewards = regMod(ReplicatedStorage.Source.Features.Index.IndexRewards, timeout) or IndexRewards
+end
+
+bootstrapSlimeModules(0)
+
+task.spawn(function()
+	LocalPlayer:WaitForChild("PlayerScripts", 45)
+	task.wait(3)
+	if G.invalidateGameRequire then
+		G.invalidateGameRequire()
+	end
+	bootstrapSlimeModules(18)
+	refreshZones()
 end)
 
 local function waitForGameData(maxAttempts)
@@ -155,41 +215,6 @@ task.spawn(function()
 	waitForGameData(10)
 end)
 
-local Zones
-pcall(function()
-	Zones = require(ReplicatedStorage.Source.Game.Items.Zones)
-end)
-
-local UpgradeServiceUtils
-pcall(function()
-	UpgradeServiceUtils = require(ReplicatedStorage.Source.Features.Upgrades.UpgradeServiceUtils)
-end)
-
-local GoopGunServiceClient
-pcall(function()
-	GoopGunServiceClient = require(ReplicatedStorage.Source.Features.GoopGun.GoopGunServiceClient)
-end)
-
-local UpgradeTree
-pcall(function()
-	UpgradeTree = require(ReplicatedStorage.Source.Features.Upgrades.UpgradeTree)
-end)
-
-local GameplayServiceClient
-pcall(function()
-	GameplayServiceClient = require(ReplicatedStorage.Source.Features.Gameplay.GameplayServiceClient)
-end)
-
-local Mutations
-pcall(function()
-	Mutations = require(ReplicatedStorage.Source.Features.Mutations.Mutations)
-end)
-
-local InventoryServiceUtils
-pcall(function()
-	InventoryServiceUtils = require(ReplicatedStorage.Source.Features.Inventory.InventoryServiceUtils)
-end)
-
 local function inventoryUtilsCall(methodName, ...)
 	if not InventoryServiceUtils then
 		return nil
@@ -200,56 +225,6 @@ local function inventoryUtilsCall(methodName, ...)
 	end
 	return method(InventoryServiceUtils, ...)
 end
-
-local XpTransferServiceUtils
-pcall(function()
-	XpTransferServiceUtils = require(ReplicatedStorage.Source.Features.XpTransfer.XpTransferServiceUtils)
-end)
-
-local CraftingServiceUtils
-pcall(function()
-	CraftingServiceUtils = require(ReplicatedStorage.Source.Features.Crafting.CraftingServiceUtils)
-end)
-
-local InventoryItemUtils
-pcall(function()
-	InventoryItemUtils = require(ReplicatedStorage.Source.Features.Inventory.InventoryItemUtils)
-end)
-
-local SlimeUpgradeTree
-pcall(function()
-	SlimeUpgradeTree = require(ReplicatedStorage.Source.Features.Upgrades.SlimeUpgradeTree)
-end)
-
-local Slimes
-pcall(function()
-	Slimes = require(ReplicatedStorage.Source.Game.Items.Slimes)
-end)
-
-local Recipes
-pcall(function()
-	Recipes = require(ReplicatedStorage.Source.Features.Crafting.Recipes)
-end)
-
-local Food
-pcall(function()
-	Food = require(ReplicatedStorage.Source.Game.Items.Food)
-end)
-
-local Fruits
-pcall(function()
-	Fruits = require(ReplicatedStorage.Source.Game.Items.Fruits)
-end)
-
-local LootServiceUtils
-pcall(function()
-	LootServiceUtils = require(ReplicatedStorage.Source.Features.Loot.LootServiceUtils)
-end)
-
-local IndexRewards
-pcall(function()
-	IndexRewards = require(ReplicatedStorage.Source.Features.Index.IndexRewards)
-end)
 
 local zonesList = { "Any" }
 local function refreshZones()

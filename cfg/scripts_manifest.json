@@ -1,70 +1,71 @@
-{
-  "version": 1,
-  "updatedAt": "2026-06-15T21:00:00+00:00",
-  "scripts": {
-    "kick_a_lucky_block": {
-      "name": "Kick a Lucky Block",
-      "status": "working",
-      "version": "7.2.6",
-      "message": "Stop executor require entirely; registry-only game modules on Xeno.",
-      "updatedAt": "2026-06-15T21:00:00+00:00",
-      "updatedBy": "system"
-    },
-    "sell_lemons": {
-      "name": "Sell Lemons",
-      "status": "working",
-      "version": "2.0.0",
-      "message": "Full farming automation — collect, offers, evolution, events, movement, and config profiles.",
-      "updatedAt": "2026-06-15T21:00:00+00:00",
-      "updatedBy": "system"
-    },
-    "grow_a_garden_2": {
-      "name": "Grow a Garden 2",
-      "status": "working",
-      "version": "2.0.0",
-      "message": "Plant, shovel, collect, water, sprinkler, and shop automation with config profiles.",
-      "updatedAt": "2026-06-15T21:00:00+00:00",
-      "updatedBy": "system"
-    },
-    "speed_keyboard_escape": {
-      "name": "Speed Keyboard Escape",
-      "status": "working",
-      "version": "1.5.0",
-      "message": "Step farming, win routes, shop automation, and treadmill tweaks.",
-      "updatedAt": "2026-06-15T21:00:00+00:00",
-      "updatedBy": "system"
-    },
-    "slime_rng": {
-      "name": "Slime RNG",
-      "status": "broken",
-      "version": "1.5.0",
-      "message": "Broken after game update — remotes and zone hooks need a rebuild.",
-      "updatedAt": "2026-06-15T21:00:00+00:00",
-      "updatedBy": "system"
-    },
-    "build_a_ring_farm": {
-      "name": "Build A Ring Farm",
-      "status": "broken",
-      "version": "1.4.0",
-      "message": "Broken after game update — planting and contract remotes changed.",
-      "updatedAt": "2026-06-15T21:00:00+00:00",
-      "updatedBy": "system"
-    },
-    "blox_fruit": {
-      "name": "Blox Fruit",
-      "status": "broken",
-      "version": "0.1.0",
-      "message": "Maintenance shell only — automation disabled pending game remap.",
-      "updatedAt": "2026-06-15T21:00:00+00:00",
-      "updatedBy": "system"
-    },
-    "survive_a_zombie_arena": {
-      "name": "Survive a Zombie Arena",
-      "status": "broken",
-      "version": "2.3.0",
-      "message": "Broken after game update — combat remotes and wave flow changed.",
-      "updatedAt": "2026-06-15T21:00:00+00:00",
-      "updatedBy": "system"
-    }
-  }
-}
+{
+  "version": 1,
+  "updatedAt": "2026-06-15T23:55:00+00:00",
+  "scripts": {
+    "kick_a_lucky_block": {
+      "name": "Kick a Lucky Block",
+      "status": "working",
+      "version": "7.2.7",
+      "message": "Luxy-style remote-first boot: static kickblox data, registry-only modules, configs sync on load.",
+      "updatedAt": "2026-06-15T23:55:00+00:00",
+      "updatedBy": "system"
+    },
+    "sell_lemons": {
+      "name": "Sell Lemons",
+      "status": "working",
+      "version": "2.0.0",
+      "message": "Full farming automation — collect, offers, evolution, events, movement, and config profiles.",
+      "updatedAt": "2026-06-15T21:00:00+00:00",
+      "updatedBy": "system"
+    },
+    "grow_a_garden_2": {
+      "name": "Grow a Garden 2",
+      "status": "working",
+      "version": "2.0.0",
+      "message": "Plant, shovel, collect, water, sprinkler, and shop automation with config profiles.",
+      "updatedAt": "2026-06-15T21:00:00+00:00",
+      "updatedBy": "system"
+    },
+    "speed_keyboard_escape": {
+      "name": "Speed Keyboard Escape",
+      "status": "working",
+      "version": "1.5.0",
+      "message": "Step farming, win routes, shop automation, and treadmill tweaks.",
+      "updatedAt": "2026-06-15T21:00:00+00:00",
+      "updatedBy": "system"
+    },
+    "slime_rng": {
+      "name": "Slime RNG",
+      "status": "broken",
+      "version": "1.5.1",
+      "message": "Registry-only module loading (no executor require spam); remotes still need rebuild after game update.",
+      "updatedAt": "2026-06-15T23:55:00+00:00",
+      "updatedBy": "system"
+    },
+    "build_a_ring_farm": {
+      "name": "Build A Ring Farm",
+      "status": "broken",
+      "version": "1.4.1",
+      "message": "Registry-only module loading; planting and contract remotes still changed after game update.",
+      "updatedAt": "2026-06-15T23:55:00+00:00",
+      "updatedBy": "system"
+    },
+    "blox_fruit": {
+      "name": "Blox Fruit",
+      "status": "broken",
+      "version": "0.1.0",
+      "message": "Maintenance shell only — automation disabled pending game remap.",
+      "updatedAt": "2026-06-15T21:00:00+00:00",
+      "updatedBy": "system"
+    },
+    "survive_a_zombie_arena": {
+      "name": "Survive a Zombie Arena",
+      "status": "broken",
+      "version": "2.3.1",
+      "message": "Registry-only zombie client hook; combat remotes and wave flow still changed after game update.",
+      "updatedAt": "2026-06-15T23:55:00+00:00",
+      "updatedBy": "system"
+    }
+  }
+}
+
