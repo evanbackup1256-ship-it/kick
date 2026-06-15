@@ -122,6 +122,7 @@ function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }
         </div>
       </div>
       <CommandPalette
+        site={site}
         onCopyScript={() => void copyLoadstring()}
         onRefresh={() => {
           void refreshLive();

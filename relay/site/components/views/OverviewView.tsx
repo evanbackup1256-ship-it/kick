@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, Copy, ExternalLink, Gamepad2, Radio, Sparkles, Terminal, Zap } from "lucide-react";
+import { ArrowRight, Check, Copy, ExternalLink, Gamepad2, Radio, Sparkles, Terminal, Zap, AlertTriangle, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { MetricCard } from "@/components/observability/MetricCard";
 import { StatusPill } from "@/components/observability/StatusPill";
@@ -29,6 +29,11 @@ export function OverviewView({
   const total = live?.games?.total ?? games.length;
   const relayKind = resolveRelayStatus(online);
   const syncKind = resolveSyncStatus(live?.sync);
+  const brokenGames = games.filter(([, g]) => {
+    const s = (g.status || "working").toLowerCase();
+    return s === "broken" || s === "maintenance";
+  });
+  const latestLog = (site.changelog || []).slice(0, 3);
 
   return (
     <div className="bento-grid">
@@ -74,6 +79,73 @@ export function OverviewView({
       <InViewReveal className="bento-stat" delay={0.2}>
         <MetricCard label="UI stack" value={site.uiLibrary || "Syde"} accent="yellow" trend={site.uiVersion} />
       </InViewReveal>
+
+      {brokenGames.length ? (
+        <InViewReveal className="bento-full panel border-yellow-500/25 bg-yellow-500/[0.06] p-4 md:p-5" delay={0.06}>
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-400" />
+            <div>
+              <p className="font-medium text-yellow-200">
+                {brokenGames.length} game{brokenGames.length === 1 ? "" : "s"} need attention
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {brokenGames.map(([id, g]) => g.name || id).join(", ")} — check Games for live status before injecting.
+              </p>
+              <Button variant="ghost" size="sm" className="mt-3" onClick={() => setView("games")}>
+                View games <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        </InViewReveal>
+      ) : null}
+
+      <InViewReveal className="bento-wide panel p-5 md:p-6" delay={0.07}>
+        <div className="mb-4 flex items-center gap-2">
+          <BookOpen className="h-4 w-4 text-accent" />
+          <h3 className="obs-title-sm">Getting started</h3>
+        </div>
+        <ol className="grid gap-3 sm:grid-cols-3">
+          {[
+            { step: "1", title: "Copy loader", desc: "Save the bootstrap once in your executor." },
+            { step: "2", title: "Join a game", desc: "Pick a Working game from the library." },
+            { step: "3", title: "Run & forget", desc: "Loader auto-updates — no manual replaces." },
+          ].map((item) => (
+            <li key={item.step} className="rounded-xl border border-border bg-bg-1/50 px-4 py-3">
+              <p className="font-mono text-xs text-accent">Step {item.step}</p>
+              <p className="mt-1 font-medium">{item.title}</p>
+              <p className="mt-1 text-sm text-muted">{item.desc}</p>
+            </li>
+          ))}
+        </ol>
+      </InViewReveal>
+
+      {latestLog.length ? (
+        <InViewReveal className="bento-wide panel p-5 md:p-6" delay={0.09}>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h3 className="obs-title-sm">Recent ship log</h3>
+            <Button variant="ghost" size="sm" onClick={() => setView("changelog")}>
+              Full log <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {latestLog.map((entry) => (
+              <div key={`${entry.date}-${entry.title}`} className="rounded-xl border border-border/80 bg-bg-1/40 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium">{entry.title}</p>
+                  <span className="text-[10px] text-muted-2">{entry.date}</span>
+                </div>
+                <ul className="mt-2 space-y-1 text-xs text-muted">
+                  {(entry.items || []).slice(0, 2).map((item) => (
+                    <li key={item} className="line-clamp-1">
+                      · {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </InViewReveal>
+      ) : null}
 
       <InViewReveal className="bento-wide panel p-5 md:p-6" delay={0.08}>
         <div className="mb-4 flex items-center gap-2">

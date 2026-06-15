@@ -51,6 +51,18 @@ export function ToolsView({ site }: { site: SitePayload }) {
             {isFetching ? "Refreshing…" : "Refresh"}
           </Button>
         </div>
+        {(data?.recentChanges?.length ?? 0) > 0 ? (
+          <div className="mb-4 rounded-xl border border-border bg-bg-1/50 px-4 py-3">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-2">Recent executor changes</p>
+            <ul className="space-y-1.5 text-sm text-muted">
+              {data!.recentChanges!.slice(0, 4).map((c, i) => (
+                <li key={`${c.slug}-${i}`} className="line-clamp-1">
+                  · {c.message || c.slug}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div className="mb-3 flex flex-wrap gap-2">
           {FILTERS.map((f) => (
             <Button key={f} size="sm" variant={filter === f ? "primary" : "ghost"} onClick={() => setFilter(f)} className="capitalize">
