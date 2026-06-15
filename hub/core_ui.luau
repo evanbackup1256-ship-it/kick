@@ -819,7 +819,7 @@ local function ensureTwoColumnLayout(tab, rawTab)
 
 	local rowList = Instance.new("UIListLayout")
 	rowList.FillDirection = Enum.FillDirection.Horizontal
-	rowList.HorizontalAlignment = Enum.HorizontalAlignment.Fill
+	rowList.HorizontalAlignment = Enum.HorizontalAlignment.Left
 	rowList.VerticalAlignment = Enum.VerticalAlignment.Top
 	rowList.SortOrder = Enum.SortOrder.LayoutOrder
 	rowList.Padding = UDim.new(0, COLUMN_GAP)

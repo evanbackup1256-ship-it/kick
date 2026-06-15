@@ -5,8 +5,8 @@
     "kick_a_lucky_block": {
       "name": "Kick a Lucky Block",
       "status": "working",
-      "version": "7.2.0",
-      "message": "Ball farming, shop automation, prediction wave reads, and world 1/2 rollback stabilization.",
+      "version": "7.2.1",
+      "message": "Fix Syde UI crash on Xeno and improve game module loading under executor sandboxes.",
       "updatedAt": "2026-06-15T21:00:00+00:00",
       "updatedBy": "system"
     },

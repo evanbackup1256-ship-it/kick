@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 38
+	local SYDE_PATCH_VERSION = 39
 	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
@@ -1153,11 +1153,13 @@ return function(Core)
 		row.Parent = page
 
 		local rowLayout = Instance.new("UIListLayout")
-		rowLayout.FillDirection = Enum.FillDirection.Horizontal
-		rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Fill
-		rowLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-		rowLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		rowLayout.Padding = UDim.new(0, COLUMN_GAP)
+		pcall(function()
+			rowLayout.FillDirection = Enum.FillDirection.Horizontal
+			rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+			rowLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+			rowLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			rowLayout.Padding = UDim.new(0, COLUMN_GAP)
+		end)
 		rowLayout.Parent = row
 
 		local function makeColumn(name, order)

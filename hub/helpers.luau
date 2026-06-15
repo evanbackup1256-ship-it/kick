@@ -1,5 +1,5 @@
 local Helpers = {}
-Helpers.VERSION = "1.1"
+Helpers.VERSION = "1.2"
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -145,26 +145,71 @@ function Helpers.gameRequire(moduleScript)
 	if not moduleScript or not moduleScript:IsA("ModuleScript") then
 		return nil
 	end
-	local ok, result = pcall(require, moduleScript)
-	if ok then
-		return result
-	end
-	local renv = ENV
-	if type(getrenv) == "function" then
-		ok, renv = pcall(getrenv)
-		if not ok then
-			renv = ENV
+
+	local function tryRequire(reqFn)
+		if type(reqFn) ~= "function" then
+			return nil
 		end
-	end
-	local gameRequireFn = renv and renv.require
-	if type(gameRequireFn) == "function" then
-		ok, result = pcall(gameRequireFn, moduleScript)
+		local ok, result = pcall(reqFn, moduleScript)
 		if ok then
 			return result
 		end
+		return nil
 	end
-	if type(loadstring) == "function" then
-		ok, result = pcall(function()
+
+	local direct = tryRequire(require)
+	if direct ~= nil then
+		return direct
+	end
+
+	if type(getthreadidentity) == "function" and type(setthreadidentity) == "function" then
+		for _, identity in ipairs({ 8, 7, 2 }) do
+			local ok, result = pcall(function()
+				local old = getthreadidentity()
+				setthreadidentity(identity)
+				local value = require(moduleScript)
+				setthreadidentity(old)
+				return value
+			end)
+			if ok and result ~= nil then
+				return result
+			end
+		end
+	end
+
+	local renv = ENV
+	if type(getrenv) == "function" then
+		local ok, env = pcall(getrenv)
+		if ok and type(env) == "table" then
+			renv = env
+		end
+	end
+
+	local fromRenv = tryRequire(renv and renv.require)
+	if fromRenv ~= nil then
+		return fromRenv
+	end
+
+	if type(getsenv) == "function" then
+		local player = Players.LocalPlayer
+		local playerScripts = player and player:FindFirstChild("PlayerScripts")
+		if playerScripts then
+			for _, inst in ipairs(playerScripts:GetDescendants()) do
+				if inst:IsA("LocalScript") then
+					local ok, env = pcall(getsenv, inst)
+					if ok and type(env) == "table" and type(env.require) == "function" then
+						local value = tryRequire(env.require)
+						if value ~= nil then
+							return value
+						end
+					end
+				end
+			end
+		end
+	end
+
+	if type(loadstring) == "function" and type(moduleScript.Source) == "string" and moduleScript.Source ~= "" then
+		local ok, result = pcall(function()
 			local fn = loadstring(moduleScript.Source, moduleScript:GetFullName())
 			if not fn then
 				return nil
@@ -174,10 +219,11 @@ function Helpers.gameRequire(moduleScript)
 			end
 			return fn()
 		end)
-		if ok then
+		if ok and result ~= nil then
 			return result
 		end
 	end
+
 	return nil
 end
 

@@ -7,7 +7,7 @@
   "coreVersion": "2.9.5",
   "uiLibrary": "Syde",
   "uiVersion": "4.0.1-syde",
-  "sydePatch": 38,
+  "sydePatch": 39,
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
@@ -47,6 +47,14 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-15",
+      "title": "Kick A Lucky Block 7.2.1 — Xeno UI & Module Loading Fix",
+      "items": [
+        "Fixed Syde UI crash (HorizontalAlignment.Fill is invalid on Roblox)",
+        "Improved game module loading under executor sandboxes (gameRequire v1.2)"
+      ]
+    },
     {
       "date": "2026-06-15",
       "title": "Sell Lemons 2.0 — Full Farming Automation",
