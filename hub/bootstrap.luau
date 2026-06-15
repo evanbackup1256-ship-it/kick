@@ -1,8 +1,9 @@
--- Alleral Bootstrap v1.0.10
+-- Alleral Bootstrap v1.0.11
 -- Save this loadstring once in your executor — it always fetches the latest loader from GitHub.
 -- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=" .. tick(), true))()
 
-local BOOTSTRAP_VERSION = "1.0.10"
+local BOOTSTRAP_VERSION = "1.0.11"
+print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Starting…")
 local HTTP_GET_TIMEOUT = 12
 local LOADER_FETCH_TIMEOUT = 28
 local LOADER_MIN_BYTES = 50000
@@ -65,51 +66,108 @@ if not loadStringFn then
 	error("[Alleral Bootstrap] loadstring is not available in this executor.")
 end
 
-local function httpGetOnce(url, minBytes)
-	minBytes = minBytes or 0
-	local requestFn = pick({ "request", "http_request", "httprequest", "syn_request", "http_request_async" })
-	if requestFn then
-		local ok, body = pcall(function()
-			local res = requestFn({
-				Url = url,
-				Method = "GET",
-				Headers = {
-					["User-Agent"] = "Alleral-Bootstrap/" .. BOOTSTRAP_VERSION,
-					["Cache-Control"] = "no-cache",
-				},
-			})
-			if type(res) == "table" and type(res.Body) == "string" and #res.Body >= minBytes then
-				return res.Body
-			end
-			return nil
-		end)
-		if ok and type(body) == "string" then
-			return body, "request"
-		end
+local function pickRequestFn()
+	local fn = pick({ "request", "http_request", "httprequest", "syn_request", "http_request_async" })
+	if fn then
+		return fn
 	end
-	if type(game.HttpGet) == "function" then
-		local ok, body = pcall(game.HttpGet, game, url, true)
-		if ok and type(body) == "string" and #body >= minBytes then
-			return body, "httpget"
-		end
-		ok, body = pcall(game.HttpGet, game, url)
-		if ok and type(body) == "string" and #body >= minBytes then
-			return body, "httpget"
-		end
+	if type(syn) == "table" and type(syn.request) == "function" then
+		return syn.request
+	end
+	if type(http) == "table" and type(http.request) == "function" then
+		return http.request
+	end
+	if type(ENV.Xeno) == "table" and type(ENV.Xeno.request) == "function" then
+		return ENV.Xeno.request
+	end
+	return nil
+end
+
+local function httpRequestOnce(url, minBytes)
+	minBytes = minBytes or 0
+	local requestFn = pickRequestFn()
+	if not requestFn then
+		return nil, "request API missing"
 	end
 	local ok, body = pcall(function()
+		local res = requestFn({
+			Url = url,
+			Method = "GET",
+			Headers = {
+				["User-Agent"] = "Alleral-Bootstrap/" .. BOOTSTRAP_VERSION,
+				["Cache-Control"] = "no-cache, no-store",
+			},
+		})
+		if type(res) == "table" and type(res.Body) == "string" and #res.Body >= minBytes then
+			return res.Body
+		end
+		if type(res) == "table" and type(res.body) == "string" and #res.body >= minBytes then
+			return res.body
+		end
+		return nil
+	end)
+	if ok and type(body) == "string" then
+		return body, "request"
+	end
+	return nil, "request failed"
+end
+
+local function httpGetOnce(url, minBytes)
+	minBytes = minBytes or 0
+	local body, via = httpRequestOnce(url, minBytes)
+	if body then
+		return body, via
+	end
+	if type(game.HttpGet) == "function" then
+		local ok, fetched = pcall(game.HttpGet, game, url, true)
+		if ok and type(fetched) == "string" and #fetched >= minBytes then
+			return fetched, "httpget"
+		end
+		ok, fetched = pcall(game.HttpGet, game, url)
+		if ok and type(fetched) == "string" and #fetched >= minBytes then
+			return fetched, "httpget"
+		end
+	end
+	local ok, fetched = pcall(function()
 		return game:HttpGet(url, true)
 	end)
-	if ok and type(body) == "string" and #body >= minBytes then
-		return body, "httpget"
+	if ok and type(fetched) == "string" and #fetched >= minBytes then
+		return fetched, "httpget"
 	end
-	ok, body = pcall(function()
+	ok, fetched = pcall(function()
 		return game:HttpGet(url)
 	end)
-	if ok and type(body) == "string" and #body >= minBytes then
-		return body, "httpget"
+	if ok and type(fetched) == "string" and #fetched >= minBytes then
+		return fetched, "httpget"
 	end
 	return nil, "transport failed"
+end
+
+local function httpFetchLoader(url, minBytes, label)
+	minBytes = minBytes or LOADER_MIN_BYTES
+	label = label or "loader"
+	local plain = url:gsub("%?.*$", "")
+	local candidates = {
+		plain .. "?t=" .. tostring(tick()) .. "&r=" .. tostring(math.random(1, 2147483646)),
+		plain,
+		url,
+	}
+	for i, candidate in ipairs(candidates) do
+		if i > 1 and typeof(task) == "table" and type(task.wait) == "function" then
+			pcall(task.wait, 0.02)
+		end
+		print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Downloading " .. label .. " via request…")
+		local body, via = httpRequestOnce(candidate, minBytes)
+		if type(body) == "string" then
+			return body, via
+		end
+		warn("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] request failed for " .. label .. " — trying HttpGet fallback")
+		body, via = httpGetOnce(candidate, minBytes)
+		if type(body) == "string" then
+			return body, via
+		end
+	end
+	return nil, "request API could not download loader (enable HTTP in executor)"
 end
 
 local function httpGet(url, minBytes)
@@ -225,29 +283,29 @@ local function releaseMetaUrls()
 end
 
 local function fetchReleaseMeta()
-	for _, url in ipairs(releaseMetaUrls()) do
-		print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Release metadata: " .. url:gsub("%?.*$", ""))
-		local src, via = httpGetWithTimeout(url, 40, HTTP_GET_TIMEOUT)
-		local meta = parseReleaseJson(src)
-		if meta and meta.loader and meta.commit then
-			return meta, via or "release"
-		end
-		if via then
-			warn("[Alleral Bootstrap] Release fetch failed (" .. tostring(via) .. ")")
-		end
-	end
-	warn(
-		"[Alleral Bootstrap] Release metadata unavailable — loading loader from "
-			.. BRANCH
-			.. " (expected v"
-			.. tostring(FALLBACK_RELEASE.loader)
-			.. ")"
-	)
-	return {
+	local builtin = {
 		loader = FALLBACK_RELEASE.loader,
 		commit = BRANCH,
 		rayfieldVersion = FALLBACK_RELEASE.rayfieldVersion,
-	}, "fallback"
+	}
+	task.spawn(function()
+		for _, url in ipairs(releaseMetaUrls()) do
+			local src = select(1, httpGetWithTimeout(url, 40, 6, "release.json"))
+			local meta = parseReleaseJson(src)
+			if meta and meta.loader then
+				ENV._Alleral_ReleaseMeta = meta
+				break
+			end
+		end
+	end)
+	print(
+		"[Alleral Bootstrap v"
+			.. BOOTSTRAP_VERSION
+			.. "] Using loader v"
+			.. builtin.loader
+			.. " (skipping slow CDN release.json)"
+	)
+	return builtin, "builtin"
 end
 
 local function buildLoaderUrls(meta)
@@ -637,13 +695,7 @@ local function Alleral_Bootstrap(reason)
 
 	pcall(checkGamePlaceUpdate)
 
-	-- Fast path purge only — full workspace scan runs after loader boots (avoids main-thread freeze).
-	local purged = purgeAlleralWorkspace(false)
-	if purged > 0 then
-		print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Purged " .. tostring(purged) .. " cached workspace file(s)")
-	end
-
-	print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Fetching release metadata…")
+	print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Preparing loader download…")
 	local meta, metaVia = fetchReleaseMeta()
 	local expectedLoader = meta.loader
 	local urls = buildLoaderUrls(meta)
@@ -655,7 +707,7 @@ local function Alleral_Bootstrap(reason)
 		end
 		local label = entry.label or entry.url:gsub("%?.*$", "")
 		print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Loader fetch: " .. label)
-		local body, transport = httpGetWithTimeout(entry.url, LOADER_MIN_BYTES, LOADER_FETCH_TIMEOUT, label)
+		local body, transport = httpFetchLoader(entry.url, LOADER_MIN_BYTES, label)
 		if type(body) == "string" and #body >= LOADER_MIN_BYTES then
 			local ok, detail = loaderMatchesRelease(body, meta)
 			if ok then
