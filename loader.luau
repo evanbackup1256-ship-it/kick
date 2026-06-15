@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.7.0"
+local LOADER_VERSION = "8.7.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -36,7 +36,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.7.0",
+	loader = "8.7.1",
 	core = "2.9.5",
 	ui = "Maclib",
 	windui = "5.3.0-maclib",
@@ -956,9 +956,25 @@ local function maclibVersionFromSource(src)
 	if type(src) ~= "string" then
 		return nil
 	end
-	return tonumber(src:match("local%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
+	return tonumber(src:match("\nlocal%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
+		or tonumber(src:match("^local%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
+		or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*ALLERAL_MACLIB_VERSION"))
 		or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
-		or tonumber(src:match("ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
+end
+
+local function maclibFetchUrls()
+	local bust = "?maclib=2&t=" .. tostring(tick())
+	local urls = {
+		GITHUB_RAW .. "/" .. MACLIB_SOURCE_PATH .. bust,
+		"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. MACLIB_SOURCE_PATH .. bust,
+	}
+	local expected = ENV._Alleral_ExpectedVersions
+	local commit = type(expected) == "table" and expected.commit
+	if type(commit) == "string" and commit ~= "" then
+		table.insert(urls, "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. commit .. "/" .. MACLIB_SOURCE_PATH .. bust)
+	end
+	table.insert(urls, JSDELIVR .. "/" .. MACLIB_SOURCE_PATH .. bust)
+	return urls
 end
 
 local function maclibSourceValid(src)
@@ -1001,24 +1017,17 @@ local function maclibSourceRejectReason(src)
 end
 
 local function maclibRemoteBases()
-	local bases = { GITHUB_RAW, GITHUB_WEB }
-	local expected = ENV._Alleral_ExpectedVersions
-	local commit = type(expected) == "table" and expected.commit
-	if type(commit) == "string" and commit ~= "" then
-		table.insert(bases, "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. commit)
-	end
-	table.insert(bases, JSDELIVR)
-	return bases
+	return maclibFetchUrls()
 end
 
 local function fetchRemoteMaclib()
 	local lastReason = "no response"
 	for attempt = 1, 3 do
-		for _, base in ipairs(maclibRemoteBases()) do
-			local body, via = httpGet(base .. "/" .. MACLIB_SOURCE_PATH, MACLIB_SOURCE_MIN_BYTES)
+		for _, url in ipairs(maclibFetchUrls()) do
+			local body, via = httpGet(url, MACLIB_SOURCE_MIN_BYTES)
 			if type(body) == "string" and #body >= MACLIB_SOURCE_MIN_BYTES then
 				if maclibSourceValid(body) then
-					return body, base .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
+					return body, url .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
 				end
 				lastReason = maclibSourceRejectReason(body)
 					.. " ("
@@ -1100,6 +1109,12 @@ end
 local function ensureMaclibSource()
 	clearStaleMaclibRuntime()
 	purgeLegacyUiSources()
+
+	if type(ENV._AlleralMaclibSource) == "string" and not maclibSourceValid(ENV._AlleralMaclibSource) then
+		ENV._AlleralMaclibSource = nil
+		ENV._AlleralMaclibSourceReady = false
+		ENV._AlleralMaclibSourceLabel = nil
+	end
 
 	for _, overridePath in ipairs(MACLIB_PATCHED_OVERRIDE_PATHS) do
 		local src, path = readLocal({ overridePath }, MACLIB_SOURCE_MIN_BYTES)
@@ -3343,6 +3358,9 @@ local function isLegacyAlleralLoader(src)
 		return false
 	end
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
+		return false
+	end
+	if src:find('local LOADER_VERSION = "8.7.1"', 1, true) then
 		return false
 	end
 	if src:find('local LOADER_VERSION = "8.7.0"', 1, true) then

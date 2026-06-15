@@ -82,9 +82,9 @@ return function(Core)
 		if type(src) ~= "string" then
 			return nil
 		end
-		return tonumber(src:match("local%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
+		return tonumber(src:match("\nlocal%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("^local%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
 			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
-			or tonumber(src:match("ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
 	end
 
 	local function maclibSourceValid(src)
@@ -167,7 +167,12 @@ return function(Core)
 		end
 
 		if type(ENV._AlleralMaclibSource) == "string" then
-			consider(ENV._AlleralMaclibSource, ENV._AlleralMaclibSourceLabel or "memory:loader")
+			if maclibSourceValid(ENV._AlleralMaclibSource) then
+				consider(ENV._AlleralMaclibSource, ENV._AlleralMaclibSourceLabel or "memory:loader")
+			else
+				ENV._AlleralMaclibSource = nil
+				ENV._AlleralMaclibSourceReady = false
+			end
 		end
 
 		for _, path in ipairs(MACLIB_SOURCE_PATHS) do
@@ -179,7 +184,7 @@ return function(Core)
 
 		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
 			for _, baseUrl in ipairs(maclibRawUrls()) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?t=" .. tostring(tick()), MACLIB_MIN_BYTES)
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?maclib=2&t=" .. tostring(tick()), MACLIB_MIN_BYTES)
 				if type(src) == "string" then
 					consider(src, "remote:" .. baseUrl)
 				end
