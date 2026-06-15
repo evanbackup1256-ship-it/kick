@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-15T22:40:01Z",
+  "updatedAt": "2026-06-15T22:43:56Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
-  "loaderVersion": "8.6.0",
+  "loaderVersion": "8.6.1",
   "coreVersion": "2.9.5",
   "uiLibrary": "Rayfield",
   "uiVersion": "5.2.0-rayfield",
