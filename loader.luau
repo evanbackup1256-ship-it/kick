@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.6.1"
+local LOADER_VERSION = "8.7.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -13,18 +13,17 @@ local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
-local RAYFIELD_SOURCE_PATH = UI .. "/rayfield/source.luau"
-local RAYFIELD_ICONS_PATH = UI .. "/rayfield/icons.luau"
-local RAYFIELD_SOURCE_MIN_BYTES = 50000
-local RAYFIELD_VERSION_MARKER = "ALLERAL_RAYFIELD_VERSION"
-local RAYFIELD_VERSION = 2
-local RAYFIELD_REQUIRED_FN = "function RayfieldLibrary:CreateWindow"
-local RAYFIELD_PATCHED_OVERRIDE_PATHS = {
-	"rayfield_patched.luau",
-	"patched_rayfield.luau",
-	".alleral/rayfield_patched.luau",
-	"kick/rayfield_patched.luau",
-	"workspace/rayfield_patched.luau",
+local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
+local MACLIB_SOURCE_MIN_BYTES = 150000
+local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
+local MACLIB_VERSION = 1
+local MACLIB_REQUIRED_FN = "function MacLib:Window"
+local MACLIB_PATCHED_OVERRIDE_PATHS = {
+	"maclib_patched.luau",
+	"patched_maclib.luau",
+	".alleral/maclib_patched.luau",
+	"kick/maclib_patched.luau",
+	"workspace/maclib_patched.luau",
 }
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
@@ -37,12 +36,12 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.6.1",
+	loader = "8.7.0",
 	core = "2.9.5",
-	ui = "Rayfield",
-	windui = "5.2.0-rayfield",
-	alleral = "5.2.0-rayfield",
-	rayfieldVersion = 2,
+	ui = "Maclib",
+	windui = "5.3.0-maclib",
+	alleral = "5.3.0-maclib",
+	maclibVersion = 1,
 	analytics = "1.2",
 	telemetry = "3.4",
 	helpers = "1.4",
@@ -942,67 +941,64 @@ local function cacheRemote(relativePath, src)
 	pcall(writeFileFn, relativePath, src)
 end
 
-local function requiredRayfieldVersion()
+local function requiredMaclibVersion()
 	local expected = ENV._Alleral_ExpectedVersions
 	if type(expected) == "table" then
-		local version = tonumber(expected.rayfieldVersion)
+		local version = tonumber(expected.maclibVersion)
 		if version then
 			return version
 		end
 	end
-	return RAYFIELD_VERSION
+	return MACLIB_VERSION
 end
 
-local function rayfieldVersionFromSource(src)
+local function maclibVersionFromSource(src)
 	if type(src) ~= "string" then
 		return nil
 	end
-	return tonumber(src:match("ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)"))
+	return tonumber(src:match("ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
 end
 
-local function rayfieldSourceValid(src)
+local function maclibSourceValid(src)
 	if type(src) ~= "string"
-		or #src < RAYFIELD_SOURCE_MIN_BYTES
+		or #src < MACLIB_SOURCE_MIN_BYTES
 		or src:find("<!DOCTYPE", 1, true)
-		or not src:find(RAYFIELD_VERSION_MARKER, 1, true)
-		or not src:find(RAYFIELD_REQUIRED_FN, 1, true)
-		or not src:find("function RayfieldLibrary:Notify", 1, true)
+		or not src:find(MACLIB_VERSION_MARKER, 1, true)
+		or not src:find(MACLIB_REQUIRED_FN, 1, true)
+		or not src:find("function MacLib:Window", 1, true)
 		or not looksLikeLua(src) then
 		return false
 	end
-	local version = rayfieldVersionFromSource(src)
-	local need = requiredRayfieldVersion()
+	local version = maclibVersionFromSource(src)
+	local need = requiredMaclibVersion()
 	return type(version) == "number" and version == need
 end
 
-local function rayfieldSourceRejectReason(src)
+local function maclibSourceRejectReason(src)
 	if type(src) ~= "string" then
 		return "no body"
 	end
-	if #src < RAYFIELD_SOURCE_MIN_BYTES then
-		return "too small (" .. tostring(#src) .. "b, need " .. tostring(RAYFIELD_SOURCE_MIN_BYTES) .. "+)"
+	if #src < MACLIB_SOURCE_MIN_BYTES then
+		return "too small (" .. tostring(#src) .. "b, need " .. tostring(MACLIB_SOURCE_MIN_BYTES) .. "+)"
 	end
 	if not looksLikeLua(src) then
 		return "not lua (" .. tostring(#src) .. "b)"
 	end
-	if not src:find(RAYFIELD_VERSION_MARKER, 1, true) then
+	if not src:find(MACLIB_VERSION_MARKER, 1, true) then
 		return "missing version marker"
 	end
-	if not src:find(RAYFIELD_REQUIRED_FN, 1, true) then
-		return "missing " .. RAYFIELD_REQUIRED_FN
+	if not src:find(MACLIB_REQUIRED_FN, 1, true) then
+		return "missing " .. MACLIB_REQUIRED_FN
 	end
-	if not src:find("function RayfieldLibrary:Notify", 1, true) then
-		return "missing RayfieldLibrary:Notify"
-	end
-	local version = rayfieldVersionFromSource(src)
-	local need = requiredRayfieldVersion()
+	local version = maclibVersionFromSource(src)
+	local need = requiredMaclibVersion()
 	if type(version) ~= "number" or version ~= need then
 		return "version v" .. tostring(version or "?") .. " != required v" .. tostring(need)
 	end
 	return "ok"
 end
 
-local function rayfieldRemoteBases()
+local function maclibRemoteBases()
 	local bases = { GITHUB_RAW, GITHUB_WEB }
 	local expected = ENV._Alleral_ExpectedVersions
 	local commit = type(expected) == "table" and expected.commit
@@ -1013,16 +1009,16 @@ local function rayfieldRemoteBases()
 	return bases
 end
 
-local function fetchRemoteRayfield()
+local function fetchRemoteMaclib()
 	local lastReason = "no response"
 	for attempt = 1, 3 do
-		for _, base in ipairs(rayfieldRemoteBases()) do
-			local body, via = httpGet(base .. "/" .. RAYFIELD_SOURCE_PATH, RAYFIELD_SOURCE_MIN_BYTES)
-			if type(body) == "string" and #body >= RAYFIELD_SOURCE_MIN_BYTES then
-				if rayfieldSourceValid(body) then
+		for _, base in ipairs(maclibRemoteBases()) do
+			local body, via = httpGet(base .. "/" .. MACLIB_SOURCE_PATH, MACLIB_SOURCE_MIN_BYTES)
+			if type(body) == "string" and #body >= MACLIB_SOURCE_MIN_BYTES then
+				if maclibSourceValid(body) then
 					return body, base .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
 				end
-				lastReason = rayfieldSourceRejectReason(body)
+				lastReason = maclibSourceRejectReason(body)
 					.. " ("
 					.. tostring(#body)
 					.. "b via "
@@ -1041,40 +1037,51 @@ local function fetchRemoteRayfield()
 	return nil, lastReason
 end
 
-local function clearStaleRayfieldRuntime()
+local function clearStaleMaclibRuntime()
 	local env = genv()
-	if type(env) ~= "table" or type(env._AlleralRayfield) ~= "table" then
+	if type(env) ~= "table" or type(env._AlleralMaclib) ~= "table" then
 		return
 	end
-	local version = env._AlleralRayfield.__AlleralPatch
-	if type(version) ~= "number" or version < requiredRayfieldVersion() then
-		env._AlleralRayfield = nil
-		env._AlleralRayfieldSourceKey = nil
+	local version = env._AlleralMaclib.__AlleralPatch
+	if type(version) ~= "number" or version < requiredMaclibVersion() then
+		env._AlleralMaclib = nil
+		env._AlleralMaclibSourceKey = nil
 	end
 end
 
-local function purgeInvalidRayfieldSources()
-	local need = requiredRayfieldVersion()
+local LEGACY_UI_SOURCE_PATHS = {
+	UI .. "/rayfield/source.luau",
+	"kick/" .. UI .. "/rayfield/source.luau",
+	".alleral/cache/" .. UI .. "/rayfield/source.luau",
+	UI .. "/syde/source.luau",
+	"kick/" .. UI .. "/syde/source.luau",
+	".alleral/cache/" .. UI .. "/syde/source.luau",
+	UI .. "/studio/source.luau",
+	"kick/" .. UI .. "/studio/source.luau",
+	".alleral/cache/" .. UI .. "/studio/source.luau",
+}
+
+local function purgeLegacyUiSources()
+	local need = requiredMaclibVersion()
+	for _, path in ipairs(LEGACY_UI_SOURCE_PATHS) do
+		local src = readLocal({ path }, 100)
+		if src then
+			deleteWorkspaceFile(path, { silent = true, label = "legacy UI source" })
+		end
+	end
 	local paths = {
-		RAYFIELD_SOURCE_PATH,
-		"kick/" .. RAYFIELD_SOURCE_PATH,
-		".alleral/cache/" .. RAYFIELD_SOURCE_PATH,
-		UI .. "/syde/source.luau",
-		"kick/" .. UI .. "/syde/source.luau",
-		".alleral/cache/" .. UI .. "/syde/source.luau",
+		MACLIB_SOURCE_PATH,
+		"kick/" .. MACLIB_SOURCE_PATH,
+		".alleral/cache/" .. MACLIB_SOURCE_PATH,
 	}
 	for _, path in ipairs(paths) do
 		local src = readLocal({ path }, 100)
-		if path:find("/syde/", 1, true) or path:find("/studio/", 1, true) then
-			if src then
-				deleteWorkspaceFile(path, { silent = true, label = "legacy UI source" })
-			end
-		elseif src then
-			local version = rayfieldVersionFromSource(src)
+		if src then
+			local version = maclibVersionFromSource(src)
 			if type(version) ~= "number" or version ~= need then
-				deleteWorkspaceFile(path, { silent = true, label = "stale Rayfield" })
+				deleteWorkspaceFile(path, { silent = true, label = "stale MacLib" })
 				log(
-					"Purged stale Rayfield source "
+					"Purged stale MacLib source "
 						.. path
 						.. " (v"
 						.. tostring(version or "?")
@@ -1088,78 +1095,63 @@ local function purgeInvalidRayfieldSources()
 	end
 end
 
-local function ensureRayfieldSource()
-	clearStaleRayfieldRuntime()
-	purgeInvalidRayfieldSources()
+local function ensureMaclibSource()
+	clearStaleMaclibRuntime()
+	purgeLegacyUiSources()
 
-	for _, overridePath in ipairs(RAYFIELD_PATCHED_OVERRIDE_PATHS) do
-		local src, path = readLocal({ overridePath }, RAYFIELD_SOURCE_MIN_BYTES)
-		if src and rayfieldSourceValid(src) then
-			local version = rayfieldVersionFromSource(src)
-			log("Using local patched Rayfield override: " .. tostring(path) .. " (v" .. tostring(version or "?") .. ")")
-			ENV._AlleralRayfieldSource = src
-			ENV._AlleralRayfieldSourceVersion = version
-			ENV._AlleralRayfieldSourceLabel = "override:" .. tostring(path)
-			ENV._AlleralRayfieldSourceReady = true
-			ENV._AlleralRayfieldSource = src
-			ENV._AlleralRayfieldSourceReady = true
-			cacheRemote(RAYFIELD_SOURCE_PATH, src)
-			cacheRemote(".alleral/cache/" .. RAYFIELD_SOURCE_PATH, src)
+	for _, overridePath in ipairs(MACLIB_PATCHED_OVERRIDE_PATHS) do
+		local src, path = readLocal({ overridePath }, MACLIB_SOURCE_MIN_BYTES)
+		if src and maclibSourceValid(src) then
+			local version = maclibVersionFromSource(src)
+			log("Using local patched MacLib override: " .. tostring(path) .. " (v" .. tostring(version or "?") .. ")")
+			ENV._AlleralMaclibSource = src
+			ENV._AlleralMaclibSourceVersion = version
+			ENV._AlleralMaclibSourceLabel = "override:" .. tostring(path)
+			ENV._AlleralMaclibSourceReady = true
+			cacheRemote(MACLIB_SOURCE_PATH, src)
+			cacheRemote(".alleral/cache/" .. MACLIB_SOURCE_PATH, src)
 			return true, "override:" .. tostring(path) .. ", v" .. tostring(version or "?")
 		end
 	end
 
 	local localPaths = {
-		RAYFIELD_SOURCE_PATH,
-		"kick/" .. RAYFIELD_SOURCE_PATH,
+		MACLIB_SOURCE_PATH,
+		"kick/" .. MACLIB_SOURCE_PATH,
 	}
 	local cachePaths = {
-		".alleral/cache/" .. RAYFIELD_SOURCE_PATH,
+		".alleral/cache/" .. MACLIB_SOURCE_PATH,
 	}
 
-	local function adoptRayfield(src, label)
-		if not src or not rayfieldSourceValid(src) then
+	local function adoptMaclib(src, label)
+		if not src or not maclibSourceValid(src) then
 			return nil
 		end
-		cacheRemote(RAYFIELD_SOURCE_PATH, src)
-		cacheRemote(".alleral/cache/" .. RAYFIELD_SOURCE_PATH, src)
-		local iconsPaths = {
-			RAYFIELD_ICONS_PATH,
-			"kick/" .. RAYFIELD_ICONS_PATH,
-			".alleral/cache/" .. RAYFIELD_ICONS_PATH,
-		}
-		local iconsSrc = readLocal(iconsPaths, 100)
-		if type(iconsSrc) == "string" and #iconsSrc > 100 then
-			ENV._AlleralRayfieldIconsSource = iconsSrc
-			cacheRemote(RAYFIELD_ICONS_PATH, iconsSrc)
-			cacheRemote(".alleral/cache/" .. RAYFIELD_ICONS_PATH, iconsSrc)
-		end
-		local version = rayfieldVersionFromSource(src)
-		ENV._AlleralRayfieldSource = src
-		ENV._AlleralRayfieldSourceVersion = version
-		ENV._AlleralRayfieldSourceLabel = label
-		ENV._AlleralRayfieldSourceReady = true
-		ENV._AlleralRayfieldSource = src
-		ENV._AlleralRayfieldSourceReady = true
+		cacheRemote(MACLIB_SOURCE_PATH, src)
+		cacheRemote(".alleral/cache/" .. MACLIB_SOURCE_PATH, src)
+		local version = maclibVersionFromSource(src)
+		ENV._AlleralMaclibSource = src
+		ENV._AlleralMaclibSourceVersion = version
+		ENV._AlleralMaclibSourceLabel = label
+		ENV._AlleralMaclibSourceReady = true
 		return true, label .. ", v" .. tostring(version or "?")
 	end
 
-	local cacheSrc, cachePath = readLocal(cachePaths, RAYFIELD_SOURCE_MIN_BYTES)
-	local cacheOk = cacheSrc and rayfieldSourceValid(cacheSrc)
-	local cacheVersion = rayfieldVersionFromSource(cacheSrc)
+	local cacheSrc, cachePath = readLocal(cachePaths, MACLIB_SOURCE_MIN_BYTES)
+	local cacheOk = cacheSrc and maclibSourceValid(cacheSrc)
+	local cacheVersion = maclibVersionFromSource(cacheSrc)
 
-	local remoteSrc, remoteVia = fetchRemoteRayfield()
-	local remoteOk = remoteSrc and rayfieldSourceValid(remoteSrc)
-	local remoteVersion = rayfieldVersionFromSource(remoteSrc)
+	local remoteSrc, remoteVia = fetchRemoteMaclib()
+	local remoteOk = remoteSrc and maclibSourceValid(remoteSrc)
+	local remoteVersion = maclibVersionFromSource(remoteSrc)
 
-	local localSrc, localPath = readLocal(localPaths, RAYFIELD_SOURCE_MIN_BYTES)
-	local localOk = localSrc and rayfieldSourceValid(localSrc)
-	local localVersion = rayfieldVersionFromSource(localSrc)
+	local localSrc, localPath = readLocal(localPaths, MACLIB_SOURCE_MIN_BYTES)
+	local localOk = localSrc and maclibSourceValid(localSrc)
+	local localVersion = maclibVersionFromSource(localSrc)
 
 	if remoteOk then
 		if localOk and localPath and (localVersion or 0) ~= (remoteVersion or 0) then
 			log(
-				"Replacing stale Rayfield source (local v"
+				"Replacing stale MacLib source (local v"
 					.. tostring(localVersion or "?")
 					.. " != remote v"
 					.. tostring(remoteVersion or "?")
@@ -1169,21 +1161,21 @@ local function ensureRayfieldSource()
 			deleteWorkspaceFile(localPath)
 		end
 		if cacheOk and cachePath and (cacheVersion or 0) ~= (remoteVersion or 0) then
-			deleteWorkspaceFile(cachePath, { silent = true, label = "stale Rayfield cache" })
+			deleteWorkspaceFile(cachePath, { silent = true, label = "stale MacLib cache" })
 		end
-		return adoptRayfield(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
+		return adoptMaclib(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
 	end
 
 	if localOk then
-		return adoptRayfield(localSrc, "local:" .. tostring(localPath))
+		return adoptMaclib(localSrc, "local:" .. tostring(localPath))
 	end
 
 	if cacheOk then
-		return adoptRayfield(cacheSrc, "cache:" .. tostring(cachePath))
+		return adoptMaclib(cacheSrc, "cache:" .. tostring(cachePath))
 	end
 
-	local fetchDetail = type(remoteVia) == "string" and remoteVia or rayfieldSourceRejectReason(remoteSrc)
-	return false, "Rayfield source unavailable (need v" .. tostring(requiredRayfieldVersion()) .. "): " .. tostring(fetchDetail)
+	local fetchDetail = type(remoteVia) == "string" and remoteVia or maclibSourceRejectReason(remoteSrc)
+	return false, "MacLib source unavailable (need v" .. tostring(requiredMaclibVersion()) .. "): " .. tostring(fetchDetail)
 end
 
 local function usesLegacyHttpHash(src)
@@ -1690,10 +1682,10 @@ local function alleralUiValid(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return false
 	end
-	if not src:find("Rayfield", 1, true) then
+	if not src:find("Maclib", 1, true) then
 		return false
 	end
-	if not src:find("loadRayfield", 1, true) then
+	if not src:find("loadMaclib", 1, true) then
 		return false
 	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then
@@ -1816,14 +1808,11 @@ local function alleralUiRejectReason(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return "missing Alleral UI layer marker"
 	end
-	if not src:find("Rayfield", 1, true) then
-		return "missing Rayfield integration"
+	if not src:find("Maclib", 1, true) then
+		return "missing MacLib integration"
 	end
-	if not src:find("loadRayfield", 1, true) then
-		return "missing loadRayfield bootstrap"
-	end
-	if not src:find("ALLERAL_RAYFIELD_VERSION", 1, true) then
-		return "missing ALLERAL_RAYFIELD_VERSION marker"
+	if not src:find("loadMaclib", 1, true) then
+		return "missing loadMaclib bootstrap"
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua body"
@@ -1856,8 +1845,8 @@ local function extractFileVersion(src, kind)
 	if type(src) ~= "string" then
 		return nil
 	end
-	if kind == "rayfield" then
-		return src:match("ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)")
+	if kind == "maclib" then
+		return src:match("ALLERAL_MACLIB_VERSION%s*=%s*(%d+)")
 	end
 	if kind == "alleral" then
 		return src:match('Core%.ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
@@ -2254,12 +2243,12 @@ local function loadCore()
 		return false, alleralUiLabel or "Alleral UI layer download failed"
 	end
 
-	if not ENV._AlleralRayfieldSourceReady then
-		local studioOk, studioLabel = ensureRayfieldSource()
+	if not ENV._AlleralMaclibSourceReady then
+		local studioOk, studioLabel = ensureMaclibSource()
 		if studioOk then
-			log("Rayfield source ready (" .. tostring(studioLabel) .. ")")
+			log("MacLib source ready (" .. tostring(studioLabel) .. ")")
 		else
-			log("Rayfield source not cached yet: " .. tostring(studioLabel), true)
+			log("MacLib source not cached yet: " .. tostring(studioLabel), true)
 		end
 	end
 
@@ -2935,7 +2924,7 @@ local function fetchExpectedVersionsFast()
 		weao = RELEASE_FALLBACK.weao,
 		alleral = RELEASE_FALLBACK.alleral,
 		windui = RELEASE_FALLBACK.windui,
-		rayfieldVersion = RELEASE_FALLBACK.rayfieldVersion,
+		maclibVersion = RELEASE_FALLBACK.maclibVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -2983,7 +2972,7 @@ fetchExpectedVersions = function(forceRefresh)
 		weao = RELEASE_FALLBACK.weao,
 		alleral = RELEASE_FALLBACK.alleral,
 		windui = RELEASE_FALLBACK.windui,
-		rayfieldVersion = RELEASE_FALLBACK.rayfieldVersion,
+		maclibVersion = RELEASE_FALLBACK.maclibVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -3008,7 +2997,7 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.windui = release.windui or expected.alleral or expected.windui
 		expected.commit = release.commit or expected.commit
 		expected.updatedAt = release.updatedAt or expected.updatedAt
-		expected.rayfieldVersion = tonumber(release.rayfieldVersion) or expected.rayfieldVersion
+		expected.maclibVersion = tonumber(release.maclibVersion) or expected.maclibVersion
 		expected.minLoader = release.minLoader or expected.minLoader
 		expected.minCore = release.minCore or expected.minCore
 		if type(release.updatePollSeconds) == "number" then
@@ -3064,7 +3053,7 @@ local function buildUpdateFingerprint(expected, profile)
 		"helpers=" .. tostring(expected.helpers or ""),
 		"weao=" .. tostring(expected.weao or ""),
 		"weaoCfg=" .. tostring((ENV.Alleral_WeaoConfig or {}).version or ""),
-		"rayfieldVersion=" .. tostring(expected.rayfieldVersion or RAYFIELD_VERSION),
+		"maclibVersion=" .. tostring(expected.maclibVersion or MACLIB_VERSION),
 	}
 	if profile and profile.id then
 		table.insert(parts, "game=" .. tostring(profile.id) .. "@" .. tostring(expected.games and expected.games[profile.id] or profile.version or ""))
@@ -3116,12 +3105,16 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				UI .. "/rayfield/source.luau",
-				".alleral/cache/" .. UI .. "/rayfield/source.luau",
+				MACLIB_SOURCE_PATH,
+				".alleral/cache/" .. MACLIB_SOURCE_PATH,
 			},
-			expectedKey = "rayfieldVersion",
-			extract = "rayfield",
-			isValid = rayfieldSourceValid,
+			expectedKey = "maclibVersion",
+			extract = "maclib",
+			isValid = maclibSourceValid,
+		},
+		{
+			paths = LEGACY_UI_SOURCE_PATHS,
+			alwaysDelete = true,
 		},
 		{
 			paths = {
@@ -3282,14 +3275,14 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 	elseif entry.purgeOnLoaderChange then
 		local installedLoader = installedManifest and installedManifest.loader
 		return type(installedLoader) == "string" and installedLoader ~= expected.loader
-	elseif entry.extract == "rayfield" then
-		expectedVersion = tostring(RAYFIELD_VERSION)
+	elseif entry.extract == "maclib" then
+		expectedVersion = tostring(MACLIB_VERSION)
 	else
 		expectedVersion = expected[entry.expectedKey]
 	end
 
 	if type(expectedVersion) ~= "string" or expectedVersion == "" then
-		return entry.extract == "rayfield" or false
+		return entry.extract == "maclib" or false
 	end
 
 	if type(src) ~= "string" or src == "" then
@@ -3306,9 +3299,9 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 
 	local foundVersion = extractFileVersion(src, entry.extract)
 	if type(foundVersion) == "string" and foundVersion ~= "" and type(expectedVersion) == "string" and expectedVersion ~= "" then
-		if entry.extract == "rayfield" then
+		if entry.extract == "maclib" then
 			local foundNum = tonumber(foundVersion) or 0
-			local needVersion = tonumber(expectedVersion) or RAYFIELD_VERSION
+			local needVersion = tonumber(expectedVersion) or MACLIB_VERSION
 			return foundNum < needVersion
 		end
 		return foundVersion ~= expectedVersion
@@ -3348,7 +3341,7 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.6.1"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.7.0"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
@@ -3741,8 +3734,8 @@ local function checkForRemoteUpdate(profile, quiet)
 		reason = "commit " .. tostring(expected.commit)
 	elseif expected.loader and not previous:find("loader=" .. tostring(expected.loader), 1, true) then
 		reason = "loader v" .. tostring(expected.loader)
-	elseif expected.rayfieldVersion and not previous:find("rayfieldVersion=" .. tostring(expected.rayfieldVersion), 1, true) then
-		reason = "studio v" .. tostring(expected.rayfieldVersion)
+	elseif expected.maclibVersion and not previous:find("maclibVersion=" .. tostring(expected.maclibVersion), 1, true) then
+		reason = "studio v" .. tostring(expected.maclibVersion)
 	elseif profile and expected.games and expected.games[profile.id] then
 		reason = profile.name .. " v" .. tostring(expected.games[profile.id])
 	end
@@ -3914,7 +3907,7 @@ local function main()
 	end
 
 	ENV.Alleral_Core = nil
-	ENV.Alleral_Rayfield = nil
+	ENV.Alleral_Maclib = nil
 	ENV.Alleral_UI = nil
 	ENV.Alleral_Weao = nil
 	ENV.Alleral_StartupFailed = nil
@@ -3949,11 +3942,11 @@ local function main()
 	purgeAlleralWorkspace({ reason = "boot" })
 	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
 	ENV.Alleral_HTTP.get = httpGet
-	local studioPrefetchOk, studioPrefetchLabel = ensureRayfieldSource()
+	local studioPrefetchOk, studioPrefetchLabel = ensureMaclibSource()
 	if studioPrefetchOk then
-		log("Rayfield source ready (" .. tostring(studioPrefetchLabel) .. ")")
+		log("MacLib source ready (" .. tostring(studioPrefetchLabel) .. ")")
 	else
-		log("Rayfield source not cached yet: " .. tostring(studioPrefetchLabel), true)
+		log("MacLib source not cached yet: " .. tostring(studioPrefetchLabel), true)
 	end
 	refreshExpectedVersionsAsync()
 	if expectedVersions.loader and versionLt(LOADER_VERSION, expectedVersions.loader) then
@@ -4010,13 +4003,13 @@ local function main()
 				.. " — continuing (bootstrap may refresh on next relaunch)"
 		)
 	end
-	local needRayfieldVersion = tonumber(expectedVersions.rayfieldVersion) or RAYFIELD_VERSION
-	if needRayfieldVersion ~= RAYFIELD_VERSION then
+	local needmaclibVersion = tonumber(expectedVersions.maclibVersion) or MACLIB_VERSION
+	if needmaclibVersion ~= MACLIB_VERSION then
 		log(
-			"Embedded rayfield v"
-				.. tostring(RAYFIELD_VERSION)
+			"Embedded MacLib v"
+				.. tostring(MACLIB_VERSION)
 				.. " != release v"
-				.. tostring(needRayfieldVersion)
+				.. tostring(needmaclibVersion)
 				.. " — auto-updating via bootstrap"
 		)
 		ENV.Alleral_LoaderRunning = false
@@ -4028,7 +4021,7 @@ local function main()
 				pcall(function()
 					game:GetService("StarterGui"):SetCore("SendNotification", {
 						Title = "Alleral",
-						Text = "Rayfield UI version mismatch — reload the script to update UI.",
+						Text = "MacLib UI version mismatch — reload the script to update UI.",
 						Duration = 8,
 					})
 				end)

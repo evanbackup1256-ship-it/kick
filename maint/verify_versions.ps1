@@ -65,44 +65,44 @@ if ($loader -match 'LOADER_VERSION = "([^"]+)"')
     Fail "loader.luau missing LOADER_VERSION"
 }
 
-if ($release.rayfieldVersion)
+if ($release.maclibVersion)
 {
-    if ($loader -match 'local RAYFIELD_VERSION = (\d+)')
+    if ($loader -match 'local MACLIB_VERSION = (\d+)')
     {
-        $rayfieldVersion = [int]$Matches[1]
-        if ($rayfieldVersion -ne [int]$release.rayfieldVersion)
+        $maclibVersion = [int]$Matches[1]
+        if ($maclibVersion -ne [int]$release.maclibVersion)
         {
-            Fail "loader RAYFIELD_VERSION ($rayfieldVersion) != release.json ($($release.rayfieldVersion))"
+            Fail "loader MACLIB_VERSION ($maclibVersion) != release.json ($($release.maclibVersion))"
         } else
         {
-            Pass "loader rayfield version $rayfieldVersion"
+            Pass "loader maclib version $maclibVersion"
         }
     } else
     {
-        Fail "loader.luau missing RAYFIELD_VERSION"
+        Fail "loader.luau missing MACLIB_VERSION"
     }
 
-    $rayfieldSourcePath = Join-Path $root "ui/rayfield/source.luau"
-    if (Test-Path $rayfieldSourcePath)
+    $maclibSourcePath = Join-Path $root "ui/maclib/source.luau"
+    if (Test-Path $maclibSourcePath)
     {
-        $rayfieldSource = Get-Content $rayfieldSourcePath -Raw
-        if ($rayfieldSource -match 'ALLERAL_RAYFIELD_VERSION = (\d+)')
+        $maclibSource = Get-Content $maclibSourcePath -Raw
+        if ($maclibSource -match 'ALLERAL_MACLIB_VERSION = (\d+)')
         {
             $sourceVersion = [int]$Matches[1]
-            if ($sourceVersion -ne [int]$release.rayfieldVersion)
+            if ($sourceVersion -ne [int]$release.maclibVersion)
             {
-                Fail "ui/rayfield/source.luau ALLERAL_RAYFIELD_VERSION ($sourceVersion) != release.json ($($release.rayfieldVersion))"
+                Fail "ui/maclib/source.luau ALLERAL_MACLIB_VERSION ($sourceVersion) != release.json ($($release.maclibVersion))"
             } else
             {
-                Pass "rayfield source version $sourceVersion"
+                Pass "maclib source version $sourceVersion"
             }
         } else
         {
-            Fail "ui/rayfield/source.luau missing ALLERAL_RAYFIELD_VERSION"
+            Fail "ui/maclib/source.luau missing ALLERAL_MACLIB_VERSION"
         }
     } else
     {
-        Fail "ui/rayfield/source.luau missing"
+        Fail "ui/maclib/source.luau missing"
     }
 }
 
@@ -291,12 +291,12 @@ if ($site.coreVersion -ne $release.core)
 {
     Pass "site coreVersion $($site.coreVersion)"
 }
-if ($release.rayfieldVersion -and $site.rayfieldVersion -ne $release.rayfieldVersion)
+if ($release.maclibVersion -and $site.maclibVersion -ne $release.maclibVersion)
 {
-    Fail "site.json rayfieldVersion ($($site.rayfieldVersion)) != release.json ($($release.rayfieldVersion))"
-} elseif ($release.rayfieldVersion)
+    Fail "site.json maclibVersion ($($site.maclibVersion)) != release.json ($($release.maclibVersion))"
+} elseif ($release.maclibVersion)
 {
-    Pass "site rayfieldVersion $($site.rayfieldVersion)"
+    Pass "site maclibVersion $($site.maclibVersion)"
 }
 
 $analyticsPath = Join-Path $root "hub/analytics.luau"

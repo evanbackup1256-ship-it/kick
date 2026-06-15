@@ -8,8 +8,8 @@ local HTTP_GET_TIMEOUT = 12
 local LOADER_FETCH_TIMEOUT = 28
 local LOADER_MIN_BYTES = 50000
 local FALLBACK_RELEASE = {
-	loader = "8.6.1",
-	rayfieldVersion = 2,
+	loader = "8.7.0",
+	maclibVersion = 1,
 }
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
@@ -236,7 +236,7 @@ local function parseReleaseJson(src)
 	return {
 		loader = src:match('"loader"%s*:%s*"([^"]+)"'),
 		commit = src:match('"commit"%s*:%s*"([^"]+)"'),
-		rayfieldVersion = tonumber(src:match('"rayfieldVersion"%s*:%s*(%d+)')),
+		maclibVersion = tonumber(src:match('"maclibVersion"%s*:%s*(%d+)')),
 	}
 end
 
@@ -247,11 +247,11 @@ local function loaderCommitFromSource(src)
 	return src:match('commit = "([^"]+)"')
 end
 
-local function loaderRayfieldVersionFromSource(src)
+local function loaderMaclibVersionFromSource(src)
 	if type(src) ~= "string" then
 		return nil
 	end
-	return tonumber(src:match("local RAYFIELD_VERSION = (%d+)"))
+	return tonumber(src:match("local MACLIB_VERSION = (%d+)"))
 end
 
 local function loaderMatchesRelease(src, meta)
@@ -286,7 +286,7 @@ local function fetchReleaseMeta()
 	local builtin = {
 		loader = FALLBACK_RELEASE.loader,
 		commit = BRANCH,
-		rayfieldVersion = FALLBACK_RELEASE.rayfieldVersion,
+		maclibVersion = FALLBACK_RELEASE.maclibVersion,
 	}
 	task.spawn(function()
 		for _, url in ipairs(releaseMetaUrls()) do
@@ -360,6 +360,7 @@ local PURGE_PATHS = {
 	"hub/core_hub_ui.luau",
 	"core/alleral_core.luau",
 	"alleral_core.luau",
+	"ui/maclib/source.luau",
 	"ui/rayfield/source.luau",
 	"ui/syde/source.luau",
 	"obfusctated_uilibrary.luau",

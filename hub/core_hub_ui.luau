@@ -399,41 +399,20 @@ end
 
 function Core.releaseUiWindow()
 	local window = ENV.Alleral_UiWindow
-	if type(window) == "table" and window._nlWindow and type(window._nlWindow.SetOpen) == "function" then
+	if type(window) == "table" and window._rawWindow and type(window._rawWindow.SetState) == "function" then
 		pcall(function()
-			window._nlWindow:SetOpen(false)
+			window._rawWindow:SetState(false)
 		end)
 	end
 	local ui = ENV.Alleral_UI
-	local lib = ui and (ui.Library or ui.Alleral or ui.WindUI)
-	if type(lib) == "table" and type(lib.ReleaseWindow) == "function" then
+	local lib = ui and (ui.Library or ui.Alleral or ui.Maclib)
+	if type(window) == "table" and window._rawWindow and type(window._rawWindow.Unload) == "function" then
 		pcall(function()
-			lib:ReleaseWindow(lib.Window)
+			window._rawWindow:Unload()
 		end)
 	end
-	if type(lib) == "table" and type(lib.Unload) == "function" then
-		pcall(lib.Unload, lib)
-	end
-	local syde = ENV._AlleralSyde
-	if type(syde) == "table" then
-		if type(syde.DisconnectAll) == "function" then
-			pcall(syde.DisconnectAll, syde)
-		end
-		local root = syde._root
-		if root and root.Destroy then
-			pcall(function()
-				root:Destroy()
-			end)
-		end
-	end
-	local rayfield = ENV._AlleralRayfield
-	if type(rayfield) == "table" and type(rayfield.Destroy) == "function" then
-		pcall(rayfield.Destroy, rayfield)
-	end
-	ENV._AlleralRayfield = nil
-	ENV._AlleralRayfieldSourceKey = nil
-	ENV._AlleralSyde = nil
-	ENV._AlleralSydeSourceKey = nil
+	ENV._AlleralMaclib = nil
+	ENV._AlleralMaclibSourceKey = nil
 	ENV._AlleralUiLibrary = nil
 	ENV.Alleral_UiWindow = nil
 	getgenv().Alleral_UiWindow = nil
@@ -1111,7 +1090,7 @@ function Core.setupHubKeybinds(options)
 	local panicKey = options.panicKey or Enum.KeyCode.Delete
 	local uiKey = options.uiKey or Enum.KeyCode.RightControl
 	local insertKey = options.insertKey or Enum.KeyCode.Insert
-	local libraryHandlesUiKeybind = Core.UI_LIBRARY == "Rayfield" or Core.UI_LIBRARY == "Syde"
+	local libraryHandlesUiKeybind = Core.UI_LIBRARY == "Maclib"
 	ENV._Alleral_KeybindConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or input.UserInputType ~= Enum.UserInputType.Keyboard then
 			return
@@ -1376,7 +1355,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	local group = Core.buildUiGroup(tab, "Customization V2", column, nil, nil, "CustomizationV2")
 
 	if not windUi or type(windUi.SetMotionProfile) ~= "function" then
-		group:CreateLabel("Rayfield UI layer unavailable — re-run the loader.")
+		group:CreateLabel("MacLib UI layer unavailable — re-run the loader.")
 		return group
 	end
 

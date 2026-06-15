@@ -70,7 +70,7 @@ return function(Core)
 		if uiOk(cached) then
 			return cacheUi(cached)
 		end
-		return nil, "Alleral UI layer missing — sync hub/alleral_ui.luau (Rayfield integration)"
+		return nil, "Alleral UI layer missing — sync hub/alleral_ui.luau (MacLib integration)"
 	end
 
 	function Core.preloadUi()
