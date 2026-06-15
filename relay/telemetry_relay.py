@@ -2177,7 +2177,13 @@ def live_status():
     })
 
 
-@app.get("/api/games/thumbnails")
+@app.get("/api/games", strict_slashes=False)
+@app.get("/api/games/", strict_slashes=False)
+def games_index():
+    return jsonify({"ok": True, "thumbnails": "/api/games/thumbnails"})
+
+
+@app.get("/api/games/thumbnails", strict_slashes=False)
 def game_thumbnails():
     """Proxy Roblox game icons so the hub avoids browser CORS blocks."""
     client_ip = resolve_client_ip(request)

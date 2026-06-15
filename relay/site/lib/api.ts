@@ -1,11 +1,11 @@
-import { API_BASE } from "./config";
+import { apiUrl } from "./config";
 import { sanitizePublicSite } from "./sanitize";
 import type { HubStatusPayload, SitePayload, WeaoPayload } from "./types";
 
-const GET_CACHE: RequestInit = { cache: "default" };
+const GET_CACHE: RequestInit = { cache: "no-store" };
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(apiUrl(path), {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
@@ -42,7 +42,7 @@ export async function fetchThumbnails(placeIds: string[]): Promise<Record<string
 export async function postHubVisit(source = "load"): Promise<void> {
   if (typeof window === "undefined") return;
   try {
-    await fetch(`${API_BASE}/api/hub/visit`, {
+    await fetch(apiUrl("/api/hub/visit"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

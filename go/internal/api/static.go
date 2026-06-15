@@ -108,6 +108,9 @@ func serveStaticContent(w http.ResponseWriter, r *http.Request, info os.FileInfo
 	w.Header().Set("Last-Modified", info.ModTime().UTC().Format(http.TimeFormat))
 	w.Header().Set("Accept-Ranges", "bytes")
 	w.Header().Set("X-Alleral-Static", info.Name())
+	if strings.HasSuffix(strings.ToLower(info.Name()), ".html") {
+		w.Header().Set("Cache-Control", "no-store, max-age=0")
+	}
 
 	if r.Method == http.MethodHead {
 		w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))

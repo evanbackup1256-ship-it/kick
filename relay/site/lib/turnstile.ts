@@ -1,4 +1,4 @@
-import { API_BASE, TURNSTILE_SITE_KEY } from "@/lib/config";
+import { TURNSTILE_SITE_KEY, apiUrl } from "@/lib/config";
 
 const TEST_SITE_KEY = "3x00000000000000000000FF";
 
@@ -57,7 +57,7 @@ export async function resolveTurnstileSiteKey(): Promise<string> {
   if (local) return local;
 
   try {
-    const res = await fetch(`${API_BASE}/api/gate/config`, { cache: "no-store" });
+    const res = await fetch(apiUrl("/api/gate/config"), { cache: "no-store" });
     const data = await res.json();
     if (data.ok && data.siteKey) return String(data.siteKey);
   } catch {
@@ -136,7 +136,7 @@ export async function mountTurnstileWidget(
 
 export async function verifyGateToken(token: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/api/gate/verify`, {
+    const res = await fetch(apiUrl("/api/gate/verify"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),

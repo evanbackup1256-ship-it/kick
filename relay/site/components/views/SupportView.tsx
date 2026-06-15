@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { API_BASE } from "@/lib/config";
+import { apiUrl } from "@/lib/config";
 import type { SitePayload } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Form";
@@ -16,7 +16,7 @@ export function SupportView({ site }: { site: SitePayload }) {
   const [captchaRequired, setCaptchaRequired] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/gate/config`, { cache: "no-store" })
+    fetch(apiUrl("/api/gate/config"), { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => setCaptchaRequired(Boolean(data.serverVerify && data.siteKey)))
       .catch(() => setCaptchaRequired(false));
@@ -46,7 +46,7 @@ export function SupportView({ site }: { site: SitePayload }) {
     if (tab !== "support") payload.robloxUser = payload.username || "";
     if (turnstileToken) payload.turnstileToken = turnstileToken;
     try {
-      const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const res = await fetch(apiUrl(path), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok || data.ok === false) throw new Error(data.error || "Submit failed");
       setOk(true);
