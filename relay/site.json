@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-15T22:36:18Z",
+  "updatedAt": "2026-06-15T22:40:01Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
   "loaderVersion": "8.6.0",
@@ -9,7 +9,7 @@
   "uiVersion": "5.2.0-rayfield",
   "rayfieldVersion": 2,
   "announcement": "",
-  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=\" .. tick(), true))()",
+  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?v=1.0.11&t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
   "branch": "main",
   "features": [
