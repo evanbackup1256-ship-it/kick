@@ -31,8 +31,8 @@ func main() {
 	}))
 
 	r.Get("/health", srv.Health)
-	r.Get("/", static)
-	r.Get("/app.html", static)
+	r.Handle("/", static)
+	r.Handle("/app.html", static)
 
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/health", srv.Health)
