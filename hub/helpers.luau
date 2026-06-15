@@ -1,5 +1,5 @@
 local Helpers = {}
-Helpers.VERSION = "1.0"
+Helpers.VERSION = "1.1"
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -13,6 +13,78 @@ local function genv()
 end
 
 local ENV = genv()
+
+function Helpers.waitChild(parent, name, timeout)
+	if not parent then
+		return nil
+	end
+	return parent:WaitForChild(name, timeout or 5)
+end
+
+function Helpers.isPickup(instance)
+	if not instance then
+		return false
+	end
+	local name = instance.Name:lower()
+	if
+		name:find("shard", 1, true)
+		or name:find("galactic", 1, true)
+		or name:find("pickup", 1, true)
+		or name:find("drop", 1, true)
+		or name:find("mineral", 1, true)
+		or name:find("coin", 1, true)
+		or name:find("credit", 1, true)
+	then
+		return true
+	end
+	return instance:GetAttribute("Shard")
+		or instance:GetAttribute("Pickup")
+		or instance:GetAttribute("Collectible")
+		or instance:GetAttribute("Coin")
+end
+
+function Helpers.nearestPickup(origin, options)
+	if not origin then
+		return nil, math.huge
+	end
+	options = type(options) == "table" and options or {}
+	local maxRange = tonumber(options.maxRange) or 300
+	local nearest
+	local nearestDist = maxRange
+	local roots = options.roots or { "Pickups", "Drops", "Loot", "Shards", "Collectibles" }
+
+	local function consider(item)
+		if not Helpers.isPickup(item) or not (item:IsA("BasePart") or item:IsA("Model")) then
+			return
+		end
+		local part = item:IsA("BasePart") and item or item:FindFirstChildWhichIsA("BasePart", true)
+		if not part or not part.Parent then
+			return
+		end
+		local dist = (origin - part.Position).Magnitude
+		if dist < nearestDist then
+			nearestDist = dist
+			nearest = part
+		end
+	end
+
+	for _, rootName in ipairs(roots) do
+		local folder = Workspace:FindFirstChild(rootName)
+		if folder then
+			for _, item in ipairs(folder:GetDescendants()) do
+				consider(item)
+			end
+		end
+	end
+
+	if not nearest then
+		for _, item in ipairs(Workspace:GetChildren()) do
+			consider(item)
+		end
+	end
+
+	return nearest, nearestDist
+end
 
 function Helpers.characterParts(player)
 	player = player or Players.LocalPlayer
@@ -64,6 +136,46 @@ function Helpers.findRemote(cache, names)
 		local remote = cache[name]
 		if remote then
 			return remote
+		end
+	end
+	return nil
+end
+
+function Helpers.gameRequire(moduleScript)
+	if not moduleScript or not moduleScript:IsA("ModuleScript") then
+		return nil
+	end
+	local ok, result = pcall(require, moduleScript)
+	if ok then
+		return result
+	end
+	local renv = ENV
+	if type(getrenv) == "function" then
+		ok, renv = pcall(getrenv)
+		if not ok then
+			renv = ENV
+		end
+	end
+	local gameRequireFn = renv and renv.require
+	if type(gameRequireFn) == "function" then
+		ok, result = pcall(gameRequireFn, moduleScript)
+		if ok then
+			return result
+		end
+	end
+	if type(loadstring) == "function" then
+		ok, result = pcall(function()
+			local fn = loadstring(moduleScript.Source, moduleScript:GetFullName())
+			if not fn then
+				return nil
+			end
+			if setfenv and renv then
+				setfenv(fn, renv)
+			end
+			return fn()
+		end)
+		if ok then
+			return result
 		end
 	end
 	return nil

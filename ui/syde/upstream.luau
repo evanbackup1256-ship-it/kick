@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 35
+local ALLERAL_SYDE_PATCH = 36
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -1672,6 +1672,21 @@ end
 
 
 function syde:updateLayout(container, spacing)
+	if not container or not container:IsA("GuiObject") then
+		return
+	end
+	if container:FindFirstChild("AlleralColumns", true) then
+		pcall(function()
+			if container:IsA("ScrollingFrame") then
+				local layout = container:FindFirstChild("AlleralColumns", true)
+				if layout then
+					local y = layout.AbsoluteSize.Y + 12
+					container.CanvasSize = UDim2.new(0, 0, 0, y)
+				end
+			end
+		end)
+		return
+	end
 	spacing = spacing or 5
 	local yOffset = 0
 	local containerWidth = container.AbsoluteSize.X
@@ -1684,6 +1699,10 @@ function syde:updateLayout(container, spacing)
 
 	if resizing == false then
 		for _, child in ipairs(container:GetChildren()) do
+			if child.Name == "AlleralColumns" then
+				yOffset = yOffset + child.AbsoluteSize.Y + spacing
+				continue
+			end
 			if (child:IsA("Frame") or child:IsA("ImageLabel") or child:IsA("TextLabel") or child:IsA("TextButton")) and child.Visible then
 				child.Size = UDim2.new(1, -10, 0, child.Size.Y.Offset)
 				child.Position = UDim2.new(0, 5, 0, yOffset)
@@ -1809,6 +1828,9 @@ function syde:enableAutoScale(container)
 	
 	local function checkOverlaps()
 		if not autoScaleEnabled then return end
+		if container:FindFirstChild("AlleralColumns", true) then
+			return
+		end
 		if autoScaleDebounce[container] then return end
 		autoScaleDebounce[container] = true
 		task.delay(0.03, function() autoScaleDebounce[container] = false end)
@@ -1822,6 +1844,9 @@ function syde:enableAutoScale(container)
 		
 		local yOffset = 0
 		for i, child in ipairs(children) do
+			if child.Name == "AlleralColumns" then
+				continue
+			end
 			local targetPos = UDim2.new(0, 5, 0, yOffset)
 			if child.Position ~= targetPos then
 				springTween(child, {Position = targetPos}, springPhysics.layout)
@@ -8447,6 +8472,13 @@ function syde:Init(library)
 			slider.slideholder.slider.Visible = false
 			slider:SetAttribute("Searchable", true)
 
+			do
+				local descLabel = slider.slideholder:FindFirstChild("Desc")
+				if descLabel and (not data.Desc or data.Desc == "") then
+					descLabel.Visible = false
+					descLabel.Text = ""
+				end
+			end
 
 			local sliderHandles = {}
 

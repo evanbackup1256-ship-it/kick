@@ -518,15 +518,24 @@ class AutoSyncEngine:
 
     def status(self) -> dict[str, Any]:
         with self._lock:
+            persisted = self._load_state()
+            commit = persisted.get("commit") or self._state.get("commit") or ""
+            last_sync = persisted.get("lastSyncAt") or self._state.get("lastSyncAt")
+            last_error = persisted.get("lastError")
+            if last_error is None:
+                last_error = self._state.get("lastError")
+            sync_count = persisted.get("syncCount")
+            if sync_count is None:
+                sync_count = self._state.get("syncCount") or 0
             return {
                 "enabled": self.enabled,
                 "repo": self.repo,
                 "branch": self.branch,
                 "intervalSec": self.interval_sec,
-                "commit": self._state.get("commit") or "",
-                "lastSyncAt": self._state.get("lastSyncAt"),
-                "lastError": self._state.get("lastError"),
-                "syncCount": self._state.get("syncCount") or 0,
+                "commit": commit,
+                "lastSyncAt": last_sync,
+                "lastError": last_error,
+                "syncCount": int(sync_count or 0),
                 "autoStatus": True,
                 "syncing": self._sync_in_progress.is_set(),
             }
@@ -737,7 +746,12 @@ class AutoSyncEngine:
     def _fetch_text(self, path: str) -> str | None:
         url = self._raw_url(path)
         try:
-            resp = requests.get(url, timeout=FETCH_TIMEOUT, headers={"Cache-Control": "no-cache"})
+            resp = requests.get(
+                url,
+                timeout=FETCH_TIMEOUT,
+                headers={"Cache-Control": "no-cache", "Pragma": "no-cache"},
+                params={"t": int(time.time())},
+            )
             if resp.status_code == 404:
                 return None
             resp.raise_for_status()
@@ -772,7 +786,7 @@ class AutoSyncEngine:
             return sha, msg
         except requests.RequestException:
             release = self._fetch_json("cfg/release.json") or {}
-            return str(release.get("commit") or ""), ""
+            return str(release.get("commit") or "")[:12], ""
 
     def _discover_games(self, known_ids: list[str]) -> dict[str, dict[str, Any]]:
         out: dict[str, dict[str, Any]] = {}

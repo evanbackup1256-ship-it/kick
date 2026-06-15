@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "6.9.0"
+local VERSION = "7.0.0"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -343,6 +343,8 @@ if not Core or not ui then
 	warn("[Alleral] Boot failed: " .. tostring(bootErr))
 	return
 end
+
+local G = Core.Game or getgenv().Alleral_GameHelpers or {}
 
 local function trim(value)
 	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
@@ -1137,6 +1139,9 @@ local function loadModule(key, label, resolver, optional)
 	end
 
 	local ok, result = safeCall("LoadModule:" .. label, function()
+		if G.gameRequire then
+			return G.gameRequire(target)
+		end
 		return require(target)
 	end)
 	if ok and result then

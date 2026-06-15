@@ -973,6 +973,11 @@ function Telemetry:InitFromEnv()
 	if type(cfg) ~= "table" then
 		return
 	end
+	local runtimeKey = trim(ENV.Alleral_TelemetryApiKey or (getgenv and getgenv().Alleral_TelemetryApiKey) or "")
+	if runtimeKey ~= "" and trim(cfg.apiKey or "") == "" then
+		cfg = mergeConfig({}, cfg)
+		cfg.apiKey = runtimeKey
+	end
 	self:Configure(cfg)
 end
 

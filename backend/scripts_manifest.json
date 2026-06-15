@@ -1,45 +1,45 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-11T00:00:00+00:00",
+  "updatedAt": "2026-06-15T18:00:00+00:00",
   "scripts": {
     "kick_a_lucky_block": {
       "name": "Kick a Lucky Block",
       "status": "working",
-      "version": "6.9.0",
-      "message": "Alleral UI V2 integration with customization studio and cloud configs.",
-      "updatedAt": "2026-06-11T00:00:00+00:00",
+      "version": "7.0.0",
+      "message": "Core-first revamp pass with shared helpers and performance tuning.",
+      "updatedAt": "2026-06-15T18:00:00+00:00",
       "updatedBy": "system"
     },
     "speed_keyboard_escape": {
       "name": "Speed Keyboard Escape",
       "status": "working",
-      "version": "1.4.0",
-      "message": "Alleral UI V2 window, settings extras, and polish pass.",
-      "updatedAt": "2026-06-11T00:00:00+00:00",
+      "version": "1.5.0",
+      "message": "Revamp pass — Core helpers, treadmill polish, anti-AFK hardening.",
+      "updatedAt": "2026-06-15T18:00:00+00:00",
       "updatedBy": "system"
     },
     "slime_rng": {
       "name": "Slime RNG",
       "status": "working",
-      "version": "1.4.0",
-      "message": "Alleral UI V2 window, settings extras, and polish pass.",
-      "updatedAt": "2026-06-11T00:00:00+00:00",
+      "version": "1.5.0",
+      "message": "Revamp pass — unified Core selection helpers and cleaner loops.",
+      "updatedAt": "2026-06-15T18:00:00+00:00",
       "updatedBy": "system"
     },
     "build_a_ring_farm": {
       "name": "Build A Ring Farm",
       "status": "working",
-      "version": "1.3.1",
-      "message": "Fix UI group creation on Volt and harden tab layout fallback.",
-      "updatedAt": "2026-06-11T00:00:00+00:00",
+      "version": "1.4.0",
+      "message": "Revamp pass — shared bind helpers, remote guards, plot cache.",
+      "updatedAt": "2026-06-15T18:00:00+00:00",
       "updatedBy": "system"
     },
     "survive_a_zombie_arena": {
       "name": "Survive a Zombie Arena",
       "status": "working",
-      "version": "2.2.0",
-      "message": "Alleral UI V2 window, settings extras, and polish pass.",
-      "updatedAt": "2026-06-11T00:00:00+00:00",
+      "version": "2.3.0",
+      "message": "Revamp pass — zombie cache, fast pickup scan, Core UI binds.",
+      "updatedAt": "2026-06-15T18:00:00+00:00",
       "updatedBy": "system"
     }
   }

@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.4.0"
+local VERSION = "1.5.0"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -99,68 +99,10 @@ local function resetSettings()
 	saveSettings()
 end
 
-local function normalizeMultiSelection(selection)
-	if Core and type(Core.normalizeMultiSelection) == "function" then
-		return Core.normalizeMultiSelection(selection)
-	end
-	if type(selection) == "string" then
-		return { selection }
-	end
-	if type(selection) ~= "table" then
-		return {}
-	end
-	local output = {}
-	local arrayLike = false
-	for key, value in pairs(selection) do
-		if type(key) == "number" then
-			arrayLike = true
-			if value ~= nil and value ~= false then
-				local text = type(value) == "string" and value or tostring(value)
-				if text ~= "" then
-					table.insert(output, text)
-				end
-			end
-		elseif value == true and type(key) == "string" then
-			table.insert(output, key)
-		end
-	end
-	if arrayLike then
-		table.sort(output)
-	end
-	return output
-end
-
-local function selectionFirst(selection, fallback)
-	if Core and type(Core.selectionFirst) == "function" then
-		return Core.selectionFirst(selection, fallback)
-	end
-	local items = normalizeMultiSelection(selection)
-	if items[1] and items[1] ~= "" then
-		return items[1]
-	end
-	return fallback or ""
-end
-
-local function listContains(list, value)
-	if Core and type(Core.listContains) == "function" then
-		return Core.listContains(list, value)
-	end
-	return table.find(normalizeMultiSelection(list), value) ~= nil
-end
-
-local function listMatches(list, value)
-	if Core and type(Core.listMatches) == "function" then
-		return Core.listMatches(list, value)
-	end
-	local items = normalizeMultiSelection(list)
-	if #items == 0 then
-		return true
-	end
-	if listContains(items, "Any") or listContains(items, "All") or listContains(items, "any") then
-		return true
-	end
-	return listContains(items, value)
-end
+local normalizeMultiSelection = Core.normalizeMultiSelection
+local selectionFirst = Core.selectionFirst
+local listContains = Core.listContains
+local listMatches = Core.listMatches
 
 local function mutationDisplayName(baseName, mutations)
 	if Mutations and type(Mutations.getDisplayName) == "function" then

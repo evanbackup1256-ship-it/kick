@@ -16,7 +16,7 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 35 -- Fluid spring motion + viewport-safe open UI
+local SYDE_PATCH_VERSION = 36 -- Fix Alleral column layout vs Syde auto-layout
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
@@ -43,7 +43,7 @@ local RELEASE_FALLBACK = {
 	alleral = "4.0.1-syde",
 	analytics = "1.2",
 	telemetry = "3.4",
-	helpers = "1.0",
+	helpers = "1.1",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
@@ -2468,11 +2468,18 @@ local function loadTelemetryConfig(deferBootstrap)
 		if trim(cfg.gateUrl or "") ~= "" then
 			cfg.gateUrl = normalizeHttps(cfg.gateUrl)
 		end
+		if trim(cfg.apiKey or "") ~= "" then
+			ENV.Alleral_TelemetryApiKey = cfg.apiKey
+			getgenv().Alleral_TelemetryApiKey = cfg.apiKey
+		end
 		ENV.Alleral_OwnerTelemetry = cfg
 	end
 	if deferBootstrap then
 		ENV.Alleral_OwnerTelemetry = cfg
-		task.spawn(applyBootstrap)
+		task.spawn(function()
+			applyBootstrap()
+			refreshTelemetryConfig()
+		end)
 	else
 		applyBootstrap()
 	end
@@ -2588,6 +2595,10 @@ end
 
 local function wireTelemetry(profile)
 	if not ensureTelemetryLoaded() then
+		loadTelemetryConfig(false)
+		ensureTelemetryLoaded()
+	end
+	if not ensureTelemetryLoaded() then
 		local configError = ENV._Alleral_TelemetryConfigurationError
 		if type(configError) == "string" and configError ~= "" and not ENV._Alleral_TelemetryConfigWarningShown then
 			ENV._Alleral_TelemetryConfigWarningShown = true
@@ -2682,7 +2693,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "6.9.0",
+		version = "7.0.0",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
@@ -2707,7 +2718,7 @@ local GAMES = {
 	{
 		id = "speed_keyboard_escape",
 		name = "Speed Keyboard Escape",
-		version = "1.4.0",
+		version = "1.5.0",
 		placeIds = { 95082159892680 },
 		scriptFiles = { "games/speed_keyboard_escape.luau", "speed_keyboard_escape.luau" },
 		scriptUrl = "games/speed_keyboard_escape.luau",
@@ -2724,7 +2735,7 @@ local GAMES = {
 	{
 		id = "slime_rng",
 		name = "Slime RNG",
-		version = "1.4.0",
+		version = "1.5.0",
 		placeIds = { 92416421522960 },
 		universeIds = { 9792947201 },
 		scriptFiles = { "games/slime_rng.luau", "slime_rng.luau" },
@@ -2742,7 +2753,7 @@ local GAMES = {
 	{
 		id = "build_a_ring_farm",
 		name = "Build A Ring Farm",
-		version = "1.3.1",
+		version = "1.4.0",
 		placeIds = { 107646426076756 },
 		scriptFiles = { "games/build_a_ring_farm.luau", "build_a_ring_farm.luau" },
 		scriptUrl = "games/build_a_ring_farm.luau",
@@ -2761,7 +2772,7 @@ local GAMES = {
 	{
 		id = "survive_a_zombie_arena",
 		name = "Survive a Zombie Arena",
-		version = "2.2.0",
+		version = "2.3.0",
 		placeIds = { 114204398207377 },
 		scriptFiles = { "games/survive_a_zombie_arena.luau", "survive_a_zombie_arena.luau" },
 		scriptUrl = "games/survive_a_zombie_arena.luau",

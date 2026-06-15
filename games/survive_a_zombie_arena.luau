@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "2.2.0"
+local VERSION = "2.3.0"
 local state = getgenv().Alleral_State
 local G = (Core and Core.Game) or getgenv().Alleral_GameHelpers or {}
 local connections = {}
@@ -119,6 +119,7 @@ local runtime = {
 	gatesRemoved = false,
 	espHighlights = {},
 	hitboxTouched = {},
+	zombieCache = { list = {}, at = 0 },
 }
 
 local function refreshRemotes()
@@ -173,8 +174,11 @@ local function zombieModelFor(id, data)
 end
 
 local function livingZombies()
-	local zombies = resolveZombieTable()
+	if tick() - runtime.zombieCache.at < 0.12 and #runtime.zombieCache.list > 0 then
+		return runtime.zombieCache.list
+	end
 	local list = {}
+	local zombies = resolveZombieTable()
 	if not zombies then
 		local folder = zombieFolder()
 		if folder then
@@ -192,6 +196,8 @@ local function livingZombies()
 				end
 			end
 		end
+		runtime.zombieCache.list = list
+		runtime.zombieCache.at = tick()
 		return list
 	end
 	for id, data in pairs(zombies) do
@@ -208,6 +214,8 @@ local function livingZombies()
 			end
 		end
 	end
+	runtime.zombieCache.list = list
+	runtime.zombieCache.at = tick()
 	return list
 end
 
@@ -344,28 +352,6 @@ local function autoSkipTick()
 	end
 end
 
-local function isPickup(instance)
-	if not instance then
-		return false
-	end
-	local name = instance.Name:lower()
-	if
-		name:find("shard")
-		or name:find("galactic")
-		or name:find("pickup")
-		or name:find("drop")
-		or name:find("mineral")
-		or name:find("coin")
-		or name:find("credit")
-	then
-		return true
-	end
-	return instance:GetAttribute("Shard")
-		or instance:GetAttribute("Pickup")
-		or instance:GetAttribute("Collectible")
-		or instance:GetAttribute("Coin")
-end
-
 local function collectShardsTick()
 	if not state.ACollectShards and not state.AAutoFarm then
 		return
@@ -378,20 +364,7 @@ local function collectShardsTick()
 	if not root or not humanoid or humanoid.Health <= 0 then
 		return
 	end
-	local nearest
-	local nearestDist = math.huge
-	for _, item in ipairs(Workspace:GetDescendants()) do
-		if isPickup(item) and (item:IsA("BasePart") or item:IsA("Model")) then
-			local part = item:IsA("BasePart") and item or item:FindFirstChildWhichIsA("BasePart", true)
-			if part and part.Parent then
-				local dist = (root.Position - part.Position).Magnitude
-				if dist < nearestDist and dist < 300 then
-					nearestDist = dist
-					nearest = part
-				end
-			end
-		end
-	end
+	local nearest = G.nearestPickup and G.nearestPickup(root.Position, { maxRange = 300 })
 	if nearest then
 		root.CFrame = nearest.CFrame + Vector3.new(0, 2.5, 0)
 	end
@@ -714,24 +687,21 @@ local safe = Core.buildUiGroup(playerTab, "Safe zone", 2, saveWrap, nil, "safe")
 local esp = Core.buildUiGroup(visualTab, "ESP", 1, saveWrap, nil, "esp")
 local util = Core.buildUiGroup(miscTab, "Utilities", 1, saveWrap, nil, "util")
 
-local function bindToggle(group, label, key, tooltip)
-	group:CreateToggle(label, state[key], tooltip, function(value)
-		state[key] = value
-		if key == "AAutoFarm" then
-			applyAutoFarmPreset(value)
-		end
-		saveSettings()
-	end)
+local function bindToggle(group, label, key, tooltip, onChange)
+	Core.bindToggle(state, saveSettings, group, label, key, {
+		tooltip = tooltip,
+		onChange = onChange,
+	})
 end
 
 local function bindSlider(group, label, minVal, maxVal, key, tooltip, increment)
-	group:CreateSlider(label, minVal, maxVal, state[key], function(value)
-		state[key] = value
-		saveSettings()
-	end, tooltip)
+	Core.bindSlider(state, saveSettings, group, label, minVal, maxVal, key, {
+		tooltip = tooltip,
+		increment = increment,
+	})
 end
 
-bindToggle(preset, "Auto farm preset", "AAutoFarm", "Enables kill aura, god mode, skip, shoot, loot, shop, and safe zone.")
+bindToggle(preset, "Auto farm preset", "AAutoFarm", "Enables kill aura, god mode, skip, shoot, loot, shop, and safe zone.", applyAutoFarmPreset)
 preset:CreateButton("One-click wave clear", function()
 	state.AKillAura = true
 	state.AInstantKill = true

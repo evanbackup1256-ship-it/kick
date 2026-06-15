@@ -2230,6 +2230,49 @@ function Core.setupAntiAfk(player)
 	end)
 end
 
+function Core.bindToggle(state, saveSettings, group, label, key, options)
+	options = type(options) == "table" and options or {}
+	if not group or type(group.CreateToggle) ~= "function" then
+		return
+	end
+	group:CreateToggle(label, state[key], options.tooltip, function(value)
+		state[key] = value
+		if type(options.onChange) == "function" then
+			pcall(options.onChange, value)
+		end
+		if type(saveSettings) == "function" then
+			saveSettings()
+		end
+	end)
+end
+
+function Core.bindSlider(state, saveSettings, group, label, minVal, maxVal, key, options)
+	options = type(options) == "table" and options or {}
+	if not group or type(group.CreateSlider) ~= "function" then
+		return
+	end
+	group:CreateSlider(label, minVal, maxVal, state[key], function(value)
+		state[key] = value
+		if type(options.onChange) == "function" then
+			pcall(options.onChange, value)
+		end
+		if type(saveSettings) == "function" then
+			saveSettings()
+		end
+	end, options.tooltip, options.increment)
+end
+
+function Core.waitChild(parent, name, timeout)
+	local gameHelpers = ENV.Alleral_GameHelpers
+	if type(gameHelpers) == "table" and type(gameHelpers.waitChild) == "function" then
+		return gameHelpers.waitChild(parent, name, timeout)
+	end
+	if not parent then
+		return nil
+	end
+	return parent:WaitForChild(name, timeout or 5)
+end
+
 function Core.initAnalytics()
 	local tracker = ENV.Alleral_Analytics
 	if tracker and tracker.Track then

@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.3.1"
+local VERSION = "1.4.0"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -25,6 +25,8 @@ if not Core or not ui then
 	end
 	return
 end
+
+local G = Core.Game or getgenv().Alleral_GameHelpers or {}
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -136,10 +138,10 @@ local runtime = {
 }
 
 local function waitChild(parent, name, timeout)
-	if not parent then
-		return nil
+	if G.waitChild then
+		return G.waitChild(parent, name, timeout)
 	end
-	return parent:WaitForChild(name, timeout or 5)
+	return Core.waitChild(parent, name, timeout)
 end
 
 local Remotes = waitChild(ReplicatedStorage, "Remotes", 10)
@@ -338,6 +340,9 @@ local function firePrompt(prompt)
 end
 
 local function callRemote(remote, ...)
+	if G.fireRemote then
+		return G.fireRemote(remote, ...)
+	end
 	if not remote then
 		return false, "Remote missing"
 	end
@@ -1907,23 +1912,11 @@ local fly = Core.buildUiGroup(miscTab, "Movement", 1, saveWrap, nil, "fly")
 local util = Core.buildUiGroup(miscTab, "Utilities", 1, saveWrap, nil, "util")
 
 local function bindToggle(group, label, key, tooltip)
-	if not group or type(group.CreateToggle) ~= "function" then
-		return
-	end
-	group:CreateToggle(label, state[key], tooltip, function(value)
-		state[key] = value
-		saveSettings()
-	end)
+	Core.bindToggle(state, saveSettings, group, label, key, { tooltip = tooltip })
 end
 
 local function bindSlider(group, label, minVal, maxVal, key)
-	if not group or type(group.CreateSlider) ~= "function" then
-		return
-	end
-	group:CreateSlider(label, minVal, maxVal, state[key], function(value)
-		state[key] = value
-		saveSettings()
-	end)
+	Core.bindSlider(state, saveSettings, group, label, minVal, maxVal, key, {})
 end
 
 bindToggle(plant, "Plant seeds", "AutoPlaceSeed", "Puts seeds from your bag onto empty plot spots.")

@@ -14,6 +14,7 @@ COPY backend/telemetry_relay.py backend/security.py backend/script_registry.py b
 COPY --from=site-build /site/out ./site
 COPY cfg/scripts_manifest.json ./scripts_manifest.json
 COPY cfg/site.json ./site.json
+COPY cfg/release.json ./release.json
 COPY cfg/weao.json ./weao.json
 RUN mkdir -p /app/data && chmod 777 /app/data
 ENV TELEMETRY_HOST=0.0.0.0
@@ -26,4 +27,4 @@ ENV GITHUB_BRANCH=main
 ENV GITHUB_SYNC_SECONDS=30
 ENV AUTO_SYNC_ENABLED=1
 EXPOSE 8080
-CMD ["sh", "-c", "gunicorn -w 2 -b 0.0.0.0:${PORT:-8080} --timeout 120 telemetry_relay:app"]
+CMD ["sh", "-c", "gunicorn -w 1 -b 0.0.0.0:${PORT:-8080} --timeout 120 telemetry_relay:app"]

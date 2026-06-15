@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 35
+	local SYDE_PATCH_VERSION = 36
 	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
@@ -453,31 +453,36 @@ return function(Core)
 		return true
 	end
 
-	function AlleralLayout.relayoutColumns(animated)
+	function AlleralLayout.relayoutColumns(_animated)
+		local halfGap = math.floor(COLUMN_GAP / 2)
+		local colSize = UDim2.new(0.5, -halfGap, 0, 0)
 		for _, tab in ipairs(Core._UiTabRegistry or {}) do
 			local layout = tab._layout
 			if layout and layout.row and layout.left and layout.right then
+				layout.row.Size = UDim2.new(1, 0, 0, 0)
+				layout.row.AutomaticSize = Enum.AutomaticSize.Y
 				local width = layout.row.AbsoluteSize.X
 				if width > 0 and width < 440 then
 					layout.right.Visible = false
-					if animated then
-						tweenGui(layout.left, MOTION_LAYOUT, { Size = UDim2.new(1, 0, 0, 0) })
-					else
-						layout.left.Size = UDim2.new(1, 0, 0, 0)
-					end
-				elseif width >= 440 then
+					layout.left.Size = UDim2.new(1, 0, 0, 0)
+					layout.left.AutomaticSize = Enum.AutomaticSize.Y
+				else
 					layout.right.Visible = true
-					local half = math.max(120, math.floor((width - COLUMN_GAP) / 2))
-					local leftSize = UDim2.new(0, half, 0, 0)
-					local rightSize = UDim2.new(0, half, 0, 0)
-					if animated then
-						tweenGui(layout.left, MOTION_LAYOUT, { Size = leftSize })
-						tweenGui(layout.right, MOTION_LAYOUT, { Size = rightSize })
-					else
-						layout.left.Size = leftSize
-						layout.right.Size = rightSize
-					end
+					layout.left.Size = colSize
+					layout.left.AutomaticSize = Enum.AutomaticSize.Y
+					layout.right.Size = colSize
+					layout.right.AutomaticSize = Enum.AutomaticSize.Y
 				end
+				pcall(function()
+					if tab._rawTab and tab._rawTab.Page then
+						local page = tab._rawTab.Page
+						local columns = page:FindFirstChild("AlleralColumns", true)
+						if columns then
+							local y = columns.AbsoluteSize.Y + 16
+							page.CanvasSize = UDim2.new(0, 0, 0, y)
+						end
+					end
+				end)
 			end
 		end
 	end
@@ -490,16 +495,11 @@ return function(Core)
 		local tabCount = #(Core._UiTabRegistry or {})
 		local target = AlleralLayout.computeSize(profile, tabCount, settings and settings.Size)
 		local main = rawWindow.Main
-		local animated = not instant
 		if main and main:IsA("GuiObject") then
-			if instant then
-				main.Size = target
-			else
-				tweenGui(main, MOTION_PANEL, { Size = target })
-			end
+			main.Size = target
 		end
-		AlleralLayout.applyRailLayout(rawWindow, profile, animated)
-		AlleralLayout.relayoutColumns(animated)
+		AlleralLayout.applyRailLayout(rawWindow, profile, false)
+		AlleralLayout.relayoutColumns(false)
 		if type(window) == "table" then
 			window._alleralLastSize = target
 		end
@@ -1144,11 +1144,13 @@ return function(Core)
 		row.BackgroundTransparency = 1
 		row.Size = UDim2.new(1, 0, 0, 0)
 		row.AutomaticSize = Enum.AutomaticSize.Y
+		row.LayoutOrder = -1000
+		row:SetAttribute("AlleralManaged", true)
 		row.Parent = page
 
 		local rowLayout = Instance.new("UIListLayout")
 		rowLayout.FillDirection = Enum.FillDirection.Horizontal
-		rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Fill
 		rowLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 		rowLayout.SortOrder = Enum.SortOrder.LayoutOrder
 		rowLayout.Padding = UDim.new(0, COLUMN_GAP)
@@ -1176,6 +1178,9 @@ return function(Core)
 			right = makeColumn("RightColumn", 2),
 			orders = { 0, 0 },
 		}
+		task.defer(function()
+			AlleralLayout.relayoutColumns(false)
+		end)
 		return tab._layout
 	end
 
@@ -1217,9 +1222,18 @@ return function(Core)
 			groupLayout.Padding = UDim.new(0, GROUP_GAP)
 			groupLayout.Parent = group
 
-			pcall(function()
-				rawTab:Section(name, optionalIconImage(settings.Icon))
-			end)
+			local title = Instance.new("TextLabel")
+			title.Name = "GroupTitle"
+			title.BackgroundTransparency = 1
+			title.Size = UDim2.new(1, 0, 0, 22)
+			title.Font = Enum.Font.GothamBold
+			title.TextSize = 14
+			title.TextXAlignment = Enum.TextXAlignment.Left
+			title.TextColor3 = Color3.fromRGB(235, 235, 245)
+			title.Text = name
+			title.LayoutOrder = 0
+			title.Parent = group
+
 			return Core.createWindUiGroupbox(rawTab, uiBundle, group)
 		end
 
@@ -1363,7 +1377,7 @@ return function(Core)
 					if defaultTab and type(defaultTab.Select) == "function" then
 						defaultTab:Select()
 					end
-					AlleralLayout.smartResize(window, rawWindow, options)
+					AlleralLayout.smartResize(window, rawWindow, options, true)
 				end)
 			end)
 		end
