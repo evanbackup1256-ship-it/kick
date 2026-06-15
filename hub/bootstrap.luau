@@ -8,7 +8,7 @@ local HTTP_GET_TIMEOUT = 12
 local LOADER_FETCH_TIMEOUT = 28
 local LOADER_MIN_BYTES = 50000
 local FALLBACK_RELEASE = {
-	loader = "8.6.0",
+	loader = "8.6.1",
 	rayfieldVersion = 2,
 }
 local REPO = "evanbackup1256-ship-it/kick"

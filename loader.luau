@@ -243,6 +243,9 @@ local function getHttpRequestFn()
 	if type(ENV.syn) == "table" and type(ENV.syn.request) == "function" then
 		return ENV.syn.request
 	end
+	if type(ENV.Xeno) == "table" and type(ENV.Xeno.request) == "function" then
+		return ENV.Xeno.request
+	end
 	return nil
 end
 
@@ -398,14 +401,9 @@ local function httpFetch(url, headers)
 	headers = headers or {}
 	local bust = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(tick())
 
-	local body, via = tryGameHttpGet(url)
-	if body then
-		return body, via
-	end
-
 	if HTTP_TRANSPORTS then
 		for _, transport in ipairs(HTTP_TRANSPORTS) do
-			body = transport.fetch(bust)
+			local body = transport.fetch(bust)
 			if type(body) == "string" and #body > 0 then
 				return body, transport.id
 			end
@@ -414,7 +412,7 @@ local function httpFetch(url, headers)
 
 	local req = getHttpRequestFn()
 	if req then
-		body = requestVia(req, bust, headers)
+		local body = requestVia(req, bust, headers)
 		if body then
 			return body, "request"
 		end
@@ -427,6 +425,11 @@ local function httpFetch(url, headers)
 		if ok and type(asyncBody) == "string" and #asyncBody > 0 then
 			return asyncBody, "httpservice"
 		end
+	end
+
+	local body, via = tryGameHttpGet(url)
+	if body then
+		return body, via
 	end
 
 	return nil
@@ -819,16 +822,33 @@ local function httpGet(url, minBytes)
 			end
 		end
 
-		local body, via = tryGameHttpGet(candidate)
-		if type(body) == "string" and #body >= minBytes then
-			return body, via or "httpget"
-		end
-
 		for _, transport in ipairs(HTTP_TRANSPORTS) do
-			body = transport.fetch(candidate)
+			local body = transport.fetch(candidate)
 			if type(body) == "string" and #body >= minBytes then
 				return body, transport.id
 			end
+		end
+
+		local req = getHttpRequestFn()
+		if req then
+			local body = requestVia(req, candidate)
+			if type(body) == "string" and #body >= minBytes then
+				return body, "request"
+			end
+		end
+
+		if HttpService and type(HttpService.GetAsync) == "function" then
+			local ok, asyncBody = pcall(function()
+				return HttpService:GetAsync(candidate, true)
+			end)
+			if ok and type(asyncBody) == "string" and #asyncBody >= minBytes then
+				return asyncBody, "httpservice"
+			end
+		end
+
+		local body, via = tryGameHttpGet(candidate)
+		if type(body) == "string" and #body >= minBytes then
+			return body, via or "httpget"
 		end
 	end
 
@@ -1619,12 +1639,6 @@ local function coreBaseValid(src)
 	if not coreVersionOk(ver) then
 		return false
 	end
-	local alleralVer = src:match('Core%.ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
-	local expectedAlleral = (ENV._Alleral_ExpectedVersions and ENV._Alleral_ExpectedVersions.alleral)
-		or RELEASE_FALLBACK.alleral
-	if type(alleralVer) == "string" and type(expectedAlleral) == "string" and alleralVer ~= expectedAlleral then
-		return false
-	end
 	return compileCoreSource(src, "Alleral/core-base")
 end
 
@@ -1717,6 +1731,9 @@ local function coreRejectReason(src)
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua"
+	end
+	if src:find("function Core.loadUi", 1, true) then
+		return "monolithic core in base slot"
 	end
 	if loadStringFn then
 		local ok, err = compileCoreSource(src, "Alleral/core-check")
