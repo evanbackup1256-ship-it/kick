@@ -1188,13 +1188,26 @@ local function loadModule(key, label, resolver, optional)
 			return gameRequireModule(target)
 		end)
 	else
-		ok, result = safeCall("LoadModule:" .. label, function()
-			return gameRequireModule(target)
-		end)
+		if (entry.failures or 0) > 0 then
+			ok, result = pcall(function()
+				return gameRequireModule(target)
+			end)
+		else
+			ok, result = safeCall("LoadModule:" .. label, function()
+				return gameRequireModule(target)
+			end)
+		end
 	end
 	if ok and result then
 		modules[key] = result
 		entry.giveUp = true
+	else
+		entry.failures = (entry.failures or 0) + 1
+		if entry.optional and entry.failures >= 2 then
+			entry.giveUp = true
+		elseif not entry.optional and entry.failures >= 8 then
+			entry.giveUp = true
+		end
 	end
 	return modules[key]
 end
@@ -1289,7 +1302,12 @@ task.spawn(function()
 		return
 	end
 	player:WaitForChild("PlayerScripts", 45)
-	task.wait(1.5)
+	task.wait(3)
+	if G.invalidateGameRequire then
+		G.invalidateGameRequire()
+	end
+	retryMissingModules()
+	task.wait(5)
 	if G.invalidateGameRequire then
 		G.invalidateGameRequire()
 	end

@@ -5,8 +5,8 @@
 local BOOTSTRAP_VERSION = "1.0.6"
 local HTTP_GET_TIMEOUT = 12
 local FALLBACK_RELEASE = {
-	loader = "8.3.3",
-	sydePatch = 41,
+	loader = "8.3.4",
+	sydePatch = 42,
 }
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"

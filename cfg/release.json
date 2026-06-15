@@ -1,20 +1,20 @@
 {
-    "loader":  "8.3.3",
+    "loader":  "8.3.4",
     "core":  "2.9.5",
     "weao":  "1.1",
     "ui":  "Syde",
     "windui":  "4.1.0-studio",
     "alleral":  "4.1.0-studio",
-    "commit":  "2ac1857",
-    "updatedAt":  "2026-06-15T20:24:43Z",
+    "commit":  "6b168af",
+    "updatedAt":  "2026-06-15T20:36:07Z",
     "updatePollSeconds":  120,
     "autoUpdate":  true,
     "minLoader":  "8.2.0",
     "minCore":  "2.7.0",
     "analytics":  "1.2",
     "telemetry":  "3.4",
-    "helpers":  "1.3",
+    "helpers":  "1.4",
     "security":  "1.3",
     "access":  "1.1",
-    "sydePatch":  41
+    "sydePatch":  42
 }

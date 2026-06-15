@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.3.3"
+local LOADER_VERSION = "8.3.4"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -16,7 +16,7 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 41 -- Fix sydeWindowSearch forward-ref crash on Xeno
+local SYDE_PATCH_VERSION = 42 -- Guard GuiObject layout signals (AbsoluteSize spam fix)
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
@@ -37,18 +37,18 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.3.3",
+	loader = "8.3.4",
 	core = "2.9.5",
 	ui = "Syde",
 	windui = "4.1.0-studio",
 	alleral = "4.1.0-studio",
 	analytics = "1.2",
 	telemetry = "3.4",
-	helpers = "1.3",
+	helpers = "1.4",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "2ac1857",
+	commit = "6b168af",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -3321,7 +3321,7 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.3.3"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.3.4"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then

@@ -37,7 +37,8 @@ if (Test-Path $sydeSource) {
 }
 
 $sydeContracts = @(
-    @{ Pattern = 'ALLERAL_SYDE_PATCH = 41'; Message = 'Syde patch version is 41' },
+    @{ Pattern = 'ALLERAL_SYDE_PATCH = 42'; Message = 'Syde patch version is 42' },
+    @{ Pattern = 'local function sydeConnectGuiLayoutSignals'; Message = 'GuiObject layout signal helper present' },
     @{ Pattern = 'local function sydeWindowSearch'; Message = 'optional window search lookup helper present' },
     @{ Pattern = 'local windowSearch = window and sydeWindowSearch\(window\)'; Message = 'window search resolved defensively at setup' },
     @{ Pattern = 'if windowSearch then'; Message = 'search UI wiring guarded when asset missing' },

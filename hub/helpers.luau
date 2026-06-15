@@ -1,5 +1,5 @@
 local Helpers = {}
-Helpers.VERSION = "1.3"
+Helpers.VERSION = "1.4"
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -157,7 +157,16 @@ local function gameEnvTable(env)
 	local ok, sameGame = pcall(function()
 		return env.game == game
 	end)
-	return ok and sameGame
+	if ok and sameGame then
+		return true
+	end
+	if type(env.require) == "function" and env.script and typeof(env.script) == "Instance" then
+		local okScript, inGame = pcall(function()
+			return env.script:IsDescendantOf(game)
+		end)
+		return okScript and inGame == true
+	end
+	return false
 end
 
 local function registryModule(moduleScript)
@@ -227,6 +236,31 @@ local function collectRequireCandidates()
 		pcall(function()
 			for _, script in ipairs(getscripts()) do
 				consider(script)
+			end
+		end)
+	end
+
+	if type(getrunningscripts) == "function" then
+		pcall(function()
+			for _, script in ipairs(getrunningscripts()) do
+				consider(script)
+			end
+		end)
+	end
+
+	if type(getloadedmodules) == "function" then
+		pcall(function()
+			for _, module in ipairs(getloadedmodules()) do
+				if typeof(module) == "Instance" and module:IsA("ModuleScript") then
+					local parent = module.Parent
+					while parent do
+						if parent:IsA("LocalScript") then
+							consider(parent)
+							break
+						end
+						parent = parent.Parent
+					end
+				end
 			end
 		end)
 	end
@@ -326,6 +360,12 @@ local function compileModule(moduleScript, reqFn)
 		return nil
 	end
 	local source = moduleScript.Source
+	if (type(source) ~= "string" or source == "") and type(decompile) == "function" then
+		local okDecompile, decompiled = pcall(decompile, moduleScript)
+		if okDecompile and type(decompiled) == "string" and decompiled ~= "" then
+			source = decompiled
+		end
+	end
 	if type(source) ~= "string" or source == "" then
 		return nil
 	end
@@ -390,24 +430,28 @@ function Helpers.gameRequire(moduleScript)
 		return cached
 	end
 
-	if type(getthreadidentity) == "function" and type(setthreadidentity) == "function" then
-		for _, identity in ipairs({ 8, 7, 4, 2, 0 }) do
-			local ok, result = pcall(function()
-				local old = getthreadidentity()
-				setthreadidentity(identity)
-				local value = require(moduleScript)
-				setthreadidentity(old)
-				return value
-			end)
+	local candidates = collectRequireCandidates()
+	for _, candidate in ipairs(candidates) do
+		if candidate.fn ~= require then
+			local ok, result = pcall(candidate.fn, moduleScript)
 			if ok then
 				MODULE_CACHE[moduleScript] = result
+				GAME_REQUIRE_FN = candidate.fn
 				return result
 			end
 		end
 	end
 
+	if GAME_REQUIRE_FN and GAME_REQUIRE_FN ~= require then
+		local ok, result = pcall(GAME_REQUIRE_FN, moduleScript)
+		if ok then
+			MODULE_CACHE[moduleScript] = result
+			return result
+		end
+	end
+
 	local reqFn = resolveGameRequire(moduleScript)
-	if reqFn then
+	if reqFn and reqFn ~= require then
 		local ok, result = pcall(reqFn, moduleScript)
 		if ok then
 			MODULE_CACHE[moduleScript] = result
@@ -419,6 +463,26 @@ function Helpers.gameRequire(moduleScript)
 	if compiled ~= nil then
 		MODULE_CACHE[moduleScript] = compiled
 		return compiled
+	end
+
+	cached = registryModule(moduleScript)
+	if cached ~= nil then
+		MODULE_CACHE[moduleScript] = cached
+		return cached
+	end
+
+	if type(getthreadidentity) == "function" and type(setthreadidentity) == "function" then
+		local ok, result = pcall(function()
+			local old = getthreadidentity()
+			setthreadidentity(2)
+			local value = require(moduleScript)
+			setthreadidentity(old)
+			return value
+		end)
+		if ok then
+			MODULE_CACHE[moduleScript] = result
+			return result
+		end
 	end
 
 	return nil

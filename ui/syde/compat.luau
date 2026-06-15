@@ -1,7 +1,7 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 41
+local ALLERAL_SYDE_PATCH = 42
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -118,6 +118,18 @@ local SYDE_CANONICAL_NAMES = {
 	Cancel = "cancel",
 	Option = "Option",
 }
+
+local function sydeConnectGuiLayoutSignals(gui, callback)
+	if not gui or type(callback) ~= "function" or not gui:IsA("GuiObject") then
+		return
+	end
+	pcall(function()
+		gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(callback)
+	end)
+	pcall(function()
+		gui:GetPropertyChangedSignal("Visible"):Connect(callback)
+	end)
+end
 
 local function sydeFindChild(parent, ...)
 	if not parent then
