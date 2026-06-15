@@ -129,7 +129,9 @@ end
 local top = window and sydeFindChild(window, "top", "Top")
 local tabsContainer = window and sydeFindChild(window, "tabs", "Tabs")
 local tabs = tabsContainer and sydeFindChild(tabsContainer, "tab", "Tab", "tb", "Tb")
-local pages = window and sydeFindChild(window, "pages", "Pages")"""
+local pages = window and sydeFindChild(window, "pages", "Pages")
+local resize = window and sydeFindChild(window, "resize", "Resize")
+local windowSearch = window and sydeWindowSearch(window)"""
     if old not in text:
         if "local ui = sydeBindUi(Library)" in text:
             return text

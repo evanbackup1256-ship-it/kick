@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 39
+local ALLERAL_SYDE_PATCH = 40
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -218,6 +218,10 @@ local SYDE_CANONICAL_NAMES = {
 	Cancel = "cancel",
 	Option = "Option",
 }
+
+local function sydeWindowSearch(windowFrame)
+	return sydeFindChild(windowFrame, "search", "Search")
+end
 
 local function sydeFindChild(parent, ...)
 	if not parent then
@@ -2606,6 +2610,7 @@ local tabsContainer = window and sydeFindChild(window, "tabs", "Tabs")
 local tabs = tabsContainer and sydeFindChild(tabsContainer, "tab", "Tab", "tb", "Tb")
 local pages = window and sydeFindChild(window, "pages", "Pages")
 local resize = window and sydeFindChild(window, "resize", "Resize")
+local windowSearch = window and sydeWindowSearch(window)
 
 --
 
@@ -3085,44 +3090,94 @@ end
 local searchopen = false
 
 function opensearch()
+	if not windowSearch then
+		return
+	end
 	searchopen = true
-	window.dim.Visible = true
-	window.search.Visible = true
-	window.search.Container.Visible = true
-	window.search.Visible = true
-
-
-	if window.search.Frame.TextBox.Text ~= '' then
-		tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 230) }):Play()
-	else
-		tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) }):Play()
+	local windowDim = sydeFindChild(window, "dim", "Dim")
+	if windowDim then
+		windowDim.Visible = true
+	end
+	windowSearch.Visible = true
+	local searchContainer = sydeFindChild(windowSearch, "Container", "container")
+	if searchContainer then
+		searchContainer.Visible = true
 	end
 
-	tweenservice:Create(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
-	tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-	tweenservice:Create(window.search.Frame.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	local searchFrame = sydeFindChild(windowSearch, "Frame", "frame")
+	local searchTextBox = searchFrame and sydeFindChild(searchFrame, "TextBox", "textbox")
+	if searchTextBox and searchTextBox.Text ~= '' then
+		tweenservice:Create(windowSearch, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 230) }):Play()
+	else
+		tweenservice:Create(windowSearch, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) }):Play()
+	end
 
-	tweenservice:Create(window.search.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-	tweenservice:Create(window.search.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	if windowDim then
+		tweenservice:Create(windowDim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
+	end
+	tweenservice:Create(windowSearch, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+	if searchFrame then
+		local searchImage = sydeFindChild(searchFrame, "ImageLabel", "imagelabel")
+		if searchImage then
+			tweenservice:Create(searchImage, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+		end
+	end
 
-	tweenservice:Create(window.search.Frame.TextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+	local searchClose = sydeFindChild(windowSearch, "close", "Close")
+	if searchClose then
+		tweenservice:Create(searchClose, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+		local closeImage = sydeFindChild(searchClose, "ImageLabel", "imagelabel")
+		if closeImage then
+			tweenservice:Create(closeImage, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+		end
+	end
+
+	if searchTextBox then
+		tweenservice:Create(searchTextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+	end
 end
 
 function closesearch()
+	if not windowSearch then
+		return
+	end
 	searchopen = false
-	window.search.Container.Visible = false
-	tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) }):Play()
-	tweenservice:Create(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-	tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-	tweenservice:Create(window.search.Frame.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	local searchContainer = sydeFindChild(windowSearch, "Container", "container")
+	if searchContainer then
+		searchContainer.Visible = false
+	end
+	tweenservice:Create(windowSearch, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) }):Play()
+	local windowDim = sydeFindChild(window, "dim", "Dim")
+	if windowDim then
+		tweenservice:Create(windowDim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+	end
+	tweenservice:Create(windowSearch, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
+	local searchFrame = sydeFindChild(windowSearch, "Frame", "frame")
+	if searchFrame then
+		local searchImage = sydeFindChild(searchFrame, "ImageLabel", "imagelabel")
+		if searchImage then
+			tweenservice:Create(searchImage, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+		end
+	end
 
-	tweenservice:Create(window.search.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-	tweenservice:Create(window.search.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	local searchClose = sydeFindChild(windowSearch, "close", "Close")
+	if searchClose then
+		tweenservice:Create(searchClose, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
+		local closeImage = sydeFindChild(searchClose, "ImageLabel", "imagelabel")
+		if closeImage then
+			tweenservice:Create(closeImage, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+		end
+	end
 
-	tweenservice:Create(window.search.Frame.TextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+	local searchTextBox = searchFrame and sydeFindChild(searchFrame, "TextBox", "textbox")
+	if searchTextBox then
+		tweenservice:Create(searchTextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+	end
 	task.wait(0.5)
-	window.dim.Visible = false
-	window.search.Visible = false
+	if windowDim then
+		windowDim.Visible = false
+	end
+	windowSearch.Visible = false
 end
 
 --@ ToggleUI
@@ -3592,9 +3647,15 @@ function syde:Init(library)
 			closesearch()
 	end]]
 
-	window.search.close.interact.MouseButton1Click:Connect(function()
-		closesearch()
-	end)
+	if windowSearch then
+		local searchClose = sydeFindChild(windowSearch, "close", "Close")
+		local searchCloseInteract = searchClose and sydeFindDescendant(searchClose, "interact", "Interact")
+		if searchCloseInteract and searchCloseInteract:IsA("GuiButton") then
+			searchCloseInteract.MouseButton1Click:Connect(function()
+				closesearch()
+			end)
+		end
+	end
 
 
 	local debounce = false
@@ -7992,8 +8053,10 @@ end
 
 
 		local Pages = pages
-		local Results = window.search.Container
-		local Template = Results.option
+		if windowSearch then
+		local Results = sydeFindChild(windowSearch, "Container", "container")
+		local Template = Results and sydeFindChild(Results, "option", "Option")
+		if Results and Template then
 
 		local activeResults = {}
 		local searchDebounce = 0
@@ -8113,17 +8176,28 @@ end
 			end)
 		end
 
-		local SearchBox = window.search.Frame.TextBox
+		local searchFrame = sydeFindChild(windowSearch, "Frame", "frame")
+		local SearchBox = searchFrame and sydeFindChild(searchFrame, "TextBox", "textbox")
+		if SearchBox then
 		SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
 			searchFunctions(SearchBox.Text)
-			--	window.search.Size = UDim2.new(0, 350,0, 230)
-			tweenservice:Create(window.search, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {Size =  UDim2.new(0, 350,0, 230)}):Play()
-			tweenservice:Create(window.search.UICorner, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {CornerRadius =  UDim.new(0,25)}):Play()
+			--	windowSearch.Size = UDim2.new(0, 350,0, 230)
+			tweenservice:Create(windowSearch, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {Size =  UDim2.new(0, 350,0, 230)}):Play()
+			local searchCorner = windowSearch:FindFirstChildOfClass("UICorner")
+			if searchCorner then
+				tweenservice:Create(searchCorner, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {CornerRadius =  UDim.new(0,25)}):Play()
+			end
 			if SearchBox.Text == '' then
-				tweenservice:Create(window.search, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {Size =  UDim2.new(0, 350,0,60)}):Play()
-				tweenservice:Create(window.search.UICorner, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {CornerRadius =  UDim.new(1,0)}):Play()
+				tweenservice:Create(windowSearch, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {Size =  UDim2.new(0, 350,0,60)}):Play()
+				if searchCorner then
+					tweenservice:Create(searchCorner, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {CornerRadius =  UDim.new(1,0)}):Play()
+				end
 			end
 		end)
+		end
+
+		end
+		end
 
 
 
