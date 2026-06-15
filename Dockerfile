@@ -2,8 +2,10 @@ FROM node:24-alpine AS site-build
 WORKDIR /site
 COPY relay/site/package.json relay/site/package-lock.json ./
 RUN npm install
+COPY cfg/site.json ./cfg/site.json
 COPY relay/site ./
 ENV SKIP_BACKEND_SYNC=1
+ENV ALLERAL_SITE_CONFIG=/site/cfg/site.json
 RUN npm run build
 
 FROM python:3.12-slim
