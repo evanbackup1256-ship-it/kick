@@ -16,7 +16,7 @@ local UI = "ui"
 local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
 local MACLIB_SOURCE_MIN_BYTES = 150000
 local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-local MACLIB_VERSION = 2
+local MACLIB_VERSION = 3
 local MACLIB_REQUIRED_FN = "function MacLib:Window"
 local MACLIB_PATCHED_OVERRIDE_PATHS = {
 	"maclib_patched.luau",
@@ -41,14 +41,14 @@ local RELEASE_FALLBACK = {
 	ui = "Maclib",
 	windui = "5.3.0-maclib",
 	alleral = "5.3.0-maclib",
-	maclibVersion = 2,
+	maclibVersion = 3,
 	analytics = "1.2",
 	telemetry = "3.4",
-	helpers = "1.4",
+	helpers = "1.5",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "af58fc8",
+	commit = "1bbbb79",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -963,7 +963,7 @@ local function maclibVersionFromSource(src)
 end
 
 local function maclibFetchUrls()
-	local bust = "?maclib=2&t=" .. tostring(tick())
+	local bust = "?maclib=3&t=" .. tostring(tick())
 	local urls = {
 		GITHUB_RAW .. "/" .. MACLIB_SOURCE_PATH .. bust,
 		"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. MACLIB_SOURCE_PATH .. bust,
@@ -2760,7 +2760,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "7.2.3",
+		version = "7.2.4",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },

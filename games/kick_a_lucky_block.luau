@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "7.2.3"
+local VERSION = "7.2.4"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -377,6 +377,24 @@ local function gameRequireModule(moduleScript)
 		return G.gameRequire(moduleScript)
 	end
 	return require(moduleScript)
+end
+
+local function gameRequireModuleWithTimeout(moduleScript, timeoutSec)
+	local result, finished = nil, false
+	task.spawn(function()
+		local ok, value = pcall(function()
+			return gameRequireModule(moduleScript)
+		end)
+		if ok then
+			result = value
+		end
+		finished = true
+	end)
+	local started = tick()
+	while not finished and tick() - started < (timeoutSec or 8) do
+		task.wait(0.05)
+	end
+	return finished and result or nil
 end
 
 local function isPrivateServer()
@@ -1188,9 +1206,11 @@ local function loadModule(key, label, resolver, optional)
 	end
 
 	local ok, result
+	local requireFn = entry.optional and gameRequireModuleWithTimeout or gameRequireModule
+	local requireTimeout = entry.optional and 8 or nil
 	if entry.optional then
 		ok, result = pcall(function()
-			return gameRequireModule(target)
+			return requireFn(target, requireTimeout)
 		end)
 	else
 		if (entry.failures or 0) > 0 then

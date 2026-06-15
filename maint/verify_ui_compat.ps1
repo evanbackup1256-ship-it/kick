@@ -19,7 +19,7 @@ if (Test-Path $maclibSource) {
 }
 
 $maclibContracts = @(
-    @{ Pattern = 'ALLERAL_MACLIB_VERSION = 2'; Message = 'MacLib version is 2' },
+    @{ Pattern = 'ALLERAL_MACLIB_VERSION = 3'; Message = 'MacLib version is 3' },
     @{ Pattern = 'function MacLib:Window'; Message = 'MacLib exposes Window' },
     @{ Pattern = 'function SectionFunctions:Toggle'; Message = 'MacLib Toggle present' },
     @{ Pattern = 'function SectionFunctions:Slider'; Message = 'MacLib Slider present' },

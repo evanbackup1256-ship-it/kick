@@ -1,5 +1,5 @@
 local Helpers = {}
-Helpers.VERSION = "1.4"
+Helpers.VERSION = "1.5"
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -472,12 +472,14 @@ function Helpers.gameRequire(moduleScript)
 		end
 	end
 
-	if not isProtectedGameModule(moduleScript) then
-		local compiled = compileModule(moduleScript, reqFn)
-		if compiled ~= nil then
-			MODULE_CACHE[moduleScript] = compiled
-			return compiled
-		end
+	if isProtectedGameModule(moduleScript) then
+		return nil
+	end
+
+	local compiled = compileModule(moduleScript, reqFn)
+	if compiled ~= nil then
+		MODULE_CACHE[moduleScript] = compiled
+		return compiled
 	end
 
 	cached = registryModule(moduleScript)

@@ -5,8 +5,8 @@
     "kick_a_lucky_block": {
       "name": "Kick a Lucky Block",
       "status": "working",
-      "version": "7.2.3",
-      "message": "Defer game module requires until PlayerScripts loads to avoid RobloxScript context errors on Xeno.",
+      "version": "7.2.4",
+      "message": "Fix MacLib slider format crash and stop game module compile hangs on Xeno.",
       "updatedAt": "2026-06-15T21:00:00+00:00",
       "updatedBy": "system"
     },

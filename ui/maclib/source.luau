@@ -1,5 +1,17 @@
--- Alleral vendored MacLib 1.2.6 (Alleral patch v2)
-local ALLERAL_MACLIB_VERSION = 2
+-- Alleral vendored MacLib 1.2.6 (Alleral patch v3)
+local ALLERAL_MACLIB_VERSION = 3
+
+local function formatSliderPrecision(value, precision)
+	local digits = tonumber(precision)
+	if digits == nil or digits < 0 then
+		return tostring(value)
+	end
+	digits = math.clamp(math.floor(digits + 0.0001), 0, 6)
+	if digits == 0 then
+		return tostring(math.round(value))
+	end
+	return string.format("%." .. tostring(digits) .. "f", value)
+end
 
 local MacLib = { 
 	Options = {}, 
@@ -1964,22 +1976,17 @@ function MacLib:Window(Settings)
 							return string.format("%.1f", sliderValue)
 						end,
 						Round = function(sliderValue, precision)
-							if precision then
-								return string.format("%." .. precision .. "f", sliderValue)
-							else
-								return tostring(math.round(sliderValue))
-							end
+							return formatSliderPrecision(sliderValue, precision)
 						end,
 						Degrees = function(sliderValue, precision)
-							local formattedValue = precision and string.format("%." .. precision .. "f", sliderValue) or tostring(sliderValue)
-							return formattedValue .. "°"
+							return formatSliderPrecision(sliderValue, precision) .. "°"
 						end,
 						Percent = function(sliderValue, precision)
 							local percentage = (sliderValue - SliderFunctions.Settings.Minimum) / (SliderFunctions.Settings.Maximum - SliderFunctions.Settings.Minimum) * 100
-							return precision and string.format("%." .. precision .. "f", percentage) .. "%" or tostring(math.round(percentage)) .. "%"
+							return formatSliderPrecision(percentage, precision) .. "%"
 						end,
 						Value = function(sliderValue, precision)
-							return precision and string.format("%." .. precision .. "f", sliderValue) or tostring(sliderValue)
+							return formatSliderPrecision(sliderValue, precision)
 						end
 					}
 

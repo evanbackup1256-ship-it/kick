@@ -285,6 +285,24 @@ function Core.bindUiState(stateKey, widget, kind, rawHandle)
 	return widget
 end
 
+function Core.sliderDisplayPrecision(minValue, maxValue, explicit)
+	local step = tonumber(explicit)
+	if step == nil then
+		step = Core.sliderIncrement(minValue, maxValue, explicit)
+	end
+	step = tonumber(step) or 1
+	if step >= 1 then
+		return 0
+	end
+	local decimals = 0
+	local scaled = step
+	while decimals < 6 and math.abs(scaled - math.round(scaled)) > 1e-9 do
+		scaled = scaled * 10
+		decimals = decimals + 1
+	end
+	return decimals
+end
+
 function Core.sliderIncrement(minValue, maxValue, explicit)
 	if explicit ~= nil then
 		return explicit
