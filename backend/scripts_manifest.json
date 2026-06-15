@@ -1,45 +1,69 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-15T18:00:00+00:00",
+  "updatedAt": "2026-06-15T20:00:00+00:00",
   "scripts": {
     "kick_a_lucky_block": {
       "name": "Kick a Lucky Block",
       "status": "working",
-      "version": "7.0.0",
-      "message": "Core-first revamp pass with shared helpers and performance tuning.",
-      "updatedAt": "2026-06-15T18:00:00+00:00",
+      "version": "7.1.0",
+      "message": "v7.1.0 — ball farming, shop automation, five selection dropdowns, prediction/kick fixes.",
+      "updatedAt": "2026-06-15T20:00:00+00:00",
+      "updatedBy": "system"
+    },
+    "sell_lemons": {
+      "name": "Sell Lemons",
+      "status": "working",
+      "version": "1.0.0",
+      "message": "Stand clicking, cash collection, upgrades, and rebirth automation.",
+      "updatedAt": "2026-06-15T20:00:00+00:00",
+      "updatedBy": "system"
+    },
+    "grow_a_garden_2": {
+      "name": "Grow a Garden 2",
+      "status": "working",
+      "version": "1.0.0",
+      "message": "Plant, harvest, and sell loops with seed/crop filters.",
+      "updatedAt": "2026-06-15T20:00:00+00:00",
       "updatedBy": "system"
     },
     "speed_keyboard_escape": {
       "name": "Speed Keyboard Escape",
       "status": "working",
       "version": "1.5.0",
-      "message": "Revamp pass — Core helpers, treadmill polish, anti-AFK hardening.",
-      "updatedAt": "2026-06-15T18:00:00+00:00",
+      "message": "Step farming, win routes, shop automation, and treadmill tweaks.",
+      "updatedAt": "2026-06-15T20:00:00+00:00",
       "updatedBy": "system"
     },
     "slime_rng": {
       "name": "Slime RNG",
-      "status": "working",
+      "status": "broken",
       "version": "1.5.0",
-      "message": "Revamp pass — unified Core selection helpers and cleaner loops.",
-      "updatedAt": "2026-06-15T18:00:00+00:00",
+      "message": "Broken after game update — remotes and zone hooks need a rebuild.",
+      "updatedAt": "2026-06-15T20:00:00+00:00",
       "updatedBy": "system"
     },
     "build_a_ring_farm": {
       "name": "Build A Ring Farm",
-      "status": "working",
+      "status": "broken",
       "version": "1.4.0",
-      "message": "Revamp pass — shared bind helpers, remote guards, plot cache.",
-      "updatedAt": "2026-06-15T18:00:00+00:00",
+      "message": "Broken after game update — planting and contract remotes changed.",
+      "updatedAt": "2026-06-15T20:00:00+00:00",
+      "updatedBy": "system"
+    },
+    "blox_fruit": {
+      "name": "Blox Fruit",
+      "status": "broken",
+      "version": "0.1.0",
+      "message": "Maintenance shell only — automation disabled pending game remap.",
+      "updatedAt": "2026-06-15T20:00:00+00:00",
       "updatedBy": "system"
     },
     "survive_a_zombie_arena": {
       "name": "Survive a Zombie Arena",
-      "status": "working",
+      "status": "broken",
       "version": "2.3.0",
-      "message": "Revamp pass — zombie cache, fast pickup scan, Core UI binds.",
-      "updatedAt": "2026-06-15T18:00:00+00:00",
+      "message": "Broken after game update — combat remotes and wave flow changed.",
+      "updatedAt": "2026-06-15T20:00:00+00:00",
       "updatedBy": "system"
     }
   }

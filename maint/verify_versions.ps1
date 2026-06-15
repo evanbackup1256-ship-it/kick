@@ -193,6 +193,9 @@ $gameFiles = @{
     slime_rng               = "games/slime_rng.luau"
     build_a_ring_farm       = "games/build_a_ring_farm.luau"
     survive_a_zombie_arena  = "games/survive_a_zombie_arena.luau"
+    sell_lemons             = "games/sell_lemons.luau"
+    grow_a_garden_2         = "games/grow_a_garden_2.luau"
+    blox_fruit              = "games/blox_fruit.luau"
 }
 
 foreach ($id in $gameFiles.Keys)

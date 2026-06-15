@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "7.0.0"
+local VERSION = "7.1.0"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -228,6 +228,19 @@ local defaults = {
 	KickVarianceMs = 80,
 	AAutoSell = false,
 	AutoSellMaxBackpack = 25,
+	AFarmBall = false,
+	AAutoBuyUpgrade = false,
+	AAutoBuyPotion = false,
+	AAutoUsePotion = false,
+	AAutoBuyShopCup = false,
+	AAutoLoadConfig = false,
+	AutoLoadProfile = "default",
+	TBallUpgrade = { "Any" },
+	TPotionType = { "Any" },
+	TShopCup = { "Any" },
+	TBallFilter1 = { "Any" },
+	TBallFilter2 = { "Any" },
+	CustomMoveSpeed = 115,
 }
 
 local savedKeys = {
@@ -303,6 +316,19 @@ local savedKeys = {
 	"KickVarianceMs",
 	"AAutoSell",
 	"AutoSellMaxBackpack",
+	"AFarmBall",
+	"AAutoBuyUpgrade",
+	"AAutoBuyPotion",
+	"AAutoUsePotion",
+	"AAutoBuyShopCup",
+	"AAutoLoadConfig",
+	"AutoLoadProfile",
+	"TBallUpgrade",
+	"TPotionType",
+	"TShopCup",
+	"TBallFilter1",
+	"TBallFilter2",
+	"CustomMoveSpeed",
 	"NotifyOnError",
 }
 
@@ -1306,6 +1332,11 @@ local function refreshRemotes()
 	remotes.battleInvite   = safeFindRemote(network, { "rev_bs_battle_invite", "ref_bs_battle_invite", "ref_battle_invite", "rev_battle_invite", "battle_invite", "BattleInvite" })
 	remotes.battleStart    = safeFindRemote(network, { "rev_bs_battle_start",  "ref_bs_battle_start",  "rev_battle_start",  "battle_start", "BattleStart", "StartBattle" })
 	remotes.kickStyle      = safeFindRemote(network, { "rev_KickStyle", "rev_KickStyleEquip", "KickStyleEquip", "EquipKickStyle" })
+	remotes.ballKick       = safeFindRemote(network, { "rev_BallKick", "BallKick", "rev_Ball", "BallEvent", "KickBall" })
+	remotes.buyPotion      = safeFindRemote(network, { "rev_PotionBuy", "PotionBuy", "BuyPotion", "rev_BuyPotion" })
+	remotes.usePotion      = safeFindRemote(network, { "rev_PotionUse", "UsePotion", "PotionUse", "rev_UsePotion" })
+	remotes.buyCup         = safeFindRemote(network, { "rev_CupBuy", "CupBuy", "ShopCup", "BuyCup", "rev_ShopCup" })
+	remotes.buyUpgrade     = safeFindRemote(network, { "rev_UpgradeBuy", "UpgradeBuy", "BuyUpgrade", "rev_BuyUpgrade" })
 
 	if network then
 		for _, child in ipairs(network:GetChildren()) do
@@ -3189,6 +3220,7 @@ local filterGroup = createUiGroup(mainTab, "Keep / Skip", "rbxassetid://10734975
 local trainGroup = createUiGroup(mainTab, "Train", "rbxassetid://10734975692", 2)
 local placeGroup = createUiGroup(autoTab, "Auto Place", "rbxassetid://10734975692", 1)
 local upgradeGroup = createUiGroup(autoTab, "Upgrades", "rbxassetid://10734975692", 2)
+local ballGroup = createUiGroup(eventsTab, "Ball & Potions", "rbxassetid://10709789407", 3)
 local economyGroup = createUiGroup(autoTab, "Shop", "rbxassetid://10734975692", 1)
 local battleGroup = createUiGroup(eventsTab, "Battle", "rbxassetid://10709789407", 1)
 local masteryGroup = createUiGroup(eventsTab, "Mastery", "rbxassetid://10709789407", 2)
@@ -3563,6 +3595,120 @@ profileGroup:CreateButton(
 	"Full dump of your settings as JSON."
 )
 
+profileGroup:CreateToggle(
+	"Auto load on start",
+	state.AAutoLoadConfig,
+	"Loads the selected setup when the script starts.",
+	function(value)
+		state.AAutoLoadConfig = value
+		saveSettings()
+	end,
+	"AAutoLoadConfig"
+)
+
+ballGroup:CreateToggle(
+	"Auto farm ball",
+	state.AFarmBall,
+	"Runs the ball minigame loop automatically.",
+	function(value)
+		state.AFarmBall = value
+		saveSettings()
+	end,
+	"AFarmBall"
+)
+ballGroup:CreateToggle(
+	"Auto buy upgrade",
+	state.AAutoBuyUpgrade,
+	"Purchases selected ball/upgrades when affordable.",
+	function(value)
+		state.AAutoBuyUpgrade = value
+		saveSettings()
+	end,
+	"AAutoBuyUpgrade"
+)
+ballGroup:CreateToggle(
+	"Auto buy potion",
+	state.AAutoBuyPotion,
+	"Buys potions from the shop automatically.",
+	function(value)
+		state.AAutoBuyPotion = value
+		saveSettings()
+	end,
+	"AAutoBuyPotion"
+)
+ballGroup:CreateToggle(
+	"Auto use potion",
+	state.AAutoUsePotion,
+	"Uses potions from inventory when available.",
+	function(value)
+		state.AAutoUsePotion = value
+		saveSettings()
+	end,
+	"AAutoUsePotion"
+)
+ballGroup:CreateToggle(
+	"Auto buy shop cup",
+	state.AAutoBuyShopCup,
+	"Purchases cup shop items automatically.",
+	function(value)
+		state.AAutoBuyShopCup = value
+		saveSettings()
+	end,
+	"AAutoBuyShopCup"
+)
+ballGroup:AddDropdown("BallUpgrade", {
+	Text = "Upgrade pick",
+	Values = gameData.RarityOptions or { "Any" },
+	Default = state.TBallUpgrade,
+	Multi = true,
+	Searchable = true,
+	Callback = function(selection)
+		state.TBallUpgrade = selectedDropdownKeys(selection)
+		saveSettings()
+	end,
+})
+ballGroup:AddDropdown("PotionType", {
+	Text = "Potion type",
+	Values = { "Any", "Luck", "Speed", "Power", "Coins" },
+	Default = state.TPotionType,
+	Multi = true,
+	Callback = function(selection)
+		state.TPotionType = selectedDropdownKeys(selection)
+		saveSettings()
+	end,
+})
+ballGroup:AddDropdown("ShopCup", {
+	Text = "Shop cup",
+	Values = { "Any", "Bronze", "Silver", "Gold", "Diamond" },
+	Default = state.TShopCup,
+	Multi = true,
+	Callback = function(selection)
+		state.TShopCup = selectedDropdownKeys(selection)
+		saveSettings()
+	end,
+})
+ballGroup:AddDropdown("BallFilterA", {
+	Text = "Ball filter A",
+	Values = gameData.BrainrotOptions or { "Any" },
+	Default = state.TBallFilter1,
+	Multi = true,
+	Searchable = true,
+	Callback = function(selection)
+		state.TBallFilter1 = selectedDropdownKeys(selection)
+		saveSettings()
+	end,
+})
+ballGroup:AddDropdown("BallFilterB", {
+	Text = "Ball filter B",
+	Values = gameData.RarityOptions or { "Any" },
+	Default = state.TBallFilter2,
+	Multi = true,
+	Callback = function(selection)
+		state.TBallFilter2 = selectedDropdownKeys(selection)
+		saveSettings()
+	end,
+})
+
 configGroup:CreateToggle(
 	"Quiet mode",
 	state.UIQuietMode,
@@ -3736,17 +3882,18 @@ uiToggle(
 	end
 )
 kickGroup:CreateSlider(
-	"Run to pad speed",
-	40,
-	220,
-	state.VolcanoTweenSpeed,
+	"Custom move speed",
+	50,
+	250,
+	state.CustomMoveSpeed or state.VolcanoTweenSpeed,
 	function(value)
+		state.CustomMoveSpeed = value
 		state.VolcanoTweenSpeed = value
 		saveSettings()
 	end,
-	"How fast you slide over to the kick spot. Crank it up if you want snappier runs.",
+	"How fast you move for auto kick, ball farming, and pad runs.",
 	nil,
-	"VolcanoTweenSpeed"
+	"CustomMoveSpeed"
 )
 kickGroup:CreateDivider()
 kickGroup:CreateDropdown(
@@ -4592,7 +4739,13 @@ if not uiHandles or not uiHandles.window then
 end
 
 local function startRuntime()
-syncTrackerConfig()
+	if state.AAutoLoadConfig then
+		local ok, err = loadProfile(state.AutoLoadProfile or profileNameInput or "default")
+		if not ok and err then
+			notify("Config", tostring(err), 3)
+		end
+	end
+	syncTrackerConfig()
 initWeatherDetector()
 if Tracker and Tracker.Track then
 	Tracker:Track()
@@ -4760,6 +4913,89 @@ if LocalPlayer.Character then
 		"CharacterToolAdded"
 	)
 end
+
+local function findBallPad()
+	local areas = Workspace:FindFirstChild("Areas")
+	if not areas then
+		return nil
+	end
+	return areas:FindFirstChild("Ball") or areas:FindFirstChild("BallReady") or areas:FindFirstChild("KickBall")
+end
+
+local function runBallFarm(character, humanoid, root)
+	local pad = findBallPad()
+	if not pad or not remotes.ballKick then
+		return
+	end
+	local speed = state.CustomMoveSpeed or state.VolcanoTweenSpeed or 115
+	local horizontal = Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(pad.Position.X, 0, pad.Position.Z)
+	if horizontal.Magnitude > 8 then
+		fastMove(root, pad.CFrame * CFrame.new(0, 3, 0), speed)
+		return
+	end
+	safeCall("BallKick", function()
+		remotes.ballKick:FireServer()
+	end)
+end
+
+local function autoShopExtras()
+	if state.AAutoBuyShopCup and remotes.buyCup then
+		for _, cup in ipairs(listFromSelection(state.TShopCup)) do
+			if cup ~= "Any" then
+				safeCall("BuyCup", function()
+					fireRemote(remotes.buyCup, cup)
+				end)
+			end
+		end
+	end
+	if state.AAutoBuyPotion and remotes.buyPotion then
+		for _, potion in ipairs(listFromSelection(state.TPotionType)) do
+			if potion ~= "Any" then
+				safeCall("BuyPotion", function()
+					fireRemote(remotes.buyPotion, potion)
+				end)
+			end
+		end
+	end
+	if state.AAutoUsePotion and remotes.usePotion then
+		safeCall("UsePotion", function()
+			fireRemote(remotes.usePotion)
+		end)
+	end
+	if state.AAutoBuyUpgrade and remotes.buyUpgrade then
+		for _, upgrade in ipairs(listFromSelection(state.TBallUpgrade)) do
+			if upgrade ~= "Any" then
+				safeCall("BuyBallUpgrade", function()
+					fireRemote(remotes.buyUpgrade, upgrade)
+				end)
+			end
+		end
+	elseif state.AAutoBuyUpgrade and remotes.shopBuy then
+		safeCall("BuyGenericUpgrade", function()
+			fireRemote(remotes.shopBuy, "Upgrade")
+		end)
+	end
+end
+
+makeSupervisor("BallFarm", 0.5, function()
+	if not state.AFarmBall then
+		return
+	end
+	refreshRemotes()
+	local character, humanoid, root = characterParts()
+	if not character or not humanoid or not root or humanoid.Health <= 0 then
+		return
+	end
+	runBallFarm(character, humanoid, root)
+end)
+
+makeSupervisor("ShopExtras", 2, function()
+	if not (state.AAutoBuyShopCup or state.AAutoBuyPotion or state.AAutoUsePotion or state.AAutoBuyUpgrade) then
+		return
+	end
+	refreshRemotes()
+	autoShopExtras()
+end)
 
 makeSupervisor("RefreshData", 8, function()
 	refreshRemotes()
@@ -4932,7 +5168,7 @@ makeSupervisor("AutoKick", 0.3, function()
 		kickReady.Position.Z
 	)
 	if horizontal.Magnitude > 10 then
-		fastMove(root, kickReady.CFrame * CFrame.new(0, 3, 0), state.VolcanoTweenSpeed)
+		fastMove(root, kickReady.CFrame * CFrame.new(0, 3, 0), state.CustomMoveSpeed or state.VolcanoTweenSpeed)
 		return
 	elseif horizontal.Magnitude > 3 then
 		root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
@@ -5385,7 +5621,7 @@ makeSupervisor("Mastery", 1, function()
 		if inGame == "" then
 			if (root.Position - kickReady.Position).Magnitude > 5 then
 				ui.updateMasteryStatus("Walking to pad")
-				fastMove(root, kickReady.CFrame * CFrame.new(0, 3, 0), state.VolcanoTweenSpeed)
+				fastMove(root, kickReady.CFrame * CFrame.new(0, 3, 0), state.CustomMoveSpeed or state.VolcanoTweenSpeed)
 				finish(0.4)
 				return
 			end

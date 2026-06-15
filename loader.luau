@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.2.26"
+local LOADER_VERSION = "8.3.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -36,7 +36,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.26",
+	loader = "8.3.0",
 	core = "2.9.5",
 	ui = "Syde",
 	windui = "4.0.1-syde",
@@ -2722,7 +2722,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "7.0.0",
+		version = "7.1.0",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
@@ -2813,6 +2813,53 @@ local GAMES = {
 		validate = function()
 			local zombieRemotes = ReplicatedStorage:FindFirstChild("ZombieRemotes")
 			return zombieRemotes and zombieRemotes:FindFirstChild("ZombieDamage") ~= nil
+		end,
+	},
+	{
+		id = "sell_lemons",
+		name = "Sell Lemons",
+		version = "1.0.0",
+		placeIds = { 79268393072444 },
+		scriptFiles = { "games/sell_lemons.luau", "sell_lemons.luau" },
+		scriptUrl = "games/sell_lemons.luau",
+		minBytes = 12000,
+		preload = function()
+			waitForPath(ReplicatedStorage, { "Remotes" }, 20)
+			return true
+		end,
+		validate = function()
+			return ReplicatedStorage:FindFirstChild("Remotes") ~= nil
+		end,
+	},
+	{
+		id = "grow_a_garden_2",
+		name = "Grow a Garden 2",
+		version = "1.0.0",
+		placeIds = { 95204935687527 },
+		scriptFiles = { "games/grow_a_garden_2.luau", "grow_a_garden_2.luau" },
+		scriptUrl = "games/grow_a_garden_2.luau",
+		minBytes = 12000,
+		preload = function()
+			waitForPath(ReplicatedStorage, { "Remotes" }, 20)
+			return true
+		end,
+		validate = function()
+			return ReplicatedStorage:FindFirstChild("Remotes") ~= nil
+		end,
+	},
+	{
+		id = "blox_fruit",
+		name = "Blox Fruit",
+		version = "0.1.0",
+		placeIds = { 2753915549 },
+		scriptFiles = { "games/blox_fruit.luau", "blox_fruit.luau" },
+		scriptUrl = "games/blox_fruit.luau",
+		minBytes = 8000,
+		preload = function()
+			return true
+		end,
+		validate = function()
+			return game.PlaceId == 2753915549
 		end,
 	},
 }
@@ -3269,7 +3316,7 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.2.26"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.3.0"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then

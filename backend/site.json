@@ -3,7 +3,7 @@
   "updatedAt": "2026-06-15T18:58:45Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
-  "loaderVersion": "8.2.26",
+  "loaderVersion": "8.3.0",
   "coreVersion": "2.9.5",
   "uiLibrary": "Syde",
   "uiVersion": "4.0.1-syde",
@@ -47,6 +47,35 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-15",
+      "title": "Kick A Lucky Block 7.1.0 — Ball Farming & Shop Automation",
+      "items": [
+        "Added Auto Farm Ball",
+        "Added Auto Buy Upgrade",
+        "Added Auto Buy Potion",
+        "Added Auto Use Potion",
+        "Added Auto Buy Shop Cup",
+        "Added 5 selection dropdowns",
+        "Fixed Auto Prediction Brainrots",
+        "Fixed Auto Kick",
+        "Loader 8.3.0 — Sell Lemons and Grow A Garden 2 added to the hub"
+      ]
+    },
+    {
+      "date": "2026-06-14",
+      "title": "Kick A Lucky Block — Configuration & Custom Speed",
+      "items": [
+        "Kick a Lucky Block: Added Custom Speed",
+        "Kick a Lucky Block: Added Configuration System",
+        "Kick a Lucky Block: Added Auto Load Config Toggle",
+        "Kick a Lucky Block: Added Save / Delete / Load Config",
+        "Kick a Lucky Block: Added Config Selection Dropdown",
+        "+1 Speed Keyboard Escape: Added Script Support",
+        "Kick a Lucky Block: Fixed Rollback Issue In World 1",
+        "Kick a Lucky Block: Fixed Rollback Issue In World 2"
+      ]
+    },
     {
       "date": "2026-06-12",
       "title": "Loader 8.2.24 — core fix + hub live tracker",
@@ -260,9 +289,79 @@
         {
           "name": "Config profiles",
           "category": "Settings",
-          "desc": "Save/load settings and quiet mode toggles."
+          "desc": "Save/load settings, auto-load on start, and quiet mode toggles."
+        },
+        {
+          "name": "Auto farm ball",
+          "category": "Events",
+          "desc": "Runs the ball minigame loop automatically."
+        },
+        {
+          "name": "Auto buy upgrade",
+          "category": "Events",
+          "desc": "Purchases selected ball upgrades when affordable."
+        },
+        {
+          "name": "Auto buy potion",
+          "category": "Events",
+          "desc": "Buys potions from the shop automatically."
+        },
+        {
+          "name": "Auto use potion",
+          "category": "Events",
+          "desc": "Uses potions from inventory when available."
+        },
+        {
+          "name": "Auto buy shop cup",
+          "category": "Events",
+          "desc": "Purchases cup shop items automatically."
+        },
+        {
+          "name": "Ball selection dropdowns",
+          "category": "Events",
+          "desc": "Five dropdowns for upgrades, potions, cups, and ball filters."
+        },
+        {
+          "name": "Custom move speed",
+          "category": "Kick",
+          "desc": "Adjust movement speed for auto kick and ball farming."
         }
       ]
+    },
+    "sell_lemons": {
+      "placeIds": [79268393072444],
+      "robloxUrl": "https://www.roblox.com/games/79268393072444",
+      "description": "Lemonade stand automation — click, collect, upgrade, and rebirth loops.",
+      "uiTabs": ["Main", "Auto", "Shop", "Settings"],
+      "scriptFeatures": [
+        { "name": "Auto click stand", "category": "Main", "desc": "Keeps tapping your lemonade stand." },
+        { "name": "Auto collect cash", "category": "Main", "desc": "Grabs nearby cash bags within radius." },
+        { "name": "Auto buy upgrades", "category": "Shop", "desc": "Purchases stand upgrades when affordable." },
+        { "name": "Auto rebirth", "category": "Auto", "desc": "Rebirths when requirements are met." },
+        { "name": "Target upgrades", "category": "Shop", "desc": "Filter which upgrades to buy." },
+        { "name": "Anti AFK", "category": "Settings", "desc": "Prevents idle kicks while farming." }
+      ]
+    },
+    "grow_a_garden_2": {
+      "placeIds": [95204935687527],
+      "robloxUrl": "https://www.roblox.com/games/95204935687527",
+      "description": "Garden automation — plant seeds, harvest crops, and sell for coins.",
+      "uiTabs": ["Farm", "Auto", "Settings"],
+      "scriptFeatures": [
+        { "name": "Auto plant seeds", "category": "Farm", "desc": "Plants seeds on open plot slots." },
+        { "name": "Auto harvest", "category": "Farm", "desc": "Collects ripe crops from your plot." },
+        { "name": "Auto sell", "category": "Farm", "desc": "Sells harvested crops for coins." },
+        { "name": "Target seeds", "category": "Farm", "desc": "Filter which seeds to plant." },
+        { "name": "Target crops", "category": "Farm", "desc": "Filter which crops to harvest." },
+        { "name": "Anti AFK", "category": "Settings", "desc": "Prevents idle kicks while farming." }
+      ]
+    },
+    "blox_fruit": {
+      "placeIds": [2753915549],
+      "robloxUrl": "https://www.roblox.com/games/2753915549",
+      "description": "Maintenance shell — automation disabled pending game remap after latest update.",
+      "uiTabs": ["Status", "Settings"],
+      "scriptFeatures": []
     },
     "speed_keyboard_escape": {
       "placeIds": [95082159892680],
