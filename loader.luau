@@ -48,7 +48,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "2a49f99",
+	commit = "d98fe14",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -3363,7 +3363,7 @@ local function isLegacyAlleralLoader(src)
 	if src:find('local LOADER_VERSION = "8.7.1"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.7.0"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.7.1"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
