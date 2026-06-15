@@ -1,5 +1,5 @@
 -- Alleral vendored MacLib 1.2.6 — ALLERAL_MACLIB_VERSION = 1
-local ALLERAL_MACLIB_VERSION = 1
+local ALLERAL_MACLIB_VERSION = 2
 
 local MacLib = { 
 	Options = {}, 
@@ -56,10 +56,10 @@ local function GetGui()
 	newGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	newGui.DisplayOrder = 2147483647
 
-	local parent = RunService:IsStudio() 
-		and LocalPlayer:FindFirstChild("PlayerGui")
-		or (gethui and gethui())
-		or (cloneref and cloneref(MacLib.GetService("CoreGui")) or MacLib.GetService("CoreGui"))
+	local parent = RunService:IsStudio() and LocalPlayer:FindFirstChild("PlayerGui")
+		or (type(gethui) == "function" and gethui())
+		or (LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui"))
+		or (type(cloneref) == "function" and cloneref(MacLib.GetService("CoreGui")) or MacLib.GetService("CoreGui"))
 
 	newGui.Parent = parent
 	return newGui
@@ -1018,8 +1018,10 @@ function MacLib:Window(Settings)
 			return x == x
 		end
 		local continue = IsNotNaN(camera:ScreenPointToRay(0,0).Origin.x)
-		while not continue do
+		local blurWaitFrames = 0
+		while not continue and blurWaitFrames < 120 do
 			RunService.RenderStepped:Wait()
+			blurWaitFrames += 1
 			continue = IsNotNaN(camera:ScreenPointToRay(0,0).Origin.x)
 		end
 	end

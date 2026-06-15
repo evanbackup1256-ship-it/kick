@@ -16,7 +16,7 @@ local UI = "ui"
 local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
 local MACLIB_SOURCE_MIN_BYTES = 150000
 local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-local MACLIB_VERSION = 1
+local MACLIB_VERSION = 2
 local MACLIB_REQUIRED_FN = "function MacLib:Window"
 local MACLIB_PATCHED_OVERRIDE_PATHS = {
 	"maclib_patched.luau",
@@ -41,7 +41,7 @@ local RELEASE_FALLBACK = {
 	ui = "Maclib",
 	windui = "5.3.0-maclib",
 	alleral = "5.3.0-maclib",
-	maclibVersion = 1,
+	maclibVersion = 2,
 	analytics = "1.2",
 	telemetry = "3.4",
 	helpers = "1.4",

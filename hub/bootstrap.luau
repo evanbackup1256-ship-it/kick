@@ -9,7 +9,7 @@ local LOADER_FETCH_TIMEOUT = 28
 local LOADER_MIN_BYTES = 50000
 local FALLBACK_RELEASE = {
 	loader = "8.7.0",
-	maclibVersion = 1,
+	maclibVersion = 2,
 }
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"

@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/maclib/source.luau",
 	}
 	local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-	local MACLIB_VERSION = 1
+	local MACLIB_VERSION = 2
 	local MACLIB_REQUIRED_FN = "function MacLib:Window"
 	local MACLIB_MIN_BYTES = 150000
 	local MACLIB_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
@@ -432,7 +432,7 @@ return function(Core)
 				Subtitle = settings.Subtitle or settings.SubName or settings.Author or "",
 				Size = settings.Size or UDim2.fromOffset(868, 650),
 				Keybind = menuKey,
-				AcrylicBlur = true,
+				AcrylicBlur = settings.AcrylicBlur == true,
 				ShowUserInfo = true,
 			})
 

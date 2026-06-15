@@ -16,5 +16,5 @@
     "helpers":  "1.4",
     "security":  "1.3",
     "access":  "1.1",
-    "maclibVersion":  1
+    "maclibVersion":  2
 }
