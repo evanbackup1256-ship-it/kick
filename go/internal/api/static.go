@@ -1,12 +1,16 @@
 package api
 
 import (
+	"io"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
+
+const spaEntryFile = "app.html"
 
 func StaticSite(root string) http.Handler {
 	root = filepath.Clean(root)
@@ -16,11 +20,12 @@ func StaticSite(root string) http.Handler {
 			return
 		}
 
+		entry := resolveSPAEntry(root)
 		rel := strings.TrimPrefix(r.URL.Path, "/")
 		rel = strings.TrimSuffix(rel, "/")
 
-		if rel == "" || rel == "index.html" {
-			serveSiteFile(w, r, root, "index.html")
+		if rel == "" || rel == "index.html" || rel == spaEntryFile {
+			serveSiteFile(w, r, root, entry)
 			return
 		}
 
@@ -40,8 +45,15 @@ func StaticSite(root string) http.Handler {
 			return
 		}
 
-		serveSiteFile(w, r, root, "index.html")
+		serveSiteFile(w, r, root, entry)
 	})
+}
+
+func resolveSPAEntry(root string) string {
+	if _, err := os.Stat(filepath.Join(root, spaEntryFile)); err == nil {
+		return spaEntryFile
+	}
+	return "index.html"
 }
 
 func serveSiteFileIfExists(w http.ResponseWriter, r *http.Request, root, rel string) bool {
@@ -88,8 +100,26 @@ func openStaticFile(root, rel string) (*os.File, os.FileInfo, error) {
 }
 
 func serveStaticContent(w http.ResponseWriter, r *http.Request, info os.FileInfo, file *os.File) {
-	if ct := mime.TypeByExtension(filepath.Ext(info.Name())); ct != "" {
-		w.Header().Set("Content-Type", ct)
+	ct := mime.TypeByExtension(filepath.Ext(info.Name()))
+	if ct == "" {
+		ct = "application/octet-stream"
 	}
-	http.ServeContent(w, r, info.Name(), info.ModTime(), file)
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Last-Modified", info.ModTime().UTC().Format(http.TimeFormat))
+	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("X-Alleral-Static", info.Name())
+
+	if r.Method == http.MethodHead {
+		w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		http.Error(w, "read_error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, file)
 }

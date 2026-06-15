@@ -22,6 +22,7 @@ COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/telemetry_relay.py backend/security.py backend/script_registry.py backend/ban_registry.py backend/site_registry.py backend/roblox_api.py backend/weao_api.py backend/auto_sync.py backend/manage_backend.py ./
 COPY --from=site-build /site/out ./site
+RUN if [ -f /app/site/index.html ]; then mv /app/site/index.html /app/site/app.html; fi
 COPY --from=go-build /alleral /usr/local/bin/alleral
 COPY cfg/scripts_manifest.json ./scripts_manifest.json
 COPY cfg/site.json ./site.json

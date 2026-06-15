@@ -65,6 +65,10 @@ export function CloudflareGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (passed !== false) return;
+    if (typeof window !== "undefined") {
+      const protocol = window.location.protocol;
+      if (protocol !== "http:" && protocol !== "https:") return;
+    }
 
     const el = mountRef.current;
     if (!el) return;
