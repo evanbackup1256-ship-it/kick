@@ -1,5 +1,5 @@
-﻿--!nocheck
-local LOADER_VERSION = "8.9.0"
+--!nocheck
+local LOADER_VERSION = "8.11.0"
 local BOOTSTRAP_VERSION = "2.0.3"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -25,22 +25,17 @@ local LEGACY_UI_SOURCE_PATHS = {
 	"kick/" .. UI .. "/studio/source.luau",
 	".alleral/cache/" .. UI .. "/studio/source.luau",
 }
-local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
-local MACLIB_SOURCE_MIN_BYTES = 150000
-local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-local MACLIB_VERSION = 17
-local FLEXUI_SOURCE_PATH = UI .. "/flexui/source.luau"
-local FLEXUI_SOURCE_MIN_BYTES = 6000
-local FLEXUI_VERSION_MARKER = "ALLERAL_FLEXUI_VERSION"
-local FLEXUI_VERSION = 1
-local MACLIB_REQUIRED_FN = "function MacLib:Window"
-local MACLIB_PATCHED_OVERRIDE_PATHS = {
-	"maclib_patched.luau",
-	"patched_maclib.luau",
-	".alleral/maclib_patched.luau",
-	"kick/maclib_patched.luau",
-	"workspace/maclib_patched.luau",
-}
+local ONYX_SOURCE_PATH = UI .. "/onyx/source.luau"
+local ONYX_SOURCE_MIN_BYTES = 12000
+local ONYX_VERSION_MARKER = "ALLERAL_ONYX_VERSION"
+local ONYX_VERSION = 1
+local ONYX_REQUIRED_FN = "function MacLib:Window"
+local IRIS_SOURCE_PATH = UI .. "/iris/source.luau"
+local IRIS_SOURCE_MIN_BYTES = 8000
+local IRIS_VERSION_MARKER = "ALLERAL_IRIS_VERSION"
+local IRIS_VERSION = 2
+local IRIS_BUNDLE_MIN_BYTES = 250000
+local IRIS_REQUIRED_FN = "function MacLib:Window"
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
 local CP = {
@@ -52,20 +47,20 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.9.0",
+	loader = "8.11.0",
 	core = "2.9.10",
-	ui = "Flexui",
-	windui = "5.5.0-maclib",
-	alleral = "5.5.0-maclib",
-	maclibVersion = 17,
-	flexuiVersion = 1,
+	ui = "Onyx",
+	windui = "5.7.0-onyx",
+	alleral = "5.7.0-onyx",
+	onyxVersion = 1,
+	irisVersion = 2,
 	analytics = "1.2",
 	telemetry = "3.5",
 	helpers = "1.8",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "1b4c5f6",
+	commit = "8db5f90",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -173,7 +168,8 @@ pcall(function()
 end)
 
 local ENV = genv()
-ENV._Alleral_RequiredMaclibVersion = MACLIB_VERSION
+ENV._Alleral_RequiredOnyxVersion = ONYX_VERSION
+ENV._Alleral_RequiredIrisVersion = IRIS_VERSION
 
 local function loaderRunEnv()
 	local env = genv()
@@ -961,94 +957,198 @@ local function cacheRemote(relativePath, src)
 	pcall(writeFileFn, relativePath, src)
 end
 
-local ensureMaclibSource, maclibSourceValid
+local ensureOnyxSource, onyxSourceValid
 do
-	local function requiredMaclibVersion()
+	local function requiredOnyxVersion()
 		local expected = ENV._Alleral_ExpectedVersions
-		local remote = type(expected) == "table" and tonumber(expected.maclibVersion)
-		if remote and remote > MACLIB_VERSION then
+		local remote = type(expected) == "table" and tonumber(expected.onyxVersion)
+		if remote and remote > ONYX_VERSION then
 			return remote
 		end
-		return MACLIB_VERSION
+		return ONYX_VERSION
 	end
 
-	local function maclibVersionFromSource(src)
+	local function onyxVersionFromSource(src)
 		if type(src) ~= "string" then
 			return nil
 		end
-		return tonumber(src:match("\nlocal%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("^local%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*ALLERAL_MACLIB_VERSION"))
+		return tonumber(src:match("\nlocal%s+ALLERAL_ONYX_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("^local%s+ALLERAL_ONYX_VERSION%s*=%s*(%d+)"))
 			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
 	end
 
-	local function maclibFetchUrls()
-		local bust = "?maclib=" .. tostring(MACLIB_VERSION) .. "&t=" .. tostring(tick())
+	local function isOnyxSourceValid(src)
+		if type(src) ~= "string"
+			or #src < ONYX_SOURCE_MIN_BYTES
+			or src:find("<!DOCTYPE", 1, true)
+			or not src:find(ONYX_VERSION_MARKER, 1, true)
+			or not src:find(ONYX_REQUIRED_FN, 1, true)
+			or not src:find("__OnyxUi", 1, true)
+			or not looksLikeLua(src) then
+			return false
+		end
+		local version = onyxVersionFromSource(src)
+		return type(version) == "number" and version == requiredOnyxVersion()
+	end
+
+	local function onyxFetchUrls()
+		local bust = "?onyx=" .. tostring(ONYX_VERSION) .. "&t=" .. tostring(tick())
+		return {
+			GITHUB_RAW .. "/" .. ONYX_SOURCE_PATH .. bust,
+			JSDELIVR .. "/" .. ONYX_SOURCE_PATH .. bust,
+		}
+	end
+
+	local function fetchRemoteOnyx()
+		for _, url in ipairs(onyxFetchUrls()) do
+			local body, via = httpGet(url, ONYX_SOURCE_MIN_BYTES)
+			if body and isOnyxSourceValid(body) then
+				return body, url .. " via " .. tostring(via)
+			end
+		end
+		return nil, "onyx fetch failed"
+	end
+
+	onyxSourceValid = isOnyxSourceValid
+
+	ensureOnyxSource = function()
+		if type(ENV._AlleralOnyxSource) == "string" and isOnyxSourceValid(ENV._AlleralOnyxSource) then
+			ENV._AlleralOnyxSourceReady = true
+			ENV._AlleralMaclibSource = ENV._AlleralOnyxSource
+			ENV._AlleralMaclibSourceReady = true
+			return true, ENV._AlleralOnyxSourceLabel or "memory:onyx"
+		end
+
+		local localPaths = { ONYX_SOURCE_PATH, "kick/" .. ONYX_SOURCE_PATH }
+		local cachePaths = { ".alleral/cache/" .. ONYX_SOURCE_PATH }
+
+		local function adoptOnyx(src, label)
+			if not isOnyxSourceValid(src) then
+				return nil
+			end
+			cacheRemote(ONYX_SOURCE_PATH, src)
+			ENV._AlleralOnyxSource = src
+			ENV._AlleralOnyxSourceLabel = label
+			ENV._AlleralOnyxSourceReady = true
+			ENV._AlleralMaclibSource = src
+			ENV._AlleralMaclibSourceLabel = label
+			ENV._AlleralMaclibSourceReady = true
+			return true, label
+		end
+
+		local backendSrc, backendLabel = fetchBackendModule(ONYX_SOURCE_PATH, ONYX_SOURCE_MIN_BYTES)
+		if backendSrc and isOnyxSourceValid(backendSrc) then
+			return adoptOnyx(backendSrc, backendLabel or "backend")
+		end
+
+		local remoteSrc, remoteVia = fetchRemoteOnyx()
+		if remoteSrc then
+			return adoptOnyx(remoteSrc, "remote:" .. tostring(remoteVia))
+		end
+
+		local localSrc, localPath = readLocal(localPaths, ONYX_SOURCE_MIN_BYTES)
+		if localSrc and isOnyxSourceValid(localSrc) then
+			return adoptOnyx(localSrc, "local:" .. tostring(localPath))
+		end
+
+		local cacheSrc, cachePath = readLocal(cachePaths, ONYX_SOURCE_MIN_BYTES)
+		if cacheSrc and isOnyxSourceValid(cacheSrc) then
+			return adoptOnyx(cacheSrc, "cache:" .. tostring(cachePath))
+		end
+
+		return false, "Onyx source unavailable (need v" .. tostring(requiredOnyxVersion()) .. ")"
+	end
+end
+
+local ensureIrisSource, irisSourceValid
+do
+	local IRIS_BUNDLE_URL =
+		"https://raw.githubusercontent.com/GhostDuckyy/UI-Libraries/main/ImGui/Iris/Versions/2.0.4/Source.lua"
+
+	local function requiredIrisVersion()
+		local expected = ENV._Alleral_ExpectedVersions
+		local remote = type(expected) == "table" and tonumber(expected.irisVersion)
+		if remote and remote > IRIS_VERSION then
+			return remote
+		end
+		return IRIS_VERSION
+	end
+
+	local function irisVersionFromSource(src)
+		if type(src) ~= "string" then
+			return nil
+		end
+		return tonumber(src:match("\nlocal%s+ALLERAL_IRIS_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("^local%s+ALLERAL_IRIS_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
+	end
+
+	local function irisFetchUrls()
+		local bust = "?iris=" .. tostring(IRIS_VERSION) .. "&t=" .. tostring(tick())
 		local urls = {
-			GITHUB_RAW .. "/" .. MACLIB_SOURCE_PATH .. bust,
-			"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. MACLIB_SOURCE_PATH .. bust,
-			JSDELIVR .. "/" .. MACLIB_SOURCE_PATH .. bust,
+			GITHUB_RAW .. "/" .. IRIS_SOURCE_PATH .. bust,
+			"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. IRIS_SOURCE_PATH .. bust,
+			JSDELIVR .. "/" .. IRIS_SOURCE_PATH .. bust,
 		}
 		local pinCommit = RELEASE_FALLBACK.commit
 		if type(pinCommit) == "string" and pinCommit ~= "" then
-			table.insert(urls, 1, "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. pinCommit .. "/" .. MACLIB_SOURCE_PATH .. bust)
+			table.insert(urls, 1, "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. pinCommit .. "/" .. IRIS_SOURCE_PATH .. bust)
 		end
 		return urls
 	end
 
-	local function maclibSourceRejectReason(src)
+	local function irisSourceRejectReason(src)
 		if type(src) ~= "string" then
 			return "no body"
 		end
-		if #src < MACLIB_SOURCE_MIN_BYTES then
-			return "too small (" .. tostring(#src) .. "b, need " .. tostring(MACLIB_SOURCE_MIN_BYTES) .. "+)"
+		if #src < IRIS_SOURCE_MIN_BYTES then
+			return "too small (" .. tostring(#src) .. "b, need " .. tostring(IRIS_SOURCE_MIN_BYTES) .. "+)"
 		end
 		if not looksLikeLua(src) then
 			return "not lua (" .. tostring(#src) .. "b)"
 		end
-		if not src:find(MACLIB_VERSION_MARKER, 1, true) then
+		if not src:find(IRIS_VERSION_MARKER, 1, true) then
 			return "missing version marker"
 		end
-		if not src:find(MACLIB_REQUIRED_FN, 1, true) then
-			return "missing " .. MACLIB_REQUIRED_FN
+		if not src:find(IRIS_REQUIRED_FN, 1, true) then
+			return "missing " .. IRIS_REQUIRED_FN
 		end
-		if src:find("Size%.Offset", 1, false) then
-			return "legacy Size.Offset bug"
+		if not src:find("__IrisUi", 1, true) then
+			return "missing Iris adapter marker"
 		end
-		local version = maclibVersionFromSource(src)
-		local need = requiredMaclibVersion()
+		local version = irisVersionFromSource(src)
+		local need = requiredIrisVersion()
 		if type(version) ~= "number" or version ~= need then
 			return "version v" .. tostring(version or "?") .. " != required v" .. tostring(need)
 		end
 		return "ok"
 	end
 
-	local function isMaclibSourceValid(src)
+	local function isIrisSourceValid(src)
 		if type(src) ~= "string"
-			or #src < MACLIB_SOURCE_MIN_BYTES
+			or #src < IRIS_SOURCE_MIN_BYTES
 			or src:find("<!DOCTYPE", 1, true)
-			or not src:find(MACLIB_VERSION_MARKER, 1, true)
-			or not src:find(MACLIB_REQUIRED_FN, 1, true)
-			or not src:find("function MacLib:Window", 1, true)
-			or src:find("Size%.Offset", 1, false)
+			or not src:find(IRIS_VERSION_MARKER, 1, true)
+			or not src:find(IRIS_REQUIRED_FN, 1, true)
+			or not src:find("__IrisUi", 1, true)
 			or not looksLikeLua(src) then
 			return false
 		end
-		local version = maclibVersionFromSource(src)
-		local need = requiredMaclibVersion()
+		local version = irisVersionFromSource(src)
+		local need = requiredIrisVersion()
 		return type(version) == "number" and version == need
 	end
 
-	local function fetchRemoteMaclib()
+	local function fetchRemoteIris()
 		local lastReason = "no response"
 		for attempt = 1, 3 do
-			for _, url in ipairs(maclibFetchUrls()) do
-				local body, via = httpGet(url, MACLIB_SOURCE_MIN_BYTES)
-				if type(body) == "string" and #body >= MACLIB_SOURCE_MIN_BYTES then
-					if isMaclibSourceValid(body) then
+			for _, url in ipairs(irisFetchUrls()) do
+				local body, via = httpGet(url, IRIS_SOURCE_MIN_BYTES)
+				if type(body) == "string" and #body >= IRIS_SOURCE_MIN_BYTES then
+					if isIrisSourceValid(body) then
 						return body, url .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
 					end
-					lastReason = maclibSourceRejectReason(body)
+					lastReason = irisSourceRejectReason(body)
 						.. " ("
 						.. tostring(#body)
 						.. "b via "
@@ -1067,154 +1167,145 @@ do
 		return nil, lastReason
 	end
 
-	local function clearStaleMaclibRuntime()
+	local function ensureIrisBundle()
+		if type(ENV._AlleralIrisBundle) == "string" and #ENV._AlleralIrisBundle >= IRIS_BUNDLE_MIN_BYTES then
+			return true, "memory:iris-bundle"
+		end
+		local body, via = httpGet(IRIS_BUNDLE_URL .. "?t=" .. tostring(tick()), IRIS_BUNDLE_MIN_BYTES)
+		if type(body) == "string" and #body >= IRIS_BUNDLE_MIN_BYTES then
+			ENV._AlleralIrisBundle = body
+			return true, "remote:" .. tostring(via or "github")
+		end
+		return false, tostring(via or "Iris bundle unavailable")
+	end
+
+	local function clearStaleIrisRuntime()
 		local env = genv()
 		if type(env) ~= "table" then
 			return
 		end
-		local need = requiredMaclibVersion()
-		if type(env._AlleralMaclibSource) == "string" then
-			local srcVersion = maclibVersionFromSource(env._AlleralMaclibSource)
+		local need = requiredIrisVersion()
+		if type(env._AlleralIrisSource) == "string" then
+			local srcVersion = irisVersionFromSource(env._AlleralIrisSource)
 			if type(srcVersion) ~= "number" or srcVersion ~= need then
-				env._AlleralMaclibSource = nil
-				env._AlleralMaclibSourceReady = false
-				env._AlleralMaclibSourceLabel = nil
-				env._AlleralMaclibSourceVersion = nil
+				env._AlleralIrisSource = nil
+				env._AlleralIrisSourceReady = false
+				env._AlleralIrisSourceLabel = nil
+				env._AlleralIrisSourceVersion = nil
 			end
 		end
-		if type(env._AlleralMaclib) == "table" then
-			local version = env._AlleralMaclib.__AlleralPatch
+		if type(env._AlleralMaclibSource) == "string" and not isIrisSourceValid(env._AlleralMaclibSource) then
+			env._AlleralMaclibSource = nil
+			env._AlleralMaclibSourceReady = false
+		end
+		if type(env._AlleralIris) == "table" then
+			local version = env._AlleralIris.__AlleralPatch
 			if type(version) ~= "number" or version ~= need then
-				env._AlleralMaclib = nil
-				env._AlleralMaclibSourceKey = nil
+				env._AlleralIris = nil
+				env._AlleralIrisSourceKey = nil
 				env.Alleral_UI = nil
 			end
 		end
 	end
 
 	local function purgeLegacyUiSources()
-		local need = requiredMaclibVersion()
 		for _, path in ipairs(LEGACY_UI_SOURCE_PATHS) do
 			local src = readLocal({ path }, 100)
 			if src then
 				deleteWorkspaceFile(path, { silent = true, label = "legacy UI source" })
 			end
 		end
-		local paths = {
-			MACLIB_SOURCE_PATH,
-			"kick/" .. MACLIB_SOURCE_PATH,
-			".alleral/cache/" .. MACLIB_SOURCE_PATH,
+		local stalePaths = {
+			UI .. "/flexui/source.luau",
+			"kick/" .. UI .. "/flexui/source.luau",
+			".alleral/cache/" .. UI .. "/flexui/source.luau",
+			UI .. "/maclib/source.luau",
+			"kick/" .. UI .. "/maclib/source.luau",
+			".alleral/cache/" .. UI .. "/maclib/source.luau",
 		}
-		for _, path in ipairs(paths) do
-			local src = readLocal({ path }, 100)
-			if src then
-				local version = maclibVersionFromSource(src)
-				if type(version) ~= "number" or version ~= need or src:find("Size%.Offset", 1, false) then
-					deleteWorkspaceFile(path, { silent = true, label = "stale MacLib" })
-					log(
-						"Purged stale MacLib source "
-							.. path
-							.. " (v"
-							.. tostring(version or "?")
-							.. " != v"
-							.. tostring(need)
-							.. ")",
-						true
-					)
-				end
-			end
+		for _, path in ipairs(stalePaths) do
+			deleteWorkspaceFile(path, { silent = true, label = "legacy UI engine" })
 		end
 	end
 
-	maclibSourceValid = isMaclibSourceValid
+	irisSourceValid = isIrisSourceValid
 
-	ensureMaclibSource = function()
-		clearStaleMaclibRuntime()
+	ensureIrisSource = function()
+		clearStaleIrisRuntime()
 		purgeLegacyUiSources()
 
-		if type(ENV._AlleralMaclibSource) == "string" and not isMaclibSourceValid(ENV._AlleralMaclibSource) then
-			ENV._AlleralMaclibSource = nil
-			ENV._AlleralMaclibSourceReady = false
-			ENV._AlleralMaclibSourceLabel = nil
-		end
-
-		for _, overridePath in ipairs(MACLIB_PATCHED_OVERRIDE_PATHS) do
-			local src, path = readLocal({ overridePath }, MACLIB_SOURCE_MIN_BYTES)
-			if src and isMaclibSourceValid(src) then
-				local version = maclibVersionFromSource(src)
-				log("Using local patched MacLib override: " .. tostring(path) .. " (v" .. tostring(version or "?") .. ")")
-				ENV._AlleralMaclibSource = src
-				ENV._AlleralMaclibSourceVersion = version
-				ENV._AlleralMaclibSourceLabel = "override:" .. tostring(path)
-				ENV._AlleralMaclibSourceReady = true
-				cacheRemote(MACLIB_SOURCE_PATH, src)
-				cacheRemote(".alleral/cache/" .. MACLIB_SOURCE_PATH, src)
-				return true, "override:" .. tostring(path) .. ", v" .. tostring(version or "?")
-			end
+		if type(ENV._AlleralIrisSource) == "string" and not isIrisSourceValid(ENV._AlleralIrisSource) then
+			ENV._AlleralIrisSource = nil
+			ENV._AlleralIrisSourceReady = false
+			ENV._AlleralIrisSourceLabel = nil
 		end
 
 		local localPaths = {
-			MACLIB_SOURCE_PATH,
-			"kick/" .. MACLIB_SOURCE_PATH,
+			IRIS_SOURCE_PATH,
+			"kick/" .. IRIS_SOURCE_PATH,
 		}
 		local cachePaths = {
-			".alleral/cache/" .. MACLIB_SOURCE_PATH,
+			".alleral/cache/" .. IRIS_SOURCE_PATH,
 		}
 
-		local function adoptMaclib(src, label)
-			if not src or not isMaclibSourceValid(src) then
+		local function adoptIris(src, label)
+			if not src or not isIrisSourceValid(src) then
 				return nil
 			end
-			cacheRemote(MACLIB_SOURCE_PATH, src)
-			cacheRemote(".alleral/cache/" .. MACLIB_SOURCE_PATH, src)
-			local version = maclibVersionFromSource(src)
-			ENV._AlleralMaclibSource = src
-			ENV._AlleralMaclibSourceVersion = version
-			ENV._AlleralMaclibSourceLabel = label
-			ENV._AlleralMaclibSourceReady = true
+			cacheRemote(IRIS_SOURCE_PATH, src)
+			cacheRemote(".alleral/cache/" .. IRIS_SOURCE_PATH, src)
+			local version = irisVersionFromSource(src)
+			ENV._AlleralIrisSource = src
+			ENV._AlleralIrisSourceVersion = version
+			ENV._AlleralIrisSourceLabel = label
+			ENV._AlleralIrisSourceReady = true
 			return true, label .. ", v" .. tostring(version or "?")
 		end
 
-		local cacheSrc, cachePath = readLocal(cachePaths, MACLIB_SOURCE_MIN_BYTES)
-		local cacheOk = cacheSrc and isMaclibSourceValid(cacheSrc)
-		local cacheVersion = maclibVersionFromSource(cacheSrc)
+		local cacheSrc, cachePath = readLocal(cachePaths, IRIS_SOURCE_MIN_BYTES)
+		local cacheOk = cacheSrc and isIrisSourceValid(cacheSrc)
+		local cacheVersion = irisVersionFromSource(cacheSrc)
 
-		local remoteSrc, remoteVia = fetchRemoteMaclib()
-		local remoteOk = remoteSrc and isMaclibSourceValid(remoteSrc)
-		local remoteVersion = maclibVersionFromSource(remoteSrc)
+		local backendSrc, backendLabel = fetchBackendModule(IRIS_SOURCE_PATH, IRIS_SOURCE_MIN_BYTES)
+		local backendOk = backendSrc and isIrisSourceValid(backendSrc)
+		local backendVersion = irisVersionFromSource(backendSrc)
 
-		local localSrc, localPath = readLocal(localPaths, MACLIB_SOURCE_MIN_BYTES)
-		local localOk = localSrc and isMaclibSourceValid(localSrc)
-		local localVersion = maclibVersionFromSource(localSrc)
+		local remoteSrc, remoteVia = fetchRemoteIris()
+		local remoteOk = remoteSrc and isIrisSourceValid(remoteSrc)
+		local remoteVersion = irisVersionFromSource(remoteSrc)
+
+		local localSrc, localPath = readLocal(localPaths, IRIS_SOURCE_MIN_BYTES)
+		local localOk = localSrc and isIrisSourceValid(localSrc)
+		local localVersion = irisVersionFromSource(localSrc)
+
+		if backendOk then
+			return adoptIris(backendSrc, backendLabel or "backend")
+		end
 
 		if remoteOk then
 			if localOk and localPath and (localVersion or 0) ~= (remoteVersion or 0) then
-				log(
-					"Replacing stale MacLib source (local v"
-						.. tostring(localVersion or "?")
-						.. " != remote v"
-						.. tostring(remoteVersion or "?")
-						.. ")",
-					true
-				)
 				deleteWorkspaceFile(localPath)
 			end
 			if cacheOk and cachePath and (cacheVersion or 0) ~= (remoteVersion or 0) then
-				deleteWorkspaceFile(cachePath, { silent = true, label = "stale MacLib cache" })
+				deleteWorkspaceFile(cachePath, { silent = true, label = "stale Iris cache" })
 			end
-			return adoptMaclib(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
+			return adoptIris(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
 		end
 
 		if localOk then
-			return adoptMaclib(localSrc, "local:" .. tostring(localPath))
+			return adoptIris(localSrc, "local:" .. tostring(localPath))
 		end
 
 		if cacheOk then
-			return adoptMaclib(cacheSrc, "cache:" .. tostring(cachePath))
+			return adoptIris(cacheSrc, "cache:" .. tostring(cachePath))
 		end
 
-		local fetchDetail = type(remoteVia) == "string" and remoteVia or maclibSourceRejectReason(remoteSrc)
-		return false, "MacLib source unavailable (need v" .. tostring(requiredMaclibVersion()) .. "): " .. tostring(fetchDetail)
+		local fetchDetail = type(remoteVia) == "string" and remoteVia or irisSourceRejectReason(remoteSrc)
+		local bundleOk, bundleLabel = ensureIrisBundle()
+		if bundleOk then
+			log("Iris bundle cached (" .. tostring(bundleLabel) .. ")")
+		end
+		return false, "Iris source unavailable (need v" .. tostring(requiredIrisVersion()) .. "): " .. tostring(fetchDetail)
 	end
 end
 
@@ -1223,7 +1314,7 @@ local function preferredUiEngine()
 	if type(expected) == "table" and type(expected.ui) == "string" and expected.ui ~= "" then
 		return expected.ui:lower()
 	end
-	return tostring(RELEASE_FALLBACK.ui or "Flexui"):lower()
+	return tostring(RELEASE_FALLBACK.ui or "Onyx"):lower()
 end
 
 local function loaderCdnBase()
@@ -1262,130 +1353,18 @@ local function fetchBackendModule(relativePath, minBytes)
 	return nil, via
 end
 
-local function requiredFlexUiVersion()
-	local expected = ENV._Alleral_ExpectedVersions
-	if type(expected) == "table" and tonumber(expected.flexuiVersion) then
-		return tonumber(expected.flexuiVersion)
-	end
-	return FLEXUI_VERSION
-end
-
-local function flexUiVersionFromSource(src)
-	if type(src) ~= "string" then
-		return nil
-	end
-	return tonumber(src:match("\nlocal%s+ALLERAL_FLEXUI_VERSION%s*=%s*(%d+)"))
-		or tonumber(src:match("^local%s+ALLERAL_FLEXUI_VERSION%s*=%s*(%d+)"))
-		or tonumber(src:match("Flex%.__AlleralPatch%s*=%s*(%d+)"))
-end
-
-local function isFlexUiSourceValid(src)
-	if type(src) ~= "string" or #src < FLEXUI_SOURCE_MIN_BYTES then
-		return false
-	end
-	if src:find("<!DOCTYPE", 1, true) or not src:find(FLEXUI_VERSION_MARKER, 1, true) then
-		return false
-	end
-	if not src:find("function MacLib:Window", 1, true) and not src:find("function Flex:Window", 1, true) then
-		return false
-	end
-	local version = flexUiVersionFromSource(src)
-	return type(version) == "number" and version == requiredFlexUiVersion()
-end
-
-local function usesLegacyHttpHash(src)
-	if type(src) ~= "string" then
-		return false
-	end
-	return src:find("HttpService:Hash", 1, true) ~= nil or src:find("HttpService.Hash", 1, true) ~= nil
-end
-
-local function getSource(localPaths, remotePath, opts)
-	opts = type(opts) == "table" and opts or { marker = opts }
-	local minBytes = opts.minBytes or 0
-	local marker = opts.marker
-
-	local src, path = readLocal(localPaths, minBytes)
-	if src then
-		if usesLegacyHttpHash(src) then
-			log("Removing executor-incompatible cached " .. path, true)
-			deleteWorkspaceFile(path)
-		elseif marker and not src:find(marker, 1, true) then
-			log("Skipping outdated local " .. path, true)
-			deleteWorkspaceFile(path)
-		else
-			return src, "local:" .. path
-		end
-	end
-
-	local backendSrc, backendLabel = fetchBackendModule(remotePath, minBytes)
-	if backendSrc then
-		if usesLegacyHttpHash(backendSrc) then
-			log("Backend " .. remotePath .. " uses HttpService.Hash — skipping", true)
-			backendSrc = nil
-		elseif marker and not backendSrc:find(marker, 1, true) then
-			log("Backend script may be outdated (missing " .. marker .. ")", true)
-		end
-		if backendSrc then
-			cacheRemote(remotePath, backendSrc)
-			return backendSrc, backendLabel or "backend"
-		end
-	end
-
-	src, path = fetchRemote(remotePath, minBytes)
-	if src then
-		if usesLegacyHttpHash(src) then
-			log("Remote " .. remotePath .. " still uses HttpService.Hash â€” skipping", true)
-			src = nil
-		elseif marker and not src:find(marker, 1, true) then
-			log("Script may be outdated (missing " .. marker .. ")", true)
-		end
-		if src then
-			cacheRemote(remotePath, src)
-			return src, "remote" .. (path and (" (" .. path .. ")") or "")
-		end
-	end
-
-	return nil, path or ("Could not load " .. remotePath)
-end
-
-local function ensureFlexUiSource()
-	if type(ENV._AlleralFlexUiSource) == "string" and isFlexUiSourceValid(ENV._AlleralFlexUiSource) then
-		ENV._AlleralFlexUiSourceReady = true
-		ENV._AlleralMaclibSource = ENV._AlleralFlexUiSource
-		ENV._AlleralMaclibSourceReady = true
-		return true, ENV._AlleralFlexUiSourceLabel or "memory:flexui"
-	end
-
-	local paths = {
-		FLEXUI_SOURCE_PATH,
-		"kick/" .. FLEXUI_SOURCE_PATH,
-		".alleral/cache/" .. FLEXUI_SOURCE_PATH,
-	}
-	local src, label = getSource(paths, FLEXUI_SOURCE_PATH, {
-		minBytes = FLEXUI_SOURCE_MIN_BYTES,
-		marker = FLEXUI_VERSION_MARKER,
-	})
-	if src and isFlexUiSourceValid(src) then
-		ENV._AlleralFlexUiSource = src
-		ENV._AlleralFlexUiSourceLabel = label
-		ENV._AlleralFlexUiSourceReady = true
-		ENV._AlleralMaclibSource = src
-		ENV._AlleralMaclibSourceLabel = label
-		ENV._AlleralMaclibSourceReady = true
-		cacheRemote(FLEXUI_SOURCE_PATH, src)
-		cacheRemote(".alleral/cache/" .. FLEXUI_SOURCE_PATH, src)
-		return true, label
-	end
-
-	return false, "FlexUI source unavailable (need v" .. tostring(requiredFlexUiVersion()) .. ")"
-end
-
 local function ensureUiSource()
-	if preferredUiEngine() == "flexui" then
-		return ensureFlexUiSource()
+	if preferredUiEngine() == "iris" then
+		return ensureIrisSource()
 	end
-	return ensureMaclibSource()
+	local onyxOk, onyxLabel = ensureOnyxSource()
+	if onyxOk then
+		task.spawn(function()
+			pcall(ensureIrisSource)
+		end)
+		return true, onyxLabel
+	end
+	return ensureIrisSource()
 end
 
 local function gameScriptExpectedVersion(profile, expectedVersion)
@@ -1924,10 +1903,10 @@ local function alleralUiValid(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return false
 	end
-	if not src:find("Maclib", 1, true) then
+	if not src:find("Onyx", 1, true) and not src:find("loadOnyx", 1, true) and not src:find("loadIris", 1, true) then
 		return false
 	end
-	if not src:find("loadMaclib", 1, true) then
+	if not src:find("loadOnyx", 1, true) and not src:find("loadIris", 1, true) then
 		return false
 	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then
@@ -2050,11 +2029,8 @@ local function alleralUiRejectReason(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return "missing Alleral UI layer marker"
 	end
-	if not src:find("Maclib", 1, true) then
-		return "missing MacLib integration"
-	end
-	if not src:find("loadMaclib", 1, true) then
-		return "missing loadMaclib bootstrap"
+	if not src:find("loadOnyx", 1, true) and not src:find("loadIris", 1, true) then
+		return "missing UI bootstrap (loadOnyx/loadIris)"
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua body"
@@ -2087,10 +2063,15 @@ local function extractFileVersion(src, kind)
 	if type(src) ~= "string" then
 		return nil
 	end
-	if kind == "maclib" then
-		return src:match("local%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)")
+	if kind == "onyx" then
+		return src:match("local%s+ALLERAL_ONYX_VERSION%s*=%s*(%d+)")
 			or src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)")
-			or src:match("ALLERAL_MACLIB_VERSION%s*=%s*(%d+)")
+			or src:match("ALLERAL_ONYX_VERSION%s*=%s*(%d+)")
+	end
+	if kind == "iris" then
+		return src:match("local%s+ALLERAL_IRIS_VERSION%s*=%s*(%d+)")
+			or src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)")
+			or src:match("ALLERAL_IRIS_VERSION%s*=%s*(%d+)")
 	end
 	if kind == "alleral" then
 		return src:match('Core%.ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
@@ -2487,12 +2468,12 @@ local function loadCore()
 		return false, alleralUiLabel or "Alleral UI layer download failed"
 	end
 
-	if not ENV._AlleralMaclibSourceReady then
+	if not ENV._AlleralIrisSourceReady and not ENV._AlleralMaclibSourceReady then
 		local studioOk, studioLabel = ensureUiSource()
 		if studioOk then
 			log("UI source ready (" .. tostring(studioLabel) .. ")")
 		else
-			log("MacLib source not cached yet: " .. tostring(studioLabel), true)
+			log("Iris source not cached yet: " .. tostring(studioLabel), true)
 		end
 	end
 
@@ -3175,8 +3156,8 @@ local function fetchExpectedVersionsFast()
 		alleral = RELEASE_FALLBACK.alleral,
 		windui = RELEASE_FALLBACK.windui,
 		ui = RELEASE_FALLBACK.ui,
-		maclibVersion = RELEASE_FALLBACK.maclibVersion,
-		flexuiVersion = RELEASE_FALLBACK.flexuiVersion,
+		irisVersion = RELEASE_FALLBACK.irisVersion,
+		onyxVersion = RELEASE_FALLBACK.onyxVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -3225,8 +3206,8 @@ fetchExpectedVersions = function(forceRefresh)
 		alleral = RELEASE_FALLBACK.alleral,
 		windui = RELEASE_FALLBACK.windui,
 		ui = RELEASE_FALLBACK.ui,
-		maclibVersion = RELEASE_FALLBACK.maclibVersion,
-		flexuiVersion = RELEASE_FALLBACK.flexuiVersion,
+		irisVersion = RELEASE_FALLBACK.irisVersion,
+		onyxVersion = RELEASE_FALLBACK.onyxVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -3252,13 +3233,13 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.ui = release.ui or expected.ui
 		expected.commit = release.commit or expected.commit
 		expected.updatedAt = release.updatedAt or expected.updatedAt
-		local remoteMaclib = tonumber(release.maclibVersion)
-		if remoteMaclib then
-			expected.maclibVersion = math.max(remoteMaclib, MACLIB_VERSION, tonumber(RELEASE_FALLBACK.maclibVersion) or 0)
+		local remoteOnyx = tonumber(release.onyxVersion)
+		if remoteOnyx then
+			expected.onyxVersion = math.max(remoteOnyx, ONYX_VERSION, tonumber(RELEASE_FALLBACK.onyxVersion) or 0)
 		end
-		local remoteFlex = tonumber(release.flexuiVersion)
-		if remoteFlex then
-			expected.flexuiVersion = math.max(remoteFlex, FLEXUI_VERSION, tonumber(RELEASE_FALLBACK.flexuiVersion) or 0)
+		local remoteIris = tonumber(release.irisVersion)
+		if remoteIris then
+			expected.irisVersion = math.max(remoteIris, IRIS_VERSION, tonumber(RELEASE_FALLBACK.irisVersion) or 0)
 		end
 		if type(release.commit) == "string" and release.commit ~= "" and type(RELEASE_FALLBACK.commit) == "string" then
 			if release.commit ~= RELEASE_FALLBACK.commit then
@@ -3322,7 +3303,8 @@ local function buildUpdateFingerprint(expected, profile)
 		"helpers=" .. tostring(expected.helpers or ""),
 		"weao=" .. tostring(expected.weao or ""),
 		"weaoCfg=" .. tostring((ENV.Alleral_WeaoConfig or {}).version or ""),
-		"maclibVersion=" .. tostring(expected.maclibVersion or MACLIB_VERSION),
+		"onyxVersion=" .. tostring(expected.onyxVersion or ONYX_VERSION),
+		"irisVersion=" .. tostring(expected.irisVersion or IRIS_VERSION),
 	}
 	if profile and profile.id then
 		table.insert(parts, "game=" .. tostring(profile.id) .. "@" .. tostring(expected.games and expected.games[profile.id] or profile.version or ""))
@@ -3374,12 +3356,21 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				MACLIB_SOURCE_PATH,
-				".alleral/cache/" .. MACLIB_SOURCE_PATH,
+				ONYX_SOURCE_PATH,
+				".alleral/cache/" .. ONYX_SOURCE_PATH,
 			},
-			expectedKey = "maclibVersion",
-			extract = "maclib",
-			isValid = maclibSourceValid,
+			expectedKey = "onyxVersion",
+			extract = "onyx",
+			isValid = onyxSourceValid,
+		},
+		{
+			paths = {
+				IRIS_SOURCE_PATH,
+				".alleral/cache/" .. IRIS_SOURCE_PATH,
+			},
+			expectedKey = "irisVersion",
+			extract = "iris",
+			isValid = irisSourceValid,
 		},
 		{
 			paths = LEGACY_UI_SOURCE_PATHS,
@@ -3546,14 +3537,16 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 	elseif entry.purgeOnLoaderChange then
 		local installedLoader = installedManifest and installedManifest.loader
 		return type(installedLoader) == "string" and installedLoader ~= expected.loader
-	elseif entry.extract == "maclib" then
-		expectedVersion = tostring(MACLIB_VERSION)
+	elseif entry.extract == "onyx" then
+		expectedVersion = tostring(ONYX_VERSION)
+	elseif entry.extract == "iris" then
+		expectedVersion = tostring(IRIS_VERSION)
 	else
 		expectedVersion = expected[entry.expectedKey]
 	end
 
 	if type(expectedVersion) ~= "string" or expectedVersion == "" then
-		return entry.extract == "maclib" or false
+		return entry.extract == "onyx" or entry.extract == "iris" or false
 	end
 
 	if type(src) ~= "string" or src == "" then
@@ -3570,9 +3563,9 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 
 	local foundVersion = extractFileVersion(src, entry.extract)
 	if type(foundVersion) == "string" and foundVersion ~= "" and type(expectedVersion) == "string" and expectedVersion ~= "" then
-		if entry.extract == "maclib" then
+		if entry.extract == "onyx" or entry.extract == "iris" then
 			local foundNum = tonumber(foundVersion) or 0
-			local needVersion = tonumber(expectedVersion) or MACLIB_VERSION
+			local needVersion = tonumber(expectedVersion) or (entry.extract == "onyx" and ONYX_VERSION or IRIS_VERSION)
 			return foundNum < needVersion
 		end
 		return foundVersion ~= expectedVersion
@@ -3612,10 +3605,10 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.9.0"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.11.0"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.9.0"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.11.0"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
@@ -4010,8 +4003,10 @@ local function checkForRemoteUpdate(profile, quiet)
 		reason = "commit " .. tostring(expected.commit)
 	elseif expected.loader and not previous:find("loader=" .. tostring(expected.loader), 1, true) then
 		reason = "loader v" .. tostring(expected.loader)
-	elseif expected.maclibVersion and not previous:find("maclibVersion=" .. tostring(expected.maclibVersion), 1, true) then
-		reason = "studio v" .. tostring(expected.maclibVersion)
+	elseif expected.onyxVersion and not previous:find("onyxVersion=" .. tostring(expected.onyxVersion), 1, true) then
+		reason = "onyx v" .. tostring(expected.onyxVersion)
+	elseif expected.irisVersion and not previous:find("irisVersion=" .. tostring(expected.irisVersion), 1, true) then
+		reason = "iris v" .. tostring(expected.irisVersion)
 	elseif profile and expected.games and expected.games[profile.id] then
 		reason = profile.name .. " v" .. tostring(expected.games[profile.id])
 	end
@@ -4222,7 +4217,7 @@ local function main()
 	if studioPrefetchOk then
 		log("UI source ready (" .. tostring(studioPrefetchLabel) .. ")")
 	else
-		log("MacLib source not cached yet: " .. tostring(studioPrefetchLabel), true)
+		log("Iris source not cached yet: " .. tostring(studioPrefetchLabel), true)
 	end
 	refreshExpectedVersionsAsync()
 	if expectedVersions.loader and versionLt(LOADER_VERSION, expectedVersions.loader) then
@@ -4279,13 +4274,38 @@ local function main()
 				.. " â€” continuing (bootstrap may refresh on next relaunch)"
 		)
 	end
-	local needmaclibVersion = tonumber(expectedVersions.maclibVersion) or MACLIB_VERSION
-	if needmaclibVersion > MACLIB_VERSION then
+	local needOnyxVersion = tonumber(expectedVersions.onyxVersion) or ONYX_VERSION
+	if needOnyxVersion > ONYX_VERSION then
 		log(
-			"Embedded MacLib v"
-				.. tostring(MACLIB_VERSION)
+			"Embedded Onyx v"
+				.. tostring(ONYX_VERSION)
 				.. " is behind release v"
-				.. tostring(needmaclibVersion)
+				.. tostring(needOnyxVersion)
+				.. " — auto-updating via bootstrap"
+		)
+		ENV.Alleral_LoaderRunning = false
+		task.defer(function()
+			local count = tonumber(ENV._Alleral_RelaunchCount) or 0
+			local last = tonumber(ENV._Alleral_LastRelaunch) or 0
+			if count >= MAX_RELAUNCHES or os.time() - last < RELAUNCH_COOLDOWN then
+				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping onyx-version relaunch (count=" .. count .. ")")
+				return
+			end
+			ENV._Alleral_RelaunchCount = count + 1
+			ENV._Alleral_LastRelaunch = os.time()
+			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
+				ENV._Alleral_RelaunchViaBootstrap("onyx-version-sync")
+			end
+		end)
+		return
+	end
+	local needIrisVersion = tonumber(expectedVersions.irisVersion) or IRIS_VERSION
+	if needIrisVersion > IRIS_VERSION then
+		log(
+			"Embedded Iris v"
+				.. tostring(IRIS_VERSION)
+				.. " is behind release v"
+				.. tostring(needIrisVersion)
 				.. " â€” auto-updating via bootstrap"
 		)
 		ENV.Alleral_LoaderRunning = false
@@ -4293,11 +4313,11 @@ local function main()
 			local count = tonumber(ENV._Alleral_RelaunchCount) or 0
 			local last = tonumber(ENV._Alleral_LastRelaunch) or 0
 			if count >= MAX_RELAUNCHES or os.time() - last < RELAUNCH_COOLDOWN then
-				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping studio-version relaunch (count=" .. count .. ")")
+				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping iris-version relaunch (count=" .. count .. ")")
 				pcall(function()
 					game:GetService("StarterGui"):SetCore("SendNotification", {
 						Title = "Alleral",
-						Text = "MacLib UI version mismatch â€” reload the script to update UI.",
+						Text = "Iris UI version mismatch â€” reload the script to update UI.",
 						Duration = 8,
 					})
 				end)
@@ -4306,7 +4326,7 @@ local function main()
 			ENV._Alleral_RelaunchCount = count + 1
 			ENV._Alleral_LastRelaunch = os.time()
 			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
-				ENV._Alleral_RelaunchViaBootstrap("studio-version-sync")
+				ENV._Alleral_RelaunchViaBootstrap("iris-version-sync")
 			end
 		end)
 		return

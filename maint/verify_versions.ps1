@@ -77,44 +77,85 @@ if ($loader -match 'LOADER_VERSION = "([^"]+)"')
     Fail "loader.luau missing LOADER_VERSION"
 }
 
-if ($release.maclibVersion)
+if ($release.onyxVersion)
 {
-    if ($loader -match 'local MACLIB_VERSION = (\d+)')
+    if ($loader -match 'local ONYX_VERSION = (\d+)')
     {
-        $maclibVersion = [int]$Matches[1]
-        if ($maclibVersion -ne [int]$release.maclibVersion)
+        $onyxVersion = [int]$Matches[1]
+        if ($onyxVersion -ne [int]$release.onyxVersion)
         {
-            Fail "loader MACLIB_VERSION ($maclibVersion) != release.json ($($release.maclibVersion))"
+            Fail "loader ONYX_VERSION ($onyxVersion) != release.json ($($release.onyxVersion))"
         } else
         {
-            Pass "loader maclib version $maclibVersion"
+            Pass "loader onyx version $onyxVersion"
         }
     } else
     {
-        Fail "loader.luau missing MACLIB_VERSION"
+        Fail "loader.luau missing ONYX_VERSION"
     }
 
-    $maclibSourcePath = Join-Path $root "ui/maclib/source.luau"
-    if (Test-Path $maclibSourcePath)
+    $onyxSourcePath = Join-Path $root "ui/onyx/source.luau"
+    if (Test-Path $onyxSourcePath)
     {
-        $maclibSource = Get-Content $maclibSourcePath -Raw
-        if ($maclibSource -match 'local ALLERAL_MACLIB_VERSION = (\d+)')
+        $onyxSource = Get-Content $onyxSourcePath -Raw
+        if ($onyxSource -match 'local ALLERAL_ONYX_VERSION = (\d+)')
         {
             $sourceVersion = [int]$Matches[1]
-            if ($sourceVersion -ne [int]$release.maclibVersion)
+            if ($sourceVersion -ne [int]$release.onyxVersion)
             {
-                Fail "ui/maclib/source.luau ALLERAL_MACLIB_VERSION ($sourceVersion) != release.json ($($release.maclibVersion))"
+                Fail "ui/onyx/source.luau ALLERAL_ONYX_VERSION ($sourceVersion) != release.json ($($release.onyxVersion))"
             } else
             {
-                Pass "maclib source version $sourceVersion"
+                Pass "onyx source version $sourceVersion"
             }
         } else
         {
-            Fail "ui/maclib/source.luau missing ALLERAL_MACLIB_VERSION"
+            Fail "ui/onyx/source.luau missing ALLERAL_ONYX_VERSION"
         }
     } else
     {
-        Fail "ui/maclib/source.luau missing"
+        Fail "ui/onyx/source.luau missing"
+    }
+}
+
+if ($release.irisVersion)
+{
+    if ($loader -match 'local IRIS_VERSION = (\d+)')
+    {
+        $irisVersion = [int]$Matches[1]
+        if ($irisVersion -ne [int]$release.irisVersion)
+        {
+            Fail "loader IRIS_VERSION ($irisVersion) != release.json ($($release.irisVersion))"
+        } else
+        {
+            Pass "loader iris version $irisVersion"
+        }
+    } else
+    {
+        Fail "loader.luau missing IRIS_VERSION"
+    }
+
+    $irisSourcePath = Join-Path $root "ui/iris/source.luau"
+    if (Test-Path $irisSourcePath)
+    {
+        $irisSource = Get-Content $irisSourcePath -Raw
+        if ($irisSource -match 'local ALLERAL_IRIS_VERSION = (\d+)')
+        {
+            $sourceVersion = [int]$Matches[1]
+            if ($sourceVersion -ne [int]$release.irisVersion)
+            {
+                Fail "ui/iris/source.luau ALLERAL_IRIS_VERSION ($sourceVersion) != release.json ($($release.irisVersion))"
+            } else
+            {
+                Pass "iris source version $sourceVersion"
+            }
+        } else
+        {
+            Fail "ui/iris/source.luau missing ALLERAL_IRIS_VERSION"
+        }
+    } else
+    {
+        Fail "ui/iris/source.luau missing"
     }
 }
 
@@ -303,12 +344,19 @@ if ($site.coreVersion -ne $release.core)
 {
     Pass "site coreVersion $($site.coreVersion)"
 }
-if ($release.maclibVersion -and $site.maclibVersion -ne $release.maclibVersion)
+if ($release.onyxVersion -and $site.onyxVersion -ne $release.onyxVersion)
 {
-    Fail "site.json maclibVersion ($($site.maclibVersion)) != release.json ($($release.maclibVersion))"
-} elseif ($release.maclibVersion)
+    Fail "site.json onyxVersion ($($site.onyxVersion)) != release.json ($($release.onyxVersion))"
+} elseif ($release.onyxVersion)
 {
-    Pass "site maclibVersion $($site.maclibVersion)"
+    Pass "site onyxVersion $($site.onyxVersion)"
+}
+if ($release.irisVersion -and $site.irisVersion -ne $release.irisVersion)
+{
+    Fail "site.json irisVersion ($($site.irisVersion)) != release.json ($($release.irisVersion))"
+} elseif ($release.irisVersion)
+{
+    Pass "site irisVersion $($site.irisVersion)"
 }
 
 $analyticsPath = Join-Path $root "hub/analytics.luau"

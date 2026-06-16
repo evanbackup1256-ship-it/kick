@@ -13,7 +13,7 @@ from typing import Any
 
 BOM = b"\xef\xbb\xbf"
 
-# Core boot chain + UI (FlexUI preferred when release.ui == Flexui)
+# Core boot chain + UI (Onyx primary + Iris exploit overlay)
 LOADER_MODULES = (
     "bootstrap.luau",
     "loader.luau",
@@ -21,8 +21,8 @@ LOADER_MODULES = (
     "hub/core_ui.luau",
     "hub/alleral_ui.luau",
     "hub/core_hub_ui.luau",
-    "ui/flexui/source.luau",
-    "ui/maclib/source.luau",
+    "ui/onyx/source.luau",
+    "ui/iris/source.luau",
     "cfg/release.json",
 )
 
@@ -71,8 +71,8 @@ def parse_release(root: Path | None = None) -> dict[str, Any]:
 
 def module_version_marker(text: str) -> int | None:
     for pattern in (
-        r"local\s+ALLERAL_FLEXUI_VERSION\s*=\s*(\d+)",
-        r"local\s+ALLERAL_MACLIB_VERSION\s*=\s*(\d+)",
+        r"local\s+ALLERAL_ONYX_VERSION\s*=\s*(\d+)",
+        r"local\s+ALLERAL_IRIS_VERSION\s*=\s*(\d+)",
         r"MacLib\.__AlleralPatch\s*=\s*(\d+)",
     ):
         match = re.search(pattern, text)
@@ -106,9 +106,9 @@ def build_manifest(root: Path | None = None) -> dict[str, Any]:
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "release": release,
         "loader": release.get("loader"),
-        "ui": release.get("ui", "Flexui"),
-        "flexuiVersion": release.get("flexuiVersion"),
-        "maclibVersion": release.get("maclibVersion"),
+        "ui": release.get("ui", "Onyx"),
+        "onyxVersion": release.get("onyxVersion"),
+        "irisVersion": release.get("irisVersion"),
         "commit": release.get("commit"),
         "modules": modules,
     }

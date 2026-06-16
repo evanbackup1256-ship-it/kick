@@ -1,21 +1,42 @@
 {
-    "loader":  "8.9.0",
+
+    "loader":  "8.11.0",
+
     "core":  "2.9.10",
+
     "weao":  "1.1",
-    "ui":  "Flexui",
-    "windui":  "5.5.0-maclib",
-    "alleral":  "5.5.0-maclib",
-    "commit":  "1b4c5f6",
-    "updatedAt":  "2026-06-16T17:43:06Z",
+
+    "ui":  "Onyx",
+
+    "windui":  "5.7.0-onyx",
+
+    "alleral":  "5.7.0-onyx",
+
+    "commit":  "8db5f90",
+
+    "updatedAt":  "2026-06-17T00:00:00Z",
+
     "updatePollSeconds":  120,
+
     "autoUpdate":  true,
+
     "minLoader":  "8.2.0",
+
     "minCore":  "2.7.0",
+
     "analytics":  "1.2",
+
     "telemetry":  "3.5",
+
     "helpers":  "1.8",
+
     "security":  "1.3",
+
     "access":  "1.1",
-    "maclibVersion":  17,
-    "flexuiVersion":  1
+
+    "onyxVersion":  1,
+
+    "irisVersion":  2
+
 }
+

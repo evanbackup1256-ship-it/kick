@@ -1,36 +1,37 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "5.5.0-maclib"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "5.7.0-onyx"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
-	Core.UI_LIBRARY = "Flexui"
+	Core.UI_LIBRARY = "Onyx"
 
-	local FLEXUI_SOURCE_PATH = "ui/flexui/source.luau"
-	local FLEXUI_SOURCE_PATHS = {
-		"ui/flexui/source.luau",
-		".alleral/cache/ui/flexui/source.luau",
-		"kick/ui/flexui/source.luau",
+	local ONYX_SOURCE_PATH = "ui/onyx/source.luau"
+	local ONYX_SOURCE_PATHS = {
+		"ui/onyx/source.luau",
+		".alleral/cache/ui/onyx/source.luau",
+		"kick/ui/onyx/source.luau",
 	}
-	local FLEXUI_VERSION_MARKER = "ALLERAL_FLEXUI_VERSION"
-	local FLEXUI_VERSION = 1
-	local FLEXUI_MIN_BYTES = 6000
-	local FLEXUI_RAW_URLS = {
-		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/flexui/source.luau",
+	local ONYX_VERSION_MARKER = "ALLERAL_ONYX_VERSION"
+	local ONYX_VERSION = 1
+	local ONYX_MIN_BYTES = 12000
+	local ONYX_REQUIRED_FN = "function MacLib:Window"
+	local ONYX_RAW_URLS = {
+		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/onyx/source.luau",
 	}
 
-	local MACLIB_SOURCE_PATH = "ui/maclib/source.luau"
-	local MACLIB_SOURCE_PATHS = {
-		"ui/maclib/source.luau",
-		".alleral/cache/ui/maclib/source.luau",
-		"kick/ui/maclib/source.luau",
+	local IRIS_SOURCE_PATH = "ui/iris/source.luau"
+	local IRIS_SOURCE_PATHS = {
+		"ui/iris/source.luau",
+		".alleral/cache/ui/iris/source.luau",
+		"kick/ui/iris/source.luau",
 	}
-	local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-	local MACLIB_VERSION = 17
-	local MACLIB_REQUIRED_FN = "function MacLib:Window"
-	local MACLIB_MIN_BYTES = 150000
-	local MACLIB_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
-	local MACLIB_RAW_URLS = {
-		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/maclib/source.luau",
+	local IRIS_VERSION_MARKER = "ALLERAL_IRIS_VERSION"
+	local IRIS_VERSION = 1
+	local IRIS_MIN_BYTES = 8000
+	local IRIS_REQUIRED_FN = "function MacLib:Window"
+	local IRIS_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
+	local IRIS_RAW_URLS = {
+		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/iris/source.luau",
 	}
 	local DEFAULT_ICON_ID = "18821914323"
 
@@ -80,16 +81,16 @@ return function(Core)
 		return "rbxassetid://" .. iconImage(icon)
 	end
 
-	local function maclibIoFn(name)
+	local function irisIoFn(name)
 		if type(Core.execFunction) == "function" then
 			return Core.execFunction(name)
 		end
 		return nil
 	end
 
-	local function readMaclibFileAt(path)
-		local readFile = maclibIoFn("readfile")
-		local isFile = maclibIoFn("isfile")
+	local function readIrisFileAt(path)
+		local readFile = irisIoFn("readfile")
+		local isFile = irisIoFn("isfile")
 		if type(readFile) ~= "function" or type(isFile) ~= "function" then
 			if type(Core.readFile) == "function" then
 				return Core.readFile(path)
@@ -109,315 +110,140 @@ return function(Core)
 		if type(expected) == "table" and type(expected.ui) == "string" and expected.ui ~= "" then
 			return expected.ui:lower()
 		end
-		return "flexui"
+		return "onyx"
 	end
 
-	local function useFlexUi()
-		return preferredUiEngine() == "flexui"
-	end
-
-	local function requiredFlexUiVersion()
+	local function requiredOnyxVersion()
 		local expected = ENV._Alleral_ExpectedVersions
 		if type(expected) == "table" then
-			local version = tonumber(expected.flexuiVersion)
+			local version = tonumber(expected.onyxVersion)
 			if version then
 				return version
 			end
 		end
-		return FLEXUI_VERSION
+		local loaderNeed = tonumber(ENV._Alleral_RequiredOnyxVersion)
+		if loaderNeed then
+			return loaderNeed
+		end
+		return ONYX_VERSION
 	end
 
-	local function flexUiVersionFromSource(src)
+	local function onyxVersionFromSource(src)
 		if type(src) ~= "string" then
 			return nil
 		end
-		return tonumber(src:match("\nlocal%s+ALLERAL_FLEXUI_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("^local%s+ALLERAL_FLEXUI_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("Flex%.__AlleralPatch%s*=%s*(%d+)"))
+		return tonumber(src:match("\nlocal%s+ALLERAL_ONYX_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("^local%s+ALLERAL_ONYX_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
 	end
 
-	local function flexUiSourceValid(src)
+	local function onyxSourceValid(src)
 		if type(src) ~= "string"
-			or #src < FLEXUI_MIN_BYTES
+			or #src < ONYX_MIN_BYTES
 			or src:find("<!DOCTYPE", 1, true)
-			or not src:find(FLEXUI_VERSION_MARKER, 1, true) then
+			or not src:find(ONYX_VERSION_MARKER, 1, true)
+			or not src:find(ONYX_REQUIRED_FN, 1, true)
+			or not src:find("__OnyxUi", 1, true) then
 			return false
 		end
-		if not src:find("function MacLib:Window", 1, true) and not src:find("function Flex:Window", 1, true) then
-			return false
-		end
-		local version = flexUiVersionFromSource(src)
-		return type(version) == "number" and version == requiredFlexUiVersion()
+		local version = onyxVersionFromSource(src)
+		return type(version) == "number" and version == requiredOnyxVersion()
 	end
 
-	local function flexUiBackendUrls()
+	local function onyxBackendUrls()
 		local urls = {}
 		local base = ENV._Alleral_LoaderCdnBase
 		if type(base) == "string" and base ~= "" then
-			table.insert(urls, base:gsub("/+$", "") .. "/api/loader/file/ui/flexui/source.luau")
+			table.insert(urls, base:gsub("/+$", "") .. "/api/loader/file/ui/onyx/source.luau")
 		end
 		return urls
 	end
 
-	local function tryReadFlexUiPath(relPath)
-		for _, root in ipairs(MACLIB_WORKSPACE_ROOTS) do
+	local function tryReadOnyxPath(relPath)
+		for _, root in ipairs(IRIS_WORKSPACE_ROOTS) do
 			local full = root .. relPath
-			local src = readMaclibFileAt(full)
-			if flexUiSourceValid(src) then
+			local src = readIrisFileAt(full)
+			if onyxSourceValid(src) then
 				return src, "local:" .. full
 			end
 		end
 		return nil
 	end
 
-	local function readFlexUiSource()
-		local need = requiredFlexUiVersion()
+	local function readOnyxSource()
+		local need = requiredOnyxVersion()
 		local bestSrc, bestLabel, bestVersion = nil, nil, -1
 		local function consider(src, label)
-			if not flexUiSourceValid(src) then
+			if not onyxSourceValid(src) then
 				return
 			end
-			local version = flexUiVersionFromSource(src) or 0
+			local version = onyxVersionFromSource(src) or 0
 			if version > bestVersion then
 				bestSrc, bestLabel, bestVersion = src, label, version
 			end
 		end
 
-		if type(ENV._AlleralFlexUiSource) == "string" then
-			if flexUiSourceValid(ENV._AlleralFlexUiSource) then
-				consider(ENV._AlleralFlexUiSource, ENV._AlleralFlexUiSourceLabel or "memory:loader")
+		if type(ENV._AlleralOnyxSource) == "string" then
+			if onyxSourceValid(ENV._AlleralOnyxSource) then
+				consider(ENV._AlleralOnyxSource, ENV._AlleralOnyxSourceLabel or "memory:loader")
 			else
-				ENV._AlleralFlexUiSource = nil
-				ENV._AlleralFlexUiSourceReady = false
+				ENV._AlleralOnyxSource = nil
+				ENV._AlleralOnyxSourceReady = false
 			end
 		end
 
-		if type(ENV._AlleralMaclibSource) == "string" and flexUiSourceValid(ENV._AlleralMaclibSource) then
-			consider(ENV._AlleralMaclibSource, ENV._AlleralMaclibSourceLabel or "memory:maclib-bridge")
+		if type(ENV._AlleralMaclibSource) == "string" and onyxSourceValid(ENV._AlleralMaclibSource) then
+			consider(ENV._AlleralMaclibSource, ENV._AlleralMaclibSourceLabel or "memory:onyx-bridge")
 		end
 
-		for _, path in ipairs(FLEXUI_SOURCE_PATHS) do
-			local src, label = tryReadFlexUiPath(path)
+		for _, path in ipairs(ONYX_SOURCE_PATHS) do
+			local src, label = tryReadOnyxPath(path)
 			if src then
 				consider(src, label)
 			end
 		end
 
 		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
-			for _, baseUrl in ipairs(flexUiBackendUrls()) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?flexui=" .. tostring(need) .. "&t=" .. tostring(tick()), FLEXUI_MIN_BYTES)
+			for _, baseUrl in ipairs(onyxBackendUrls()) do
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?onyx=" .. tostring(need) .. "&t=" .. tostring(tick()), ONYX_MIN_BYTES)
 				if type(src) == "string" then
 					consider(src, "backend:" .. baseUrl)
 				end
 			end
-			for _, baseUrl in ipairs(FLEXUI_RAW_URLS) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?flexui=" .. tostring(need) .. "&t=" .. tostring(tick()), FLEXUI_MIN_BYTES)
+			for _, baseUrl in ipairs(ONYX_RAW_URLS) do
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?onyx=" .. tostring(need) .. "&t=" .. tostring(tick()), ONYX_MIN_BYTES)
 				if type(src) == "string" then
 					consider(src, "remote:" .. baseUrl)
 				end
 			end
 		end
 
-		if not bestSrc or bestVersion ~= requiredFlexUiVersion() then
-			return nil, "FlexUI source missing (need v" .. tostring(requiredFlexUiVersion()) .. ")"
+		if not bestSrc or bestVersion ~= requiredOnyxVersion() then
+			return nil, "Onyx source missing (need v" .. tostring(requiredOnyxVersion()) .. ")"
 		end
 		return bestSrc, bestLabel
 	end
 
-	local function requiredMaclibVersion()
-		local expected = ENV._Alleral_ExpectedVersions
-		if type(expected) == "table" then
-			local version = tonumber(expected.maclibVersion)
-			if version then
-				return version
-			end
-		end
-		local loaderNeed = tonumber(ENV._Alleral_RequiredMaclibVersion)
-		if loaderNeed then
-			return loaderNeed
-		end
-		return MACLIB_VERSION
-	end
-
-	local function maclibVersionFromSource(src)
-		if type(src) ~= "string" then
-			return nil
-		end
-		return tonumber(src:match("\nlocal%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("^local%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
-	end
-
-	local function maclibSourceValid(src)
-		if type(src) ~= "string"
-			or #src < MACLIB_MIN_BYTES
-			or src:find("<!DOCTYPE", 1, true)
-			or not src:find(MACLIB_VERSION_MARKER, 1, true)
-			or not src:find(MACLIB_REQUIRED_FN, 1, true)
-			or not src:find("function MacLib:Window", 1, true)
-			or src:find("Size%.Offset", 1, false) then
-			return false
-		end
-		local version = maclibVersionFromSource(src)
-		return type(version) == "number" and version == requiredMaclibVersion()
-	end
-
-	local function purgeStaleMaclibFiles()
-		local need = requiredMaclibVersion()
-		local deleteFile = maclibIoFn("delfile") or maclibIoFn("deletefile")
-		if type(deleteFile) ~= "function" then
-			return
-		end
-		for _, relPath in ipairs(MACLIB_SOURCE_PATHS) do
-			for _, root in ipairs(MACLIB_WORKSPACE_ROOTS) do
-				local full = root .. relPath
-				local src = readMaclibFileAt(full)
-				if type(src) == "string" then
-					local version = maclibVersionFromSource(src)
-					if src:find("Size%.Offset", 1, false) or type(version) ~= "number" or version ~= need then
-						pcall(deleteFile, full)
-						if ENV._AlleralMaclibSource == src then
-							ENV._AlleralMaclibSource = nil
-							ENV._AlleralMaclibSourceReady = false
-							ENV._AlleralMaclib = nil
-						end
-					end
-				end
-			end
-		end
-	end
-
-	local function tryReadMaclibPath(relPath)
-		for _, root in ipairs(MACLIB_WORKSPACE_ROOTS) do
-			local full = root .. relPath
-			local src = readMaclibFileAt(full)
-			if maclibSourceValid(src) then
-				return src, "local:" .. full
-			end
-		end
-		return nil
-	end
-
-	local function maclibRawUrls()
-		local urls = {}
-		local seen = {}
-		local function add(url)
-			if type(url) == "string" and url ~= "" and not seen[url] then
-				seen[url] = true
-				table.insert(urls, url)
-			end
-		end
-		for _, url in ipairs(MACLIB_RAW_URLS) do
-			add(url)
-		end
-		local bases = (type(Core._UiRemoteBases) == "table" and Core._UiRemoteBases)
-			or (type(ENV.Alleral_Core) == "table" and ENV.Alleral_Core._UiRemoteBases)
-		if type(bases) == "table" then
-			for _, base in ipairs(bases) do
-				add(tostring(base) .. "/ui/maclib/source.luau")
-			end
-		end
-		return urls
-	end
-
-	local function readMaclibSource()
-		pcall(purgeStaleMaclibFiles)
-		local need = requiredMaclibVersion()
-		local bestSrc, bestLabel, bestVersion = nil, nil, -1
-		local function consider(src, label)
-			if not maclibSourceValid(src) then
-				return
-			end
-			local version = maclibVersionFromSource(src) or 0
-			if version > bestVersion then
-				bestSrc, bestLabel, bestVersion = src, label, version
-			end
-		end
-
-		if type(ENV._AlleralMaclibSource) == "string" then
-			if maclibSourceValid(ENV._AlleralMaclibSource) then
-				consider(ENV._AlleralMaclibSource, ENV._AlleralMaclibSourceLabel or "memory:loader")
-			else
-				ENV._AlleralMaclibSource = nil
-				ENV._AlleralMaclibSourceReady = false
-			end
-		end
-
-		for _, path in ipairs(MACLIB_SOURCE_PATHS) do
-			local src, label = tryReadMaclibPath(path)
-			if src then
-				consider(src, label)
-			end
-		end
-
-		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
-			for _, baseUrl in ipairs(maclibRawUrls()) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?maclib=13&v=" .. tostring(need) .. "&t=" .. tostring(tick()), MACLIB_MIN_BYTES)
-				if type(src) == "string" then
-					consider(src, "remote:" .. baseUrl)
-				end
-			end
-		end
-
-		if not bestSrc or bestVersion ~= requiredMaclibVersion() then
-			return nil, "MacLib source missing (need v" .. tostring(requiredMaclibVersion()) .. ")"
-		end
-		return bestSrc, bestLabel
-	end
-
-	local function applyMaclibRuntimePatches(MacLib)
-		local effects = type(MacLib) == "table" and MacLib.Effects
-		if type(effects) ~= "table" or effects._AlleralTweenPatch then
-			return
-		end
-		local TweenService = game:GetService("TweenService")
-		local origTweenInfo = effects.tweenInfo
-		local origPlay = effects.play
-		if type(origTweenInfo) ~= "function" or type(origPlay) ~= "function" then
-			return
-		end
-		function effects.tweenInfo(duration, style, direction)
-			if typeof(duration) == "TweenInfo" then
-				return duration
-			end
-			return origTweenInfo(tonumber(duration) or 0.2, style, direction)
-		end
-		function effects.play(instance, duration, props, style, direction)
-			if not instance or not props then
-				return nil
-			end
-			if typeof(duration) == "TweenInfo" then
-				local tw = TweenService:Create(instance, duration, props)
-				tw:Play()
-				return tw
-			end
-			return origPlay(instance, duration, props, style, direction)
-		end
-		effects._AlleralTweenPatch = true
-	end
-
-	local function loadMaclib()
-		if type(ENV._AlleralMaclib) == "table" then
-			local version = ENV._AlleralMaclib.__AlleralPatch
-			local need = requiredMaclibVersion()
+	local function loadOnyx()
+		if type(ENV._AlleralOnyx) == "table" then
+			local version = ENV._AlleralOnyx.__AlleralPatch
+			local need = requiredOnyxVersion()
 			if type(version) ~= "number" or version ~= need then
-				ENV._AlleralMaclib = nil
-				ENV._AlleralMaclibSourceKey = nil
+				ENV._AlleralOnyx = nil
+				ENV._AlleralOnyxSourceKey = nil
 			else
-				applyMaclibRuntimePatches(ENV._AlleralMaclib)
-				return ENV._AlleralMaclib
+				return ENV._AlleralOnyx
 			end
 		end
 
-		local source, sourceLabel = readMaclibSource()
+		local source, sourceLabel = readOnyxSource()
 		if not source then
-			return nil, sourceLabel or "MacLib source missing"
+			return nil, sourceLabel or "Onyx source missing"
 		end
 
 		local sourceKey = tostring(#source) .. ":" .. source:sub(1, 64)
-		if ENV._AlleralMaclibSourceKey == sourceKey and type(ENV._AlleralMaclib) == "table" then
-			applyMaclibRuntimePatches(ENV._AlleralMaclib)
-			return ENV._AlleralMaclib
+		if ENV._AlleralOnyxSourceKey == sourceKey and type(ENV._AlleralOnyx) == "table" then
+			return ENV._AlleralOnyx
 		end
 
 		local loadFn = Core.execFunction and Core.execFunction("loadstring") or loadstring or load
@@ -425,54 +251,35 @@ return function(Core)
 			return nil, "loadstring unavailable"
 		end
 
-		local chunk, err = loadFn(source, "@MacLib/source")
+		local chunk, err = loadFn(source, "@Onyx/source")
 		if not chunk then
-			return nil, tostring(err or "MacLib compile failed")
+			return nil, tostring(err or "Onyx compile failed")
 		end
 
 		local ok, MacLib = pcall(chunk)
 		if not ok or type(MacLib) ~= "table" or type(MacLib.Window) ~= "function" then
-			return nil, tostring(MacLib or "MacLib runtime failed")
+			return nil, tostring(MacLib or "Onyx runtime failed")
 		end
 
 		local patch = MacLib.__AlleralPatch
-		local need = requiredMaclibVersion()
-		if type(patch) ~= "number" or patch ~= need then
-			if type(patch) == "number" and patch >= 7 and patch < need then
-				ENV._AlleralMaclibSource = nil
-				ENV._AlleralMaclibSourceReady = false
-				source, sourceLabel = readMaclibSource()
-				if not source then
-					return nil, "MacLib source missing (need v" .. tostring(need) .. ")"
-				end
-				sourceKey = tostring(#source) .. ":" .. source:sub(1, 64)
-				chunk, err = loadFn(source, "@MacLib/source")
-				if not chunk then
-					return nil, tostring(err or "MacLib compile failed")
-				end
-				ok, MacLib = pcall(chunk)
-				if not ok or type(MacLib) ~= "table" or type(MacLib.Window) ~= "function" then
-					return nil, tostring(MacLib or "MacLib runtime failed")
-				end
-				patch = MacLib.__AlleralPatch
-			end
-			if type(patch) ~= "number" or patch ~= need then
-				return nil, "MacLib version outdated (have v" .. tostring(patch or "?") .. ", need v" .. tostring(need) .. ")"
-			end
+		local need = requiredOnyxVersion()
+		if type(patch) ~= "number" or patch ~= need or MacLib.__OnyxUi ~= true then
+			return nil, "Onyx version outdated (have v" .. tostring(patch or "?") .. ", need v" .. tostring(need) .. ")"
 		end
 
-		applyMaclibRuntimePatches(MacLib)
-
-		ENV._AlleralMaclibSourceKey = sourceKey
+		ENV._AlleralOnyxSourceKey = sourceKey
+		ENV._AlleralOnyx = MacLib
+		ENV._AlleralOnyxSource = source
+		ENV._AlleralOnyxSourceLabel = sourceLabel
 		ENV._AlleralMaclib = MacLib
 		ENV._AlleralMaclibSource = source
 		ENV._AlleralMaclibSourceLabel = sourceLabel
 		if type(Core.say) == "function" then
 			Core.say(
-				"MacLib patch v"
+				"OnyxUI v"
 					.. tostring(MacLib.__AlleralPatch or "?")
-					.. " ("
-					.. tostring(MacLib.__AlleralVersion or "1.2.6")
+					.. " (Fusion "
+					.. tostring(MacLib.__AlleralVersion or "1.0.4")
 					.. ") from "
 					.. tostring(sourceLabel or "unknown")
 			)
@@ -480,26 +287,165 @@ return function(Core)
 		return MacLib
 	end
 
-	local function loadFlexUi()
-		if type(ENV._AlleralFlexUi) == "table" then
-			local version = ENV._AlleralFlexUi.__AlleralPatch
-			local need = requiredFlexUiVersion()
-			if type(version) ~= "number" or version ~= need then
-				ENV._AlleralFlexUi = nil
-				ENV._AlleralFlexUiSourceKey = nil
-			else
-				return ENV._AlleralFlexUi
+	local function bootIrisOverlay(mainEngine)
+		if ENV.Alleral_IrisOverlay == false then
+			return
+		end
+		local iris, err = loadIris()
+		if not iris then
+			if type(Core.logWarn) == "function" then
+				Core.logWarn("Iris exploit overlay unavailable: " .. tostring(err))
+			end
+			return
+		end
+		ENV._AlleralIrisOverlay = iris
+		if type(mainEngine) == "table" and type(mainEngine.BootIrisOverlay) == "function" then
+			pcall(mainEngine.BootIrisOverlay, mainEngine, iris)
+		end
+		if type(Core.say) == "function" then
+			Core.say("Iris exploit overlay ready (RightShift debug panel)")
+		end
+	end
+
+	local function requiredIrisVersion()
+		local expected = ENV._Alleral_ExpectedVersions
+		if type(expected) == "table" then
+			local version = tonumber(expected.irisVersion)
+			if version then
+				return version
+			end
+		end
+		local loaderNeed = tonumber(ENV._Alleral_RequiredIrisVersion)
+		if loaderNeed then
+			return loaderNeed
+		end
+		return IRIS_VERSION
+	end
+
+	local function irisVersionFromSource(src)
+		if type(src) ~= "string" then
+			return nil
+		end
+		return tonumber(src:match("\nlocal%s+ALLERAL_IRIS_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("^local%s+ALLERAL_IRIS_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
+	end
+
+	local function irisSourceValid(src)
+		if type(src) ~= "string"
+			or #src < IRIS_MIN_BYTES
+			or src:find("<!DOCTYPE", 1, true)
+			or not src:find(IRIS_VERSION_MARKER, 1, true)
+			or not src:find(IRIS_REQUIRED_FN, 1, true)
+			or not src:find("__IrisUi", 1, true) then
+			return false
+		end
+		local version = irisVersionFromSource(src)
+		return type(version) == "number" and version == requiredIrisVersion()
+	end
+
+	local function irisBackendUrls()
+		local urls = {}
+		local base = ENV._Alleral_LoaderCdnBase
+		if type(base) == "string" and base ~= "" then
+			table.insert(urls, base:gsub("/+$", "") .. "/api/loader/file/ui/iris/source.luau")
+		end
+		return urls
+	end
+
+	local function tryReadIrisPath(relPath)
+		for _, root in ipairs(IRIS_WORKSPACE_ROOTS) do
+			local full = root .. relPath
+			local src = readIrisFileAt(full)
+			if irisSourceValid(src) then
+				return src, "local:" .. full
+			end
+		end
+		return nil
+	end
+
+	local function readIrisSource()
+		local need = requiredIrisVersion()
+		local bestSrc, bestLabel, bestVersion = nil, nil, -1
+		local function consider(src, label)
+			if not irisSourceValid(src) then
+				return
+			end
+			local version = irisVersionFromSource(src) or 0
+			if version > bestVersion then
+				bestSrc, bestLabel, bestVersion = src, label, version
 			end
 		end
 
-		local source, sourceLabel = readFlexUiSource()
+		if type(ENV._AlleralIrisSource) == "string" then
+			if irisSourceValid(ENV._AlleralIrisSource) then
+				consider(ENV._AlleralIrisSource, ENV._AlleralIrisSourceLabel or "memory:loader")
+			else
+				ENV._AlleralIrisSource = nil
+				ENV._AlleralIrisSourceReady = false
+			end
+		end
+
+		if type(ENV._AlleralMaclibSource) == "string" and irisSourceValid(ENV._AlleralMaclibSource) then
+			consider(ENV._AlleralMaclibSource, ENV._AlleralMaclibSourceLabel or "memory:iris-bridge")
+		end
+
+		for _, path in ipairs(IRIS_SOURCE_PATHS) do
+			local src, label = tryReadIrisPath(path)
+			if src then
+				consider(src, label)
+			end
+		end
+
+		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
+			for _, baseUrl in ipairs(irisBackendUrls()) do
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?iris=" .. tostring(need) .. "&t=" .. tostring(tick()), IRIS_MIN_BYTES)
+				if type(src) == "string" then
+					consider(src, "backend:" .. baseUrl)
+				end
+			end
+			for _, baseUrl in ipairs(IRIS_RAW_URLS) do
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?iris=" .. tostring(need) .. "&t=" .. tostring(tick()), IRIS_MIN_BYTES)
+				if type(src) == "string" then
+					consider(src, "remote:" .. baseUrl)
+				end
+			end
+		end
+
+		if not bestSrc or bestVersion ~= requiredIrisVersion() then
+			return nil, "Iris source missing (need v" .. tostring(requiredIrisVersion()) .. ")"
+		end
+		return bestSrc, bestLabel
+	end
+
+	local function loadIris()
+		if type(ENV._AlleralIris) == "table" then
+			local version = ENV._AlleralIris.__AlleralPatch
+			local need = requiredIrisVersion()
+			if type(version) ~= "number" or version ~= need then
+				ENV._AlleralIris = nil
+				ENV._AlleralIrisSourceKey = nil
+			else
+				return ENV._AlleralIris
+			end
+		end
+
+		if type(ENV._AlleralMaclib) == "table" and ENV._AlleralMaclib.__IrisUi == true then
+			local version = ENV._AlleralMaclib.__AlleralPatch
+			if type(version) == "number" and version == requiredIrisVersion() then
+				ENV._AlleralIris = ENV._AlleralMaclib
+				return ENV._AlleralMaclib
+			end
+		end
+
+		local source, sourceLabel = readIrisSource()
 		if not source then
-			return nil, sourceLabel or "FlexUI source missing"
+			return nil, sourceLabel or "Iris source missing"
 		end
 
 		local sourceKey = tostring(#source) .. ":" .. source:sub(1, 64)
-		if ENV._AlleralFlexUiSourceKey == sourceKey and type(ENV._AlleralFlexUi) == "table" then
-			return ENV._AlleralFlexUi
+		if ENV._AlleralIrisSourceKey == sourceKey and type(ENV._AlleralIris) == "table" then
+			return ENV._AlleralIris
 		end
 
 		local loadFn = Core.execFunction and Core.execFunction("loadstring") or loadstring or load
@@ -507,35 +453,35 @@ return function(Core)
 			return nil, "loadstring unavailable"
 		end
 
-		local chunk, err = loadFn(source, "@FlexUI/source")
+		local chunk, err = loadFn(source, "@Iris/source")
 		if not chunk then
-			return nil, tostring(err or "FlexUI compile failed")
+			return nil, tostring(err or "Iris compile failed")
 		end
 
 		local ok, MacLib = pcall(chunk)
 		if not ok or type(MacLib) ~= "table" or type(MacLib.Window) ~= "function" then
-			return nil, tostring(MacLib or "FlexUI runtime failed")
+			return nil, tostring(MacLib or "Iris runtime failed")
 		end
 
 		local patch = MacLib.__AlleralPatch
-		local need = requiredFlexUiVersion()
-		if type(patch) ~= "number" or patch ~= need then
-			return nil, "FlexUI version outdated (have v" .. tostring(patch or "?") .. ", need v" .. tostring(need) .. ")"
+		local need = requiredIrisVersion()
+		if type(patch) ~= "number" or patch ~= need or MacLib.__IrisUi ~= true then
+			return nil, "Iris version outdated (have v" .. tostring(patch or "?") .. ", need v" .. tostring(need) .. ")"
 		end
 
-		ENV._AlleralFlexUiSourceKey = sourceKey
-		ENV._AlleralFlexUi = MacLib
-		ENV._AlleralFlexUiSource = source
-		ENV._AlleralFlexUiSourceLabel = sourceLabel
+		ENV._AlleralIrisSourceKey = sourceKey
+		ENV._AlleralIris = MacLib
+		ENV._AlleralIrisSource = source
+		ENV._AlleralIrisSourceLabel = sourceLabel
 		ENV._AlleralMaclib = MacLib
 		ENV._AlleralMaclibSource = source
 		ENV._AlleralMaclibSourceLabel = sourceLabel
 		if type(Core.say) == "function" then
 			Core.say(
-				"FlexUI v"
+				"Iris v"
 					.. tostring(MacLib.__AlleralPatch or "?")
 					.. " ("
-					.. tostring(MacLib.__AlleralVersion or "1.0.0")
+					.. tostring(MacLib.__AlleralVersion or "2.0.4")
 					.. ") from "
 					.. tostring(sourceLabel or "unknown")
 			)
@@ -544,22 +490,31 @@ return function(Core)
 	end
 
 	local function loadUiEngine()
-		if useFlexUi() then
-			local flex, flexErr = loadFlexUi()
-			if flex then
-				Core.UI_LIBRARY = "Flexui"
-				return flex
+		if preferredUiEngine() == "iris" then
+			local irisOnly, irisErr = loadIris()
+			if irisOnly then
+				Core.UI_LIBRARY = "Iris"
+				return irisOnly
 			end
 			if type(Core.logWarn) == "function" then
-				Core.logWarn("FlexUI unavailable, falling back to MacLib: " .. tostring(flexErr))
+				Core.logWarn("Iris-only mode failed, falling back to Onyx: " .. tostring(irisErr))
 			end
 		end
-		local mac, macErr = loadMaclib()
-		if mac then
-			Core.UI_LIBRARY = "Maclib"
-			return mac
+
+		local onyx, onyxErr = loadOnyx()
+		if onyx then
+			Core.UI_LIBRARY = "Onyx"
+			bootIrisOverlay(onyx)
+			return onyx
 		end
-		return nil, macErr or "UI engine missing"
+
+		local iris, irisErr = loadIris()
+		if iris then
+			Core.UI_LIBRARY = "Iris"
+			return iris
+		end
+
+		return nil, onyxErr or irisErr or "UI engine missing"
 	end
 
 	local function wrapLibrary(MacLib)
@@ -770,7 +725,7 @@ return function(Core)
 		end
 
 		function Library:ListThemeNames()
-			return { "Maclib", "Default" }
+			return { "Onyx", "Iris", "Default" }
 		end
 
 		function Library:SetTheme(_name)
@@ -778,7 +733,7 @@ return function(Core)
 		end
 
 		function Library:CycleTheme(_step)
-			return { Name = "Maclib" }
+			return { Name = "Onyx" }
 		end
 
 		function Library:CreateWindow(settings)
@@ -885,10 +840,14 @@ return function(Core)
 
 	Core.releaseAlleralRuntime = function()
 		ENV._AlleralUiLibrary = nil
+		ENV._AlleralOnyx = nil
+		ENV._AlleralOnyxSourceKey = nil
+		ENV._AlleralOnyxSource = nil
+		ENV._AlleralIris = nil
+		ENV._AlleralIrisOverlay = nil
+		ENV._AlleralIrisSourceKey = nil
 		ENV._AlleralMaclib = nil
 		ENV._AlleralMaclibSourceKey = nil
-		ENV._AlleralFlexUi = nil
-		ENV._AlleralFlexUiSourceKey = nil
 	end
 
 	function Core.uiLibrary(bundle)
@@ -1176,7 +1135,7 @@ return function(Core)
 
 		function tab:BuildThemeGroupbox(column)
 			local group = Core.buildUiGroup(tab, "Appearance", column or 1)
-			group:CreateLabel(tostring(Core.UI_LIBRARY or "Flexui") .. " is the active UI layer.")
+			group:CreateLabel(tostring(Core.UI_LIBRARY or "Onyx") .. " + Fusion Spring is the active UI layer.")
 			return group
 		end
 
