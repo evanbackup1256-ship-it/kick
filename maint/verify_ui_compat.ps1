@@ -33,8 +33,8 @@ foreach ($contract in $maclibContracts) {
 }
 
 $loader = Get-Content (Join-Path $root "loader.luau") -Raw
-if ($loader -match 'ensureMaclibSource') { Pass "loader prefetches MacLib source" } else { Fail "loader missing ensureMaclibSource" }
-if ($loader -match 'Core\.UI_LIBRARY = "Maclib"' -or $loader -match 'ui = "Maclib"') { Pass "loader release fallback uses Maclib" } else { Fail "loader missing Maclib release config" }
+if ($loader -match 'ensureMaclibSource|ensureUiSource|ensureFlexUiSource') { Pass "loader prefetches UI source" } else { Fail "loader missing UI source prefetch" }
+if ($loader -match 'Core\.UI_LIBRARY = "Maclib"' -or $loader -match 'ui = "Maclib"' -or $loader -match 'ui = "Flexui"') { Pass "loader release fallback sets ui engine" } else { Fail "loader missing ui release config" }
 
 if ($failures -gt 0) {
     Write-Host "`n$failures UI compatibility check(s) failed." -ForegroundColor Red

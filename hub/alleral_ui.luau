@@ -3,7 +3,20 @@ return function(Core)
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
 	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "5.5.0-maclib"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
-	Core.UI_LIBRARY = "Maclib"
+	Core.UI_LIBRARY = "Flexui"
+
+	local FLEXUI_SOURCE_PATH = "ui/flexui/source.luau"
+	local FLEXUI_SOURCE_PATHS = {
+		"ui/flexui/source.luau",
+		".alleral/cache/ui/flexui/source.luau",
+		"kick/ui/flexui/source.luau",
+	}
+	local FLEXUI_VERSION_MARKER = "ALLERAL_FLEXUI_VERSION"
+	local FLEXUI_VERSION = 1
+	local FLEXUI_MIN_BYTES = 6000
+	local FLEXUI_RAW_URLS = {
+		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/flexui/source.luau",
+	}
 
 	local MACLIB_SOURCE_PATH = "ui/maclib/source.luau"
 	local MACLIB_SOURCE_PATHS = {
@@ -65,6 +78,126 @@ return function(Core)
 
 	local function iconAsset(icon)
 		return "rbxassetid://" .. iconImage(icon)
+	end
+
+	local function preferredUiEngine()
+		local expected = ENV._Alleral_ExpectedVersions
+		if type(expected) == "table" and type(expected.ui) == "string" and expected.ui ~= "" then
+			return expected.ui:lower()
+		end
+		return "flexui"
+	end
+
+	local function useFlexUi()
+		return preferredUiEngine() == "flexui"
+	end
+
+	local function requiredFlexUiVersion()
+		local expected = ENV._Alleral_ExpectedVersions
+		if type(expected) == "table" then
+			local version = tonumber(expected.flexuiVersion)
+			if version then
+				return version
+			end
+		end
+		return FLEXUI_VERSION
+	end
+
+	local function flexUiVersionFromSource(src)
+		if type(src) ~= "string" then
+			return nil
+		end
+		return tonumber(src:match("\nlocal%s+ALLERAL_FLEXUI_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("^local%s+ALLERAL_FLEXUI_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("Flex%.__AlleralPatch%s*=%s*(%d+)"))
+	end
+
+	local function flexUiSourceValid(src)
+		if type(src) ~= "string"
+			or #src < FLEXUI_MIN_BYTES
+			or src:find("<!DOCTYPE", 1, true)
+			or not src:find(FLEXUI_VERSION_MARKER, 1, true) then
+			return false
+		end
+		if not src:find("function MacLib:Window", 1, true) and not src:find("function Flex:Window", 1, true) then
+			return false
+		end
+		local version = flexUiVersionFromSource(src)
+		return type(version) == "number" and version == requiredFlexUiVersion()
+	end
+
+	local function flexUiBackendUrls()
+		local urls = {}
+		local base = ENV._Alleral_LoaderCdnBase
+		if type(base) == "string" and base ~= "" then
+			table.insert(urls, base:gsub("/+$", "") .. "/api/loader/file/ui/flexui/source.luau")
+		end
+		return urls
+	end
+
+	local function tryReadFlexUiPath(relPath)
+		for _, root in ipairs(MACLIB_WORKSPACE_ROOTS) do
+			local full = root .. relPath
+			local src = readMaclibFileAt(full)
+			if flexUiSourceValid(src) then
+				return src, "local:" .. full
+			end
+		end
+		return nil
+	end
+
+	local function readFlexUiSource()
+		local need = requiredFlexUiVersion()
+		local bestSrc, bestLabel, bestVersion = nil, nil, -1
+		local function consider(src, label)
+			if not flexUiSourceValid(src) then
+				return
+			end
+			local version = flexUiVersionFromSource(src) or 0
+			if version > bestVersion then
+				bestSrc, bestLabel, bestVersion = src, label, version
+			end
+		end
+
+		if type(ENV._AlleralFlexUiSource) == "string" then
+			if flexUiSourceValid(ENV._AlleralFlexUiSource) then
+				consider(ENV._AlleralFlexUiSource, ENV._AlleralFlexUiSourceLabel or "memory:loader")
+			else
+				ENV._AlleralFlexUiSource = nil
+				ENV._AlleralFlexUiSourceReady = false
+			end
+		end
+
+		if type(ENV._AlleralMaclibSource) == "string" and flexUiSourceValid(ENV._AlleralMaclibSource) then
+			consider(ENV._AlleralMaclibSource, ENV._AlleralMaclibSourceLabel or "memory:maclib-bridge")
+		end
+
+		for _, path in ipairs(FLEXUI_SOURCE_PATHS) do
+			local src, label = tryReadFlexUiPath(path)
+			if src then
+				consider(src, label)
+			end
+		end
+
+		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
+			for _, baseUrl in ipairs(flexUiBackendUrls()) do
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?flexui=" .. tostring(need) .. "&t=" .. tostring(tick()), FLEXUI_MIN_BYTES)
+				if type(src) == "string" then
+					consider(src, "backend:" .. baseUrl)
+				end
+			end
+			for _, baseUrl in ipairs(FLEXUI_RAW_URLS) do
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?flexui=" .. tostring(need) .. "&t=" .. tostring(tick()), FLEXUI_MIN_BYTES)
+				if type(src) == "string" then
+					consider(src, "remote:" .. baseUrl)
+				end
+			end
+		end
+
+		if not bestSrc or bestVersion ~= requiredFlexUiVersion() then
+			return nil, "FlexUI source missing (need v" .. tostring(requiredFlexUiVersion()) .. ")"
+		end
+		return bestSrc, bestLabel
 	end
 
 	local function requiredMaclibVersion()
@@ -345,6 +478,88 @@ return function(Core)
 			)
 		end
 		return MacLib
+	end
+
+	local function loadFlexUi()
+		if type(ENV._AlleralFlexUi) == "table" then
+			local version = ENV._AlleralFlexUi.__AlleralPatch
+			local need = requiredFlexUiVersion()
+			if type(version) ~= "number" or version ~= need then
+				ENV._AlleralFlexUi = nil
+				ENV._AlleralFlexUiSourceKey = nil
+			else
+				return ENV._AlleralFlexUi
+			end
+		end
+
+		local source, sourceLabel = readFlexUiSource()
+		if not source then
+			return nil, sourceLabel or "FlexUI source missing"
+		end
+
+		local sourceKey = tostring(#source) .. ":" .. source:sub(1, 64)
+		if ENV._AlleralFlexUiSourceKey == sourceKey and type(ENV._AlleralFlexUi) == "table" then
+			return ENV._AlleralFlexUi
+		end
+
+		local loadFn = Core.execFunction and Core.execFunction("loadstring") or loadstring or load
+		if type(loadFn) ~= "function" then
+			return nil, "loadstring unavailable"
+		end
+
+		local chunk, err = loadFn(source, "@FlexUI/source")
+		if not chunk then
+			return nil, tostring(err or "FlexUI compile failed")
+		end
+
+		local ok, MacLib = pcall(chunk)
+		if not ok or type(MacLib) ~= "table" or type(MacLib.Window) ~= "function" then
+			return nil, tostring(MacLib or "FlexUI runtime failed")
+		end
+
+		local patch = MacLib.__AlleralPatch
+		local need = requiredFlexUiVersion()
+		if type(patch) ~= "number" or patch ~= need then
+			return nil, "FlexUI version outdated (have v" .. tostring(patch or "?") .. ", need v" .. tostring(need) .. ")"
+		end
+
+		ENV._AlleralFlexUiSourceKey = sourceKey
+		ENV._AlleralFlexUi = MacLib
+		ENV._AlleralFlexUiSource = source
+		ENV._AlleralFlexUiSourceLabel = sourceLabel
+		ENV._AlleralMaclib = MacLib
+		ENV._AlleralMaclibSource = source
+		ENV._AlleralMaclibSourceLabel = sourceLabel
+		if type(Core.say) == "function" then
+			Core.say(
+				"FlexUI v"
+					.. tostring(MacLib.__AlleralPatch or "?")
+					.. " ("
+					.. tostring(MacLib.__AlleralVersion or "1.0.0")
+					.. ") from "
+					.. tostring(sourceLabel or "unknown")
+			)
+		end
+		return MacLib
+	end
+
+	local function loadUiEngine()
+		if useFlexUi() then
+			local flex, flexErr = loadFlexUi()
+			if flex then
+				Core.UI_LIBRARY = "Flexui"
+				return flex
+			end
+			if type(Core.logWarn) == "function" then
+				Core.logWarn("FlexUI unavailable, falling back to MacLib: " .. tostring(flexErr))
+			end
+		end
+		local mac, macErr = loadMaclib()
+		if mac then
+			Core.UI_LIBRARY = "Maclib"
+			return mac
+		end
+		return nil, macErr or "UI engine missing"
 	end
 
 	local function wrapLibrary(MacLib)
@@ -636,10 +851,10 @@ return function(Core)
 			ENV.Alleral_UI = nil
 		end
 
-		local MacLib, err = loadMaclib()
+		local MacLib, err = loadUiEngine()
 		if not MacLib then
-			Core.logWarn("Alleral UI load failed: " .. tostring(err or "MacLib missing"))
-			return nil, err or "MacLib missing"
+			Core.logWarn("Alleral UI load failed: " .. tostring(err or "UI missing"))
+			return nil, err or "UI missing"
 		end
 		if type(MacLib.ApplyEffectsFromEnv) == "function" then
 			pcall(MacLib.ApplyEffectsFromEnv, MacLib, ENV)
@@ -660,7 +875,7 @@ return function(Core)
 				Library:Notification(info)
 			end,
 		}
-		Core.say("Alleral UI " .. tostring(Library:GetAlleralVersion()) .. " (MacLib)")
+		Core.say("Alleral UI " .. tostring(Library:GetAlleralVersion()) .. " (" .. tostring(Core.UI_LIBRARY) .. ")")
 		return cacheUi(bundle)
 	end
 
@@ -672,6 +887,8 @@ return function(Core)
 		ENV._AlleralUiLibrary = nil
 		ENV._AlleralMaclib = nil
 		ENV._AlleralMaclibSourceKey = nil
+		ENV._AlleralFlexUi = nil
+		ENV._AlleralFlexUiSourceKey = nil
 	end
 
 	function Core.uiLibrary(bundle)
@@ -959,7 +1176,7 @@ return function(Core)
 
 		function tab:BuildThemeGroupbox(column)
 			local group = Core.buildUiGroup(tab, "Appearance", column or 1)
-			group:CreateLabel("MacLib is the active UI layer.")
+			group:CreateLabel(tostring(Core.UI_LIBRARY or "Flexui") .. " is the active UI layer.")
 			return group
 		end
 

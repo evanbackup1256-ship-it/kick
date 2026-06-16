@@ -1,0 +1,86 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-16T17:41:41Z",
+  "release": {
+    "loader": "8.9.0",
+    "core": "2.9.10",
+    "weao": "1.1",
+    "ui": "Flexui",
+    "windui": "5.5.0-maclib",
+    "alleral": "5.5.0-maclib",
+    "commit": "89496e3",
+    "updatedAt": "2026-06-16T17:40:11Z",
+    "updatePollSeconds": 120,
+    "autoUpdate": true,
+    "minLoader": "8.2.0",
+    "minCore": "2.7.0",
+    "analytics": "1.2",
+    "telemetry": "3.5",
+    "helpers": "1.8",
+    "security": "1.3",
+    "access": "1.1",
+    "maclibVersion": 17,
+    "flexuiVersion": 1
+  },
+  "loader": "8.9.0",
+  "ui": "Flexui",
+  "flexuiVersion": 1,
+  "maclibVersion": 17,
+  "commit": "89496e3",
+  "modules": [
+    {
+      "path": "bootstrap.luau",
+      "bytes": 4873,
+      "sha256": "774d167164b32b0ff072f5b883133a82513bb7d07ad286c98a4092e2ce99f4ca",
+      "versionMarker": null
+    },
+    {
+      "path": "loader.luau",
+      "bytes": 135225,
+      "sha256": "ba00e35bc6793d13d7a60159cfaa4c34d2a644f289b56278c16d81a13745f2d0",
+      "versionMarker": null
+    },
+    {
+      "path": "hub/core_base.luau",
+      "bytes": 37049,
+      "sha256": "9051673d48ffe70c547a6885a26732b6b45eab201d760ae67e16c8ef62f97a9d",
+      "versionMarker": null
+    },
+    {
+      "path": "hub/core_ui.luau",
+      "bytes": 63004,
+      "sha256": "7931f4cc9c47d474e36efd45e78840b61e5415824a5f95d05e1dc5e5d27ef3aa",
+      "versionMarker": null
+    },
+    {
+      "path": "hub/alleral_ui.luau",
+      "bytes": 38534,
+      "sha256": "72c321c231fd6726b45b1b940d7452b43b1fba00707f4a40a4af0faa545f158d",
+      "versionMarker": null
+    },
+    {
+      "path": "hub/core_hub_ui.luau",
+      "bytes": 96331,
+      "sha256": "56e8459b5631bd9d5be80823c377c045f497f7c4c328a025a0ceb1b0b1413584",
+      "versionMarker": null
+    },
+    {
+      "path": "ui/flexui/source.luau",
+      "bytes": 25330,
+      "sha256": "e02f13ee24c1383af431b1f0ad180707b489c834e198decceed7f30441d1ddd1",
+      "versionMarker": 1
+    },
+    {
+      "path": "ui/maclib/source.luau",
+      "bytes": 250844,
+      "sha256": "262db13fbe48b006966102e5feb519734c89b78c476631eab3d7934b7b94cd9c",
+      "versionMarker": 17
+    },
+    {
+      "path": "cfg/release.json",
+      "bytes": 520,
+      "sha256": "2d4c3718eb1fe4849ddb88ca63dd6d8fa24fbac55f6a194ff7a0450def14d538",
+      "versionMarker": null
+    }
+  ]
+}

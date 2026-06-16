@@ -1,6 +1,6 @@
--- Alleral Bootstrap v2.0.2 — fetches loader.luau and runs it (one saved loadstring)
-local BOOTSTRAP_VERSION = "2.0.2"
-local LOADER_PIN_COMMIT = "884c36f"
+-- Alleral Bootstrap v2.0.3 — fetches loader.luau and runs it (one saved loadstring)
+local BOOTSTRAP_VERSION = "2.0.3"
+local LOADER_PIN_COMMIT = "89496e3"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
 local LOADER_MIN_BYTES = 50000

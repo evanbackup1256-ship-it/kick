@@ -1,6 +1,6 @@
 --!nocheck
-local LOADER_VERSION = "8.8.14"
-local BOOTSTRAP_VERSION = "2.0.2"
+local LOADER_VERSION = "8.9.0"
+local BOOTSTRAP_VERSION = "2.0.3"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -29,6 +29,10 @@ local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
 local MACLIB_SOURCE_MIN_BYTES = 150000
 local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
 local MACLIB_VERSION = 17
+local FLEXUI_SOURCE_PATH = UI .. "/flexui/source.luau"
+local FLEXUI_SOURCE_MIN_BYTES = 6000
+local FLEXUI_VERSION_MARKER = "ALLERAL_FLEXUI_VERSION"
+local FLEXUI_VERSION = 1
 local MACLIB_REQUIRED_FN = "function MacLib:Window"
 local MACLIB_PATCHED_OVERRIDE_PATHS = {
 	"maclib_patched.luau",
@@ -48,19 +52,20 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.8.14",
+	loader = "8.9.0",
 	core = "2.9.10",
-	ui = "Maclib",
+	ui = "Flexui",
 	windui = "5.5.0-maclib",
 	alleral = "5.5.0-maclib",
 	maclibVersion = 17,
+	flexuiVersion = 1,
 	analytics = "1.2",
 	telemetry = "3.5",
 	helpers = "1.8",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "884c36f",
+	commit = "89496e3",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -1213,6 +1218,81 @@ do
 	end
 end
 
+local function preferredUiEngine()
+	local expected = ENV._Alleral_ExpectedVersions
+	if type(expected) == "table" and type(expected.ui) == "string" and expected.ui ~= "" then
+		return expected.ui:lower()
+	end
+	return tostring(RELEASE_FALLBACK.ui or "Flexui"):lower()
+end
+
+local function loaderCdnBase()
+	local base = ENV._Alleral_LoaderCdnBase
+	if type(base) == "string" and base ~= "" then
+		return base:gsub("/+$", "")
+	end
+	return nil
+end
+
+local function stripUtf8Bom(text)
+	if type(text) ~= "string" or #text < 3 then
+		return text
+	end
+	if string.byte(text, 1) == 0xEF and string.byte(text, 2) == 0xBB and string.byte(text, 3) == 0xBF then
+		return text:sub(4)
+	end
+	return text
+end
+
+local function fetchBackendModule(relativePath, minBytes)
+	minBytes = minBytes or 0
+	local base = loaderCdnBase()
+	if not base then
+		return nil
+	end
+	local clean = relativePath:gsub("\\", "/")
+	local url = base .. "/api/loader/file/" .. clean .. "?t=" .. tick()
+	local body, via = httpGet(url, minBytes)
+	if body then
+		body = stripUtf8Bom(body)
+	end
+	if body and looksLikeLua(body) and not isRobloxHttp404(body) then
+		return body, "backend" .. (via and (" via " .. via) or "")
+	end
+	return nil, via
+end
+
+local function requiredFlexUiVersion()
+	local expected = ENV._Alleral_ExpectedVersions
+	if type(expected) == "table" and tonumber(expected.flexuiVersion) then
+		return tonumber(expected.flexuiVersion)
+	end
+	return FLEXUI_VERSION
+end
+
+local function flexUiVersionFromSource(src)
+	if type(src) ~= "string" then
+		return nil
+	end
+	return tonumber(src:match("\nlocal%s+ALLERAL_FLEXUI_VERSION%s*=%s*(%d+)"))
+		or tonumber(src:match("^local%s+ALLERAL_FLEXUI_VERSION%s*=%s*(%d+)"))
+		or tonumber(src:match("Flex%.__AlleralPatch%s*=%s*(%d+)"))
+end
+
+local function isFlexUiSourceValid(src)
+	if type(src) ~= "string" or #src < FLEXUI_SOURCE_MIN_BYTES then
+		return false
+	end
+	if src:find("<!DOCTYPE", 1, true) or not src:find(FLEXUI_VERSION_MARKER, 1, true) then
+		return false
+	end
+	if not src:find("function MacLib:Window", 1, true) and not src:find("function Flex:Window", 1, true) then
+		return false
+	end
+	local version = flexUiVersionFromSource(src)
+	return type(version) == "number" and version == requiredFlexUiVersion()
+end
+
 local function usesLegacyHttpHash(src)
 	if type(src) ~= "string" then
 		return false
@@ -1238,6 +1318,20 @@ local function getSource(localPaths, remotePath, opts)
 		end
 	end
 
+	local backendSrc, backendLabel = fetchBackendModule(remotePath, minBytes)
+	if backendSrc then
+		if usesLegacyHttpHash(backendSrc) then
+			log("Backend " .. remotePath .. " uses HttpService.Hash — skipping", true)
+			backendSrc = nil
+		elseif marker and not backendSrc:find(marker, 1, true) then
+			log("Backend script may be outdated (missing " .. marker .. ")", true)
+		end
+		if backendSrc then
+			cacheRemote(remotePath, backendSrc)
+			return backendSrc, backendLabel or "backend"
+		end
+	end
+
 	src, path = fetchRemote(remotePath, minBytes)
 	if src then
 		if usesLegacyHttpHash(src) then
@@ -1253,6 +1347,45 @@ local function getSource(localPaths, remotePath, opts)
 	end
 
 	return nil, path or ("Could not load " .. remotePath)
+end
+
+local function ensureFlexUiSource()
+	if type(ENV._AlleralFlexUiSource) == "string" and isFlexUiSourceValid(ENV._AlleralFlexUiSource) then
+		ENV._AlleralFlexUiSourceReady = true
+		ENV._AlleralMaclibSource = ENV._AlleralFlexUiSource
+		ENV._AlleralMaclibSourceReady = true
+		return true, ENV._AlleralFlexUiSourceLabel or "memory:flexui"
+	end
+
+	local paths = {
+		FLEXUI_SOURCE_PATH,
+		"kick/" .. FLEXUI_SOURCE_PATH,
+		".alleral/cache/" .. FLEXUI_SOURCE_PATH,
+	}
+	local src, label = getSource(paths, FLEXUI_SOURCE_PATH, {
+		minBytes = FLEXUI_SOURCE_MIN_BYTES,
+		marker = FLEXUI_VERSION_MARKER,
+	})
+	if src and isFlexUiSourceValid(src) then
+		ENV._AlleralFlexUiSource = src
+		ENV._AlleralFlexUiSourceLabel = label
+		ENV._AlleralFlexUiSourceReady = true
+		ENV._AlleralMaclibSource = src
+		ENV._AlleralMaclibSourceLabel = label
+		ENV._AlleralMaclibSourceReady = true
+		cacheRemote(FLEXUI_SOURCE_PATH, src)
+		cacheRemote(".alleral/cache/" .. FLEXUI_SOURCE_PATH, src)
+		return true, label
+	end
+
+	return false, "FlexUI source unavailable (need v" .. tostring(requiredFlexUiVersion()) .. ")"
+end
+
+local function ensureUiSource()
+	if preferredUiEngine() == "flexui" then
+		return ensureFlexUiSource()
+	end
+	return ensureMaclibSource()
 end
 
 local function gameScriptExpectedVersion(profile, expectedVersion)
@@ -1550,7 +1683,7 @@ local function enforceExecutorPolicy()
 	return true
 end
 
-local function stripUtf8Bom(text)
+local function stripUtf8BomCompile(text)
 	if type(text) ~= "string" or #text < 3 then
 		return text
 	end
@@ -1564,7 +1697,7 @@ local function compileAndRun(source, chunkName, runEnv)
 	if not loadStringFn then
 		return false, "loadstring unavailable"
 	end
-	source = stripUtf8Bom(source)
+	source = stripUtf8BomCompile(source)
 	local fn, err = loadStringFn(source, chunkName)
 	if not fn and type(load) == "function" then
 		fn, err = load(source, chunkName)
@@ -2355,7 +2488,7 @@ local function loadCore()
 	end
 
 	if not ENV._AlleralMaclibSourceReady then
-		local studioOk, studioLabel = ensureMaclibSource()
+		local studioOk, studioLabel = ensureUiSource()
 		if studioOk then
 			log("MacLib source ready (" .. tostring(studioLabel) .. ")")
 		else
@@ -2618,6 +2751,11 @@ local function loadTelemetryConfig(deferBootstrap)
 					if trim(cfg.gateUrl or "") == "" then
 						cfg.gateUrl = cfg.banCheckUrl
 					end
+				end
+				if trim(boot.loaderCdnBase or "") ~= "" then
+					ENV._Alleral_LoaderCdnBase = normalizeHttps(boot.loaderCdnBase)
+				elseif trim(boot.relayUrl or "") ~= "" then
+					ENV._Alleral_LoaderCdnBase = base
 				end
 			end
 		end
@@ -3035,7 +3173,9 @@ local function fetchExpectedVersionsFast()
 		weao = RELEASE_FALLBACK.weao,
 		alleral = RELEASE_FALLBACK.alleral,
 		windui = RELEASE_FALLBACK.windui,
+		ui = RELEASE_FALLBACK.ui,
 		maclibVersion = RELEASE_FALLBACK.maclibVersion,
+		flexuiVersion = RELEASE_FALLBACK.flexuiVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -3083,7 +3223,9 @@ fetchExpectedVersions = function(forceRefresh)
 		weao = RELEASE_FALLBACK.weao,
 		alleral = RELEASE_FALLBACK.alleral,
 		windui = RELEASE_FALLBACK.windui,
+		ui = RELEASE_FALLBACK.ui,
 		maclibVersion = RELEASE_FALLBACK.maclibVersion,
+		flexuiVersion = RELEASE_FALLBACK.flexuiVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -3106,11 +3248,16 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.weao = release.weao or expected.weao
 		expected.alleral = release.alleral or release.windui or expected.alleral
 		expected.windui = release.windui or expected.alleral or expected.windui
+		expected.ui = release.ui or expected.ui
 		expected.commit = release.commit or expected.commit
 		expected.updatedAt = release.updatedAt or expected.updatedAt
 		local remoteMaclib = tonumber(release.maclibVersion)
 		if remoteMaclib then
 			expected.maclibVersion = math.max(remoteMaclib, MACLIB_VERSION, tonumber(RELEASE_FALLBACK.maclibVersion) or 0)
+		end
+		local remoteFlex = tonumber(release.flexuiVersion)
+		if remoteFlex then
+			expected.flexuiVersion = math.max(remoteFlex, FLEXUI_VERSION, tonumber(RELEASE_FALLBACK.flexuiVersion) or 0)
 		end
 		if type(release.commit) == "string" and release.commit ~= "" and type(RELEASE_FALLBACK.commit) == "string" then
 			if release.commit ~= RELEASE_FALLBACK.commit then
@@ -3464,10 +3611,10 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.12"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.9.0"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.12"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.9.0"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
@@ -4070,7 +4217,7 @@ local function main()
 	purgeAlleralWorkspace({ reason = "boot" })
 	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
 	ENV.Alleral_HTTP.get = httpGet
-	local studioPrefetchOk, studioPrefetchLabel = ensureMaclibSource()
+	local studioPrefetchOk, studioPrefetchLabel = ensureUiSource()
 	if studioPrefetchOk then
 		log("MacLib source ready (" .. tostring(studioPrefetchLabel) .. ")")
 	else

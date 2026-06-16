@@ -1997,6 +1997,38 @@ def site_next_static(filename: str):
     return "Not found", 404
 
 
+try:
+    from loader_builder import build_manifest, read_module
+except ImportError:
+    from relay.loader_builder import build_manifest, read_module  # type: ignore
+
+
+@app.get("/api/loader/manifest")
+def loader_manifest():
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    return jsonify(build_manifest(ROOT))
+
+
+@app.get("/api/loader/file/<path:rel_path>")
+def loader_file(rel_path: str):
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    text, err = read_module(rel_path, ROOT)
+    if err == "invalid_path":
+        return jsonify({"ok": False, "error": err}), 400
+    if err == "unsupported_type":
+        return jsonify({"ok": False, "error": err}), 415
+    if text is None:
+        return jsonify({"ok": False, "error": err or "not_found"}), 404
+    content_type = "application/json; charset=utf-8"
+    if rel_path.lower().endswith(".luau"):
+        content_type = "text/plain; charset=utf-8"
+    return text, 200, {"Content-Type": content_type, "Cache-Control": "no-store"}
+
+
 @app.get("/api/bootstrap")
 def client_bootstrap():
     client_ip = resolve_client_ip(request)
@@ -2011,6 +2043,8 @@ def client_bootstrap():
         "gateUrl": f"{base}/gate/check",
         "banCheckUrl": f"{base}/api/ban/check",
         "banApiUrl": f"{base}/api/ban",
+        "loaderCdnBase": base,
+        "loaderManifestUrl": f"{base}/api/loader/manifest",
         "apiKey": API_KEY,
         "brand": BRAND,
     })
