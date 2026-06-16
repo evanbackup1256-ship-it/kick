@@ -1,5 +1,7 @@
 --!nocheck
-local LOADER_VERSION = "8.7.1"
+local LOADER_VERSION = "8.8.0"
+local BOOTSTRAP_VERSION = "2.0.0"
+local MERGED_BOOTSTRAP = true
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -36,7 +38,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.7.1",
+	loader = "8.8.0",
 	core = "2.9.5",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
@@ -67,14 +69,16 @@ local LOADER_LOCAL_PATHS = {
 	"kick/loader.luau",
 	"Alleral/loader.luau",
 }
-local BOOTSTRAP_REMOTE_PATH = HUB .. "/bootstrap.luau"
+local BOOTSTRAP_REMOTE_PATH = "bootstrap.luau"
 local BOOTSTRAP_LOCAL_PATHS = {
-	HUB .. "/bootstrap.luau",
-	"kick/" .. HUB .. "/bootstrap.luau",
+	"bootstrap.luau",
+	"kick/bootstrap.luau",
 	"alleral_bootstrap.luau",
 }
 local BOOTSTRAP_LOADSTRING =
-	"loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=\" .. tick(), true))()"
+	'loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?v='
+	.. BOOTSTRAP_VERSION
+	.. '&t=" .. tick(), true))()'
 local LEGACY_LOADER_MARKERS = {
 	"[Alleral Loader v",
 	"Alleral loader 3.",
@@ -154,6 +158,15 @@ pcall(function()
 end)
 
 local ENV = genv()
+
+ENV._Alleral_MergedBootstrap = MERGED_BOOTSTRAP
+ENV._Alleral_SelfBootstrapped = true
+ENV._Alleral_Bootstrapped = true
+ENV._Alleral_BootstrapVersion = BOOTSTRAP_VERSION
+ENV._Alleral_BootstrapAt = tick()
+ENV._Alleral_BootstrapCommit = RELEASE_FALLBACK.commit
+
+print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. " / Loader v" .. LOADER_VERSION .. "] Starting…")
 
 local function loaderRunEnv()
 	local env = genv()
@@ -1308,11 +1321,20 @@ local function cacheLoaderSource(_src)
 end
 
 local function fetchRemoteLoaderSource()
-	local body, via = httpGet(GITHUB_RAW .. "/loader.luau?t=" .. tostring(tick()), 500)
-	if type(body) == "string" and #body >= 500 then
-		return body, via
+	local bust = "?t=" .. tostring(tick())
+	local urls = {
+		GITHUB_RAW .. "/bootstrap.luau" .. bust,
+		GITHUB_RAW .. "/loader.luau" .. bust,
+		JSDELIVR .. "/bootstrap.luau" .. bust,
+		JSDELIVR .. "/loader.luau" .. bust,
+	}
+	for _, url in ipairs(urls) do
+		local body, via = httpGet(url, 50000)
+		if type(body) == "string" and #body >= 50000 then
+			return body, via
+		end
 	end
-	return nil, via or "remote loader fetch failed"
+	return nil, "remote bootstrap fetch failed"
 end
 
 local function readFreshLocalLoaderSource()
@@ -1416,12 +1438,70 @@ local function hashBootstrapAttest(placeId, jobId, at, commit)
 	return string.format("ab_%x_%x", h1, h2)
 end
 
+local function checkGamePlaceUpdate()
+	local placeId = game.PlaceId
+	local placeVersion = tonumber(game.PlaceVersion) or 0
+	if placeId == 0 or placeVersion == 0 then
+		return
+	end
+	if not readFile or not isFile then
+		return
+	end
+	local path = ".alleral/place_versions.json"
+	local known = type(ENV._Alleral_PlaceVersions) == "table" and ENV._Alleral_PlaceVersions or {}
+	local okExists, exists = pcall(isFile, path)
+	if okExists and exists then
+		local okRead, raw = pcall(readFile, path)
+		if okRead and type(raw) == "string" then
+			for pid, ver in raw:gmatch('"(%d+)"%s*:%s*(%d+)') do
+				known[pid] = tonumber(ver) or known[pid]
+			end
+		end
+	end
+	local key = tostring(placeId)
+	local previous = tonumber(known[key]) or 0
+	if previous > 0 and previous ~= placeVersion then
+		local msg = "Game updated (build "
+			.. tostring(previous)
+			.. " -> "
+			.. tostring(placeVersion)
+			.. "). Alleral still loads — report it if something breaks."
+		warn("[Alleral v" .. LOADER_VERSION .. "] " .. msg)
+		ENV._Alleral_GameRecentlyUpdated = true
+		ENV._Alleral_GameUpdateMessage = msg
+		ENV._Alleral_PlaceVersionChange = {
+			placeId = placeId,
+			previousPlaceVersion = previous,
+			placeVersion = placeVersion,
+			changed = true,
+		}
+	end
+	known[key] = placeVersion
+	ENV._Alleral_PlaceVersions = known
+	if writeFileFn then
+		if makeFolderFn then
+			pcall(makeFolderFn, ".alleral")
+		end
+		local parts = {}
+		for pid, ver in pairs(known) do
+			table.insert(parts, ('"%s":%s'):format(tostring(pid), tostring(ver)))
+		end
+		table.sort(parts)
+		pcall(writeFileFn, path, "{" .. table.concat(parts, ",") .. "}")
+	end
+end
+
 local function verifyBootstrapAttestation()
 	if ENV._Alleral_BootstrapVerified == true then
 		return true
 	end
+	if ENV._Alleral_MergedBootstrap == true or ENV._Alleral_SelfBootstrapped == true then
+		ENV._Alleral_BootstrapVerified = true
+		ENV._Alleral_BootstrapVersion = BOOTSTRAP_VERSION
+		return true
+	end
 	if ENV._Alleral_Bootstrapped ~= true then
-		return false, "Direct loader access is disabled. Run the bootstrap loadstring only."
+		return false, "Run the Alleral loadstring from the site — don't paste loader.luau directly."
 	end
 	local token = ENV._Alleral_BootstrapToken
 	local at = tonumber(ENV._Alleral_BootstrapTokenAt)
@@ -3360,10 +3440,10 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.7.1"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.0"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.7.1"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.0"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
@@ -3909,6 +3989,8 @@ local function main()
 		return
 	end
 
+	pcall(checkGamePlaceUpdate)
+
 	local execOk, execErr = enforceExecutorPolicy()
 	if not execOk then
 		notify("Alleral", tostring(execErr), 10)
@@ -4385,13 +4467,27 @@ end)
 
 publishConsoleApi("Alleral_SyncWeao", syncWeaoConfig)
 
+publishConsoleApi("Alleral_Bootstrap", function(reason)
+	if type(ENV.Alleral_Reload) == "function" then
+		ENV.Alleral_Reload()
+		return true
+	end
+	if ENV._Alleral_RelaunchViaBootstrap then
+		local ok, err = ENV._Alleral_RelaunchViaBootstrap(reason or "bootstrap")
+		return ok == true, err
+	end
+	return false, "reload unavailable"
+end)
+
 log("v" .. LOADER_VERSION .. " booting on PlaceId " .. tostring(game.PlaceId) .. " (" .. EXECUTOR.slug .. ")")
 
-task.defer(function()
-	local ok, err = pcall(main)
-	if not ok then
-		log(tostring(err), true)
-		notify("Alleral", tostring(err), 10)
-		ENV.Alleral_LoaderRunning = false
-	end
-end)
+if not ENV._Alleral_BootstrapSkipAutoRun then
+	task.defer(function()
+		local ok, err = pcall(main)
+		if not ok then
+			log(tostring(err), true)
+			notify("Alleral", tostring(err), 10)
+			ENV.Alleral_LoaderRunning = false
+		end
+	end)
+end

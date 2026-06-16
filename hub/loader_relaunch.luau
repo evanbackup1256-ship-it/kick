@@ -28,6 +28,7 @@ if type(compileAndRun) ~= "function" or typeof(gameInstance) ~= "Instance" then
 end
 
 local TELEPORT_RELAUNCH_COOLDOWN = 5
+local MERGED_MIN_BYTES = 50000
 
 local function installAutoexecRedirect()
 	if type(writeFileFn) ~= "function" then
@@ -66,7 +67,7 @@ local function installAutoexecRedirect()
 		log("Autoexec install failed at " .. targetDir .. "/alleral.luau: " .. tostring(writeErr), true)
 	end
 	return okWrite, writeErr
-	end
+end
 
 local function markSupportedPlaces()
 	local places = {}
@@ -86,25 +87,18 @@ local function relaunchViaBootstrap(reason)
 	if type(stopAutoUpdater) == "function" then
 		stopAutoUpdater()
 	end
-	-- Never call ENV.Alleral_Bootstrap here — loader publishes a wrapper that calls this
-	-- function back, which caused infinite recursion / stack overflow.
-	local src, via = httpGet(GITHUB_RAW .. "/" .. BOOTSTRAP_REMOTE_PATH .. "?t=" .. tostring(tick()), 200)
-	if type(src) ~= "string" or #src < 200 then
+
+	if ENV._Alleral_MergedBootstrap == true and type(ENV.Alleral_Reload) == "function" then
+		ENV.Alleral_Reload()
+		return true, "reload"
+	end
+
+	local src, via = httpGet(GITHUB_RAW .. "/" .. BOOTSTRAP_REMOTE_PATH .. "?t=" .. tostring(tick()), MERGED_MIN_BYTES)
+	if type(src) ~= "string" or #src < MERGED_MIN_BYTES then
 		return false, "bootstrap fetch failed (" .. tostring(via) .. ")"
 	end
-	ENV._Alleral_BootstrapSkipAutoRun = true
 	local ok, err = compileAndRun(src, "Alleral/bootstrap", loaderRunEnv())
-	if not ok then
-		ENV._Alleral_BootstrapSkipAutoRun = nil
-		return false, err
-	end
-	if type(ENV.Alleral_Bootstrap) == "function" then
-		local bootOk, bootResult = ENV.Alleral_Bootstrap(reason)
-		ENV._Alleral_BootstrapSkipAutoRun = nil
-		return bootOk == true, bootResult
-	end
-	ENV._Alleral_BootstrapSkipAutoRun = nil
-	return false, "bootstrap entry missing after load"
+	return ok == true, err
 end
 
 local function installGlobalBootstrap()
