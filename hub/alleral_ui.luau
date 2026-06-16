@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/maclib/source.luau",
 	}
 	local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-	local MACLIB_VERSION = 13
+	local MACLIB_VERSION = 14
 	local MACLIB_REQUIRED_FN = "function MacLib:Window"
 	local MACLIB_MIN_BYTES = 150000
 	local MACLIB_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
@@ -836,6 +836,7 @@ return function(Core)
 				Options = values,
 				Multi = multi,
 				Default = default,
+				Search = settings.Search == true,
 				Callback = function(selection)
 					local userCallback = settings.Callback or function() end
 					if multi then

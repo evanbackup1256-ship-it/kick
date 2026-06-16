@@ -1,5 +1,5 @@
 -- Alleral vendored MacLib 1.2.6 (Alleral patch v13)
-local ALLERAL_MACLIB_VERSION = 13
+local ALLERAL_MACLIB_VERSION = 14
 
 local function udim2PixelSize(udim2, fallbackX, fallbackY)
 	if typeof(udim2) ~= "UDim2" then
@@ -95,9 +95,9 @@ local Effects = {
 		notifyCompact = false,
 		shimmerHeaders = true,
 		rippleClick = true,
-		staggerReveal = true,
+		staggerReveal = false,
 		tabParallax = true,
-		sectionEntrance = true,
+		sectionEntrance = false,
 		dropdownElastic = true,
 	},
 	glowTargets = {},
@@ -545,7 +545,7 @@ function Resizer.computeLayout(profileName)
 	local aspect = design.X / math.max(design.Y, 1)
 
 	local marginX, marginY = 28, 52
-	local fillW, fillH = 0.86, 0.84
+	local fillW, fillH = 0.86, 0.76
 	local minW, minH = 660, 480
 	local maxW, maxH = design.X, design.Y + 40
 
@@ -566,10 +566,10 @@ function Resizer.computeLayout(profileName)
 		maxW, maxH = 860, 620
 	else
 		if longSide >= 1900 and shortSide >= 1040 then
-			fillW, fillH = 0.68, 0.82
+			fillW, fillH = 0.68, 0.74
 			maxW, maxH = 980, 760
 		elseif longSide >= 1400 then
-			fillW, fillH = 0.78, 0.84
+			fillW, fillH = 0.78, 0.76
 			maxW, maxH = 940, 720
 		end
 	end
@@ -2722,7 +2722,9 @@ function MacLib:Window(Settings)
 			local function columnLayoutMode()
 				local scrollW = math.max(elementsScrolling.AbsoluteSize.X, 280)
 				local hasCenter = columnSectionCount(center) > 0
-				if mobileLayout() or scrollW < 720 or (hasCenter and scrollW < 880) then
+				local cols = hasCenter and 3 or 2
+				local colW = (scrollW - COLUMN_GAP * (cols - 1)) / cols
+				if mobileLayout() or scrollW < 720 or colW < 400 then
 					return "stack"
 				end
 				if hasCenter then
@@ -2817,16 +2819,16 @@ function MacLib:Window(Settings)
 				section.LayoutOrder = sectionLayoutSeq[sideKey]
 				section.Parent = parentCol
 				local elementOrder = 0
-				section.ChildAdded:Connect(function(child)
-					if child:IsA("GuiObject") and not child:IsA("UIComponent") then
+				local function addSectionElement(element)
+					if element and element:IsA("GuiObject") then
 						elementOrder += 1
-						child.LayoutOrder = elementOrder
+						element.LayoutOrder = elementOrder
+						element.Parent = section
+						task.defer(refreshTabScrollCanvas)
 					end
-				end)
+					return element
+				end
 				task.defer(relayoutTabColumns)
-				task.defer(function()
-					Effects.playSectionEntrance(section)
-				end)
 
 				local sectionUICorner = Instance.new("UICorner")
 				sectionUICorner.Name = "SectionUICorner"
@@ -2844,7 +2846,7 @@ function MacLib:Window(Settings)
 
 				local sectionUIListLayout = Instance.new("UIListLayout")
 				sectionUIListLayout.Name = "SectionUIListLayout"
-				sectionUIListLayout.Padding = UDim.new(0, 10)
+				sectionUIListLayout.Padding = UDim.new(0, 16)
 				sectionUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 				sectionUIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 				sectionUIListLayout.Parent = section
@@ -2867,7 +2869,7 @@ function MacLib:Window(Settings)
 					button.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					button.BorderSizePixel = 0
 					button.Size = UDim2.new(1, 0, 0, 38)
-					button.Parent = section
+					addSectionElement(button)
 
 					local buttonInteract = Instance.new("TextButton")
 					buttonInteract.Name = "ButtonInteract"
@@ -2970,13 +2972,27 @@ function MacLib:Window(Settings)
 					local ToggleFunctions = { Settings = Settings, IgnoreConfig = false, Class = "Toggle" }
 					local toggle = Instance.new("Frame")
 					toggle.Name = "Toggle"
-					toggle.AutomaticSize = Enum.AutomaticSize.Y
 					toggle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 					toggle.BackgroundTransparency = 1
 					toggle.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					toggle.BorderSizePixel = 0
-					toggle.Size = UDim2.new(1, 0, 0, 0)
-					toggle.Parent = section
+					toggle.Size = UDim2.new(1, 0, 0, 40)
+
+					local toggleRow = Instance.new("UIListLayout")
+					toggleRow.Name = "ToggleRow"
+					toggleRow.FillDirection = Enum.FillDirection.Horizontal
+					toggleRow.VerticalAlignment = Enum.VerticalAlignment.Center
+					toggleRow.HorizontalAlignment = Enum.HorizontalAlignment.Left
+					toggleRow.SortOrder = Enum.SortOrder.LayoutOrder
+					toggleRow.Padding = UDim.new(0, 8)
+					toggleRow.Parent = toggle
+
+					local togglePad = Instance.new("UIPadding")
+					togglePad.PaddingTop = UDim.new(0, 4)
+					togglePad.PaddingBottom = UDim.new(0, 4)
+					togglePad.Parent = toggle
+
+					addSectionElement(toggle)
 
 					local toggleName = Instance.new("TextLabel")
 					toggleName.Name = "ToggleName"
@@ -2986,31 +3002,28 @@ function MacLib:Window(Settings)
 					toggleName.TextColor3 = Color3.fromRGB(255, 255, 255)
 					toggleName.TextSize = 13
 					toggleName.TextTransparency = 0.5
-					toggleName.TextTruncate = Enum.TextTruncate.AtEnd
 					toggleName.TextWrapped = true
 					toggleName.TextXAlignment = Enum.TextXAlignment.Left
-					toggleName.TextYAlignment = Enum.TextYAlignment.Top
-					toggleName.AnchorPoint = Vector2.new(0, 0.5)
+					toggleName.TextYAlignment = Enum.TextYAlignment.Center
 					toggleName.AutomaticSize = Enum.AutomaticSize.Y
 					toggleName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					toggleName.BackgroundTransparency = 1
 					toggleName.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					toggleName.BorderSizePixel = 0
-					toggleName.Position = UDim2.fromScale(0, 0.5)
-					toggleName.Size = UDim2.new(1, -50, 0, 0)
+					toggleName.LayoutOrder = 1
+					toggleName.Size = UDim2.new(1, -52, 0, 0)
 					toggleName.Parent = toggle
 
 					local toggle1 = Instance.new("ImageButton")
-					toggle1.Name = "Toggle"
+					toggle1.Name = "ToggleSwitch"
 					toggle1.Image = assets.toggleBackground
 					toggle1.ImageColor3 = Color3.fromRGB(87, 86, 86)
 					toggle1.AutoButtonColor = false
-					toggle1.AnchorPoint = Vector2.new(1, 0.5)
 					toggle1.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					toggle1.BackgroundTransparency = 1
 					toggle1.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					toggle1.BorderSizePixel = 0
-					toggle1.Position = UDim2.fromScale(1, 0.5)
+					toggle1.LayoutOrder = 2
 					toggle1.Size = UDim2.fromOffset(41, 21)
 					toggle1.ImageTransparency = 0.5
 
@@ -3115,8 +3128,22 @@ function MacLib:Window(Settings)
 					slider.BackgroundTransparency = 1
 					slider.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					slider.BorderSizePixel = 0
-					slider.Size = UDim2.new(1, 0, 0, 38)
-					slider.Parent = section
+					slider.Size = UDim2.new(1, 0, 0, 44)
+					addSectionElement(slider)
+
+					local sliderRow = Instance.new("UIListLayout")
+					sliderRow.Name = "SliderRow"
+					sliderRow.FillDirection = Enum.FillDirection.Horizontal
+					sliderRow.VerticalAlignment = Enum.VerticalAlignment.Center
+					sliderRow.HorizontalAlignment = Enum.HorizontalAlignment.Left
+					sliderRow.SortOrder = Enum.SortOrder.LayoutOrder
+					sliderRow.Padding = UDim.new(0, 10)
+					sliderRow.Parent = slider
+
+					local sliderPad = Instance.new("UIPadding")
+					sliderPad.PaddingTop = UDim.new(0, 4)
+					sliderPad.PaddingBottom = UDim.new(0, 4)
+					sliderPad.Parent = slider
 
 					local sliderName = Instance.new("TextLabel")
 					sliderName.Name = "SliderName"
@@ -3126,27 +3153,26 @@ function MacLib:Window(Settings)
 					sliderName.TextColor3 = Color3.fromRGB(255, 255, 255)
 					sliderName.TextSize = 13
 					sliderName.TextTransparency = 0.5
-					sliderName.TextTruncate = Enum.TextTruncate.AtEnd
+					sliderName.TextWrapped = true
 					sliderName.TextXAlignment = Enum.TextXAlignment.Left
-					sliderName.TextYAlignment = Enum.TextYAlignment.Top
-					sliderName.AnchorPoint = Vector2.new(0, 0.5)
-					sliderName.AutomaticSize = Enum.AutomaticSize.XY
+					sliderName.TextYAlignment = Enum.TextYAlignment.Center
+					sliderName.AutomaticSize = Enum.AutomaticSize.Y
 					sliderName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					sliderName.BackgroundTransparency = 1
 					sliderName.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					sliderName.BorderSizePixel = 0
-					sliderName.Position = UDim2.fromScale(1.3e-07, 0.5)
+					sliderName.LayoutOrder = 1
+					sliderName.Size = UDim2.new(1, -188, 0, 0)
 					sliderName.Parent = slider
 
 					local sliderElements = Instance.new("Frame")
 					sliderElements.Name = "SliderElements"
-					sliderElements.AnchorPoint = Vector2.new(1, 0)
 					sliderElements.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					sliderElements.BackgroundTransparency = 1
 					sliderElements.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					sliderElements.BorderSizePixel = 0
-					sliderElements.Position = UDim2.fromScale(1, 0)
-					sliderElements.Size = UDim2.fromScale(1, 1)
+					sliderElements.LayoutOrder = 2
+					sliderElements.Size = UDim2.fromOffset(178, 28)
 
 					local sliderValue = Instance.new("TextBox")
 					sliderValue.Name = "SliderValue"
@@ -3159,8 +3185,7 @@ function MacLib:Window(Settings)
 					sliderValue.BackgroundTransparency = 0.95
 					sliderValue.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					sliderValue.BorderSizePixel = 0
-					sliderValue.LayoutOrder = 1
-					sliderValue.Position = UDim2.fromScale(-0.0789, 0.171)
+					sliderValue.LayoutOrder = 2
 					sliderValue.Size = UDim2.fromOffset(41, 21)
 					sliderValue.ClipsDescendants = true
 
@@ -3186,7 +3211,7 @@ function MacLib:Window(Settings)
 
 					local sliderElementsUIListLayout = Instance.new("UIListLayout")
 					sliderElementsUIListLayout.Name = "SliderElementsUIListLayout"
-					sliderElementsUIListLayout.Padding = UDim.new(0, 20)
+					sliderElementsUIListLayout.Padding = UDim.new(0, 8)
 					sliderElementsUIListLayout.FillDirection = Enum.FillDirection.Horizontal
 					sliderElementsUIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
 					sliderElementsUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -3201,7 +3226,7 @@ function MacLib:Window(Settings)
 					sliderBar.BackgroundTransparency = 1
 					sliderBar.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					sliderBar.BorderSizePixel = 0
-					sliderBar.Position = UDim2.fromScale(0.219, 0.457)
+					sliderBar.LayoutOrder = 1
 					sliderBar.Size = UDim2.fromOffset(123, 3)
 
 					local sliderHead = Instance.new("ImageButton")
@@ -3383,7 +3408,7 @@ function MacLib:Window(Settings)
 					input.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					input.BorderSizePixel = 0
 					input.Size = UDim2.new(1, 0, 0, 0)
-					input.Parent = section
+					addSectionElement(input)
 
 					local inputLayout = Instance.new("UIListLayout")
 					inputLayout.Name = "InputLayout"
@@ -3545,13 +3570,21 @@ function MacLib:Window(Settings)
 					local KeybindFunctions = { Settings = Settings, IgnoreConfig = false, Class = "Keybind" }
 					local keybind = Instance.new("Frame")
 					keybind.Name = "Keybind"
-					keybind.AutomaticSize = Enum.AutomaticSize.Y
 					keybind.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 					keybind.BackgroundTransparency = 1
 					keybind.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					keybind.BorderSizePixel = 0
 					keybind.Size = UDim2.new(1, 0, 0, 38)
-					keybind.Parent = section
+					addSectionElement(keybind)
+
+					local keybindRow = Instance.new("UIListLayout")
+					keybindRow.Name = "KeybindRow"
+					keybindRow.FillDirection = Enum.FillDirection.Horizontal
+					keybindRow.VerticalAlignment = Enum.VerticalAlignment.Center
+					keybindRow.HorizontalAlignment = Enum.HorizontalAlignment.Left
+					keybindRow.SortOrder = Enum.SortOrder.LayoutOrder
+					keybindRow.Padding = UDim.new(0, 8)
+					keybindRow.Parent = keybind
 
 					local keybindName = Instance.new("TextLabel")
 					keybindName.Name = "KeybindName"
@@ -3561,16 +3594,16 @@ function MacLib:Window(Settings)
 					keybindName.TextColor3 = Color3.fromRGB(255, 255, 255)
 					keybindName.TextSize = 13
 					keybindName.TextTransparency = 0.5
-					keybindName.TextTruncate = Enum.TextTruncate.AtEnd
+					keybindName.TextWrapped = true
 					keybindName.TextXAlignment = Enum.TextXAlignment.Left
-					keybindName.TextYAlignment = Enum.TextYAlignment.Top
-					keybindName.AnchorPoint = Vector2.new(0, 0.5)
-					keybindName.AutomaticSize = Enum.AutomaticSize.XY
+					keybindName.TextYAlignment = Enum.TextYAlignment.Center
+					keybindName.AutomaticSize = Enum.AutomaticSize.Y
 					keybindName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					keybindName.BackgroundTransparency = 1
 					keybindName.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					keybindName.BorderSizePixel = 0
-					keybindName.Position = UDim2.fromScale(0, 0.5)
+					keybindName.LayoutOrder = 1
+					keybindName.Size = UDim2.new(1, -52, 0, 0)
 					keybindName.Parent = keybind
 
 					local binderBox = Instance.new("TextBox")
@@ -3582,16 +3615,13 @@ function MacLib:Window(Settings)
 					binderBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 					binderBox.TextSize = 12
 					binderBox.TextTransparency = 0.1
-					binderBox.AnchorPoint = Vector2.new(1, 0.5)
-					binderBox.AutomaticSize = Enum.AutomaticSize.X
 					binderBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					binderBox.BackgroundTransparency = 0.95
 					binderBox.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					binderBox.BorderSizePixel = 0
 					binderBox.ClipsDescendants = true
-					binderBox.LayoutOrder = 1
-					binderBox.Position = UDim2.fromScale(1, 0.5)
-					binderBox.Size = UDim2.fromOffset(21, 21)
+					binderBox.LayoutOrder = 2
+					binderBox.Size = UDim2.fromOffset(44, 24)
 
 					local binderBoxUICorner = Instance.new("UICorner")
 					binderBoxUICorner.Name = "BinderBoxUICorner"
@@ -3733,7 +3763,7 @@ function MacLib:Window(Settings)
 					dropdown.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					dropdown.BorderSizePixel = 0
 					dropdown.Size = UDim2.new(1, 0, 0, 38)
-					dropdown.Parent = section
+					addSectionElement(dropdown)
 					dropdown.ClipsDescendants = true
 
 					local dropdownUIPadding = Instance.new("UIPadding")
@@ -4328,7 +4358,7 @@ function MacLib:Window(Settings)
 					colorpicker.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					colorpicker.BorderSizePixel = 0
 					colorpicker.Size = UDim2.new(1, 0, 0, 38)
-					colorpicker.Parent = section
+					addSectionElement(colorpicker)
 
 					local colorpickerName = Instance.new("TextLabel")
 					colorpickerName.Name = "KeybindName"
@@ -5609,7 +5639,7 @@ function MacLib:Window(Settings)
 					header.BorderSizePixel = 0
 					header.LayoutOrder = 0
 					header.Size = UDim2.fromScale(1, 0)
-					header.Parent = section
+					addSectionElement(header)
 
 					local uIPadding = Instance.new("UIPadding")
 					uIPadding.Name = "UIPadding"
@@ -5665,7 +5695,7 @@ function MacLib:Window(Settings)
 					label.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					label.BorderSizePixel = 0
 					label.Size = UDim2.new(1, 0, 0, 0)
-					label.Parent = section
+					addSectionElement(label)
 
 					local labelText = Instance.new("TextLabel")
 					labelText.Name = "LabelText"
@@ -5709,7 +5739,7 @@ function MacLib:Window(Settings)
 					subLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					subLabel.BorderSizePixel = 0
 					subLabel.Size = UDim2.new(1, 0, 0, 0)
-					subLabel.Parent = section
+					addSectionElement(subLabel)
 
 					local subLabelText = Instance.new("TextLabel")
 					subLabelText.Name = "SubLabelText"
@@ -5753,7 +5783,7 @@ function MacLib:Window(Settings)
 					paragraph.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					paragraph.BorderSizePixel = 0
 					paragraph.Size = UDim2.new(1, 0, 0, 38)
-					paragraph.Parent = section
+					addSectionElement(paragraph)
 
 					local paragraphHeader = Instance.new("TextLabel")
 					paragraphHeader.Name = "ParagraphHeader"
@@ -5831,7 +5861,7 @@ function MacLib:Window(Settings)
 					divider.BorderSizePixel = 0
 					divider.Position = UDim2.fromScale(0, 1)
 					divider.Size = UDim2.new(1, 0, 0, 1)
-					divider.Parent = section
+					addSectionElement(divider)
 
 					local uIPadding = Instance.new("UIPadding")
 					uIPadding.Name = "UIPadding"
@@ -5874,7 +5904,7 @@ function MacLib:Window(Settings)
 					spacer.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					spacer.BorderSizePixel = 0
 					spacer.Position = UDim2.fromScale(0, 1)
-					spacer.Parent = section
+					addSectionElement(spacer)
 
 					function SpacerFunctions:Remove()
 						spacer:Destroy()

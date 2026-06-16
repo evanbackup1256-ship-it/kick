@@ -1673,9 +1673,6 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 		end
 		local function rebuild(currentValues)
 			local nextValues = currentValues or handle.Values
-			if config.Searchable then
-				nextValues = compactOptions(nextValues, handle.Selection)
-			end
 			if handle.Dropdown and handle.Dropdown.Set then
 				handle.Dropdown:Set({
 					Options = nextValues,
@@ -1688,13 +1685,14 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 				})
 			end
 		end
-		local renderedValues = config.Searchable and compactOptions(values, current) or values
+		local renderedValues = values
 		local dropdown = groupbox:CreateDropdown({
 			Name = config.Text or config.Name or id,
 			Options = renderedValues,
 			Values = renderedValues,
 			CurrentOption = current,
 			MultipleOptions = multi,
+			Search = config.Searchable == true,
 			Callback = safeCallback,
 		}, nextId(id .. "_dd"))
 		handle.Dropdown = dropdown
@@ -1708,19 +1706,13 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 		end
 		function handle:Search(query)
 			self.LastSearch = tostring(query or "")
+			if self.Dropdown and self.Dropdown.SetSearch then
+				self.Dropdown:SetSearch(self.LastSearch)
+				return
+			end
 			local filtered = self.LastSearch == "" and self.Values
 				or compactOptions(Core.filterDropdownOptions(self.Values, self.LastSearch), self.Selection)
 			rebuild(filtered)
-		end
-		if config.Searchable then
-			groupbox:CreateInput({
-				Name = "",
-				PlaceholderText = "Filter " .. tostring(config.Text or config.Name or id) .. "...",
-				RemoveTextOnFocus = false,
-				Callback = wrap((config.Text or config.Name or id) .. " Search", function(text)
-					handle:Search(text)
-				end),
-			}, nextId(id .. "_search"))
 		end
 		return handle
 	end
