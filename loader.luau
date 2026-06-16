@@ -1,4 +1,4 @@
---!nocheck
+﻿--!nocheck
 local LOADER_VERSION = "8.9.0"
 local BOOTSTRAP_VERSION = "2.0.3"
 local MIN_CORE = "2.7.0"
@@ -2490,7 +2490,7 @@ local function loadCore()
 	if not ENV._AlleralMaclibSourceReady then
 		local studioOk, studioLabel = ensureUiSource()
 		if studioOk then
-			log("MacLib source ready (" .. tostring(studioLabel) .. ")")
+			log("UI source ready (" .. tostring(studioLabel) .. ")")
 		else
 			log("MacLib source not cached yet: " .. tostring(studioLabel), true)
 		end
@@ -4219,7 +4219,7 @@ local function main()
 	ENV.Alleral_HTTP.get = httpGet
 	local studioPrefetchOk, studioPrefetchLabel = ensureUiSource()
 	if studioPrefetchOk then
-		log("MacLib source ready (" .. tostring(studioPrefetchLabel) .. ")")
+		log("UI source ready (" .. tostring(studioPrefetchLabel) .. ")")
 	else
 		log("MacLib source not cached yet: " .. tostring(studioPrefetchLabel), true)
 	end

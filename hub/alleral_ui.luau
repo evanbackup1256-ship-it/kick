@@ -80,6 +80,30 @@ return function(Core)
 		return "rbxassetid://" .. iconImage(icon)
 	end
 
+	local function maclibIoFn(name)
+		if type(Core.execFunction) == "function" then
+			return Core.execFunction(name)
+		end
+		return nil
+	end
+
+	local function readMaclibFileAt(path)
+		local readFile = maclibIoFn("readfile")
+		local isFile = maclibIoFn("isfile")
+		if type(readFile) ~= "function" or type(isFile) ~= "function" then
+			if type(Core.readFile) == "function" then
+				return Core.readFile(path)
+			end
+			return nil
+		end
+		local okExists, exists = pcall(isFile, path)
+		if not (okExists and exists) then
+			return nil
+		end
+		local okRead, src = pcall(readFile, path)
+		return okRead and src or nil
+	end
+
 	local function preferredUiEngine()
 		local expected = ENV._Alleral_ExpectedVersions
 		if type(expected) == "table" and type(expected.ui) == "string" and expected.ui ~= "" then
@@ -236,30 +260,6 @@ return function(Core)
 		end
 		local version = maclibVersionFromSource(src)
 		return type(version) == "number" and version == requiredMaclibVersion()
-	end
-
-	local function maclibIoFn(name)
-		if type(Core.execFunction) == "function" then
-			return Core.execFunction(name)
-		end
-		return nil
-	end
-
-	local function readMaclibFileAt(path)
-		local readFile = maclibIoFn("readfile")
-		local isFile = maclibIoFn("isfile")
-		if type(readFile) ~= "function" or type(isFile) ~= "function" then
-			if type(Core.readFile) == "function" then
-				return Core.readFile(path)
-			end
-			return nil
-		end
-		local okExists, exists = pcall(isFile, path)
-		if not (okExists and exists) then
-			return nil
-		end
-		local okRead, src = pcall(readFile, path)
-		return okRead and src or nil
 	end
 
 	local function purgeStaleMaclibFiles()
