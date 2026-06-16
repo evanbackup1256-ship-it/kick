@@ -10,9 +10,12 @@ export const liveStatusQueryKey = ["live-status"] as const;
 
 const LIVE_VIEWS = new Set<PlatformView>(["overview", "status", "games"]);
 
-function livePollInterval() {
-  if (typeof document === "undefined") return 30_000;
-  return document.hidden ? false : 30_000;
+function livePollInterval(view?: PlatformView) {
+  if (typeof document === "undefined") return 5_000;
+  if (document.hidden) return false;
+  if (view === "status") return 3_000;
+  if (view === "overview") return 4_000;
+  return 5_000;
 }
 
 export function useSiteQuery() {
@@ -20,11 +23,10 @@ export function useSiteQuery() {
     queryKey: siteQueryKey,
     queryFn: fetchSite,
     initialData: SITE_SNAPSHOT,
-    staleTime: 5 * 60_000,
+    staleTime: 30_000,
     gcTime: 30 * 60_000,
-    refetchInterval: 5 * 60_000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -34,10 +36,10 @@ export function useLiveStatusQuery(activeView: PlatformView) {
     queryKey: liveStatusQueryKey,
     queryFn: fetchLiveStatus,
     enabled,
-    staleTime: 15_000,
-    refetchInterval: enabled ? livePollInterval : false,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: false,
+    staleTime: 2_000,
+    refetchInterval: enabled ? () => livePollInterval(activeView) : false,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
   });
 }
 

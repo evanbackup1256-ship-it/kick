@@ -1,7 +1,7 @@
 -- Back-compat redirect — bootstrap + loader merged into /bootstrap.luau at repo root.
 -- Old saved scripts that still hit hub/bootstrap.luau get forwarded in one fetch.
 
-local REDIRECT_VERSION = "2.0.0"
+local REDIRECT_VERSION = "2.0.1"
 local REPO = "evanbackup1256-ship-it/kick"
 local MERGED_URLS = {
 	"https://raw.githubusercontent.com/" .. REPO .. "/main/bootstrap.luau?v=" .. REDIRECT_VERSION,

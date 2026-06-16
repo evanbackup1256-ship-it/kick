@@ -90,7 +90,7 @@ $manifestSrc = Join-Path $root "cfg/scripts_manifest.json"
 $siteSrc = Join-Path $root "cfg/site.json"
 $siteRaw = Get-Content $siteSrc -Raw -Encoding UTF8
 $siteRaw = [regex]::Replace($siteRaw, '"loaderVersion"\s*:\s*"[^"]*"', ('"loaderVersion": "' + $release.loader + '"'))
-$siteRaw = [regex]::Replace($siteRaw, 'bootstrap\.luau\?v=[^"&]+', ('bootstrap.luau?v=2.0.0'))
+$siteRaw = [regex]::Replace($siteRaw, 'bootstrap\.luau\?v=[^"&]+', ('bootstrap.luau?v=2.0.1'))
 $siteRaw = [regex]::Replace($siteRaw, '"coreVersion"\s*:\s*"[^"]*"', ('"coreVersion": "' + $release.core + '"'))
 $uiLibrary = if ($release.ui) { $release.ui } else { "Maclib" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiLibrary"\s*:\s*"[^"]*"', ('"uiLibrary": "' + $uiLibrary + '"'))

@@ -1,4 +1,5 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,4 +43,21 @@ writeFileSync(
   JSON.stringify({ bakedAt: new Date().toISOString(), version: snapshot.version ?? 1 }, null, 2)
 );
 
+const apiBase = process.env.NEXT_PUBLIC_ALLERAL_API;
+const configJsPath = join(siteDir, "public/assets/config.js");
+if (existsSync(configJsPath)) {
+  let configJs = readFileSync(configJsPath, "utf8");
+  const injected =
+    apiBase !== undefined
+      ? String(apiBase).replace(/\/$/, "")
+      : (snapshot.links?.relay || snapshot.links?.website?.replace(/\/$/, "") || "");
+  configJs = configJs.replace("__ALLERAL_API__", injected);
+  writeFileSync(configJsPath, configJs);
+}
+
 console.log(`prebuild-site: baked ${src} → ${dest}`);
+
+const patch = join(siteDir, "scripts/patch-static-html.mjs");
+if (existsSync(patch)) {
+  spawnSync(process.execPath, [patch], { stdio: "inherit", cwd: siteDir, env: process.env });
+}

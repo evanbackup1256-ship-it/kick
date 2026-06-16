@@ -28,7 +28,7 @@ if type(compileAndRun) ~= "function" or typeof(gameInstance) ~= "Instance" then
 end
 
 local TELEPORT_RELAUNCH_COOLDOWN = 5
-local MERGED_MIN_BYTES = 50000
+local LOADER_MIN_BYTES = 50000
 
 local function installAutoexecRedirect()
 	if type(writeFileFn) ~= "function" then
@@ -88,16 +88,16 @@ local function relaunchViaBootstrap(reason)
 		stopAutoUpdater()
 	end
 
-	if ENV._Alleral_MergedBootstrap == true and type(ENV.Alleral_Reload) == "function" then
-		ENV.Alleral_Reload()
-		return true, "reload"
+	local src, via = httpGet(GITHUB_RAW .. "/bootstrap.luau?t=" .. tostring(tick()), 200)
+	if type(src) ~= "string" or #src < 200 then
+		src, via = httpGet(GITHUB_RAW .. "/loader.luau?t=" .. tostring(tick()), LOADER_MIN_BYTES)
 	end
-
-	local src, via = httpGet(GITHUB_RAW .. "/" .. BOOTSTRAP_REMOTE_PATH .. "?t=" .. tostring(tick()), MERGED_MIN_BYTES)
-	if type(src) ~= "string" or #src < MERGED_MIN_BYTES then
+	if type(src) ~= "string" or #src < 200 then
 		return false, "bootstrap fetch failed (" .. tostring(via) .. ")"
 	end
+	ENV._Alleral_BootstrapSkipAutoRun = true
 	local ok, err = compileAndRun(src, "Alleral/bootstrap", loaderRunEnv())
+	ENV._Alleral_BootstrapSkipAutoRun = nil
 	return ok == true, err
 end
 

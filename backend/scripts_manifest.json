@@ -14,7 +14,7 @@
 
       "version": "7.2.8",
 
-      "message": "Luxy-style remote-first boot: static kickblox data, registry-only modules, configs sync on load.",
+      "message": "Remote-first boot fix, registry-only modules, configs load on start.",
 
       "updatedAt": "2026-06-15T23:55:00+00:00",
 

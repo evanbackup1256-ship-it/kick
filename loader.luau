@@ -1,7 +1,6 @@
 --!nocheck
-local LOADER_VERSION = "8.8.0"
-local BOOTSTRAP_VERSION = "2.0.0"
-local MERGED_BOOTSTRAP = true
+local LOADER_VERSION = "8.8.1"
+local BOOTSTRAP_VERSION = "2.0.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -38,7 +37,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.8.0",
+	loader = "8.8.1",
 	core = "2.9.5",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
@@ -158,15 +157,6 @@ pcall(function()
 end)
 
 local ENV = genv()
-
-ENV._Alleral_MergedBootstrap = MERGED_BOOTSTRAP
-ENV._Alleral_SelfBootstrapped = true
-ENV._Alleral_Bootstrapped = true
-ENV._Alleral_BootstrapVersion = BOOTSTRAP_VERSION
-ENV._Alleral_BootstrapAt = tick()
-ENV._Alleral_BootstrapCommit = RELEASE_FALLBACK.commit
-
-print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. " / Loader v" .. LOADER_VERSION .. "] Starting…")
 
 local function loaderRunEnv()
 	local env = genv()
@@ -659,7 +649,7 @@ local function bootExecutorRuntime()
 	return false
 end
 
-bootExecutorRuntime()
+task.defer(bootExecutorRuntime)
 
 local EXECUTOR = resolveExecutorProfile()
 if type(ENV.Alleral_ExecutorRuntime) == "table" and type(ENV.Alleral_ExecutorRuntime.enrichProfile) == "function" then
@@ -954,258 +944,259 @@ local function cacheRemote(relativePath, src)
 	pcall(writeFileFn, relativePath, src)
 end
 
-local function requiredMaclibVersion()
-	local expected = ENV._Alleral_ExpectedVersions
-	if type(expected) == "table" then
-		local version = tonumber(expected.maclibVersion)
-		if version then
-			return version
-		end
-	end
-	return MACLIB_VERSION
-end
-
-local function maclibVersionFromSource(src)
-	if type(src) ~= "string" then
-		return nil
-	end
-	return tonumber(src:match("\nlocal%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
-		or tonumber(src:match("^local%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
-		or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*ALLERAL_MACLIB_VERSION"))
-		or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
-end
-
-local function maclibFetchUrls()
-	local bust = "?maclib=3&t=" .. tostring(tick())
-	local urls = {
-		GITHUB_RAW .. "/" .. MACLIB_SOURCE_PATH .. bust,
-		"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. MACLIB_SOURCE_PATH .. bust,
+local ensureMaclibSource, maclibSourceValid
+do
+	local LEGACY_UI_SOURCE_PATHS = {
+		UI .. "/rayfield/source.luau",
+		"kick/" .. UI .. "/rayfield/source.luau",
+		".alleral/cache/" .. UI .. "/rayfield/source.luau",
+		UI .. "/syde/source.luau",
+		"kick/" .. UI .. "/syde/source.luau",
+		".alleral/cache/" .. UI .. "/syde/source.luau",
+		UI .. "/studio/source.luau",
+		"kick/" .. UI .. "/studio/source.luau",
+		".alleral/cache/" .. UI .. "/studio/source.luau",
 	}
-	local expected = ENV._Alleral_ExpectedVersions
-	local commit = type(expected) == "table" and expected.commit
-	if type(commit) == "string" and commit ~= "" then
-		table.insert(urls, "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. commit .. "/" .. MACLIB_SOURCE_PATH .. bust)
-	end
-	table.insert(urls, JSDELIVR .. "/" .. MACLIB_SOURCE_PATH .. bust)
-	return urls
-end
 
-local function maclibSourceValid(src)
-	if type(src) ~= "string"
-		or #src < MACLIB_SOURCE_MIN_BYTES
-		or src:find("<!DOCTYPE", 1, true)
-		or not src:find(MACLIB_VERSION_MARKER, 1, true)
-		or not src:find(MACLIB_REQUIRED_FN, 1, true)
-		or not src:find("function MacLib:Window", 1, true)
-		or not looksLikeLua(src) then
-		return false
-	end
-	local version = maclibVersionFromSource(src)
-	local need = requiredMaclibVersion()
-	return type(version) == "number" and version == need
-end
-
-local function maclibSourceRejectReason(src)
-	if type(src) ~= "string" then
-		return "no body"
-	end
-	if #src < MACLIB_SOURCE_MIN_BYTES then
-		return "too small (" .. tostring(#src) .. "b, need " .. tostring(MACLIB_SOURCE_MIN_BYTES) .. "+)"
-	end
-	if not looksLikeLua(src) then
-		return "not lua (" .. tostring(#src) .. "b)"
-	end
-	if not src:find(MACLIB_VERSION_MARKER, 1, true) then
-		return "missing version marker"
-	end
-	if not src:find(MACLIB_REQUIRED_FN, 1, true) then
-		return "missing " .. MACLIB_REQUIRED_FN
-	end
-	local version = maclibVersionFromSource(src)
-	local need = requiredMaclibVersion()
-	if type(version) ~= "number" or version ~= need then
-		return "version v" .. tostring(version or "?") .. " != required v" .. tostring(need)
-	end
-	return "ok"
-end
-
-local function maclibRemoteBases()
-	return maclibFetchUrls()
-end
-
-local function fetchRemoteMaclib()
-	local lastReason = "no response"
-	for attempt = 1, 3 do
-		for _, url in ipairs(maclibFetchUrls()) do
-			local body, via = httpGet(url, MACLIB_SOURCE_MIN_BYTES)
-			if type(body) == "string" and #body >= MACLIB_SOURCE_MIN_BYTES then
-				if maclibSourceValid(body) then
-					return body, url .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
-				end
-				lastReason = maclibSourceRejectReason(body)
-					.. " ("
-					.. tostring(#body)
-					.. "b via "
-					.. tostring(via)
-					.. ")"
-			elseif type(body) == "string" then
-				lastReason = "too small (" .. tostring(#body) .. "b via " .. tostring(via) .. ")"
-			else
-				lastReason = tostring(via or "http failed")
+	local function requiredMaclibVersion()
+		local expected = ENV._Alleral_ExpectedVersions
+		if type(expected) == "table" then
+			local version = tonumber(expected.maclibVersion)
+			if version then
+				return version
 			end
 		end
-		if attempt < 3 then
-			task.wait(0.25 * attempt)
+		return MACLIB_VERSION
+	end
+
+	local function maclibVersionFromSource(src)
+		if type(src) ~= "string" then
+			return nil
+		end
+		return tonumber(src:match("\nlocal%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("^local%s+ALLERAL_MACLIB_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*ALLERAL_MACLIB_VERSION"))
+			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
+	end
+
+	local function maclibFetchUrls()
+		local bust = "?maclib=3&t=" .. tostring(tick())
+		local urls = {
+			GITHUB_RAW .. "/" .. MACLIB_SOURCE_PATH .. bust,
+			"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. MACLIB_SOURCE_PATH .. bust,
+		}
+		local expected = ENV._Alleral_ExpectedVersions
+		local commit = type(expected) == "table" and expected.commit
+		if type(commit) == "string" and commit ~= "" then
+			table.insert(urls, "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. commit .. "/" .. MACLIB_SOURCE_PATH .. bust)
+		end
+		table.insert(urls, JSDELIVR .. "/" .. MACLIB_SOURCE_PATH .. bust)
+		return urls
+	end
+
+	local function maclibSourceRejectReason(src)
+		if type(src) ~= "string" then
+			return "no body"
+		end
+		if #src < MACLIB_SOURCE_MIN_BYTES then
+			return "too small (" .. tostring(#src) .. "b, need " .. tostring(MACLIB_SOURCE_MIN_BYTES) .. "+)"
+		end
+		if not looksLikeLua(src) then
+			return "not lua (" .. tostring(#src) .. "b)"
+		end
+		if not src:find(MACLIB_VERSION_MARKER, 1, true) then
+			return "missing version marker"
+		end
+		if not src:find(MACLIB_REQUIRED_FN, 1, true) then
+			return "missing " .. MACLIB_REQUIRED_FN
+		end
+		local version = maclibVersionFromSource(src)
+		local need = requiredMaclibVersion()
+		if type(version) ~= "number" or version ~= need then
+			return "version v" .. tostring(version or "?") .. " != required v" .. tostring(need)
+		end
+		return "ok"
+	end
+
+	local function isMaclibSourceValid(src)
+		if type(src) ~= "string"
+			or #src < MACLIB_SOURCE_MIN_BYTES
+			or src:find("<!DOCTYPE", 1, true)
+			or not src:find(MACLIB_VERSION_MARKER, 1, true)
+			or not src:find(MACLIB_REQUIRED_FN, 1, true)
+			or not src:find("function MacLib:Window", 1, true)
+			or not looksLikeLua(src) then
+			return false
+		end
+		local version = maclibVersionFromSource(src)
+		local need = requiredMaclibVersion()
+		return type(version) == "number" and version == need
+	end
+
+	local function fetchRemoteMaclib()
+		local lastReason = "no response"
+		for attempt = 1, 3 do
+			for _, url in ipairs(maclibFetchUrls()) do
+				local body, via = httpGet(url, MACLIB_SOURCE_MIN_BYTES)
+				if type(body) == "string" and #body >= MACLIB_SOURCE_MIN_BYTES then
+					if isMaclibSourceValid(body) then
+						return body, url .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
+					end
+					lastReason = maclibSourceRejectReason(body)
+						.. " ("
+						.. tostring(#body)
+						.. "b via "
+						.. tostring(via)
+						.. ")"
+				elseif type(body) == "string" then
+					lastReason = "too small (" .. tostring(#body) .. "b via " .. tostring(via) .. ")"
+				else
+					lastReason = tostring(via or "http failed")
+				end
+			end
+			if attempt < 3 then
+				task.wait(0.25 * attempt)
+			end
+		end
+		return nil, lastReason
+	end
+
+	local function clearStaleMaclibRuntime()
+		local env = genv()
+		if type(env) ~= "table" or type(env._AlleralMaclib) ~= "table" then
+			return
+		end
+		local version = env._AlleralMaclib.__AlleralPatch
+		if type(version) ~= "number" or version < requiredMaclibVersion() then
+			env._AlleralMaclib = nil
+			env._AlleralMaclibSourceKey = nil
 		end
 	end
-	return nil, lastReason
-end
 
-local function clearStaleMaclibRuntime()
-	local env = genv()
-	if type(env) ~= "table" or type(env._AlleralMaclib) ~= "table" then
-		return
-	end
-	local version = env._AlleralMaclib.__AlleralPatch
-	if type(version) ~= "number" or version < requiredMaclibVersion() then
-		env._AlleralMaclib = nil
-		env._AlleralMaclibSourceKey = nil
-	end
-end
-
-local LEGACY_UI_SOURCE_PATHS = {
-	UI .. "/rayfield/source.luau",
-	"kick/" .. UI .. "/rayfield/source.luau",
-	".alleral/cache/" .. UI .. "/rayfield/source.luau",
-	UI .. "/syde/source.luau",
-	"kick/" .. UI .. "/syde/source.luau",
-	".alleral/cache/" .. UI .. "/syde/source.luau",
-	UI .. "/studio/source.luau",
-	"kick/" .. UI .. "/studio/source.luau",
-	".alleral/cache/" .. UI .. "/studio/source.luau",
-}
-
-local function purgeLegacyUiSources()
-	local need = requiredMaclibVersion()
-	for _, path in ipairs(LEGACY_UI_SOURCE_PATHS) do
-		local src = readLocal({ path }, 100)
-		if src then
-			deleteWorkspaceFile(path, { silent = true, label = "legacy UI source" })
+	local function purgeLegacyUiSources()
+		local need = requiredMaclibVersion()
+		for _, path in ipairs(LEGACY_UI_SOURCE_PATHS) do
+			local src = readLocal({ path }, 100)
+			if src then
+				deleteWorkspaceFile(path, { silent = true, label = "legacy UI source" })
+			end
+		end
+		local paths = {
+			MACLIB_SOURCE_PATH,
+			"kick/" .. MACLIB_SOURCE_PATH,
+			".alleral/cache/" .. MACLIB_SOURCE_PATH,
+		}
+		for _, path in ipairs(paths) do
+			local src = readLocal({ path }, 100)
+			if src then
+				local version = maclibVersionFromSource(src)
+				if type(version) ~= "number" or version ~= need then
+					deleteWorkspaceFile(path, { silent = true, label = "stale MacLib" })
+					log(
+						"Purged stale MacLib source "
+							.. path
+							.. " (v"
+							.. tostring(version or "?")
+							.. " != v"
+							.. tostring(need)
+							.. ")",
+						true
+					)
+				end
+			end
 		end
 	end
-	local paths = {
-		MACLIB_SOURCE_PATH,
-		"kick/" .. MACLIB_SOURCE_PATH,
-		".alleral/cache/" .. MACLIB_SOURCE_PATH,
-	}
-	for _, path in ipairs(paths) do
-		local src = readLocal({ path }, 100)
-		if src then
+
+	maclibSourceValid = isMaclibSourceValid
+
+	ensureMaclibSource = function()
+		clearStaleMaclibRuntime()
+		purgeLegacyUiSources()
+
+		if type(ENV._AlleralMaclibSource) == "string" and not isMaclibSourceValid(ENV._AlleralMaclibSource) then
+			ENV._AlleralMaclibSource = nil
+			ENV._AlleralMaclibSourceReady = false
+			ENV._AlleralMaclibSourceLabel = nil
+		end
+
+		for _, overridePath in ipairs(MACLIB_PATCHED_OVERRIDE_PATHS) do
+			local src, path = readLocal({ overridePath }, MACLIB_SOURCE_MIN_BYTES)
+			if src and isMaclibSourceValid(src) then
+				local version = maclibVersionFromSource(src)
+				log("Using local patched MacLib override: " .. tostring(path) .. " (v" .. tostring(version or "?") .. ")")
+				ENV._AlleralMaclibSource = src
+				ENV._AlleralMaclibSourceVersion = version
+				ENV._AlleralMaclibSourceLabel = "override:" .. tostring(path)
+				ENV._AlleralMaclibSourceReady = true
+				cacheRemote(MACLIB_SOURCE_PATH, src)
+				cacheRemote(".alleral/cache/" .. MACLIB_SOURCE_PATH, src)
+				return true, "override:" .. tostring(path) .. ", v" .. tostring(version or "?")
+			end
+		end
+
+		local localPaths = {
+			MACLIB_SOURCE_PATH,
+			"kick/" .. MACLIB_SOURCE_PATH,
+		}
+		local cachePaths = {
+			".alleral/cache/" .. MACLIB_SOURCE_PATH,
+		}
+
+		local function adoptMaclib(src, label)
+			if not src or not isMaclibSourceValid(src) then
+				return nil
+			end
+			cacheRemote(MACLIB_SOURCE_PATH, src)
+			cacheRemote(".alleral/cache/" .. MACLIB_SOURCE_PATH, src)
 			local version = maclibVersionFromSource(src)
-			if type(version) ~= "number" or version ~= need then
-				deleteWorkspaceFile(path, { silent = true, label = "stale MacLib" })
+			ENV._AlleralMaclibSource = src
+			ENV._AlleralMaclibSourceVersion = version
+			ENV._AlleralMaclibSourceLabel = label
+			ENV._AlleralMaclibSourceReady = true
+			return true, label .. ", v" .. tostring(version or "?")
+		end
+
+		local cacheSrc, cachePath = readLocal(cachePaths, MACLIB_SOURCE_MIN_BYTES)
+		local cacheOk = cacheSrc and isMaclibSourceValid(cacheSrc)
+		local cacheVersion = maclibVersionFromSource(cacheSrc)
+
+		local remoteSrc, remoteVia = fetchRemoteMaclib()
+		local remoteOk = remoteSrc and isMaclibSourceValid(remoteSrc)
+		local remoteVersion = maclibVersionFromSource(remoteSrc)
+
+		local localSrc, localPath = readLocal(localPaths, MACLIB_SOURCE_MIN_BYTES)
+		local localOk = localSrc and isMaclibSourceValid(localSrc)
+		local localVersion = maclibVersionFromSource(localSrc)
+
+		if remoteOk then
+			if localOk and localPath and (localVersion or 0) ~= (remoteVersion or 0) then
 				log(
-					"Purged stale MacLib source "
-						.. path
-						.. " (v"
-						.. tostring(version or "?")
-						.. " != v"
-						.. tostring(need)
+					"Replacing stale MacLib source (local v"
+						.. tostring(localVersion or "?")
+						.. " != remote v"
+						.. tostring(remoteVersion or "?")
 						.. ")",
 					true
 				)
+				deleteWorkspaceFile(localPath)
 			end
+			if cacheOk and cachePath and (cacheVersion or 0) ~= (remoteVersion or 0) then
+				deleteWorkspaceFile(cachePath, { silent = true, label = "stale MacLib cache" })
+			end
+			return adoptMaclib(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
 		end
-	end
-end
 
-local function ensureMaclibSource()
-	clearStaleMaclibRuntime()
-	purgeLegacyUiSources()
-
-	if type(ENV._AlleralMaclibSource) == "string" and not maclibSourceValid(ENV._AlleralMaclibSource) then
-		ENV._AlleralMaclibSource = nil
-		ENV._AlleralMaclibSourceReady = false
-		ENV._AlleralMaclibSourceLabel = nil
-	end
-
-	for _, overridePath in ipairs(MACLIB_PATCHED_OVERRIDE_PATHS) do
-		local src, path = readLocal({ overridePath }, MACLIB_SOURCE_MIN_BYTES)
-		if src and maclibSourceValid(src) then
-			local version = maclibVersionFromSource(src)
-			log("Using local patched MacLib override: " .. tostring(path) .. " (v" .. tostring(version or "?") .. ")")
-			ENV._AlleralMaclibSource = src
-			ENV._AlleralMaclibSourceVersion = version
-			ENV._AlleralMaclibSourceLabel = "override:" .. tostring(path)
-			ENV._AlleralMaclibSourceReady = true
-			cacheRemote(MACLIB_SOURCE_PATH, src)
-			cacheRemote(".alleral/cache/" .. MACLIB_SOURCE_PATH, src)
-			return true, "override:" .. tostring(path) .. ", v" .. tostring(version or "?")
+		if localOk then
+			return adoptMaclib(localSrc, "local:" .. tostring(localPath))
 		end
-	end
 
-	local localPaths = {
-		MACLIB_SOURCE_PATH,
-		"kick/" .. MACLIB_SOURCE_PATH,
-	}
-	local cachePaths = {
-		".alleral/cache/" .. MACLIB_SOURCE_PATH,
-	}
-
-	local function adoptMaclib(src, label)
-		if not src or not maclibSourceValid(src) then
-			return nil
+		if cacheOk then
+			return adoptMaclib(cacheSrc, "cache:" .. tostring(cachePath))
 		end
-		cacheRemote(MACLIB_SOURCE_PATH, src)
-		cacheRemote(".alleral/cache/" .. MACLIB_SOURCE_PATH, src)
-		local version = maclibVersionFromSource(src)
-		ENV._AlleralMaclibSource = src
-		ENV._AlleralMaclibSourceVersion = version
-		ENV._AlleralMaclibSourceLabel = label
-		ENV._AlleralMaclibSourceReady = true
-		return true, label .. ", v" .. tostring(version or "?")
+
+		local fetchDetail = type(remoteVia) == "string" and remoteVia or maclibSourceRejectReason(remoteSrc)
+		return false, "MacLib source unavailable (need v" .. tostring(requiredMaclibVersion()) .. "): " .. tostring(fetchDetail)
 	end
-
-	local cacheSrc, cachePath = readLocal(cachePaths, MACLIB_SOURCE_MIN_BYTES)
-	local cacheOk = cacheSrc and maclibSourceValid(cacheSrc)
-	local cacheVersion = maclibVersionFromSource(cacheSrc)
-
-	local remoteSrc, remoteVia = fetchRemoteMaclib()
-	local remoteOk = remoteSrc and maclibSourceValid(remoteSrc)
-	local remoteVersion = maclibVersionFromSource(remoteSrc)
-
-	local localSrc, localPath = readLocal(localPaths, MACLIB_SOURCE_MIN_BYTES)
-	local localOk = localSrc and maclibSourceValid(localSrc)
-	local localVersion = maclibVersionFromSource(localSrc)
-
-	if remoteOk then
-		if localOk and localPath and (localVersion or 0) ~= (remoteVersion or 0) then
-			log(
-				"Replacing stale MacLib source (local v"
-					.. tostring(localVersion or "?")
-					.. " != remote v"
-					.. tostring(remoteVersion or "?")
-					.. ")",
-				true
-			)
-			deleteWorkspaceFile(localPath)
-		end
-		if cacheOk and cachePath and (cacheVersion or 0) ~= (remoteVersion or 0) then
-			deleteWorkspaceFile(cachePath, { silent = true, label = "stale MacLib cache" })
-		end
-		return adoptMaclib(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
-	end
-
-	if localOk then
-		return adoptMaclib(localSrc, "local:" .. tostring(localPath))
-	end
-
-	if cacheOk then
-		return adoptMaclib(cacheSrc, "cache:" .. tostring(cachePath))
-	end
-
-	local fetchDetail = type(remoteVia) == "string" and remoteVia or maclibSourceRejectReason(remoteSrc)
-	return false, "MacLib source unavailable (need v" .. tostring(requiredMaclibVersion()) .. "): " .. tostring(fetchDetail)
 end
 
 local function usesLegacyHttpHash(src)
@@ -1495,13 +1486,8 @@ local function verifyBootstrapAttestation()
 	if ENV._Alleral_BootstrapVerified == true then
 		return true
 	end
-	if ENV._Alleral_MergedBootstrap == true or ENV._Alleral_SelfBootstrapped == true then
-		ENV._Alleral_BootstrapVerified = true
-		ENV._Alleral_BootstrapVersion = BOOTSTRAP_VERSION
-		return true
-	end
 	if ENV._Alleral_Bootstrapped ~= true then
-		return false, "Run the Alleral loadstring from the site — don't paste loader.luau directly."
+		return false, "Run the Alleral loadstring from the site."
 	end
 	local token = ENV._Alleral_BootstrapToken
 	local at = tonumber(ENV._Alleral_BootstrapTokenAt)
@@ -3440,10 +3426,10 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.0"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.1"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.0"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.1"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
@@ -3928,8 +3914,6 @@ local function initRelaunchHooks()
 	return false
 end
 
-pcall(initRelaunchHooks)
-
 local function detectGame()
 	local placeId = game.PlaceId
 	local universeId = nil
@@ -4031,7 +4015,7 @@ local function main()
 	end
 
 	if type(ENV._Alleral_InstallGlobalBootstrap) ~= "function" then
-		pcall(initRelaunchHooks)
+		task.defer(initRelaunchHooks)
 	end
 	if type(ENV._Alleral_InstallGlobalBootstrap) == "function" then
 		ENV._Alleral_InstallGlobalBootstrap()
@@ -4405,13 +4389,10 @@ end)
 
 publishConsoleApi("Alleral_Reload", function()
 	stopAutoUpdater()
-	if type(ENV._Alleral_RunLoader) == "function" then
-		ENV._Alleral_RunLoader("manual-reload")
-		return true
-	end
 	if ENV.Alleral_State and type(ENV.Alleral_State.Alleral_Unload) == "function" then
 		pcall(ENV.Alleral_State.Alleral_Unload)
 	end
+	ENV.Alleral_LoaderRunning = false
 	ENV._Alleral_TeleportWatchConnected = nil
 	if typeof(task) == "table" and task.defer then
 		task.defer(main)
@@ -4466,18 +4447,6 @@ publishConsoleApi("Alleral_CheckUpdate", function()
 end)
 
 publishConsoleApi("Alleral_SyncWeao", syncWeaoConfig)
-
-publishConsoleApi("Alleral_Bootstrap", function(reason)
-	if type(ENV.Alleral_Reload) == "function" then
-		ENV.Alleral_Reload()
-		return true
-	end
-	if ENV._Alleral_RelaunchViaBootstrap then
-		local ok, err = ENV._Alleral_RelaunchViaBootstrap(reason or "bootstrap")
-		return ok == true, err
-	end
-	return false, "reload unavailable"
-end)
 
 log("v" .. LOADER_VERSION .. " booting on PlaceId " .. tostring(game.PlaceId) .. " (" .. EXECUTOR.slug .. ")")
 

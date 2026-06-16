@@ -37,8 +37,15 @@
   }
 
   function apiBase() {
-    const cfg = window.ALLERAL_API || "";
-    if (cfg) return cfg.replace(/\/+$/, "");
+    const cfg = String(window.ALLERAL_API ?? "").trim();
+    if (cfg && cfg !== "__ALLERAL_API__") return cfg.replace(/\/+$/, "");
+    const pub = window.ALLERAL_CONFIG?.publicUrl || window.ALLERAL_CONFIG?.relayUrl || "";
+    if (pub && window.location.hostname.includes("github.io")) {
+      return String(pub).replace(/\/+$/, "");
+    }
+    if (window.location.hostname.includes("github.io")) {
+      return "https://alleral-telemetry-production.up.railway.app";
+    }
     return window.location.origin.replace(/\/+$/, "");
   }
 

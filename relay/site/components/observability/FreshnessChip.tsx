@@ -15,9 +15,9 @@ export function FreshnessChip({
   live?: boolean;
   className?: string;
 }) {
-  const tickSeconds = useSecondsSince(dataUpdatedAt ?? null, 5000);
+  const tickSeconds = useSecondsSince(dataUpdatedAt ?? null, 1000);
   const secondsAgo = secondsAgoProp ?? tickSeconds;
-  const fresh = secondsAgo != null && secondsAgo < 30;
+  const fresh = secondsAgo != null && secondsAgo < 12;
 
   return (
     <span

@@ -133,7 +133,8 @@ export function CommandPalette({
               </Command.Item>
               <Command.Item
                 onSelect={() => {
-                  window.open("/admin", "_blank");
+                  const adminUrl = site.links?.admin || site.links?.relay?.replace(/\/$/, "") + "/admin" || "/admin";
+                  window.open(adminUrl, "_blank", "noopener,noreferrer");
                   setOpen(false);
                 }}
                 className="cursor-pointer rounded-xl px-3 py-2.5 text-sm text-muted aria-selected:bg-white/[0.06] aria-selected:text-text"

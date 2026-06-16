@@ -1,4 +1,4 @@
-window.ALLERAL_API = window.ALLERAL_API || "";
+window.ALLERAL_API = window.ALLERAL_API || "https://alleral-telemetry-production.up.railway.app";
 
 window.ALLERAL_CONFIG = {
   /** Primary URL players should bookmark (shown on the site). */

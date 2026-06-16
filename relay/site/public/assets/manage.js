@@ -5,7 +5,14 @@
   const toast = $("#toast");
 
   function apiBase() {
-    return (window.ALLERAL_API || window.location.origin).replace(/\/+$/, "");
+    const cfg = window.ALLERAL_API || "";
+    if (cfg && cfg !== "__ALLERAL_API__") return cfg.replace(/\/+$/, "");
+    const pub = window.ALLERAL_CONFIG?.publicUrl || "";
+    if (pub) return String(pub).replace(/\/+$/, "");
+    if (window.location.hostname.includes("github.io")) {
+      return "https://alleral-telemetry-production.up.railway.app";
+    }
+    return window.location.origin.replace(/\/+$/, "");
   }
 
   function flash(text, isError = false) {
