@@ -1,5 +1,5 @@
 -- Alleral vendored MacLib 1.2.6 (Alleral patch v5)
-local ALLERAL_MACLIB_VERSION = 5
+local ALLERAL_MACLIB_VERSION = 6
 
 local function formatSliderPrecision(value, precision)
 	local digits = tonumber(precision)
