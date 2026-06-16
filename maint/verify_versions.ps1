@@ -12,6 +12,18 @@ function Pass($msg)
 $release = Get-Content (Join-Path $root "cfg/release.json") -Raw | ConvertFrom-Json
 $manifest = Get-Content (Join-Path $root "cfg/scripts_manifest.json") -Raw | ConvertFrom-Json
 $loader = Get-Content (Join-Path $root "loader.luau") -Raw
+$loaderBytes = [System.IO.File]::ReadAllBytes((Join-Path $root "loader.luau"))
+if ($loaderBytes.Length -ge 3 -and $loaderBytes[0] -eq 0xEF -and $loaderBytes[1] -eq 0xBB -and $loaderBytes[2] -eq 0xBF) {
+    Fail "loader.luau contains UTF-8 BOM (breaks loadstring on Xeno)"
+} else {
+    Pass "loader.luau has no UTF-8 BOM"
+}
+$bootstrapBytes = [System.IO.File]::ReadAllBytes((Join-Path $root "bootstrap.luau"))
+if ($bootstrapBytes.Length -ge 3 -and $bootstrapBytes[0] -eq 0xEF -and $bootstrapBytes[1] -eq 0xBB -and $bootstrapBytes[2] -eq 0xBF) {
+    Fail "bootstrap.luau contains UTF-8 BOM (breaks loadstring on Xeno)"
+} else {
+    Pass "bootstrap.luau has no UTF-8 BOM"
+}
 $HashBumpMessagePattern = '^Update release commit hash'
 
 $head = (git -C $root rev-parse --short HEAD).Trim()

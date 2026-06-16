@@ -1,5 +1,5 @@
-﻿--!nocheck
-local LOADER_VERSION = "8.8.11"
+--!nocheck
+local LOADER_VERSION = "8.8.12"
 local BOOTSTRAP_VERSION = "2.0.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -48,7 +48,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.8.11",
+	loader = "8.8.12",
 	core = "2.9.10",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
@@ -3452,10 +3452,10 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.11"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.12"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.11"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.12"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
