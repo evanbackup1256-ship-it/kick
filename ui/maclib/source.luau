@@ -1,5 +1,5 @@
 -- Alleral vendored MacLib 1.2.6 (Alleral patch v13)
-local ALLERAL_MACLIB_VERSION = 14
+local ALLERAL_MACLIB_VERSION = 15
 
 local function udim2PixelSize(udim2, fallbackX, fallbackY)
 	if typeof(udim2) ~= "UDim2" then
@@ -2850,6 +2850,11 @@ function MacLib:Window(Settings)
 				sectionUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 				sectionUIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 				sectionUIListLayout.Parent = section
+				pcall(function()
+					sectionUIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+						task.defer(refreshTabScrollCanvas)
+					end)
+				end)
 
 				local sectionUIPadding = Instance.new("UIPadding")
 				sectionUIPadding.Name = "SectionUIPadding"
@@ -3123,7 +3128,6 @@ function MacLib:Window(Settings)
 					local SliderFunctions = { Settings = Settings, IgnoreConfig = false, Class = "Slider" }
 					local slider = Instance.new("Frame")
 					slider.Name = "Slider"
-					slider.AutomaticSize = Enum.AutomaticSize.Y
 					slider.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 					slider.BackgroundTransparency = 1
 					slider.BorderColor3 = Color3.fromRGB(0, 0, 0)
@@ -3402,12 +3406,12 @@ function MacLib:Window(Settings)
 					local InputFunctions = { Settings = Settings, IgnoreConfig = false, Class = "Input" }
 					local input = Instance.new("Frame")
 					input.Name = "Input"
-					input.AutomaticSize = Enum.AutomaticSize.Y
+					input.AutomaticSize = Enum.AutomaticSize.None
 					input.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 					input.BackgroundTransparency = 1
 					input.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					input.BorderSizePixel = 0
-					input.Size = UDim2.new(1, 0, 0, 0)
+					input.Size = UDim2.new(1, 0, 0, 30)
 					addSectionElement(input)
 
 					local inputLayout = Instance.new("UIListLayout")
@@ -3478,6 +3482,17 @@ function MacLib:Window(Settings)
 					inputBoxUISizeConstraint.Parent = inputBox
 
 					inputBox.Parent = input
+
+					local function syncInputHeight()
+						local labelH = inputName.Visible and math.max(inputName.TextBounds.Y, 0) or 0
+						local gap = inputName.Visible and 5 or 0
+						input.Size = UDim2.new(1, 0, 0, math.max(30, labelH + gap + 30))
+						task.defer(refreshTabScrollCanvas)
+					end
+					syncInputHeight()
+					pcall(function()
+						inputName:GetPropertyChangedSignal("TextBounds"):Connect(syncInputHeight)
+					end)
 
 					local InputBox = inputBox
 
@@ -3783,6 +3798,7 @@ function MacLib:Window(Settings)
 					interact.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					interact.BorderSizePixel = 0
 					interact.Size = UDim2.new(1, 0, 0, 38)
+					interact.ZIndex = 2
 					interact.Parent = dropdown
 
 					local dropdownName = Instance.new("TextLabel")
@@ -3796,19 +3812,40 @@ function MacLib:Window(Settings)
 					dropdownName.TextTruncate = Enum.TextTruncate.AtEnd
 					dropdownName.TextWrapped = true
 					dropdownName.TextXAlignment = Enum.TextXAlignment.Left
-					dropdownName.AutomaticSize = Enum.AutomaticSize.Y
+					dropdownName.TextYAlignment = Enum.TextYAlignment.Center
 					dropdownName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					dropdownName.BackgroundTransparency = 1
 					dropdownName.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					dropdownName.BorderSizePixel = 0
-					dropdownName.Size = UDim2.new(1, -24, 0, 0)
-					dropdownName.Parent = dropdown
+					dropdownName.Size = UDim2.new(1, -24, 1, 0)
+					dropdownName.ZIndex = 3
+					dropdownName.Parent = interact
+
+					local function getDropdownHeaderHeight()
+						return math.max(38, dropdownName.TextBounds.Y + 14)
+					end
+
+					local function syncDropdownHeader()
+						local headerH = getDropdownHeaderHeight()
+						interact.Size = UDim2.new(1, 0, 0, headerH)
+						dropdownImage.Position = UDim2.new(1, 0, 0, math.max(0, math.floor(headerH / 2) - 7))
+						if dropdownFrame then
+							dropdownFrame.Position = UDim2.new(0, 0, 0, headerH)
+						end
+						return headerH
+					end
+
+					local function notifyDropdownLayout()
+						task.defer(refreshTabScrollCanvas)
+					end
 
 					local function syncDropdownCollapsedHeight()
 						if dropdownFrame and dropdownFrame.Visible then
 							return
 						end
-						dropdown.Size = UDim2.new(1, 0, 0, math.max(38, dropdownName.TextBounds.Y + 14))
+						local headerH = syncDropdownHeader()
+						dropdown.Size = UDim2.new(1, 0, 0, headerH)
+						notifyDropdownLayout()
 					end
 					pcall(function()
 						dropdownName:GetPropertyChangedSignal("TextBounds"):Connect(syncDropdownCollapsedHeight)
@@ -3838,6 +3875,7 @@ function MacLib:Window(Settings)
 					dropdownImage.BorderSizePixel = 0
 					dropdownImage.Position = UDim2.new(1, 0, 0, 12)
 					dropdownImage.Size = UDim2.fromOffset(14, 14)
+					dropdownImage.ZIndex = 4
 					dropdownImage.Parent = dropdown
 
 					local dropdownFrame = Instance.new("Frame")
@@ -3847,13 +3885,15 @@ function MacLib:Window(Settings)
 					dropdownFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					dropdownFrame.BorderSizePixel = 0
 					dropdownFrame.ClipsDescendants = true
-					dropdownFrame.Size = UDim2.fromScale(1, 1)
+					dropdownFrame.Position = UDim2.new(0, 0, 0, 38)
+					dropdownFrame.Size = UDim2.new(1, 0, 0, 0)
 					dropdownFrame.Visible = false
 					dropdownFrame.AutomaticSize = Enum.AutomaticSize.Y
+					dropdownFrame.ZIndex = 1
 
 					local dropdownFrameUIPadding = Instance.new("UIPadding")
 					dropdownFrameUIPadding.Name = "DropdownFrameUIPadding"
-					dropdownFrameUIPadding.PaddingTop = UDim.new(0, 38)
+					dropdownFrameUIPadding.PaddingTop = UDim.new(0, 0)
 					dropdownFrameUIPadding.PaddingBottom = UDim.new(0, 10)
 					dropdownFrameUIPadding.Parent = dropdownFrame
 
@@ -3917,20 +3957,9 @@ function MacLib:Window(Settings)
 					searchBox.Size = UDim2.fromScale(1, 1)
 
 					local function CalculateDropdownSize()
-						local totalHeight = 0
-						local visibleChildrenCount = 0
+						local headerH = syncDropdownHeader()
 						local padding = dropdownFrameUIPadding.PaddingTop.Offset + dropdownFrameUIPadding.PaddingBottom.Offset
-
-						for _, v in pairs(dropdownFrame:GetChildren()) do
-							if not v:IsA("UIComponent") and v.Visible then
-								totalHeight += v.AbsoluteSize.Y
-								visibleChildrenCount += 1
-							end
-						end
-
-						local spacing = dropdownFrameUIListLayout.Padding.Offset * (visibleChildrenCount - 1)
-
-						return totalHeight + spacing + padding
+						return headerH + dropdownFrameUIListLayout.AbsoluteContentSize.Y + padding
 					end
 
 					local function findOption()
@@ -3946,6 +3975,7 @@ function MacLib:Window(Settings)
 						end
 
 						dropdown.Size = UDim2.new(1, 0, 0, CalculateDropdownSize())
+						notifyDropdownLayout()
 					end
 
 					searchBox:GetPropertyChangedSignal("Text"):Connect(findOption)
@@ -4038,9 +4068,14 @@ function MacLib:Window(Settings)
 					local function ToggleDropdown()
 						if db then return end
 						db = true
-						local defaultDropdownSize = 38
 						local isDropdownOpen = not dropped
-						local targetSize = isDropdownOpen and UDim2.new(1, 0, 0, CalculateDropdownSize()) or UDim2.new(1, 0, 0, defaultDropdownSize)
+						local targetSize
+						if isDropdownOpen then
+							targetSize = UDim2.new(1, 0, 0, CalculateDropdownSize())
+						else
+							syncDropdownCollapsedHeight()
+							targetSize = dropdown.Size
+						end
 						local dropDuration = Effects.enabled("dropdownAnimations") and 0.28 or 0.2
 						local dropStyle = Effects.config.springMotion and Enum.EasingStyle.Back or Enum.EasingStyle.Exponential
 
@@ -4064,11 +4099,13 @@ function MacLib:Window(Settings)
 							dropdownFrame.Visible = true
 							dropTween.Completed:Connect(function()
 								db = false
+								notifyDropdownLayout()
 							end)
 						else
 							dropTween.Completed:Connect(function()
 								dropdownFrame.Visible = false
 								db = false
+								notifyDropdownLayout()
 							end)
 						end
 
@@ -4227,6 +4264,16 @@ function MacLib:Window(Settings)
 							addOption(i, v)
 						end
 					end
+					syncDropdownHeader()
+					syncDropdownCollapsedHeight()
+					pcall(function()
+						dropdownFrameUIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+							if dropped then
+								dropdown.Size = UDim2.new(1, 0, 0, CalculateDropdownSize())
+								notifyDropdownLayout()
+							end
+						end)
+					end)
 
 					function DropdownFunctions:UpdateName(New)
 						dropdownName.Text = New
@@ -5853,14 +5900,11 @@ function MacLib:Window(Settings)
 
 					local divider = Instance.new("Frame")
 					divider.Name = "Divider"
-					divider.AnchorPoint = Vector2.new(0, 1)
-					divider.AutomaticSize = Enum.AutomaticSize.Y
 					divider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					divider.BackgroundTransparency = 1
 					divider.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					divider.BorderSizePixel = 0
-					divider.Position = UDim2.fromScale(0, 1)
-					divider.Size = UDim2.new(1, 0, 0, 1)
+					divider.Size = UDim2.new(1, 0, 0, 17)
 					addSectionElement(divider)
 
 					local uIPadding = Instance.new("UIPadding")
@@ -5868,11 +5912,6 @@ function MacLib:Window(Settings)
 					uIPadding.PaddingBottom = UDim.new(0, 8)
 					uIPadding.PaddingTop = UDim.new(0, 8)
 					uIPadding.Parent = divider
-
-					local uIListLayout = Instance.new("UIListLayout")
-					uIListLayout.Name = "UIListLayout"
-					uIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-					uIListLayout.Parent = divider
 
 					local line = Instance.new("Frame")
 					line.Name = "Line"
@@ -5898,12 +5937,11 @@ function MacLib:Window(Settings)
 
 					local spacer = Instance.new("Frame")
 					spacer.Name = "Spacer"
-					spacer.AnchorPoint = Vector2.new(0, 1)
 					spacer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					spacer.BackgroundTransparency = 1
 					spacer.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					spacer.BorderSizePixel = 0
-					spacer.Position = UDim2.fromScale(0, 1)
+					spacer.Size = UDim2.new(1, 0, 0, 10)
 					addSectionElement(spacer)
 
 					function SpacerFunctions:Remove()

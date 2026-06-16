@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.8.9"
+local LOADER_VERSION = "8.8.10"
 local BOOTSTRAP_VERSION = "2.0.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -28,7 +28,7 @@ local LEGACY_UI_SOURCE_PATHS = {
 local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
 local MACLIB_SOURCE_MIN_BYTES = 150000
 local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-local MACLIB_VERSION = 14
+local MACLIB_VERSION = 15
 local MACLIB_REQUIRED_FN = "function MacLib:Window"
 local MACLIB_PATCHED_OVERRIDE_PATHS = {
 	"maclib_patched.luau",
@@ -48,12 +48,12 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.8.9",
+	loader = "8.8.10",
 	core = "2.9.10",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
 	alleral = "5.5.0-maclib",
-	maclibVersion = 14,
+	maclibVersion = 15,
 	analytics = "1.2",
 	telemetry = "3.5",
 	helpers = "1.8",
@@ -3452,10 +3452,10 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.9"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.10"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.9"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.10"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
