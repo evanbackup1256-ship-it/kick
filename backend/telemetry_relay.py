@@ -2031,7 +2031,7 @@ def gate_config():
         "ok": True,
         "siteKey": TURNSTILE_SITE_KEY,
         "provider": "cloudflare-turnstile",
-        "required": True,
+        "required": bool(TURNSTILE_SECRET_KEY),
         "sessionHours": 4,
         "mode": "interactive",
         "serverVerify": bool(TURNSTILE_SECRET_KEY),

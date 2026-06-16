@@ -104,7 +104,7 @@ export async function mountTurnstileWidget(
     sitekey,
     theme: "dark",
     size: "normal",
-    appearance: "always",
+    appearance: "interaction-only",
     retry: "auto",
     "refresh-expired": "auto",
     callback: (token: string) => handlers.onToken(token),

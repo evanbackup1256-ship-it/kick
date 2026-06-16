@@ -16,7 +16,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { openExternalUrl, resolveAdminUrl } from "@/lib/links";
+import { resolveAdminUrl } from "@/lib/links";
 import { usePlatformStore, VIEW_META, type PlatformView } from "@/lib/store/platform";
 import type { SitePayload } from "@/lib/types";
 import { StatusPill } from "@/components/observability/StatusPill";
@@ -44,6 +44,7 @@ function SidebarNav({
   const activeView = usePlatformStore((s) => s.activeView);
   const setView = usePlatformStore((s) => s.setView);
   const relayKind = resolveRelayStatus(online);
+  const adminUrl = resolveAdminUrl(site);
 
   return (
     <>
@@ -98,15 +99,15 @@ function SidebarNav({
             <Bug className="h-3.5 w-3.5" />
             {!collapsed ? <span>Report bug</span> : null}
           </button>
-          <button
-            type="button"
-            onClick={() => openExternalUrl(resolveAdminUrl(site))}
+          <a
+            href={adminUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="sidebar-action sidebar-action-accent"
-            title="Open admin panel"
           >
             <Shield className="h-3.5 w-3.5" />
-            {!collapsed ? <span>Admin panel</span> : null}
-          </button>
+            {!collapsed ? <span>Admin site</span> : null}
+          </a>
         </div>
         <div className={clsx("flex items-center gap-2 rounded-xl border border-border bg-bg-1/80 px-3 py-2.5", collapsed && "justify-center px-2")}>
           {!collapsed ? <StatusPill kind={relayKind} size="sm" /> : <span className={clsx("h-2 w-2 rounded-full", online !== false ? "bg-green" : "bg-red")} />}

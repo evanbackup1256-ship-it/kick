@@ -3,7 +3,7 @@
 import { Command } from "cmdk";
 import { Bug, RefreshCw, Shield, Terminal, Wrench } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { openExternalUrl, resolveAdminUrl } from "@/lib/links";
+import { resolveAdminUrl } from "@/lib/links";
 import { usePlatformStore, VIEW_META, type PlatformView } from "@/lib/store/platform";
 import type { SitePayload } from "@/lib/types";
 
@@ -53,6 +53,8 @@ export function CommandPalette({
       })
       .slice(0, 8);
   }, [games, q]);
+
+  const adminUrl = resolveAdminUrl(site);
 
   if (!open) return null;
 
@@ -125,15 +127,17 @@ export function CommandPalette({
                 <Wrench className="h-4 w-4 opacity-70" />
                 Check executor status
               </Command.Item>
-              <Command.Item
-                onSelect={() => {
-                  openExternalUrl(resolveAdminUrl(site));
-                  setOpen(false);
-                }}
-                className="cmdk-item cmdk-item-accent"
-              >
-                <Shield className="h-4 w-4 text-accent" />
-                Open admin panel
+              <Command.Item asChild value="admin-panel">
+                <a
+                  href={adminUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="cmdk-item cmdk-item-accent"
+                  onClick={() => setOpen(false)}
+                >
+                  <Shield className="h-4 w-4 text-accent" />
+                  Open admin site
+                </a>
               </Command.Item>
             </Command.Group>
           </Command.List>

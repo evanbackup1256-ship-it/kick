@@ -1,16 +1,15 @@
 "use client";
 
 import { Menu, RefreshCw, Search, Shield } from "lucide-react";
-import { Button, Kbd } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Form";
-import { FreshnessChip } from "@/components/observability/FreshnessChip";
-import { StatusPill } from "@/components/observability/StatusPill";
-import { openExternalUrl, resolveAdminUrl } from "@/lib/links";
-import { resolveRelayStatus } from "@/lib/status/resolve";
+import { resolveAdminUrl } from "@/lib/links";
+import { resolveRelayStatus, formatFreshness } from "@/lib/status/resolve";
 import { usePlatformStore, VIEW_META, type WorkspacePreset } from "@/lib/store/platform";
 import type { SitePayload } from "@/lib/types";
-import { formatFreshness } from "@/lib/status/resolve";
 import { useSecondsSince } from "@/lib/hooks/useSecondsSince";
+import { FreshnessChip } from "@/components/observability/FreshnessChip";
+import { StatusPill } from "@/components/observability/StatusPill";
+import { Select } from "@/components/ui/Form";
+import { Button, Kbd } from "@/components/ui/Button";
 
 const WORKSPACE_OPTIONS: { value: WorkspacePreset; label: string }[] = [
   { value: "default", label: "Default" },
@@ -43,6 +42,7 @@ export function TopBar({
   const relayKind = resolveRelayStatus(online);
   const meta = VIEW_META[activeView];
   const siteAge = useSecondsSince(siteUpdatedAt ?? null, 1000);
+  const adminUrl = resolveAdminUrl(site);
 
   return (
     <header className="topbar-shell z-20 flex h-14 shrink-0 items-center justify-between gap-2 px-3 md:h-[3.85rem] md:px-5">
@@ -68,9 +68,15 @@ export function TopBar({
         <Button variant="ghost" size="sm" className="hidden px-2 lg:inline-flex" onClick={onRefreshSite}>
           <RefreshCw className={`h-3.5 w-3.5 ${siteFetching ? "animate-spin" : ""}`} />
         </Button>
-        <Button variant="ghost" size="sm" className="hidden px-2 md:inline-flex" onClick={() => openExternalUrl(resolveAdminUrl(site))}>
-          <Shield className="h-3.5 w-3.5" />
-        </Button>
+        <a
+          href={adminUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="motion-pop hidden items-center justify-center rounded-lg border border-transparent px-2 py-1.5 text-muted hover:bg-white/[0.04] hover:text-text md:inline-flex"
+          aria-label="Open admin site"
+        >
+          <Shield className="h-3.5 w-3.5 text-accent" />
+        </a>
         <div className="hidden w-36 sm:block md:w-40">
           <Select name="workspace" options={WORKSPACE_OPTIONS} value={preset} onChange={(v) => setWorkspace(v as WorkspacePreset)} />
         </div>

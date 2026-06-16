@@ -26,8 +26,7 @@ export function sanitizePublicSite(site: SitePayload): SitePayload {
     resources: (site.resources || []).filter((r: ResourceEntry) => {
       const blob = `${r.title || ""} ${r.desc || ""} ${r.url || ""}`;
       if (isBanRelatedText(blob)) return false;
-      if (r.urlKey === "admin") return false;
-      if ((r.url || "").includes("ban")) return false;
+      if ((r.url || "").includes("ban") && r.urlKey !== "admin") return false;
       return true;
     }),
     credits: site.credits

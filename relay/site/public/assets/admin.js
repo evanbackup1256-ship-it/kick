@@ -49,6 +49,26 @@
     return window.location.origin.replace(/\/+$/, "");
   }
 
+  function wireStaticNav() {
+    const relay = apiBase();
+    const hub = (window.ALLERAL_CONFIG?.publicUrl || `${relay}/`).replace(/\/+$/, "") + "/";
+    $$("a[href='/']").forEach((el) => {
+      el.href = hub;
+      el.target = "_blank";
+      el.rel = "noopener noreferrer";
+    });
+    $$("a[href='/health']").forEach((el) => {
+      el.href = `${relay}/health`;
+    });
+    $$("a[href^='/api/']").forEach((el) => {
+      el.href = `${relay}${el.getAttribute("href")}`;
+    });
+    const logo = $(".nav-logo");
+    if (logo) logo.href = `${relay}/admin.html`;
+  }
+
+  wireStaticNav();
+
   function esc(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-16T01:37:46Z",
+  "updatedAt": "2026-06-16T01:44:36Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
   "loaderVersion": "8.8.1",
@@ -773,10 +773,16 @@
     "github": "https://github.com/evanbackup1256-ship-it/kick",
     "loaderRaw": "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau",
     "relay": "https://alleral-telemetry-production.up.railway.app",
-    "admin": "https://alleral-telemetry-production.up.railway.app/admin"
+    "admin": "https://alleral-telemetry-production.up.railway.app/admin.html"
   },
   "executors": [],
   "resources": [
+    {
+      "title": "Admin panel",
+      "desc": "Separate control site — scripts, bans, telemetry (Railway)",
+      "urlKey": "admin",
+      "icon": "shield"
+    },
     {
       "title": "WEAO executors",
       "desc": "Live exploit status (same feed as the Executors tab)",
