@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/maclib/source.luau",
 	}
 	local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-	local MACLIB_VERSION = 8
+	local MACLIB_VERSION = 9
 	local MACLIB_REQUIRED_FN = "function MacLib:Window"
 	local MACLIB_MIN_BYTES = 150000
 	local MACLIB_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
@@ -219,7 +219,7 @@ return function(Core)
 
 		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
 			for _, baseUrl in ipairs(maclibRawUrls()) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?maclib=8&v=" .. tostring(need) .. "&t=" .. tostring(tick()), MACLIB_MIN_BYTES)
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?maclib=9&v=" .. tostring(need) .. "&t=" .. tostring(tick()), MACLIB_MIN_BYTES)
 				if type(src) == "string" then
 					consider(src, "remote:" .. baseUrl)
 				end
@@ -947,7 +947,8 @@ return function(Core)
 				Core.logWarn("CreateGroupbox skipped — tab missing for " .. tostring(name))
 				return Core.createStubUiGroup(name)
 			end
-			local side = (tonumber(settings.Column) or 1) == 2 and "Right" or "Left"
+			local col = tonumber(settings.Column) or 1
+			local side = col == 2 and "Right" or (col == 3 and "Center" or "Left")
 			local section = rawTab:Section({ Side = side })
 			if name ~= "" and type(section.Header) == "function" then
 				pcall(section.Header, section, { Name = name })
@@ -1050,6 +1051,9 @@ return function(Core)
 					local defaultTab = window._defaultTab
 					if defaultTab and type(defaultTab.Select) == "function" then
 						defaultTab:Select()
+					end
+					if type(Core.refreshAllTabColumns) == "function" then
+						Core.refreshAllTabColumns()
 					end
 				end)
 			end)

@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.8.2"
+local LOADER_VERSION = "8.8.3"
 local BOOTSTRAP_VERSION = "2.0.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -28,7 +28,7 @@ local LEGACY_UI_SOURCE_PATHS = {
 local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
 local MACLIB_SOURCE_MIN_BYTES = 150000
 local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-local MACLIB_VERSION = 8
+local MACLIB_VERSION = 9
 local MACLIB_REQUIRED_FN = "function MacLib:Window"
 local MACLIB_PATCHED_OVERRIDE_PATHS = {
 	"maclib_patched.luau",
@@ -48,19 +48,19 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.8.2",
-	core = "2.9.8",
+	loader = "8.8.3",
+	core = "2.9.9",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
 	alleral = "5.5.0-maclib",
-	maclibVersion = 8,
+	maclibVersion = 9,
 	analytics = "1.2",
 	telemetry = "3.4",
 	helpers = "1.8",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "646ce17",
+	commit = "e6e8946",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -980,7 +980,7 @@ do
 	end
 
 	local function maclibFetchUrls()
-		local bust = "?maclib=8&t=" .. tostring(tick())
+		local bust = "?maclib=9&t=" .. tostring(tick())
 		local urls = {
 			GITHUB_RAW .. "/" .. MACLIB_SOURCE_PATH .. bust,
 			"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. MACLIB_SOURCE_PATH .. bust,
@@ -3445,10 +3445,10 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.2"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.3"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.2"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.3"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then

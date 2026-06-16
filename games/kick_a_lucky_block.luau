@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "7.3.0"
+local VERSION = "7.3.1"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -3417,8 +3417,8 @@ if not uiWindow or not uiWindow._rawWindow then
 end
 local uiSection = Core.buildUiSection(uiWindow)
 
-local function createUiTab(name, icon)
-	return Core.buildUiTab(uiSection, name, icon, 2)
+local function createUiTab(name, icon, columns)
+	return Core.buildUiTab(uiSection, name, icon, columns or 2)
 end
 
 local function createUiGroup(tab, name, icon, column)
@@ -3451,9 +3451,9 @@ end
 
 local mainTab = createUiTab("Kick", "rbxassetid://10723407389")
 local autoTab = createUiTab("Plot", "rbxassetid://10734923214")
-local eventsTab = createUiTab("Events", "rbxassetid://10709789407")
-local shopTab = createUiTab("Inventory", "rbxassetid://10734952479")
-local miscTab = createUiTab("Tools", "rbxassetid://10734950020")
+local eventsTab = createUiTab("Events", "rbxassetid://10709789407", 3)
+local shopTab = createUiTab("Inventory", "rbxassetid://10734952479", 2)
+local miscTab = createUiTab("Tools", "rbxassetid://10734950020", 3)
 local configTab = createUiTab("Settings", "rbxassetid://10734950309")
 
 local kickGroup = createUiGroup(mainTab, "Auto Kick", "rbxassetid://10734975692", 1)

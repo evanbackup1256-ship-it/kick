@@ -1,5 +1,5 @@
--- Alleral vendored MacLib 1.2.6 (Alleral patch v8)
-local ALLERAL_MACLIB_VERSION = 8
+-- Alleral vendored MacLib 1.2.6 (Alleral patch v9)
+local ALLERAL_MACLIB_VERSION = 9
 
 local function udim2PixelSize(udim2, fallbackX, fallbackY)
 	if typeof(udim2) ~= "UDim2" then
@@ -468,6 +468,14 @@ function Resizer.applyWindow(ref, animate)
 	if Resizer.config.autoResize == false then
 		local manual = tonumber(Resizer.config.userScaleMultiplier) or 1
 		ref.baseUIScale.Scale = math.clamp(manual, 0.72, 1.14)
+		if Resizer.config.userCustomSize then
+			local custom = Resizer.config.userCustomSize
+			ref.base.Size = UDim2.fromOffset(custom.X, custom.Y)
+			Resizer.baseDesignSize = custom
+		end
+		if type(ref.syncContentLayout) == "function" then
+			pcall(ref.syncContentLayout)
+		end
 		return nil
 	end
 
@@ -479,6 +487,9 @@ function Resizer.applyWindow(ref, animate)
 	end
 	ref.base.Size = layout.size
 	ref._lastLayout = layout
+	if type(ref.syncContentLayout) == "function" then
+		pcall(ref.syncContentLayout)
+	end
 	return layout
 end
 
@@ -809,10 +820,30 @@ function MacLib:Window(Settings)
 	baseUIStroke.Transparency = 0.9
 	baseUIStroke.Parent = base
 	Effects.setupWindow(base, baseUIStroke, baseUIScale)
-	Resizer.registerWindow({
+
+	local envCustomSize
+	pcall(function()
+		local env = getgenv and getgenv() or {}
+		if type(env.Alleral_UiCustomSize) == "table" then
+			local w = tonumber(env.Alleral_UiCustomSize.w)
+			local h = tonumber(env.Alleral_UiCustomSize.h)
+			if w and h then
+				w = math.clamp(math.floor(w + 0.5), 520, 1400)
+				h = math.clamp(math.floor(h + 0.5), 380, 920)
+				base.Size = UDim2.fromOffset(w, h)
+				Resizer.baseDesignSize = Vector2.new(w, h)
+				Resizer.config.autoResize = false
+				Resizer.config.userCustomSize = Vector2.new(w, h)
+				envCustomSize = true
+			end
+		end
+	end)
+
+	local windowRef = {
 		base = base,
 		baseUIScale = baseUIScale,
-	})
+		syncContentLayout = nil,
+	}
 
 	local sidebar = Instance.new("Frame")
 	sidebar.Name = "Sidebar"
@@ -1297,8 +1328,9 @@ function MacLib:Window(Settings)
 	tabSwitchersScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	tabSwitchersScrollingFrame.BottomImage = ""
 	tabSwitchersScrollingFrame.CanvasSize = UDim2.new()
-	tabSwitchersScrollingFrame.ScrollBarImageTransparency = 0.8
-	tabSwitchersScrollingFrame.ScrollBarThickness = 1
+	tabSwitchersScrollingFrame.ScrollBarImageTransparency = 0.65
+	tabSwitchersScrollingFrame.ScrollBarThickness = 4
+	tabSwitchersScrollingFrame.ScrollingEnabled = true
 	tabSwitchersScrollingFrame.TopImage = ""
 	tabSwitchersScrollingFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	tabSwitchersScrollingFrame.BackgroundTransparency = 1
@@ -1327,20 +1359,24 @@ function MacLib:Window(Settings)
 
 	local content = Instance.new("Frame")
 	content.Name = "Content"
-	content.AnchorPoint = Vector2.new(1, 0)
+	content.AnchorPoint = Vector2.new(0, 0)
 	content.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	content.BackgroundTransparency = 1
 	content.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	content.BorderSizePixel = 0
-	content.Position = UDim2.fromScale(1, 4.69e-08)
-	content.Size = UDim2.new(0, (base.AbsoluteSize.X - sidebar.AbsoluteSize.X), 1, 0)
+	content.Position = UDim2.fromOffset(0, 0)
+	content.Size = UDim2.new(1, 0, 1, 0)
 
-	local resizingContent = false
-	local defaultSidebarWidth = sidebar.AbsoluteSize.X
-	local initialMouseX, initialSidebarWidth
-	local snapRange = 20
 	local minSidebarWidth = 107
-	local maxSidebarWidth = base.AbsoluteSize.X - minSidebarWidth
+	local maxSidebarWidth = 900
+
+	local function syncContentLayout()
+		local sidebarW = sidebar.AbsoluteSize.X
+		local baseW = math.max(base.AbsoluteSize.X, 320)
+		maxSidebarWidth = math.max(minSidebarWidth, baseW - minSidebarWidth)
+		content.Position = UDim2.fromOffset(sidebarW, 0)
+		content.Size = UDim2.new(0, math.max(baseW - sidebarW, 120), 1, 0)
+	end
 
 	local TweenSettings = {
 		DefaultTransparency = 0.9,
@@ -1386,9 +1422,21 @@ function MacLib:Window(Settings)
 			end
 
 			sidebar.Size = UDim2.new(0, newSidebarWidth, 1, 0)
-			content.Size = UDim2.new(0, base.AbsoluteSize.X - newSidebarWidth, 1, 0)
+			syncContentLayout()
 		end
 	end)
+
+	syncContentLayout()
+	windowRef.syncContentLayout = syncContentLayout
+	pcall(function()
+		base:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncContentLayout)
+		sidebar:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncContentLayout)
+	end)
+
+	local resizingContent = false
+	local defaultSidebarWidth = sidebar.AbsoluteSize.X
+	local initialMouseX, initialSidebarWidth
+	local snapRange = 20
 
 	local topbar = Instance.new("Frame")
 	topbar.Name = "Topbar"
@@ -1548,24 +1596,46 @@ function MacLib:Window(Settings)
 	currentTab.FontFace = Font.new(assets.interFont)
 	currentTab.RichText = true
 	currentTab.Text = ""
-	currentTab.RichText = true
 	currentTab.TextColor3 = Color3.fromRGB(255, 255, 255)
 	currentTab.TextSize = 15
-	currentTab.TextTransparency = 0.5
-	currentTab.TextTruncate = Enum.TextTruncate.SplitWord
+	currentTab.TextTransparency = 0.35
+	currentTab.TextTruncate = Enum.TextTruncate.AtEnd
 	currentTab.TextXAlignment = Enum.TextXAlignment.Left
-	currentTab.TextYAlignment = Enum.TextYAlignment.Top
+	currentTab.TextYAlignment = Enum.TextYAlignment.Center
 	currentTab.AnchorPoint = Vector2.new(0, 0.5)
-	currentTab.AutomaticSize = Enum.AutomaticSize.Y
 	currentTab.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	currentTab.BackgroundTransparency = 1
 	currentTab.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	currentTab.BorderSizePixel = 0
-	currentTab.Position = UDim2.fromScale(0, 0.5)
-	currentTab.Size = UDim2.fromScale(0.9, 0)
+	currentTab.Position = UDim2.new(0, 0, 0.5, 0)
+	currentTab.Size = UDim2.new(1, -52, 1, 0)
 	currentTab.Parent = elements
 
 	elements.Parent = topbar
+
+	local topbarDrag = Instance.new("TextButton")
+	topbarDrag.Name = "TopbarDrag"
+	topbarDrag.AutoButtonColor = false
+	topbarDrag.BackgroundTransparency = 1
+	topbarDrag.BorderSizePixel = 0
+	topbarDrag.Size = UDim2.new(1, -44, 1, 0)
+	topbarDrag.Text = ""
+	topbarDrag.ZIndex = 1
+	topbarDrag.Parent = topbar
+
+	if not Settings.DragStyle or Settings.DragStyle == 1 then
+		topbarDrag.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				onDragStart(input)
+			end
+		end)
+		topbarDrag.InputChanged:Connect(onDragUpdate)
+		topbarDrag.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				dragging_ = false
+			end
+		end)
+	end
 
 	topbar.Parent = content
 
@@ -1608,6 +1678,100 @@ function MacLib:Window(Settings)
 	globalSettingsUIScale.Scale = 1e-07
 	globalSettingsUIScale.Parent = globalSettings
 	globalSettings.Parent = base
+
+	local resizeGrip = Instance.new("TextButton")
+	resizeGrip.Name = "ResizeGrip"
+	resizeGrip.AnchorPoint = Vector2.new(1, 1)
+	resizeGrip.AutoButtonColor = false
+	resizeGrip.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	resizeGrip.BackgroundTransparency = 0.92
+	resizeGrip.BorderSizePixel = 0
+	resizeGrip.Position = UDim2.new(1, -4, 1, -4)
+	resizeGrip.Size = UDim2.fromOffset(18, 18)
+	resizeGrip.Text = ""
+	resizeGrip.ZIndex = 8
+
+	local resizeCorner = Instance.new("UICorner")
+	resizeCorner.CornerRadius = UDim.new(0, 4)
+	resizeCorner.Parent = resizeGrip
+
+	local resizeStroke = Instance.new("UIStroke")
+	resizeStroke.Color = Color3.fromRGB(255, 255, 255)
+	resizeStroke.Transparency = 0.82
+	resizeStroke.Parent = resizeGrip
+
+	local gripIcon = Instance.new("ImageLabel")
+	gripIcon.BackgroundTransparency = 1
+	gripIcon.Image = assets.transform
+	gripIcon.ImageTransparency = 0.55
+	gripIcon.Rotation = 90
+	gripIcon.Size = UDim2.fromScale(1, 1)
+	gripIcon.Parent = resizeGrip
+
+	local resizingWindow = false
+	local resizeStartMouse
+	local resizeStartSize
+
+	local function persistCustomSize()
+		local w = math.floor(base.AbsoluteSize.X + 0.5)
+		local h = math.floor(base.AbsoluteSize.Y + 0.5)
+		Resizer.config.autoResize = false
+		Resizer.config.userCustomSize = Vector2.new(w, h)
+		Resizer.baseDesignSize = Vector2.new(w, h)
+		pcall(function()
+			local env = getgenv and getgenv() or {}
+			env.Alleral_UiCustomSize = { w = w, h = h }
+		end)
+	end
+
+	resizeGrip.MouseEnter:Connect(function()
+		Effects.play(resizeGrip, 0.12, { BackgroundTransparency = 0.84 })
+		Effects.play(gripIcon, 0.12, { ImageTransparency = 0.35 })
+	end)
+	resizeGrip.MouseLeave:Connect(function()
+		if not resizingWindow then
+			Effects.play(resizeGrip, 0.12, { BackgroundTransparency = 0.92 })
+			Effects.play(gripIcon, 0.12, { ImageTransparency = 0.55 })
+		end
+	end)
+
+	resizeGrip.InputBegan:Connect(function(input)
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		resizingWindow = true
+		resizeStartMouse = UserInputService:GetMouseLocation()
+		resizeStartSize = Vector2.new(base.AbsoluteSize.X, base.AbsoluteSize.Y)
+		Resizer.config.autoResize = false
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if resizingWindow and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			resizingWindow = false
+			persistCustomSize()
+			Effects.play(resizeGrip, 0.12, { BackgroundTransparency = 0.92 })
+			Effects.play(gripIcon, 0.12, { ImageTransparency = 0.55 })
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if not resizingWindow then
+			return
+		end
+		if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		local mouse = UserInputService:GetMouseLocation()
+		local delta = mouse - resizeStartMouse
+		local newW = math.clamp(math.floor(resizeStartSize.X + delta.X + 0.5), 520, 1400)
+		local newH = math.clamp(math.floor(resizeStartSize.Y + delta.Y + 0.5), 380, 920)
+		base.Size = UDim2.fromOffset(newW, newH)
+		syncContentLayout()
+	end)
+
+	Resizer.registerWindow(windowRef)
+	Resizer.layoutRefresh["window_" .. tostring(base)] = syncContentLayout
+	resizeGrip.Parent = base
 	base.Parent = macLib
 
 	function WindowFunctions:UpdateTitle(NewTitle)
@@ -2181,11 +2345,13 @@ function MacLib:Window(Settings)
 
 			local elementsScrolling = Instance.new("ScrollingFrame")
 			elementsScrolling.Name = "ElementsScrolling"
-			elementsScrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			elementsScrolling.AutomaticCanvasSize = Enum.AutomaticSize.None
 			elementsScrolling.BottomImage = ""
-			elementsScrolling.CanvasSize = UDim2.new()
-			elementsScrolling.ScrollBarImageTransparency = 0.5
-			elementsScrolling.ScrollBarThickness = 1
+			elementsScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
+			elementsScrolling.ScrollBarImageTransparency = 0.45
+			elementsScrolling.ScrollBarThickness = 4
+			elementsScrolling.ScrollingEnabled = true
+			elementsScrolling.Active = true
 			elementsScrolling.TopImage = ""
 			elementsScrolling.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 			elementsScrolling.BackgroundTransparency = 1
@@ -2193,6 +2359,51 @@ function MacLib:Window(Settings)
 			elementsScrolling.BorderSizePixel = 0
 			elementsScrolling.Size = UDim2.fromScale(1, 1)
 			elementsScrolling.ClipsDescendants = false
+
+			local COLUMN_GAP = 10
+
+			local function refreshTabScrollCanvas()
+				task.defer(function()
+					if not elementsScrolling.Parent then
+						return
+					end
+					local layout = elementsScrolling:FindFirstChild("ElementsScrollingUIListLayout")
+					if not layout then
+						return
+					end
+					local contentH = layout.AbsoluteContentSize.Y + 28
+					local viewH = elementsScrolling.AbsoluteSize.Y
+					elementsScrolling.CanvasSize = UDim2.new(0, 0, 0, math.max(contentH, viewH + 1))
+				end)
+			end
+
+			local function columnSectionCount(colFrame)
+				local count = 0
+				for _, child in ipairs(colFrame:GetChildren()) do
+					if child:IsA("Frame") and child.Name == "Section" then
+						count += 1
+					end
+				end
+				return count
+			end
+
+			local function relayoutTabColumns()
+				local useCenter = columnSectionCount(center) > 0
+				center.Visible = useCenter
+				if useCenter then
+					local share = UDim2.new(1 / 3, -math.ceil(COLUMN_GAP * 2 / 3), 0, 0)
+					left.Size = share
+					center.Size = share
+					right.Size = share
+					center.LayoutOrder = 1
+					right.LayoutOrder = 2
+				else
+					left.Size = UDim2.new(0.5, -math.floor(COLUMN_GAP / 2), 0, 0)
+					right.Size = UDim2.new(0.5, -math.floor(COLUMN_GAP / 2), 0, 0)
+					right.LayoutOrder = 1
+				end
+				refreshTabScrollCanvas()
+			end
 
 			local elementsScrollingUIPadding = Instance.new("UIPadding")
 			elementsScrollingUIPadding.Name = "ElementsScrollingUIPadding"
@@ -2204,7 +2415,7 @@ function MacLib:Window(Settings)
 
 			local elementsScrollingUIListLayout = Instance.new("UIListLayout")
 			elementsScrollingUIListLayout.Name = "ElementsScrollingUIListLayout"
-			elementsScrollingUIListLayout.Padding = UDim.new(0, 15)
+			elementsScrollingUIListLayout.Padding = UDim.new(0, COLUMN_GAP)
 			elementsScrollingUIListLayout.FillDirection = Enum.FillDirection.Horizontal
 			elementsScrollingUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 			elementsScrollingUIListLayout.Parent = elementsScrolling
@@ -2227,6 +2438,25 @@ function MacLib:Window(Settings)
 
 			left.Parent = elementsScrolling
 
+			local center = Instance.new("Frame")
+			center.Name = "Center"
+			center.AutomaticSize = Enum.AutomaticSize.Y
+			center.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+			center.BackgroundTransparency = 1
+			center.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			center.BorderSizePixel = 0
+			center.LayoutOrder = 1
+			center.Size = UDim2.new(1 / 3, -math.ceil(COLUMN_GAP * 2 / 3), 0, 0)
+			center.Visible = false
+
+			local centerUIListLayout = Instance.new("UIListLayout")
+			centerUIListLayout.Name = "CenterUIListLayout"
+			centerUIListLayout.Padding = UDim.new(0, 15)
+			centerUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			centerUIListLayout.Parent = center
+
+			center.Parent = elementsScrolling
+
 			local right = Instance.new("Frame")
 			right.Name = "Right"
 			right.AutomaticSize = Enum.AutomaticSize.Y
@@ -2246,6 +2476,21 @@ function MacLib:Window(Settings)
 
 			right.Parent = elementsScrolling
 
+			for _, colFrame in ipairs({ left, center, right }) do
+				local list = colFrame:FindFirstChildOfClass("UIListLayout")
+				if list then
+					pcall(function()
+						list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+							relayoutTabColumns()
+						end)
+					end)
+				end
+			end
+			pcall(function()
+				elementsScrolling:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshTabScrollCanvas)
+			end)
+			relayoutTabColumns()
+
 			elementsScrolling.Parent = elements1
 
 			function TabFunctions:Section(Settings)
@@ -2260,7 +2505,10 @@ function MacLib:Window(Settings)
 				section.Position = UDim2.fromScale(0, 6.78e-08)
 				section.Size = UDim2.fromScale(1, 0)
 				section.ClipsDescendants = true
-				section.Parent = Settings.Side == "Left" and left or right
+				local side = Settings.Side or "Left"
+				local parentCol = side == "Right" and right or (side == "Center" and center or left)
+				section.Parent = parentCol
+				task.defer(relayoutTabColumns)
 
 				local sectionUICorner = Instance.new("UICorner")
 				sectionUICorner.Name = "SectionUICorner"
@@ -6124,6 +6372,12 @@ function MacLib:Window(Settings)
 
 	function WindowFunctions:SetSize(Size)
 		base.Size = Size
+		local w, h = udim2PixelSize(Size, base.AbsoluteSize.X, base.AbsoluteSize.Y)
+		Resizer.baseDesignSize = Vector2.new(w, h)
+		Resizer.config.userCustomSize = Vector2.new(w, h)
+		Resizer.config.autoResize = false
+		syncContentLayout()
+		persistCustomSize()
 	end
 	function WindowFunctions:GetSize(Size)
 		return base.Size
