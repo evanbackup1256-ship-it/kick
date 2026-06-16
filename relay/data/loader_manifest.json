@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-16T17:41:41Z",
+  "generatedAt": "2026-06-16T17:43:42Z",
   "release": {
     "loader": "8.9.0",
     "core": "2.9.10",
@@ -8,8 +8,8 @@
     "ui": "Flexui",
     "windui": "5.5.0-maclib",
     "alleral": "5.5.0-maclib",
-    "commit": "89496e3",
-    "updatedAt": "2026-06-16T17:40:11Z",
+    "commit": "1b4c5f6",
+    "updatedAt": "2026-06-16T17:43:06Z",
     "updatePollSeconds": 120,
     "autoUpdate": true,
     "minLoader": "8.2.0",
@@ -26,18 +26,18 @@
   "ui": "Flexui",
   "flexuiVersion": 1,
   "maclibVersion": 17,
-  "commit": "89496e3",
+  "commit": "1b4c5f6",
   "modules": [
     {
       "path": "bootstrap.luau",
       "bytes": 4873,
-      "sha256": "774d167164b32b0ff072f5b883133a82513bb7d07ad286c98a4092e2ce99f4ca",
+      "sha256": "b5582d54cca8a0e8dd6ae715a8ce8331a8d94d6fa8eab3f8b525f6bcc6f22fb6",
       "versionMarker": null
     },
     {
       "path": "loader.luau",
       "bytes": 135225,
-      "sha256": "ba00e35bc6793d13d7a60159cfaa4c34d2a644f289b56278c16d81a13745f2d0",
+      "sha256": "75d6d5bd02ef78fd1255f4d1bfbcacfeb0c9b69a85e3549367e6815d99bb8f8d",
       "versionMarker": null
     },
     {
@@ -79,7 +79,7 @@
     {
       "path": "cfg/release.json",
       "bytes": 520,
-      "sha256": "2d4c3718eb1fe4849ddb88ca63dd6d8fa24fbac55f6a194ff7a0450def14d538",
+      "sha256": "c40d9b84d1ad11ec2a8a1da3435c549518d9a3bc00eb6a65c3768718a09bbd7c",
       "versionMarker": null
     }
   ]
