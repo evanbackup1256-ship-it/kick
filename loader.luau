@@ -1,6 +1,6 @@
 --!nocheck
-local LOADER_VERSION = "8.8.12"
-local BOOTSTRAP_VERSION = "2.0.1"
+local LOADER_VERSION = "8.8.13"
+local BOOTSTRAP_VERSION = "2.0.2"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -48,7 +48,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.8.12",
+	loader = "8.8.13",
 	core = "2.9.10",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
@@ -1550,10 +1550,21 @@ local function enforceExecutorPolicy()
 	return true
 end
 
+local function stripUtf8Bom(text)
+	if type(text) ~= "string" or #text < 3 then
+		return text
+	end
+	if string.byte(text, 1) == 0xEF and string.byte(text, 2) == 0xBB and string.byte(text, 3) == 0xBF then
+		return text:sub(4)
+	end
+	return text
+end
+
 local function compileAndRun(source, chunkName, runEnv)
 	if not loadStringFn then
 		return false, "loadstring unavailable"
 	end
+	source = stripUtf8Bom(source)
 	local fn, err = loadStringFn(source, chunkName)
 	if not fn and type(load) == "function" then
 		fn, err = load(source, chunkName)
@@ -1652,6 +1663,7 @@ local function relaxedCompileOk(src)
 end
 
 local function compileCoreSource(src, label)
+	src = stripUtf8Bom(src)
 	if type(src) ~= "string" then
 		return false, "invalid source"
 	end

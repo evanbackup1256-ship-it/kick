@@ -1,5 +1,6 @@
--- Alleral Bootstrap v2.0.1 — fetches loader.luau and runs it (one saved loadstring)
-local BOOTSTRAP_VERSION = "2.0.1"
+-- Alleral Bootstrap v2.0.2 — fetches loader.luau and runs it (one saved loadstring)
+local BOOTSTRAP_VERSION = "2.0.2"
+local LOADER_PIN_COMMIT = "a51cfa2"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
 local LOADER_MIN_BYTES = 50000
@@ -86,10 +87,22 @@ local function fetchUrl(url, minBytes)
 	return nil, "fetch failed"
 end
 
+local function stripUtf8Bom(text)
+	if type(text) ~= "string" or #text < 3 then
+		return text
+	end
+	if string.byte(text, 1) == 0xEF and string.byte(text, 2) == 0xBB and string.byte(text, 3) == 0xBF then
+		return text:sub(4)
+	end
+	return text
+end
+
 local function fetchLoader()
-	local bust = "?v=" .. BOOTSTRAP_VERSION .. "&t=" .. tostring(tick())
+	local bust = "?v=" .. BOOTSTRAP_VERSION .. "&loader=8.8.12&t=" .. tostring(tick())
 	local urls = {
+		GITHUB_RAW .. "/" .. LOADER_PIN_COMMIT .. "/loader.luau" .. bust,
 		GITHUB_RAW .. "/loader.luau" .. bust,
+		JSDELIVR .. "/" .. LOADER_PIN_COMMIT .. "/loader.luau" .. bust,
 		JSDELIVR .. "/loader.luau" .. bust,
 	}
 	for _, url in ipairs(urls) do
@@ -122,6 +135,7 @@ if type(src) ~= "string" then
 	ENV._Alleral_BootstrapRunning = false
 	error("[Alleral Bootstrap] Could not download loader.luau (" .. tostring(via) .. "). Enable HTTP in your executor.")
 end
+src = stripUtf8Bom(src)
 
 local ver = src:match('LOADER_VERSION%s*=%s*"([%d%.]+)"') or "?"
 print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Running loader v" .. ver .. " (" .. tostring(#src) .. "b via " .. tostring(via) .. ")")
