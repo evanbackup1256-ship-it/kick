@@ -2267,7 +2267,7 @@ function Core.uiWindowSettings(options)
 		theme = "Maclib"
 	end
 	base.Theme = theme
-	base.Size = options.Size or UDim2.fromOffset(860, 580)
+	base.Size = options.Size or UDim2.fromOffset(920, 680)
 	base.Acrylic = options.Acrylic ~= false
 	base.Subtitle = options.Subtitle
 	return base
@@ -2279,7 +2279,7 @@ function Core.buildExploitHub(section, options)
 
 	local hub = {}
 	hub.dashboardTab = Core.buildUiTab(section, "Dashboard", "layout-dashboard", 2, "dashboard")
-	hub.exploitTab = Core.buildUiTab(section, "Exploit", "terminal", 2, "exploit")
+	hub.exploitTab = Core.buildUiTab(section, "Tools", "terminal", 2, "exploit")
 
 	Core.buildSessionStatsGroup(hub.dashboardTab, 1)
 

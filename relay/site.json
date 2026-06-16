@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-16T02:30:00+00:00",
+  "updatedAt": "2026-06-16T03:12:48Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
-  "loaderVersion": "8.8.1",
-  "coreVersion": "2.9.5",
+  "loaderVersion": "8.8.7",
+  "coreVersion": "2.9.10",
   "uiLibrary": "Maclib",
   "uiVersion": "5.5.0-maclib",
-  "maclibVersion": 5,
+  "maclibVersion": 13,
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?v=2.0.1&t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
@@ -47,6 +47,36 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-16",
+      "title": "MacLib v13 — Smart Resizer & Layout Fix",
+      "items": [
+        "Fixed section/card overlap — elements now get proper layout order automatically",
+        "Rewrote auto-resizer: viewport-fill sizing, no double-shrink, smooth resize animations",
+        "Hub exploit tools moved to Tools tab; game server/webhook controls on Misc tab",
+        "Default window 920×680 — scales cleanly from mobile to ultrawide"
+      ]
+    },
+    {
+      "date": "2026-06-16",
+      "title": "MacLib v12 — Layout Fix & Premium Animations",
+      "items": [
+        "Fixed overlapping text in 3-column tabs — responsive stack when window is too narrow",
+        "Inputs and dropdowns now stack vertically with proper spacing (no more cramped filters)",
+        "New animations: ripple clicks, header shimmer, tab parallax, staggered section reveals",
+        "Mobile keeps animations but disables only heavy glow/blur loops for stability"
+      ]
+    },
+    {
+      "date": "2026-06-16",
+      "title": "MacLib v11 — Mobile Stability Fix",
+      "items": [
+        "Fixed mobile crash from layout feedback loops and heavy UI effects",
+        "Mobile safe mode disables glow and blur loops automatically",
+        "Smaller capped window size on touch devices (680×500 max)",
+        "Touch-safe sidebar and resize grip input handling"
+      ]
+    },
     {
       "date": "2026-06-16",
       "title": "All Games — Performance & Stability Pass",

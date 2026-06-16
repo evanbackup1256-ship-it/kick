@@ -1,5 +1,5 @@
--- Alleral vendored MacLib 1.2.6 (Alleral patch v10)
-local ALLERAL_MACLIB_VERSION = 10
+-- Alleral vendored MacLib 1.2.6 (Alleral patch v13)
+local ALLERAL_MACLIB_VERSION = 13
 
 local function udim2PixelSize(udim2, fallbackX, fallbackY)
 	if typeof(udim2) ~= "UDim2" then
@@ -93,6 +93,12 @@ local Effects = {
 		notificationAnimations = true,
 		notificationStyle = "glass",
 		notifyCompact = false,
+		shimmerHeaders = true,
+		rippleClick = true,
+		staggerReveal = true,
+		tabParallax = true,
+		sectionEntrance = true,
+		dropdownElastic = true,
 	},
 	glowTargets = {},
 	accentColor = Color3.fromRGB(120, 170, 255),
@@ -256,6 +262,114 @@ function Effects.animateToggle(toggle1, togglerHead, state, tweenInfo)
 	return TweenInfo.new(tweenInfo.Time or 0.15, style, Enum.EasingDirection.Out)
 end
 
+function Effects.playRipple(parent, input)
+	if not parent or not Effects.enabled("rippleClick") then
+		return
+	end
+	local pos = Vector2.new(parent.AbsoluteSize.X * 0.5, parent.AbsoluteSize.Y * 0.5)
+	if input and input.UserInputType == Enum.UserInputType.Touch then
+		pos = Vector2.new(input.Position.X - parent.AbsolutePosition.X, input.Position.Y - parent.AbsolutePosition.Y)
+	elseif input and input.UserInputType == Enum.UserInputType.MouseButton1 then
+		local mouse = UserInputService:GetMouseLocation()
+		pos = Vector2.new(mouse.X - parent.AbsolutePosition.X, mouse.Y - parent.AbsolutePosition.Y)
+	end
+	local ripple = Instance.new("Frame")
+	ripple.Name = "AlleralRipple"
+	ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+	ripple.BackgroundColor3 = Effects.accentColor
+	ripple.BackgroundTransparency = 0.55
+	ripple.BorderSizePixel = 0
+	ripple.Position = UDim2.fromOffset(pos.X, pos.Y)
+	ripple.Size = UDim2.fromOffset(8, 8)
+	ripple.ZIndex = parent.ZIndex + 2
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = ripple
+	ripple.Parent = parent
+	Effects.play(ripple, 0.42, {
+		Size = UDim2.fromOffset(math.max(parent.AbsoluteSize.X, parent.AbsoluteSize.Y) * 1.4, math.max(parent.AbsoluteSize.X, parent.AbsoluteSize.Y) * 1.4),
+		BackgroundTransparency = 1,
+	}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	task.delay(0.45, function()
+		if ripple.Parent then
+			ripple:Destroy()
+		end
+	end)
+end
+
+function Effects.playShimmer(textLabel)
+	if not textLabel or not Effects.enabled("shimmerHeaders") then
+		return
+	end
+	local start = textLabel.TextTransparency
+	Effects.play(textLabel, 0.35, { TextTransparency = math.max(0, start - 0.22) }, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+	task.delay(0.38, function()
+		if textLabel.Parent then
+			Effects.play(textLabel, 0.45, { TextTransparency = start }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+		end
+	end)
+end
+
+function Effects.staggerReveal(container, delayStep)
+	if not container or not Effects.enabled("staggerReveal") then
+		return
+	end
+	delayStep = tonumber(delayStep) or 0.04
+	local order = 0
+	for _, child in ipairs(container:GetChildren()) do
+		if child:IsA("GuiObject") and child.Name == "Section" then
+			order += 1
+			local scale = child:FindFirstChild("AlleralEntranceScale")
+			if not scale then
+				scale = Instance.new("UIScale")
+				scale.Name = "AlleralEntranceScale"
+				scale.Parent = child
+			end
+			scale.Scale = 0.94
+			child.BackgroundTransparency = math.min(child.BackgroundTransparency + 0.12, 1)
+			task.delay(order * delayStep, function()
+				if not child.Parent then
+					return
+				end
+				Effects.play(scale, 0.34, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+				Effects.play(child, 0.28, { BackgroundTransparency = 0.98 }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			end)
+		end
+	end
+end
+
+function Effects.playTabParallax(contentFrame, incoming)
+	if not contentFrame or not Effects.enabled("tabParallax") then
+		return
+	end
+	local scale = contentFrame:FindFirstChild("AlleralTabParallax")
+	if not scale then
+		scale = Instance.new("UIScale")
+		scale.Name = "AlleralTabParallax"
+		scale.Parent = contentFrame
+	end
+	scale.Scale = incoming and 0.97 or 1
+	contentFrame.Position = UDim2.fromOffset(incoming and 18 or -10, 0)
+	Effects.play(scale, 0.28, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	Effects.play(contentFrame, 0.28, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+end
+
+function Effects.playSectionEntrance(sectionFrame)
+	if not sectionFrame or not Effects.enabled("sectionEntrance") then
+		return
+	end
+	local scale = sectionFrame:FindFirstChild("AlleralEntranceScale")
+	if not scale then
+		scale = Instance.new("UIScale")
+		scale.Name = "AlleralEntranceScale"
+		scale.Parent = sectionFrame
+	end
+	scale.Scale = 0.96
+	sectionFrame.BackgroundTransparency = 1
+	Effects.play(scale, 0.32, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	Effects.play(sectionFrame, 0.26, { BackgroundTransparency = 0.98 }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+end
+
 function Effects.setupWindow(base, baseStroke, baseScale)
 	if not base or not baseStroke then
 		return
@@ -384,10 +498,11 @@ local Resizer = {
 	},
 	windows = {},
 	layoutRefresh = {},
-	baseDesignSize = Vector2.new(868, 650),
+	baseDesignSize = Vector2.new(920, 680),
 	_watchConn = nil,
 	_viewportConn = nil,
 	_lastViewport = nil,
+	_pendingRelayout = false,
 }
 
 function Resizer.viewport()
@@ -424,48 +539,71 @@ end
 function Resizer.computeLayout(profileName)
 	local profile = Resizer.resolveProfile(profileName or Resizer.config.profile)
 	local vp = Resizer.viewport()
-	local marginX, marginY = 24, 40
-	local availW = math.max(300, vp.X - marginX * 2)
-	local availH = math.max(220, vp.Y - marginY * 2)
+	local shortSide = math.min(vp.X, vp.Y)
+	local longSide = math.max(vp.X, vp.Y)
 	local design = Resizer.baseDesignSize
-	local targetW, targetH = design.X, design.Y
-	local profileScale = 1
+	local aspect = design.X / math.max(design.Y, 1)
+
+	local marginX, marginY = 28, 52
+	local fillW, fillH = 0.86, 0.84
+	local minW, minH = 660, 480
+	local maxW, maxH = design.X, design.Y + 40
 
 	if profile == "mobile" then
-		marginX = 8
-		marginY = 14
-		availW = math.max(280, vp.X - marginX * 2)
-		availH = math.max(260, vp.Y - marginY * 2)
-		targetW = math.floor(availW)
-		targetH = math.floor(availH)
-		profileScale = 1
+		marginX, marginY = 12, 28
+		fillW, fillH = 0.94, 0.8
+		minW, minH = 300, 300
+		maxW, maxH = math.min(720, vp.X - 24), math.min(560, vp.Y - 36)
 	elseif profile == "compact" then
-		targetW = math.min(780, availW)
-		targetH = math.min(560, availH)
-		profileScale = 0.86
+		marginX, marginY = 22, 44
+		fillW, fillH = 0.9, 0.82
+		minW, minH = 580, 420
+		maxW, maxH = 820, 600
 	elseif profile == "performance" then
-		targetW = math.min(820, availW)
-		targetH = math.min(600, availH)
-		profileScale = 0.92
+		marginX, marginY = 24, 48
+		fillW, fillH = 0.84, 0.8
+		minW, minH = 620, 440
+		maxW, maxH = 860, 620
 	else
-		targetW = math.min(design.X, availW)
-		targetH = math.min(design.Y, availH)
-		profileScale = 1
+		if longSide >= 1900 and shortSide >= 1040 then
+			fillW, fillH = 0.68, 0.82
+			maxW, maxH = 980, 760
+		elseif longSide >= 1400 then
+			fillW, fillH = 0.78, 0.84
+			maxW, maxH = 940, 720
+		end
 	end
 
-	local fitScale = math.min(availW / targetW, availH / targetH, 1.1) * profileScale
-	fitScale = fitScale * (tonumber(Resizer.config.userScaleMultiplier) or 1)
-	if profile == "mobile" then
-		fitScale = 1
+	local availW = math.max(minW, vp.X - marginX * 2)
+	local availH = math.max(minH, vp.Y - marginY * 2)
+
+	local targetW = math.floor(availW * fillW + 0.5)
+	local targetH = math.floor(availH * fillH + 0.5)
+
+	if targetW / math.max(targetH, 1) > aspect then
+		targetW = math.floor(targetH * aspect + 0.5)
 	else
-		fitScale = math.clamp(fitScale, 0.72, 1.14)
+		targetH = math.floor(targetW / aspect + 0.5)
+	end
+
+	targetW = math.clamp(targetW, minW, math.min(maxW, availW))
+	targetH = math.clamp(targetH, minH, math.min(maxH, availH))
+	targetW = math.floor(targetW / 2) * 2
+	targetH = math.floor(targetH / 2) * 2
+
+	local userMul = tonumber(Resizer.config.userScaleMultiplier) or 1
+	local fitScale = math.clamp(userMul, 0.88, 1.06)
+	if profile == "mobile" then
+		fitScale = math.clamp(userMul * 0.98, 0.88, 1)
 	end
 
 	return {
 		profile = profile,
-		size = UDim2.fromOffset(math.floor(targetW + 0.5), math.floor(targetH + 0.5)),
+		size = UDim2.fromOffset(targetW, targetH),
 		scale = fitScale,
 		viewport = vp,
+		fillW = fillW,
+		fillH = fillH,
 	}
 end
 
@@ -475,7 +613,7 @@ function Resizer.applyWindow(ref, animate)
 	end
 	if Resizer.config.autoResize == false then
 		local manual = tonumber(Resizer.config.userScaleMultiplier) or 1
-		ref.baseUIScale.Scale = math.clamp(manual, 0.72, 1.14)
+		ref.baseUIScale.Scale = math.clamp(manual, 0.85, 1.08)
 		if Resizer.config.userCustomSize then
 			local custom = Resizer.config.userCustomSize
 			ref.base.Size = UDim2.fromOffset(custom.X, custom.Y)
@@ -488,16 +626,46 @@ function Resizer.applyWindow(ref, animate)
 	end
 
 	local layout = Resizer.computeLayout(Resizer.config.profile)
-	if animate and Effects.enabled("startupAnimation") then
-		Effects.play(ref.baseUIScale, 0.22, { Scale = layout.scale }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-	else
-		ref.baseUIScale.Scale = layout.scale
+	local prev = ref._lastLayout
+	local sizeChanged = not prev
+		or math.abs((prev.size and prev.size.X.Offset or 0) - layout.size.X.Offset) > 3
+		or math.abs((prev.size and prev.size.Y.Offset or 0) - layout.size.Y.Offset) > 3
+	local scaleChanged = not prev or math.abs((prev.scale or 1) - layout.scale) > 0.015
+
+	if sizeChanged then
+		if animate and Effects.enabled("startupAnimation") and prev then
+			Effects.play(ref.baseUIScale, 0.26, { Scale = layout.scale * 0.985 }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			ref.base.Size = layout.size
+			task.delay(0.04, function()
+				if ref.base and ref.base.Parent and ref.baseUIScale then
+					Effects.play(ref.baseUIScale, 0.22, { Scale = layout.scale }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+				end
+			end)
+		elseif animate and Effects.enabled("startupAnimation") and not prev then
+			ref.baseUIScale.Scale = layout.scale * 0.96
+			ref.base.Size = layout.size
+			Effects.play(ref.baseUIScale, 0.32, { Scale = layout.scale }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		else
+			ref.baseUIScale.Scale = layout.scale
+			ref.base.Size = layout.size
+		end
+	elseif scaleChanged then
+		if animate and Effects.enabled("startupAnimation") then
+			Effects.play(ref.baseUIScale, 0.18, { Scale = layout.scale }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		else
+			ref.baseUIScale.Scale = layout.scale
+		end
 	end
-	ref.base.Size = layout.size
+
 	ref._lastLayout = layout
 	if type(ref.syncContentLayout) == "function" then
 		pcall(ref.syncContentLayout)
 	end
+	task.defer(function()
+		for _, callback in pairs(Resizer.layoutRefresh) do
+			pcall(callback)
+		end
+	end)
 	return layout
 end
 
@@ -536,11 +704,16 @@ function Resizer.ensureWatch()
 				end
 				local vp = camera.ViewportSize
 				local last = Resizer._lastViewport
-				if last and math.abs(last.X - vp.X) < 2 and math.abs(last.Y - vp.Y) < 2 then
+				if last and math.abs(last.X - vp.X) < 4 and math.abs(last.Y - vp.Y) < 4 then
 					return
 				end
 				Resizer._lastViewport = vp
-				task.defer(function()
+				if Resizer._pendingRelayout then
+					return
+				end
+				Resizer._pendingRelayout = true
+				task.delay(0.06, function()
+					Resizer._pendingRelayout = false
 					Resizer.applyAll(true)
 				end)
 			end)
@@ -565,7 +738,10 @@ function Resizer.applyEnv(env)
 	if env.Alleral_UiProfile ~= nil then
 		Resizer.config.profile = tostring(env.Alleral_UiProfile)
 	elseif UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		Resizer.config.profile = "mobile"
+		local vp = Resizer.viewport()
+		if math.min(vp.X, vp.Y) < 820 then
+			Resizer.config.profile = "mobile"
+		end
 	end
 	if env.Alleral_UiScale ~= nil then
 		Resizer.config.userScaleMultiplier = tonumber(env.Alleral_UiScale) or 1
@@ -573,6 +749,16 @@ function Resizer.applyEnv(env)
 end
 
 MacLib.Resizer = Resizer
+
+function MacLib.applyMobileSafeMode()
+	if Resizer.resolveProfile(Resizer.config.profile) ~= "mobile" then
+		return false
+	end
+	Effects.config.ambientGlow = false
+	Effects.config.strokeGlow = false
+	Effects.stopPulse()
+	return true
+end
 
 function MacLib:SetAutoResize(enabled)
 	Resizer.config.autoResize = enabled ~= false
@@ -730,6 +916,7 @@ end
 function MacLib:ApplyEffectsFromEnv(env)
 	Effects.applyEnv(env)
 	Resizer.applyEnv(env)
+	MacLib.applyMobileSafeMode()
 	if Effects.enabled("strokeGlow") then
 		Effects.ensurePulse()
 	end
@@ -766,10 +953,11 @@ function MacLib:Window(Settings)
 	end
 
 	local WindowFunctions = {Settings = Settings}
+	local mobileWindow = Resizer.resolveProfile(Resizer.config.profile) == "mobile"
 	if Settings.AcrylicBlur ~= nil then
 		acrylicBlur = Settings.AcrylicBlur
 	else
-		acrylicBlur = true
+		acrylicBlur = not mobileWindow
 	end
 
 	local macLib = GetGui()
@@ -804,13 +992,13 @@ function MacLib:Window(Settings)
 	base.Name = "Base"
 	base.AnchorPoint = Vector2.new(0.5, 0.5)
 	base.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-	base.BackgroundTransparency = Settings.AcrylicBlur and 0.05 or 0
+	base.BackgroundTransparency = acrylicBlur and 0.05 or 0
 	base.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	base.BorderSizePixel = 0
 	base.Position = UDim2.fromScale(0.5, 0.5)
-	base.Size = Settings.Size or UDim2.fromOffset(868, 650)
+	base.Size = Settings.Size or UDim2.fromOffset(920, 680)
 	do
-		local w, h = udim2PixelSize(Settings.Size or base.Size, 868, 650)
+		local w, h = udim2PixelSize(Settings.Size or base.Size, 920, 680)
 		Resizer.baseDesignSize = Vector2.new(w, h)
 	end
 
@@ -838,8 +1026,13 @@ function MacLib:Window(Settings)
 			local w = tonumber(env.Alleral_UiCustomSize.w)
 			local h = tonumber(env.Alleral_UiCustomSize.h)
 			if w and h then
-				w = math.clamp(math.floor(w + 0.5), 520, 1400)
-				h = math.clamp(math.floor(h + 0.5), 380, 920)
+				if mobileWindow then
+					w = math.clamp(math.floor(w + 0.5), 300, 720)
+					h = math.clamp(math.floor(h + 0.5), 280, 560)
+				else
+					w = math.clamp(math.floor(w + 0.5), 520, 1400)
+					h = math.clamp(math.floor(h + 0.5), 380, 920)
+				end
 				base.Size = UDim2.fromOffset(w, h)
 				Resizer.baseDesignSize = Vector2.new(w, h)
 				Resizer.config.autoResize = false
@@ -1379,20 +1572,35 @@ function MacLib:Window(Settings)
 
 	local minSidebarWidth = 107
 	local maxSidebarWidth = 900
+	local syncingLayout = false
+	local resizingContent = false
+	local defaultSidebarWidth = 0
+	local initialMouseX, initialSidebarWidth
+	local snapRange = 20
 
 	local function syncContentLayout()
+		if syncingLayout then
+			return
+		end
+		syncingLayout = true
 		local baseW = math.max(base.AbsoluteSize.X, 320)
 		local profile = Resizer.resolveProfile(Resizer.config.profile)
+		local sidebarW
 		if profile == "mobile" then
-			local sidebarW = math.clamp(math.floor(baseW * 0.26 + 0.5), 96, 128)
-			sidebar.Size = UDim2.new(0, sidebarW, 1, 0)
+			sidebarW = math.clamp(math.floor(baseW * 0.24 + 0.5), 88, 112)
+			if math.abs(sidebar.AbsoluteSize.X - sidebarW) > 1 then
+				sidebar.Size = UDim2.new(0, sidebarW, 1, 0)
+			end
 		elseif sidebar.Size.X.Scale > 0 then
 			sidebar.Size = UDim2.fromScale(0.325, 1)
+			sidebarW = sidebar.AbsoluteSize.X
+		else
+			sidebarW = sidebar.AbsoluteSize.X
 		end
-		local sidebarW = sidebar.AbsoluteSize.X
 		maxSidebarWidth = math.max(minSidebarWidth, baseW - minSidebarWidth)
 		content.Position = UDim2.fromOffset(sidebarW, 0)
 		content.Size = UDim2.new(0, math.max(baseW - sidebarW, 120), 1, 0)
+		syncingLayout = false
 	end
 
 	local TweenSettings = {
@@ -1415,45 +1623,58 @@ function MacLib:Window(Settings)
 		ChangeState("Idle")
 	end)
 
-	dividerInteract.MouseButton1Down:Connect(function()
+	dividerInteract.InputBegan:Connect(function(input)
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
 		resizingContent = true
-		initialMouseX = UserInputService:GetMouseLocation().X
+		if input.UserInputType == Enum.UserInputType.Touch then
+			initialMouseX = input.Position.X
+		else
+			initialMouseX = UserInputService:GetMouseLocation().X
+		end
 		initialSidebarWidth = sidebar.AbsoluteSize.X
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			resizingContent = false
 		end
 	end)
 
-	UserInputService.InputChanged:Connect(function(input)
-		if resizingContent and input.UserInputType == Enum.UserInputType.MouseMovement then
-			local deltaX = UserInputService:GetMouseLocation().X - initialMouseX
-			local newSidebarWidth = initialSidebarWidth + deltaX
-
-			if math.abs(newSidebarWidth - defaultSidebarWidth) < snapRange then
-				newSidebarWidth = defaultSidebarWidth
-			else
-				newSidebarWidth = math.clamp(newSidebarWidth, minSidebarWidth, maxSidebarWidth)
-			end
-
-			sidebar.Size = UDim2.new(0, newSidebarWidth, 1, 0)
-			syncContentLayout()
+	local function pointerScreenX(input)
+		if input and input.UserInputType == Enum.UserInputType.Touch then
+			return input.Position.X
 		end
+		return UserInputService:GetMouseLocation().X
+	end
+
+	UserInputService.InputChanged:Connect(function(input)
+		if not resizingContent then
+			return
+		end
+		if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		local deltaX = pointerScreenX(input) - initialMouseX
+		local newSidebarWidth = initialSidebarWidth + deltaX
+
+		if math.abs(newSidebarWidth - defaultSidebarWidth) < snapRange then
+			newSidebarWidth = defaultSidebarWidth
+		else
+			newSidebarWidth = math.clamp(newSidebarWidth, minSidebarWidth, maxSidebarWidth)
+		end
+
+		sidebar.Size = UDim2.new(0, newSidebarWidth, 1, 0)
+		syncContentLayout()
 	end)
 
 	syncContentLayout()
+	defaultSidebarWidth = sidebar.AbsoluteSize.X
 	windowRef.syncContentLayout = syncContentLayout
 	pcall(function()
 		base:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncContentLayout)
-		sidebar:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncContentLayout)
 	end)
-
-	local resizingContent = false
-	local defaultSidebarWidth = sidebar.AbsoluteSize.X
-	local initialMouseX, initialSidebarWidth
-	local snapRange = 20
 
 	local topbar = Instance.new("Frame")
 	topbar.Name = "Topbar"
@@ -1754,12 +1975,19 @@ function MacLib:Window(Settings)
 		end
 	end)
 
+	local function inputScreenPos(input)
+		if input and input.UserInputType == Enum.UserInputType.Touch then
+			return Vector2.new(input.Position.X, input.Position.Y)
+		end
+		return UserInputService:GetMouseLocation()
+	end
+
 	resizeGrip.InputBegan:Connect(function(input)
 		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
 			return
 		end
 		resizingWindow = true
-		resizeStartMouse = UserInputService:GetMouseLocation()
+		resizeStartMouse = inputScreenPos(input)
 		resizeStartSize = Vector2.new(base.AbsoluteSize.X, base.AbsoluteSize.Y)
 		Resizer.config.autoResize = false
 	end)
@@ -1780,7 +2008,7 @@ function MacLib:Window(Settings)
 		if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
 			return
 		end
-		local mouse = UserInputService:GetMouseLocation()
+		local mouse = inputScreenPos(input)
 		local delta = mouse - resizeStartMouse
 		local vp = Resizer.viewport()
 		local minW = mobileUi and 300 or 520
@@ -2416,6 +2644,7 @@ function MacLib:Window(Settings)
 			leftUIListLayout.Name = "LeftUIListLayout"
 			leftUIListLayout.Padding = UDim.new(0, 15)
 			leftUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			leftUIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 			leftUIListLayout.Parent = left
 			left.Parent = elementsScrolling
 
@@ -2432,6 +2661,7 @@ function MacLib:Window(Settings)
 			centerUIListLayout.Name = "CenterUIListLayout"
 			centerUIListLayout.Padding = UDim.new(0, 15)
 			centerUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			centerUIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 			centerUIListLayout.Parent = center
 			center.Parent = elementsScrolling
 
@@ -2447,6 +2677,7 @@ function MacLib:Window(Settings)
 			rightUIListLayout.Name = "RightUIListLayout"
 			rightUIListLayout.Padding = UDim.new(0, 15)
 			rightUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			rightUIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 			rightUIListLayout.Parent = right
 			right.Parent = elementsScrolling
 
@@ -2487,29 +2718,46 @@ function MacLib:Window(Settings)
 				end)
 			end
 
+			local relayoutPending = false
+			local function columnLayoutMode()
+				local scrollW = math.max(elementsScrolling.AbsoluteSize.X, 280)
+				local hasCenter = columnSectionCount(center) > 0
+				if mobileLayout() or scrollW < 720 or (hasCenter and scrollW < 880) then
+					return "stack"
+				end
+				if hasCenter then
+					return "triple"
+				end
+				return "double"
+			end
+
 			relayoutTabColumns = function()
-				if not left or not center or not right or not elementsScrollingUIListLayout then
+				if relayoutPending then
 					return
 				end
-				local mobile = mobileLayout()
-				if mobile then
-					elementsScrolling.ScrollBarThickness = 6
-					elementsScrollingUIListLayout.FillDirection = Enum.FillDirection.Vertical
-					local full = UDim2.new(1, 0, 0, 0)
-					left.Size = full
-					left.LayoutOrder = 1
-					center.Size = full
-					center.LayoutOrder = 2
-					center.Visible = columnSectionCount(center) > 0
-					right.Size = full
-					right.LayoutOrder = 3
-				else
-					elementsScrolling.ScrollBarThickness = 4
-					elementsScrollingUIListLayout.FillDirection = Enum.FillDirection.Horizontal
-					local useCenter = columnSectionCount(center) > 0
-					center.Visible = useCenter
-					left.LayoutOrder = 0
-					if useCenter then
+				relayoutPending = true
+				task.defer(function()
+					relayoutPending = false
+					if not left or not center or not right or not elementsScrollingUIListLayout then
+						return
+					end
+					local mode = columnLayoutMode()
+					if mode == "stack" then
+						elementsScrolling.ScrollBarThickness = mobileLayout() and 6 or 5
+						elementsScrollingUIListLayout.FillDirection = Enum.FillDirection.Vertical
+						local full = UDim2.new(1, 0, 0, 0)
+						left.Size = full
+						left.LayoutOrder = 1
+						center.Size = full
+						center.LayoutOrder = 2
+						center.Visible = columnSectionCount(center) > 0
+						right.Size = full
+						right.LayoutOrder = 3
+					elseif mode == "triple" then
+						elementsScrolling.ScrollBarThickness = 4
+						elementsScrollingUIListLayout.FillDirection = Enum.FillDirection.Horizontal
+						center.Visible = true
+						left.LayoutOrder = 0
 						local share = UDim2.new(1 / 3, -math.ceil(COLUMN_GAP * 2 / 3), 0, 0)
 						left.Size = share
 						center.Size = share
@@ -2517,12 +2765,16 @@ function MacLib:Window(Settings)
 						center.LayoutOrder = 1
 						right.LayoutOrder = 2
 					else
+						elementsScrolling.ScrollBarThickness = 4
+						elementsScrollingUIListLayout.FillDirection = Enum.FillDirection.Horizontal
+						center.Visible = false
+						left.LayoutOrder = 0
 						left.Size = UDim2.new(0.5, -math.floor(COLUMN_GAP / 2), 0, 0)
 						right.Size = UDim2.new(0.5, -math.floor(COLUMN_GAP / 2), 0, 0)
 						right.LayoutOrder = 1
 					end
-				end
-				refreshTabScrollCanvas()
+					refreshTabScrollCanvas()
+				end)
 			end
 
 			for _, colFrame in ipairs({ left, center, right }) do
@@ -2534,12 +2786,17 @@ function MacLib:Window(Settings)
 				end
 			end
 			pcall(function()
-				elementsScrolling:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshTabScrollCanvas)
+				elementsScrolling:GetPropertyChangedSignal("AbsoluteSize"):Connect(relayoutTabColumns)
+			end)
+			pcall(function()
+				elementsScrollingUIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshTabScrollCanvas)
 			end)
 			MacLib:RegisterLayoutRefresh("tab_" .. tostring(elements1), relayoutTabColumns)
 			relayoutTabColumns()
 
 			elementsScrolling.Parent = elements1
+
+			local sectionLayoutSeq = { left = 0, center = 0, right = 0 }
 
 			function TabFunctions:Section(Settings)
 				local SectionFunctions = {}
@@ -2550,13 +2807,26 @@ function MacLib:Window(Settings)
 				section.BackgroundTransparency = 0.98
 				section.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				section.BorderSizePixel = 0
-				section.Position = UDim2.fromScale(0, 6.78e-08)
-				section.Size = UDim2.fromScale(1, 0)
-				section.ClipsDescendants = true
+				section.Position = UDim2.fromOffset(0, 0)
+				section.Size = UDim2.new(1, 0, 0, 0)
+				section.ClipsDescendants = false
 				local side = Settings.Side or "Left"
+				local sideKey = side == "Right" and "right" or (side == "Center" and "center" or "left")
 				local parentCol = side == "Right" and right or (side == "Center" and center or left)
+				sectionLayoutSeq[sideKey] += 1
+				section.LayoutOrder = sectionLayoutSeq[sideKey]
 				section.Parent = parentCol
+				local elementOrder = 0
+				section.ChildAdded:Connect(function(child)
+					if child:IsA("GuiObject") and not child:IsA("UIComponent") then
+						elementOrder += 1
+						child.LayoutOrder = elementOrder
+					end
+				end)
 				task.defer(relayoutTabColumns)
+				task.defer(function()
+					Effects.playSectionEntrance(section)
+				end)
 
 				local sectionUICorner = Instance.new("UICorner")
 				sectionUICorner.Name = "SectionUICorner"
@@ -2576,6 +2846,7 @@ function MacLib:Window(Settings)
 				sectionUIListLayout.Name = "SectionUIListLayout"
 				sectionUIListLayout.Padding = UDim.new(0, 10)
 				sectionUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+				sectionUIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 				sectionUIListLayout.Parent = section
 
 				local sectionUIPadding = Instance.new("UIPadding")
@@ -2655,7 +2926,15 @@ function MacLib:Window(Settings)
 						end
 					end
 
-					local function Callback()
+					buttonInteract.MouseEnter:Connect(function()
+						ChangeState("Hover")
+					end)
+					buttonInteract.MouseLeave:Connect(function()
+						ChangeState("Idle")
+					end)
+
+					buttonInteract.Activated:Connect(function(input)
+						Effects.playRipple(button, input)
 						if Effects.enabled("buttonClick") or Effects.enabled("touchFeedback") then
 							local scale = button:FindFirstChild("AlleralClickScale")
 							if not scale then
@@ -2673,16 +2952,7 @@ function MacLib:Window(Settings)
 						if ButtonFunctions.Settings.Callback then
 							ButtonFunctions.Settings.Callback()
 						end
-					end
-
-					buttonInteract.MouseEnter:Connect(function()
-						ChangeState("Hover")
 					end)
-					buttonInteract.MouseLeave:Connect(function()
-						ChangeState("Idle")
-					end)
-
-					buttonInteract.MouseButton1Click:Connect(Callback)
 					function ButtonFunctions:UpdateName(Name)
 						buttonInteract.Text = Name
 					end
@@ -2705,7 +2975,7 @@ function MacLib:Window(Settings)
 					toggle.BackgroundTransparency = 1
 					toggle.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					toggle.BorderSizePixel = 0
-					toggle.Size = UDim2.new(1, 0, 0, 38)
+					toggle.Size = UDim2.new(1, 0, 0, 0)
 					toggle.Parent = section
 
 					local toggleName = Instance.new("TextLabel")
@@ -2717,6 +2987,7 @@ function MacLib:Window(Settings)
 					toggleName.TextSize = 13
 					toggleName.TextTransparency = 0.5
 					toggleName.TextTruncate = Enum.TextTruncate.AtEnd
+					toggleName.TextWrapped = true
 					toggleName.TextXAlignment = Enum.TextXAlignment.Left
 					toggleName.TextYAlignment = Enum.TextYAlignment.Top
 					toggleName.AnchorPoint = Vector2.new(0, 0.5)
@@ -3111,27 +3382,35 @@ function MacLib:Window(Settings)
 					input.BackgroundTransparency = 1
 					input.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					input.BorderSizePixel = 0
-					input.Size = UDim2.new(1, 0, 0, 38)
+					input.Size = UDim2.new(1, 0, 0, 0)
 					input.Parent = section
+
+					local inputLayout = Instance.new("UIListLayout")
+					inputLayout.Name = "InputLayout"
+					inputLayout.Padding = UDim.new(0, 5)
+					inputLayout.SortOrder = Enum.SortOrder.LayoutOrder
+					inputLayout.Parent = input
 
 					local inputName = Instance.new("TextLabel")
 					inputName.Name = "InputName"
 					inputName.FontFace = Font.new(assets.interFont)
-					inputName.Text = InputFunctions.Settings.Name
+					inputName.Text = InputFunctions.Settings.Name or ""
 					inputName.RichText = true
 					inputName.TextColor3 = Color3.fromRGB(255, 255, 255)
 					inputName.TextSize = 13
 					inputName.TextTransparency = 0.5
 					inputName.TextTruncate = Enum.TextTruncate.AtEnd
+					inputName.TextWrapped = true
 					inputName.TextXAlignment = Enum.TextXAlignment.Left
 					inputName.TextYAlignment = Enum.TextYAlignment.Top
-					inputName.AnchorPoint = Vector2.new(0, 0.5)
-					inputName.AutomaticSize = Enum.AutomaticSize.XY
+					inputName.AutomaticSize = Enum.AutomaticSize.Y
 					inputName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					inputName.BackgroundTransparency = 1
 					inputName.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					inputName.BorderSizePixel = 0
-					inputName.Position = UDim2.fromScale(0, 0.5)
+					inputName.LayoutOrder = 0
+					inputName.Size = UDim2.new(1, 0, 0, 0)
+					inputName.Visible = inputName.Text ~= ""
 					inputName.Parent = input
 
 					local inputBox = Instance.new("TextBox")
@@ -3141,17 +3420,15 @@ function MacLib:Window(Settings)
 					inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 					inputBox.TextSize = 12
 					inputBox.TextTransparency = 0.1
-					inputBox.AnchorPoint = Vector2.new(1, 0.5)
-					inputBox.AutomaticSize = Enum.AutomaticSize.X
+					inputBox.AutomaticSize = Enum.AutomaticSize.None
 					inputBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					inputBox.BackgroundTransparency = 0.95
 					inputBox.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					inputBox.BorderSizePixel = 0
 					inputBox.ClipsDescendants = true
 					inputBox.LayoutOrder = 1
-					inputBox.Position = UDim2.fromScale(1, 0.5)
-					inputBox.Size = UDim2.fromOffset(21, 21)
-					inputBox.TextXAlignment = Enum.TextXAlignment.Right
+					inputBox.Size = UDim2.new(1, 0, 0, 30)
+					inputBox.TextXAlignment = Enum.TextXAlignment.Left
 
 					local inputBoxUICorner = Instance.new("UICorner")
 					inputBoxUICorner.Name = "InputBoxUICorner"
@@ -3177,10 +3454,7 @@ function MacLib:Window(Settings)
 
 					inputBox.Parent = input
 
-					local Input = input
 					local InputBox = inputBox
-					local InputName = inputName
-					local Constraint = inputBoxUISizeConstraint
 
 					local function applyCharacterLimit(value)
 						if InputFunctions.Settings.CharacterLimit then
@@ -3215,18 +3489,7 @@ function MacLib:Window(Settings)
 						AcceptedCharacters = CharacterSubs[InputFunctions.Settings.AcceptedCharacters] or CharacterSubs.All
 					end
 
-					InputBox.AutomaticSize = Enum.AutomaticSize.X
-
-					local function checkSize()
-						local nameWidth = InputName.AbsoluteSize.X
-						local totalWidth = Input.AbsoluteSize.X
-
-						local maxWidth = (totalWidth - nameWidth - 20) / baseUIScale.Scale
-						Constraint.MaxSize = Vector2.new(maxWidth, 9e9)
-					end
-
-					checkSize()
-					InputName:GetPropertyChangedSignal("AbsoluteSize"):Connect(checkSize)
+					InputBox.AutomaticSize = Enum.AutomaticSize.None
 
 					InputBox.FocusLost:Connect(function()
 						local inputText = InputBox.Text
@@ -3500,15 +3763,27 @@ function MacLib:Window(Settings)
 					dropdownName.TextColor3 = Color3.fromRGB(255, 255, 255)
 					dropdownName.TextSize = 13
 					dropdownName.TextTransparency = 0.5
-					dropdownName.TextTruncate = Enum.TextTruncate.SplitWord
+					dropdownName.TextTruncate = Enum.TextTruncate.AtEnd
+					dropdownName.TextWrapped = true
 					dropdownName.TextXAlignment = Enum.TextXAlignment.Left
 					dropdownName.AutomaticSize = Enum.AutomaticSize.Y
 					dropdownName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					dropdownName.BackgroundTransparency = 1
 					dropdownName.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					dropdownName.BorderSizePixel = 0
-					dropdownName.Size = UDim2.new(1, -20, 0, 38)
+					dropdownName.Size = UDim2.new(1, -24, 0, 0)
 					dropdownName.Parent = dropdown
+
+					local function syncDropdownCollapsedHeight()
+						if dropdownFrame and dropdownFrame.Visible then
+							return
+						end
+						dropdown.Size = UDim2.new(1, 0, 0, math.max(38, dropdownName.TextBounds.Y + 14))
+					end
+					pcall(function()
+						dropdownName:GetPropertyChangedSignal("TextBounds"):Connect(syncDropdownCollapsedHeight)
+					end)
+					syncDropdownCollapsedHeight()
 
 					local dropdownUIStroke = Instance.new("UIStroke")
 					dropdownUIStroke.Name = "DropdownUIStroke"
@@ -5362,6 +5637,9 @@ function MacLib:Window(Settings)
 					headerText.BorderSizePixel = 0
 					headerText.Size = UDim2.fromScale(1, 0)
 					headerText.Parent = header
+					task.defer(function()
+						Effects.playShimmer(headerText)
+					end)
 
 					function HeaderFunctions:UpdateName(New)
 						headerText.Text = New
@@ -5386,7 +5664,7 @@ function MacLib:Window(Settings)
 					label.BackgroundTransparency = 1
 					label.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					label.BorderSizePixel = 0
-					label.Size = UDim2.new(1, 0, 0, 38)
+					label.Size = UDim2.new(1, 0, 0, 0)
 					label.Parent = section
 
 					local labelText = Instance.new("TextLabel")
@@ -5649,14 +5927,28 @@ function MacLib:Window(Settings)
 
 				local nextContent = tabs[tabSwitcher].tabContent
 				if Effects.enabled("tabSwitchAnimation") then
-					nextContent.Position = UDim2.fromOffset(16, 0)
+					if Effects.enabled("tabParallax") then
+						Effects.playTabParallax(nextContent, true)
+					else
+						nextContent.Position = UDim2.fromOffset(16, 0)
+					end
 				end
 				nextContent.Parent = content
-				if Effects.enabled("tabSwitchAnimation") then
+				if Effects.enabled("tabSwitchAnimation") and not Effects.enabled("tabParallax") then
 					Effects.play(nextContent, easetime, { Position = UDim2.fromOffset(0, 0) }, easeStyle, Enum.EasingDirection.Out)
 				end
 				currentTabInstance = nextContent
 				currentTab.Text = Settings.Name
+				task.defer(function()
+					local scroll = nextContent:FindFirstChild("ElementsScrolling", true)
+					if scroll then
+						for _, col in ipairs(scroll:GetChildren()) do
+							if col:IsA("Frame") and (col.Name == "Left" or col.Name == "Center" or col.Name == "Right") then
+								Effects.staggerReveal(col, 0.035)
+							end
+						end
+					end
+				end)
 			end
 
 			tabSwitcher.MouseButton1Click:Connect(function()

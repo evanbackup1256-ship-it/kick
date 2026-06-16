@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/maclib/source.luau",
 	}
 	local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-	local MACLIB_VERSION = 10
+	local MACLIB_VERSION = 13
 	local MACLIB_REQUIRED_FN = "function MacLib:Window"
 	local MACLIB_MIN_BYTES = 150000
 	local MACLIB_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
@@ -219,7 +219,7 @@ return function(Core)
 
 		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
 			for _, baseUrl in ipairs(maclibRawUrls()) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?maclib=10&v=" .. tostring(need) .. "&t=" .. tostring(tick()), MACLIB_MIN_BYTES)
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?maclib=13&v=" .. tostring(need) .. "&t=" .. tostring(tick()), MACLIB_MIN_BYTES)
 				if type(src) == "string" then
 					consider(src, "remote:" .. baseUrl)
 				end
@@ -584,7 +584,7 @@ return function(Core)
 			local macWindow = MacLib:Window({
 				Title = settings.Title or settings.Name or "Alleral",
 				Subtitle = settings.Subtitle or settings.SubName or settings.Author or "",
-				Size = settings.Size or UDim2.fromOffset(868, 650),
+				Size = settings.Size or UDim2.fromOffset(920, 680),
 				Keybind = menuKey,
 				AcrylicBlur = settings.AcrylicBlur == true,
 				ShowUserInfo = true,
@@ -978,7 +978,7 @@ return function(Core)
 			return nil
 		end
 		if not settings.Size then
-			settings.Size = UDim2.fromOffset(868, 650)
+			settings.Size = UDim2.fromOffset(920, 680)
 		end
 		local rawWindow = lib:CreateWindow(settings)
 		if not rawWindow then

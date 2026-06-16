@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.8.4"
+local LOADER_VERSION = "8.8.7"
 local BOOTSTRAP_VERSION = "2.0.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -28,7 +28,7 @@ local LEGACY_UI_SOURCE_PATHS = {
 local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
 local MACLIB_SOURCE_MIN_BYTES = 150000
 local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-local MACLIB_VERSION = 10
+local MACLIB_VERSION = 13
 local MACLIB_REQUIRED_FN = "function MacLib:Window"
 local MACLIB_PATCHED_OVERRIDE_PATHS = {
 	"maclib_patched.luau",
@@ -48,19 +48,19 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.8.4",
+	loader = "8.8.7",
 	core = "2.9.10",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
 	alleral = "5.5.0-maclib",
-	maclibVersion = 10,
+	maclibVersion = 13,
 	analytics = "1.2",
-	telemetry = "3.4",
+	telemetry = "3.5",
 	helpers = "1.8",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "8f77aad",
+	commit = "46a86a6",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -980,7 +980,7 @@ do
 	end
 
 	local function maclibFetchUrls()
-		local bust = "?maclib=10&t=" .. tostring(tick())
+		local bust = "?maclib=13&t=" .. tostring(tick())
 		local urls = {
 			GITHUB_RAW .. "/" .. MACLIB_SOURCE_PATH .. bust,
 			"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. MACLIB_SOURCE_PATH .. bust,
@@ -2843,7 +2843,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "7.3.0",
+		version = "7.3.2",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
@@ -3445,10 +3445,10 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.4"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.7"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.4"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.7"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then

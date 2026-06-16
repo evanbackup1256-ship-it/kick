@@ -3453,7 +3453,7 @@ local mainTab = createUiTab("Kick", "rbxassetid://10723407389")
 local autoTab = createUiTab("Plot", "rbxassetid://10734923214")
 local eventsTab = createUiTab("Events", "rbxassetid://10709789407", 3)
 local shopTab = createUiTab("Inventory", "rbxassetid://10734952479", 2)
-local miscTab = createUiTab("Tools", "rbxassetid://10734950020", 3)
+local miscTab = createUiTab("Misc", "rbxassetid://10734950020", 3)
 local configTab = createUiTab("Settings", "rbxassetid://10734950309")
 
 local kickGroup = createUiGroup(mainTab, "Auto Kick", "rbxassetid://10734975692", 1)

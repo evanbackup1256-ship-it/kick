@@ -1714,8 +1714,8 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 		end
 		if config.Searchable then
 			groupbox:CreateInput({
-				Name = (config.Text or config.Name or id) .. " filter",
-				PlaceholderText = "search...",
+				Name = "",
+				PlaceholderText = "Filter " .. tostring(config.Text or config.Name or id) .. "...",
 				RemoveTextOnFocus = false,
 				Callback = wrap((config.Text or config.Name or id) .. " Search", function(text)
 					handle:Search(text)
