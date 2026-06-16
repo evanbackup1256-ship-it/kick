@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/maclib/source.luau",
 	}
 	local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-	local MACLIB_VERSION = 5
+	local MACLIB_VERSION = 7
 	local MACLIB_REQUIRED_FN = "function MacLib:Window"
 	local MACLIB_MIN_BYTES = 150000
 	local MACLIB_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
@@ -75,6 +75,10 @@ return function(Core)
 				return version
 			end
 		end
+		local loaderNeed = tonumber(ENV._Alleral_RequiredMaclibVersion)
+		if loaderNeed then
+			return loaderNeed
+		end
 		return MACLIB_VERSION
 	end
 
@@ -93,11 +97,37 @@ return function(Core)
 			or src:find("<!DOCTYPE", 1, true)
 			or not src:find(MACLIB_VERSION_MARKER, 1, true)
 			or not src:find(MACLIB_REQUIRED_FN, 1, true)
-			or not src:find("function MacLib:Window", 1, true) then
+			or not src:find("function MacLib:Window", 1, true)
+			or src:find("Size%.Offset", 1, false) then
 			return false
 		end
 		local version = maclibVersionFromSource(src)
 		return type(version) == "number" and version == requiredMaclibVersion()
+	end
+
+	local function purgeStaleMaclibFiles()
+		local need = requiredMaclibVersion()
+		local deleteFile = maclibIoFn("delfile") or maclibIoFn("deletefile")
+		if type(deleteFile) ~= "function" then
+			return
+		end
+		for _, relPath in ipairs(MACLIB_SOURCE_PATHS) do
+			for _, root in ipairs(MACLIB_WORKSPACE_ROOTS) do
+				local full = root .. relPath
+				local src = readMaclibFileAt(full)
+				if type(src) == "string" then
+					local version = maclibVersionFromSource(src)
+					if src:find("Size%.Offset", 1, false) or type(version) ~= "number" or version ~= need then
+						pcall(deleteFile, full)
+						if ENV._AlleralMaclibSource == src then
+							ENV._AlleralMaclibSource = nil
+							ENV._AlleralMaclibSourceReady = false
+							ENV._AlleralMaclib = nil
+						end
+					end
+				end
+			end
+		end
 	end
 
 	local function maclibIoFn(name)
@@ -155,6 +185,8 @@ return function(Core)
 	end
 
 	local function readMaclibSource()
+		purgeStaleMaclibFiles()
+		local need = requiredMaclibVersion()
 		local bestSrc, bestLabel, bestVersion = nil, nil, -1
 		local function consider(src, label)
 			if not maclibSourceValid(src) then
@@ -184,7 +216,7 @@ return function(Core)
 
 		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
 			for _, baseUrl in ipairs(maclibRawUrls()) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?maclib=3&t=" .. tostring(tick()), MACLIB_MIN_BYTES)
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?maclib=7&v=" .. tostring(need) .. "&t=" .. tostring(tick()), MACLIB_MIN_BYTES)
 				if type(src) == "string" then
 					consider(src, "remote:" .. baseUrl)
 				end

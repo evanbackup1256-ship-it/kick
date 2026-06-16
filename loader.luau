@@ -49,7 +49,7 @@ local CP = {
 
 local RELEASE_FALLBACK = {
 	loader = "8.8.1",
-	core = "2.9.5",
+	core = "2.9.6",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
 	alleral = "5.5.0-maclib",
@@ -60,7 +60,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "b503281",
+	commit = "c0f970d",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -168,6 +168,7 @@ pcall(function()
 end)
 
 local ENV = genv()
+ENV._Alleral_RequiredMaclibVersion = MACLIB_VERSION
 
 local function loaderRunEnv()
 	local env = genv()
