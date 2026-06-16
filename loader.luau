@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.11.0"
+local LOADER_VERSION = "8.11.1"
 local BOOTSTRAP_VERSION = "2.0.3"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -47,7 +47,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.11.0",
+	loader = "8.11.1",
 	core = "2.9.10",
 	ui = "Onyx",
 	windui = "5.7.0-onyx",
@@ -1351,6 +1351,62 @@ local function fetchBackendModule(relativePath, minBytes)
 		return body, "backend" .. (via and (" via " .. via) or "")
 	end
 	return nil, via
+end
+
+local function usesLegacyHttpHash(src)
+	if type(src) ~= "string" then
+		return false
+	end
+	return src:find("HttpService:Hash", 1, true) ~= nil or src:find("HttpService.Hash", 1, true) ~= nil
+end
+
+local function getSource(localPaths, remotePath, opts)
+	opts = type(opts) == "table" and opts or { marker = opts }
+	local minBytes = opts.minBytes or 0
+	local marker = opts.marker
+
+	local src, path = readLocal(localPaths, minBytes)
+	if src then
+		if usesLegacyHttpHash(src) then
+			log("Removing executor-incompatible cached " .. path, true)
+			deleteWorkspaceFile(path)
+		elseif marker and not src:find(marker, 1, true) then
+			log("Skipping outdated local " .. path, true)
+			deleteWorkspaceFile(path)
+		else
+			return src, "local:" .. path
+		end
+	end
+
+	local backendSrc, backendLabel = fetchBackendModule(remotePath, minBytes)
+	if backendSrc then
+		if usesLegacyHttpHash(backendSrc) then
+			log("Backend " .. remotePath .. " uses HttpService.Hash - skipping", true)
+			backendSrc = nil
+		elseif marker and not backendSrc:find(marker, 1, true) then
+			log("Backend script may be outdated (missing " .. marker .. ")", true)
+		end
+		if backendSrc then
+			cacheRemote(remotePath, backendSrc)
+			return backendSrc, backendLabel or "backend"
+		end
+	end
+
+	src, path = fetchRemote(remotePath, minBytes)
+	if src then
+		if usesLegacyHttpHash(src) then
+			log("Remote " .. remotePath .. " still uses HttpService.Hash - skipping", true)
+			src = nil
+		elseif marker and not src:find(marker, 1, true) then
+			log("Script may be outdated (missing " .. marker .. ")", true)
+		end
+		if src then
+			cacheRemote(remotePath, src)
+			return src, "remote" .. (path and (" (" .. path .. ")") or "")
+		end
+	end
+
+	return nil, path or ("Could not load " .. remotePath)
 end
 
 local function ensureUiSource()
@@ -3608,7 +3664,7 @@ local function isLegacyAlleralLoader(src)
 	if src:find('local LOADER_VERSION = "8.11.0"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.11.0"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.11.1"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
