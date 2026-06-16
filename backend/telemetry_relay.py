@@ -1998,9 +1998,23 @@ def site_next_static(filename: str):
 
 
 try:
-    from loader_builder import build_manifest, read_module
+    from loader_builder import build_manifest, read_module, resolve_root as resolve_loader_root
+    _LOADER_BUILDER_OK = True
 except ImportError:
-    from relay.loader_builder import build_manifest, read_module  # type: ignore
+    try:
+        from relay.loader_builder import build_manifest, read_module, resolve_root as resolve_loader_root  # type: ignore
+        _LOADER_BUILDER_OK = True
+    except ImportError:
+        _LOADER_BUILDER_OK = False
+
+        def build_manifest(_root=None):  # type: ignore
+            return {"ok": False, "error": "loader_builder_unavailable"}
+
+        def read_module(_rel_path, _root=None):  # type: ignore
+            return None, "loader_builder_unavailable"
+
+        def resolve_loader_root(_root=None):  # type: ignore
+            return ROOT
 
 
 @app.get("/api/loader/manifest")
@@ -2008,7 +2022,9 @@ def loader_manifest():
     client_ip = resolve_client_ip(request)
     if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
         return jsonify({"ok": False, "error": "rate_limited"}), 429
-    return jsonify(build_manifest(ROOT))
+    if not _LOADER_BUILDER_OK:
+        return jsonify({"ok": False, "error": "loader_builder_unavailable"}), 503
+    return jsonify(build_manifest(resolve_loader_root()))
 
 
 @app.get("/api/loader/file/<path:rel_path>")
@@ -2016,7 +2032,9 @@ def loader_file(rel_path: str):
     client_ip = resolve_client_ip(request)
     if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
         return jsonify({"ok": False, "error": "rate_limited"}), 429
-    text, err = read_module(rel_path, ROOT)
+    if not _LOADER_BUILDER_OK:
+        return jsonify({"ok": False, "error": "loader_builder_unavailable"}), 503
+    text, err = read_module(rel_path, resolve_loader_root())
     if err == "invalid_path":
         return jsonify({"ok": False, "error": err}), 400
     if err == "unsupported_type":

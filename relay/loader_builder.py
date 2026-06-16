@@ -5,12 +5,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent.parent
+BOM = b"\xef\xbb\xbf"
 
 # Core boot chain + UI (FlexUI preferred when release.ui == Flexui)
 LOADER_MODULES = (
@@ -25,7 +26,18 @@ LOADER_MODULES = (
     "cfg/release.json",
 )
 
-BOM = b"\xef\xbb\xbf"
+
+def resolve_root(root: Path | None = None) -> Path:
+    if root is not None:
+        return root
+    override = os.environ.get("LOADER_MODULES_ROOT", "").strip()
+    if override:
+        return Path(override)
+    here = Path(__file__).resolve().parent
+    for candidate in (here / "loader_src", here.parent, here):
+        if (candidate / "loader.luau").is_file():
+            return candidate
+    return here.parent
 
 
 def strip_utf8_bom(text: str) -> str:
@@ -45,11 +57,16 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def parse_release() -> dict[str, Any]:
-    release_path = ROOT / "cfg" / "release.json"
-    if not release_path.is_file():
-        return {}
-    return json.loads(release_path.read_text(encoding="utf-8-sig"))
+def parse_release(root: Path | None = None) -> dict[str, Any]:
+    base = resolve_root(root)
+    candidates: list[Path] = [base / "cfg" / "release.json"]
+    env_release = os.environ.get("RELEASE_CONFIG_PATH", "").strip()
+    if env_release:
+        candidates.append(Path(env_release))
+    for release_path in candidates:
+        if release_path.is_file():
+            return json.loads(release_path.read_text(encoding="utf-8-sig"))
+    return {}
 
 
 def module_version_marker(text: str) -> int | None:
@@ -68,11 +85,11 @@ def module_version_marker(text: str) -> int | None:
 
 
 def build_manifest(root: Path | None = None) -> dict[str, Any]:
-    root = root or ROOT
-    release = parse_release()
+    base = resolve_root(root)
+    release = parse_release(base)
     modules: list[dict[str, Any]] = []
     for rel in LOADER_MODULES:
-        path = root / rel.replace("/", "\\") if False else root / rel
+        path = base / rel
         if not path.is_file():
             continue
         text = read_luau(path)
@@ -98,11 +115,11 @@ def build_manifest(root: Path | None = None) -> dict[str, Any]:
 
 
 def read_module(rel_path: str, root: Path | None = None) -> tuple[str | None, str | None]:
-    root = root or ROOT
+    base = resolve_root(root)
     clean = rel_path.replace("\\", "/").lstrip("/")
     if ".." in clean.split("/"):
         return None, "invalid_path"
-    path = root / clean
+    path = base / clean
     if not path.is_file():
         return None, "not_found"
     if path.suffix.lower() not in {".luau", ".json"}:
@@ -114,7 +131,8 @@ def read_module(rel_path: str, root: Path | None = None) -> tuple[str | None, st
 
 
 def write_manifest_cache(out_path: Path | None = None) -> Path:
-    out_path = out_path or ROOT / "relay" / "data" / "loader_manifest.json"
+    repo = resolve_root()
+    out_path = out_path or repo / "relay" / "data" / "loader_manifest.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     payload = build_manifest()
     out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
