@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/maclib/source.luau",
 	}
 	local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-	local MACLIB_VERSION = 16
+	local MACLIB_VERSION = 17
 	local MACLIB_REQUIRED_FN = "function MacLib:Window"
 	local MACLIB_MIN_BYTES = 150000
 	local MACLIB_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }

@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.8.13"
+local LOADER_VERSION = "8.8.14"
 local BOOTSTRAP_VERSION = "2.0.2"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -28,7 +28,7 @@ local LEGACY_UI_SOURCE_PATHS = {
 local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
 local MACLIB_SOURCE_MIN_BYTES = 150000
 local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-local MACLIB_VERSION = 16
+local MACLIB_VERSION = 17
 local MACLIB_REQUIRED_FN = "function MacLib:Window"
 local MACLIB_PATCHED_OVERRIDE_PATHS = {
 	"maclib_patched.luau",
@@ -48,12 +48,12 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.8.13",
+	loader = "8.8.14",
 	core = "2.9.10",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
 	alleral = "5.5.0-maclib",
-	maclibVersion = 16,
+	maclibVersion = 17,
 	analytics = "1.2",
 	telemetry = "3.5",
 	helpers = "1.8",

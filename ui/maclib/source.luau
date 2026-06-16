@@ -1,5 +1,5 @@
 -- Alleral vendored MacLib 1.2.6 (Alleral patch v13)
-local ALLERAL_MACLIB_VERSION = 16
+local ALLERAL_MACLIB_VERSION = 17
 
 local function udim2PixelSize(udim2, fallbackX, fallbackY)
 	if typeof(udim2) ~= "UDim2" then
@@ -2703,18 +2703,27 @@ function MacLib:Window(Settings)
 					if not elementsScrolling or not elementsScrolling.Parent then
 						return
 					end
-					local layout = elementsScrollingUIListLayout
-					if not layout then
-						return
-					end
 					local pad = elementsScrollingUIPadding
 					local padY = 0
 					if pad then
 						padY = pad.PaddingTop.Offset + pad.PaddingBottom.Offset
 					end
-					local contentH = layout.AbsoluteContentSize.Y + padY + 28
+					local contentH = 0
+					local layout = elementsScrollingUIListLayout
+					if layout and layout.FillDirection == Enum.FillDirection.Horizontal then
+						for _, col in ipairs({ left, center, right }) do
+							if col and col.Visible then
+								local colList = col:FindFirstChildOfClass("UIListLayout")
+								if colList then
+									contentH = math.max(contentH, colList.AbsoluteContentSize.Y)
+								end
+							end
+						end
+					elseif layout then
+						contentH = layout.AbsoluteContentSize.Y
+					end
 					local viewH = elementsScrolling.AbsoluteSize.Y
-					elementsScrolling.CanvasSize = UDim2.new(0, 0, 0, math.max(contentH, viewH + 1))
+					elementsScrolling.CanvasSize = UDim2.new(0, 0, 0, math.max(contentH + padY + 28, viewH + 1))
 				end)
 			end
 
@@ -2724,7 +2733,7 @@ function MacLib:Window(Settings)
 				local hasCenter = columnSectionCount(center) > 0
 				local cols = hasCenter and 3 or 2
 				local colW = (scrollW - COLUMN_GAP * (cols - 1)) / cols
-				if mobileLayout() or scrollW < 720 or colW < 400 then
+				if mobileLayout() or scrollW < 960 or colW < 480 then
 					return "stack"
 				end
 				if hasCenter then
@@ -2783,6 +2792,19 @@ function MacLib:Window(Settings)
 				local list = colFrame:FindFirstChildOfClass("UIListLayout")
 				if list then
 					pcall(function()
+						list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshTabScrollCanvas)
+					end)
+				end
+			end
+			pcall(function()
+				left:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshTabScrollCanvas)
+				center:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshTabScrollCanvas)
+				right:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshTabScrollCanvas)
+			end)
+			for _, colFrame in ipairs({ left, center, right }) do
+				local list = colFrame:FindFirstChildOfClass("UIListLayout")
+				if list then
+					pcall(function()
 						list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(relayoutTabColumns)
 					end)
 				end
@@ -2824,7 +2846,10 @@ function MacLib:Window(Settings)
 						elementOrder += 1
 						element.LayoutOrder = elementOrder
 						element.Parent = section
-						task.defer(refreshTabScrollCanvas)
+						task.defer(function()
+							refreshTabScrollCanvas()
+							relayoutTabColumns()
+						end)
 					end
 					return element
 				end
@@ -2846,7 +2871,7 @@ function MacLib:Window(Settings)
 
 				local sectionUIListLayout = Instance.new("UIListLayout")
 				sectionUIListLayout.Name = "SectionUIListLayout"
-				sectionUIListLayout.Padding = UDim.new(0, 16)
+				sectionUIListLayout.Padding = UDim.new(0, 10)
 				sectionUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 				sectionUIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 				sectionUIListLayout.Parent = section
@@ -2868,7 +2893,6 @@ function MacLib:Window(Settings)
 					local ButtonFunctions = {Settings = Settings}
 					local button = Instance.new("Frame")
 					button.Name = "Button"
-					button.AutomaticSize = Enum.AutomaticSize.Y
 					button.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 					button.BackgroundTransparency = 1
 					button.BorderColor3 = Color3.fromRGB(0, 0, 0)
@@ -2982,6 +3006,11 @@ function MacLib:Window(Settings)
 					toggle.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					toggle.BorderSizePixel = 0
 					toggle.Size = UDim2.new(1, 0, 0, 40)
+					toggle.AutomaticSize = Enum.AutomaticSize.Y
+
+					local toggleMin = Instance.new("UISizeConstraint")
+					toggleMin.MinSize = Vector2.new(0, 40)
+					toggleMin.Parent = toggle
 
 					local toggleRow = Instance.new("UIListLayout")
 					toggleRow.Name = "ToggleRow"
@@ -3128,21 +3157,20 @@ function MacLib:Window(Settings)
 					local SliderFunctions = { Settings = Settings, IgnoreConfig = false, Class = "Slider" }
 					local slider = Instance.new("Frame")
 					slider.Name = "Slider"
+					slider.AutomaticSize = Enum.AutomaticSize.Y
 					slider.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 					slider.BackgroundTransparency = 1
 					slider.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					slider.BorderSizePixel = 0
-					slider.Size = UDim2.new(1, 0, 0, 44)
+					slider.Size = UDim2.new(1, 0, 0, 0)
 					addSectionElement(slider)
 
-					local sliderRow = Instance.new("UIListLayout")
-					sliderRow.Name = "SliderRow"
-					sliderRow.FillDirection = Enum.FillDirection.Horizontal
-					sliderRow.VerticalAlignment = Enum.VerticalAlignment.Center
-					sliderRow.HorizontalAlignment = Enum.HorizontalAlignment.Left
-					sliderRow.SortOrder = Enum.SortOrder.LayoutOrder
-					sliderRow.Padding = UDim.new(0, 10)
-					sliderRow.Parent = slider
+					local sliderColumn = Instance.new("UIListLayout")
+					sliderColumn.Name = "SliderColumn"
+					sliderColumn.FillDirection = Enum.FillDirection.Vertical
+					sliderColumn.SortOrder = Enum.SortOrder.LayoutOrder
+					sliderColumn.Padding = UDim.new(0, 6)
+					sliderColumn.Parent = slider
 
 					local sliderPad = Instance.new("UIPadding")
 					sliderPad.PaddingTop = UDim.new(0, 4)
@@ -3159,14 +3187,14 @@ function MacLib:Window(Settings)
 					sliderName.TextTransparency = 0.5
 					sliderName.TextWrapped = true
 					sliderName.TextXAlignment = Enum.TextXAlignment.Left
-					sliderName.TextYAlignment = Enum.TextYAlignment.Center
+					sliderName.TextYAlignment = Enum.TextYAlignment.Top
 					sliderName.AutomaticSize = Enum.AutomaticSize.Y
 					sliderName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					sliderName.BackgroundTransparency = 1
 					sliderName.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					sliderName.BorderSizePixel = 0
 					sliderName.LayoutOrder = 1
-					sliderName.Size = UDim2.new(1, -188, 0, 0)
+					sliderName.Size = UDim2.new(1, 0, 0, 0)
 					sliderName.Parent = slider
 
 					local sliderElements = Instance.new("Frame")
@@ -3176,7 +3204,7 @@ function MacLib:Window(Settings)
 					sliderElements.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					sliderElements.BorderSizePixel = 0
 					sliderElements.LayoutOrder = 2
-					sliderElements.Size = UDim2.fromOffset(178, 28)
+					sliderElements.Size = UDim2.new(1, 0, 0, 28)
 
 					local sliderValue = Instance.new("TextBox")
 					sliderValue.Name = "SliderValue"
@@ -3217,7 +3245,7 @@ function MacLib:Window(Settings)
 					sliderElementsUIListLayout.Name = "SliderElementsUIListLayout"
 					sliderElementsUIListLayout.Padding = UDim.new(0, 8)
 					sliderElementsUIListLayout.FillDirection = Enum.FillDirection.Horizontal
-					sliderElementsUIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+					sliderElementsUIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 					sliderElementsUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 					sliderElementsUIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 					sliderElementsUIListLayout.Parent = sliderElements
@@ -3231,7 +3259,7 @@ function MacLib:Window(Settings)
 					sliderBar.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					sliderBar.BorderSizePixel = 0
 					sliderBar.LayoutOrder = 1
-					sliderBar.Size = UDim2.fromOffset(123, 3)
+					sliderBar.Size = UDim2.new(1, -49, 0, 3)
 
 					local sliderHead = Instance.new("ImageButton")
 					sliderHead.Name = "SliderHead"
@@ -4405,13 +4433,19 @@ function MacLib:Window(Settings)
 
 					local colorpicker = Instance.new("Frame")
 					colorpicker.Name = "Colorpicker"
-					colorpicker.AutomaticSize = Enum.AutomaticSize.Y
 					colorpicker.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 					colorpicker.BackgroundTransparency = 1
 					colorpicker.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					colorpicker.BorderSizePixel = 0
 					colorpicker.Size = UDim2.new(1, 0, 0, 38)
 					addSectionElement(colorpicker)
+
+					local colorpickerRow = Instance.new("UIListLayout")
+					colorpickerRow.FillDirection = Enum.FillDirection.Horizontal
+					colorpickerRow.VerticalAlignment = Enum.VerticalAlignment.Center
+					colorpickerRow.SortOrder = Enum.SortOrder.LayoutOrder
+					colorpickerRow.Padding = UDim.new(0, 8)
+					colorpickerRow.Parent = colorpicker
 
 					local colorpickerName = Instance.new("TextLabel")
 					colorpickerName.Name = "KeybindName"
@@ -4421,16 +4455,16 @@ function MacLib:Window(Settings)
 					colorpickerName.TextSize = 13
 					colorpickerName.TextTransparency = 0.5
 					colorpickerName.RichText = true
-					colorpickerName.TextTruncate = Enum.TextTruncate.AtEnd
+					colorpickerName.TextWrapped = true
 					colorpickerName.TextXAlignment = Enum.TextXAlignment.Left
-					colorpickerName.TextYAlignment = Enum.TextYAlignment.Top
-					colorpickerName.AnchorPoint = Vector2.new(0, 0.5)
-					colorpickerName.AutomaticSize = Enum.AutomaticSize.XY
+					colorpickerName.TextYAlignment = Enum.TextYAlignment.Center
+					colorpickerName.AutomaticSize = Enum.AutomaticSize.Y
 					colorpickerName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					colorpickerName.BackgroundTransparency = 1
 					colorpickerName.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					colorpickerName.BorderSizePixel = 0
-					colorpickerName.Position = UDim2.fromScale(0, 0.5)
+					colorpickerName.LayoutOrder = 1
+					colorpickerName.Size = UDim2.new(1, -52, 0, 0)
 					colorpickerName.Parent = colorpicker
 
 					local colorCbg = Instance.new("ImageLabel")
@@ -4438,12 +4472,11 @@ function MacLib:Window(Settings)
 					colorCbg.Image = assets.grid
 					colorCbg.ScaleType = Enum.ScaleType.Tile
 					colorCbg.TileSize = UDim2.fromOffset(500, 500)
-					colorCbg.AnchorPoint = Vector2.new(1, 0.5)
 					colorCbg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					colorCbg.BackgroundTransparency = 1
 					colorCbg.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					colorCbg.BorderSizePixel = 0
-					colorCbg.Position = UDim2.fromScale(1, 0.5)
+					colorCbg.LayoutOrder = 2
 					colorCbg.Size = UDim2.fromOffset(21, 21)
 
 					local colorC = Instance.new("Frame")
