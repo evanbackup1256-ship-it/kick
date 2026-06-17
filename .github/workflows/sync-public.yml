@@ -1,0 +1,79 @@
+# Syncs loader files from this private repo to a public repo
+# so players can still fetch loader.luau / bootstrap.luau etc.
+#
+# Setup:
+#   1. Create a new public repo: evanbackup1256-ship-it/kick-loader
+#   2. Generate a classic PAT with "repo" scope
+#   3. Add it as a secret: SYNC_PAT
+#   4. Update REPO in bootstrap.luau / loader.luau to "evanbackup1256-ship-it/kick-loader"
+#   5. Push to main on this repo
+
+name: Sync public loader repo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    if: github.repository == 'evanbackup1256-ship-it/kick'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build public bundle
+        shell: bash
+        run: |
+          mkdir -p public_repo
+
+          # Loader core
+          cp loader.luau public_repo/
+          cp bootstrap.luau public_repo/
+
+          # Config files the loader fetches
+          cp cfg/release.json public_repo/
+          cp cfg/site.json public_repo/
+          cp cfg/access.json public_repo/
+          cp cfg/security.json public_repo/
+          cp cfg/telemetry.json public_repo/
+          cp cfg/weao.json public_repo/
+          cp cfg/scripts_manifest.json public_repo/
+
+          # Hub scripts
+          mkdir -p public_repo/hub
+          cp hub/*.luau public_repo/hub/
+
+          # UI sources
+          mkdir -p public_repo/ui/onyx
+          mkdir -p public_repo/ui/iris
+          mkdir -p public_repo/ui/flexui
+          cp ui/onyx/source.luau public_repo/ui/onyx/ 2>/dev/null || true
+          cp ui/iris/source.luau public_repo/ui/iris/ 2>/dev/null || true
+          cp ui/flexui/source.luau public_repo/ui/flexui/ 2>/dev/null || true
+
+          # Game scripts
+          mkdir -p public_repo/games
+          cp games/*.luau public_repo/games/ 2>/dev/null || true
+          cp -r games/data public_repo/games/data 2>/dev/null || true
+
+      - name: Push to public repo
+        uses: peaceiris/actions-gh-pages@v4
+        if: env.SYNC_PAT != ''
+        env:
+          SYNC_PAT: ${{ secrets.SYNC_PAT }}
+        with:
+          personal_token: ${{ secrets.SYNC_PAT }}
+          external_repository: evanbackup1256-ship-it/kick-loader
+          publish_branch: main
+          publish_dir: ./public_repo
+          force_orphan: true
+          enable_jekyll: false
+          user_name: "github-actions[bot]"
+          user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          commit_message: "Sync from evanbackup1256-ship-it/kick@${{ github.sha }}"
