@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, ArrowRight, BadgeCheck, ChevronRight, Clipboard, Cpu, Gauge,
   GitBranch, Globe, Layers, Lock, Monitor, Network, Rocket, ScrollText,
-  Shield, Sparkles, Terminal, Zap, LogIn, Headset, type LucideIcon,
+  Shield, Sparkles, Terminal, Zap, LogIn, type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { postHubVisit } from "@/lib/api";
@@ -41,13 +41,6 @@ const stats = [
   { label: "UI Runtime", value: "Iris", detail: "active layer" },
   { label: "Resources", value: "Onyx", detail: "Fusion + Spring" },
   { label: "Poll Loop", value: "~60s", detail: "release checks" },
-];
-
-const pipelineSteps = [
-  { icon: Globe, number: "01", title: "Fetch", body: "The loader requests the current release manifest and keeps a local fallback when remote data is unavailable." },
-  { icon: Lock, number: "02", title: "Verify", body: "Expected versions include Iris 5.7.0-iris, core 2.9.10, and the pinned commit." },
-  { icon: Layers, number: "03", title: "Compose", body: "Iris owns the visual runtime, while Onyx supplies resources and the Fusion/Spring capability stack behind it." },
-  { icon: Zap, number: "04", title: "Launch", body: "The game script starts only after access, security, telemetry, UI source, and workspace prep have resolved." },
 ];
 
 function getGameEntries(site: SitePayload): GameEntry[] {
@@ -204,12 +197,14 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
         </header>
 
         <ScanLines />
-        <ParticleField count={15} />
+        <ParticleField />
 
         {/* ── Hero ── */}
-        <section id="top" className="relative mx-auto min-h-[90dvh] max-w-7xl items-center gap-12 px-4 pb-24 pt-28 md:grid-cols-[1.1fr_0.9fr] md:px-6 md:pt-36" style={{ display: "grid" }}>
-          <Hero3D />
-          <div>
+        <section id="top" className="relative grid min-h-[90dvh] max-w-7xl mx-auto items-center gap-12 px-4 pb-24 pt-28 md:grid-cols-[1.1fr_0.9fr] md:px-6 md:pt-36">
+          <div className="absolute inset-0 z-0">
+            <Hero3D />
+          </div>
+          <div className="relative z-10">
             <div className="kicker">
               <Sparkles className="h-3 w-3" />
               {relayKind === "online" ? "Relay live" : "Relay monitored"} · {site.uiLibrary || "Iris"} active
