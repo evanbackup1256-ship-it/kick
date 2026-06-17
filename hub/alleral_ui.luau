@@ -1,9 +1,9 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "5.7.0-onyx"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "5.7.0-iris"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
-	Core.UI_LIBRARY = "Onyx"
+	Core.UI_LIBRARY = "Iris"
 
 	local ONYX_SOURCE_PATH = "ui/onyx/source.luau"
 	local ONYX_SOURCE_PATHS = {
@@ -26,7 +26,7 @@ return function(Core)
 		"kick/ui/iris/source.luau",
 	}
 	local IRIS_VERSION_MARKER = "ALLERAL_IRIS_VERSION"
-	local IRIS_VERSION = 1
+	local IRIS_VERSION = 2
 	local IRIS_MIN_BYTES = 8000
 	local IRIS_REQUIRED_FN = "function MacLib:Window"
 	local IRIS_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
@@ -110,7 +110,7 @@ return function(Core)
 		if type(expected) == "table" and type(expected.ui) == "string" and expected.ui ~= "" then
 			return expected.ui:lower()
 		end
-		return "onyx"
+		return "iris"
 	end
 
 	local function requiredOnyxVersion()
@@ -492,31 +492,33 @@ return function(Core)
 	end
 
 	local function loadUiEngine()
-		if preferredUiEngine() == "iris" then
-			local irisOnly, irisErr = loadIris()
-			if irisOnly then
-				Core.UI_LIBRARY = "Iris"
-				return irisOnly
-			end
-			if type(Core.logWarn) == "function" then
-				Core.logWarn("Iris-only mode failed, falling back to Onyx: " .. tostring(irisErr))
-			end
-		end
-
-		local onyx, onyxErr = loadOnyx()
-		if onyx then
-			Core.UI_LIBRARY = "Onyx"
-			bootIrisOverlay(onyx)
-			return onyx
-		end
-
 		local iris, irisErr = loadIris()
 		if iris then
 			Core.UI_LIBRARY = "Iris"
+			local irisSource = ENV._AlleralIrisSource
+			local irisSourceLabel = ENV._AlleralIrisSourceLabel
+			local onyx, onyxErr = loadOnyx()
+			if onyx then
+				ENV._AlleralOnyxResource = onyx
+				ENV._AlleralUiResources = {
+					Iris = iris,
+					Onyx = onyx,
+					Fusion = onyx.__FusionStack == true,
+					Spring = type(onyx.GetSpringMotion) == "function" and onyx:GetSpringMotion() or true,
+				}
+				ENV._AlleralMaclib = iris
+				ENV._AlleralMaclibSource = irisSource
+				ENV._AlleralMaclibSourceLabel = irisSourceLabel
+			elseif type(Core.logWarn) == "function" then
+				Core.logWarn("Onyx resource layer unavailable: " .. tostring(onyxErr))
+			end
 			return iris
 		end
 
-		return nil, onyxErr or irisErr or "UI engine missing"
+		if preferredUiEngine() ~= "iris" and type(Core.logWarn) == "function" then
+			Core.logWarn("Ignoring non-Iris UI preference; Iris is the only runtime UI.")
+		end
+		return nil, irisErr or "Iris UI engine missing"
 	end
 
 	local function wrapLibrary(MacLib)
@@ -1137,7 +1139,7 @@ return function(Core)
 
 		function tab:BuildThemeGroupbox(column)
 			local group = Core.buildUiGroup(tab, "Appearance", column or 1)
-			group:CreateLabel(tostring(Core.UI_LIBRARY or "Onyx") .. " + Fusion Spring is the active UI layer.")
+			group:CreateLabel("Iris UI with Onyx resources, Fusion, and Spring is the active UI layer.")
 			return group
 		end
 

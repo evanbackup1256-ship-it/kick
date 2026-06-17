@@ -6,9 +6,9 @@ function Pass($msg) { Write-Host "OK: $msg" -ForegroundColor Green }
 function Fail($msg) { Write-Host "FAIL: $msg" -ForegroundColor Red; $script:failures++ }
 
 $alleralUi = Get-Content (Join-Path $root "hub/alleral_ui.luau") -Raw
-if ($alleralUi -match 'loadOnyx') { Pass "alleral_ui loads Onyx UI library" } else { Fail "alleral_ui missing loadOnyx bootstrap" }
-if ($alleralUi -match 'loadIris') { Pass "alleral_ui loads Iris overlay" } else { Fail "alleral_ui missing loadIris bootstrap" }
-if ($alleralUi -match 'Core\.UI_LIBRARY = "Onyx"') { Pass "alleral_ui declares Onyx as default UI library" } else { Fail "alleral_ui missing Onyx UI_LIBRARY" }
+if ($alleralUi -match 'loadOnyx') { Pass "alleral_ui loads Onyx resource library" } else { Fail "alleral_ui missing loadOnyx resource bootstrap" }
+if ($alleralUi -match 'loadIris') { Pass "alleral_ui loads Iris UI library" } else { Fail "alleral_ui missing loadIris bootstrap" }
+if ($alleralUi -match 'Core\.UI_LIBRARY = "Iris"') { Pass "alleral_ui declares Iris as active UI library" } else { Fail "alleral_ui missing Iris UI_LIBRARY" }
 
 $onyxSource = Join-Path $root "ui/onyx/source.luau"
 if (Test-Path $onyxSource) {
@@ -54,10 +54,10 @@ foreach ($contract in $irisContracts) {
 
 $loader = Get-Content (Join-Path $root "loader.luau") -Raw
 if ($loader -match 'ensureOnyxSource|ensureUiSource') { Pass "loader prefetches UI source" } else { Fail "loader missing UI source prefetch" }
-if ($loader -match 'ui = "Onyx"') { Pass "loader release fallback sets Onyx ui engine" } else { Fail "loader missing Onyx ui release config" }
+if ($loader -match 'ui = "Iris"') { Pass "loader release fallback sets Iris ui engine" } else { Fail "loader missing Iris ui release config" }
 
 $release = Get-Content (Join-Path $root "cfg/release.json") -Raw | ConvertFrom-Json
-if ($release.ui -eq "Onyx") { Pass "release.json ui is Onyx" } else { Fail "release.json ui is not Onyx" }
+if ($release.ui -eq "Iris") { Pass "release.json ui is Iris" } else { Fail "release.json ui is not Iris" }
 
 if ($failures -gt 0) {
     Write-Host "`n$failures UI compatibility check(s) failed." -ForegroundColor Red

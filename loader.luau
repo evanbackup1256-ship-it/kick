@@ -49,9 +49,9 @@ local CP = {
 local RELEASE_FALLBACK = {
 	loader = "8.11.1",
 	core = "2.9.10",
-	ui = "Onyx",
-	windui = "5.7.0-onyx",
-	alleral = "5.7.0-onyx",
+	ui = "Iris",
+	windui = "5.7.0-iris",
+	alleral = "5.7.0-iris",
 	onyxVersion = 1,
 	irisVersion = 2,
 	analytics = "1.2",
@@ -1315,7 +1315,7 @@ local function preferredUiEngine()
 	if type(expected) == "table" and type(expected.ui) == "string" and expected.ui ~= "" then
 		return expected.ui:lower()
 	end
-	return tostring(RELEASE_FALLBACK.ui or "Onyx"):lower()
+	return tostring(RELEASE_FALLBACK.ui or "Iris"):lower()
 end
 
 local function loaderCdnBase()
@@ -1412,16 +1412,20 @@ end
 
 local function ensureUiSource()
 	if preferredUiEngine() == "iris" then
-		return ensureIrisSource()
-	end
-	local onyxOk, onyxLabel = ensureOnyxSource()
-	if onyxOk then
+		local irisOk, irisLabel = ensureIrisSource()
 		task.spawn(function()
-			pcall(ensureIrisSource)
+			pcall(ensureOnyxSource)
 		end)
-		return true, onyxLabel
+		return irisOk, irisLabel
 	end
-	return ensureIrisSource()
+	local irisOk, irisLabel = ensureIrisSource()
+	if not irisOk then
+		return false, irisLabel
+	end
+	task.spawn(function()
+		pcall(ensureOnyxSource)
+	end)
+	return true, irisLabel
 end
 
 local function gameScriptExpectedVersion(profile, expectedVersion)
