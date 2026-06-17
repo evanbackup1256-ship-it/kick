@@ -65,6 +65,11 @@ jobs:
           # UI sources
           Copy-Item "ui/" "$releaseDir/ui/" -Recurse
 
+          # Game scripts
+          if (Test-Path "games") {
+            Copy-Item "games/" "$releaseDir/games/" -Recurse
+          }
+
           # Create zip for easy download
           Compress-Archive -Path "$releaseDir/*" -DestinationPath "alleral-loader-$version.zip" -Force
           Write-Host "Created alleral-loader-$version.zip"
