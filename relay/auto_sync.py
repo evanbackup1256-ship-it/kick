@@ -465,7 +465,7 @@ class AutoSyncEngine:
         enabled: bool = True,
         notify_fn: SyncNotifyFn | None = None,
     ) -> None:
-        self.repo = repo.strip() or "evanbackup1256-ship-it/kick"
+        self.repo = repo.strip() or "evanbackup1256-ship-it/-kick-loader"
         self.branch = branch.strip() or "main"
         self.script_registry = script_registry
         self.site_registry = site_registry

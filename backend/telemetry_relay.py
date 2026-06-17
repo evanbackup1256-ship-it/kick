@@ -484,7 +484,7 @@ def bootstrap_runtime_keys() -> dict[str, str]:
 
 bootstrap_runtime_keys()
 
-GITHUB_REPO = os.environ.get("GITHUB_REPO", "evanbackup1256-ship-it/kick").strip()
+GITHUB_REPO = os.environ.get("GITHUB_REPO", "evanbackup1256-ship-it/-kick-loader").strip()
 GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "main").strip()
 GITHUB_SYNC_SECONDS = int(os.environ.get("GITHUB_SYNC_SECONDS", "30"))
 AUTO_SYNC_ENABLED = os.environ.get("AUTO_SYNC_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
