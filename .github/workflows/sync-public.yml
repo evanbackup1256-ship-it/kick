@@ -54,9 +54,7 @@ jobs:
         if: env.SYNC_PAT != ''
         shell: bash
         run: |
-          bash maint/strip_comments.sh public_repo/hub/*.luau public_repo/games/*.luau public_repo/ui/*/source.luau 2>/dev/null || true
           bash maint/obfuscate_scripts.sh public_repo/hub/*.luau public_repo/games/*.luau public_repo/ui/*/source.luau 2>/dev/null || true
-          bash maint/strip_comments.sh public_repo/*.luau 2>/dev/null || true
 
       - name: Push to public repo
         if: env.SYNC_PAT != ''
