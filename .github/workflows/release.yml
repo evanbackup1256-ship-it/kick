@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cfg/release.json"
+      - "loader.luau"
+      - "bootstrap.luau"
+      - "cfg/scripts_manifest.json"
+      - "hub/**"
+      - "ui/**"
+      - "cfg/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Read release version
+        id: version
+        shell: pwsh
+        run: |
+          $release = Get-Content cfg/release.json -Raw | ConvertFrom-Json
+          $version = "v$($release.loader)-core-$($release.core)-ui-$($release.ui)"
+          $tag = "release-$version"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          echo "loader=$($release.loader)" >> $env:GITHUB_OUTPUT
+          echo "core=$($release.core)" >> $env:GITHUB_OUTPUT
+          echo "commit=$($release.commit)" >> $env:GITHUB_OUTPUT
+          echo "updatedAt=$($release.updatedAt)" >> $env:GITHUB_OUTPUT
+
+      - name: Create release package
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $releaseDir = "release_$version"
+          New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
+
+          # Core files for players
+          Copy-Item "loader.luau" "$releaseDir/"
+          Copy-Item "bootstrap.luau" "$releaseDir/"
+          Copy-Item "cfg/release.json" "$releaseDir/"
+          Copy-Item "cfg/scripts_manifest.json" "$releaseDir/"
+          Copy-Item "cfg/site.json" "$releaseDir/"
+          Copy-Item "cfg/access.json" "$releaseDir/"
+          Copy-Item "cfg/security.json" "$releaseDir/"
+          Copy-Item "cfg/telemetry.json" "$releaseDir/"
+          Copy-Item "cfg/weao.json" "$releaseDir/"
+
+          # Hub files
+          Copy-Item "hub/" "$releaseDir/hub/" -Recurse
+
+          # UI sources
+          Copy-Item "ui/" "$releaseDir/ui/" -Recurse
+
+          # Create zip for easy download
+          Compress-Archive -Path "$releaseDir/*" -DestinationPath "alleral-loader-$version.zip" -Force
+          Write-Host "Created alleral-loader-$version.zip"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Alleral Loader ${{ steps.version.outputs.version }}
+          body: |
+            **Alleral Loader Release**
+
+            - **Loader**: ${{ steps.version.outputs.loader }}
+            - **Core**: ${{ steps.version.outputs.core }}
+            - **Commit**: ${{ steps.version.outputs.commit }}
+            - **Updated**: ${{ steps.version.outputs.updatedAt }}
+
+            Download the zip for all files, or individual files below.
+          draft: false
+          prerelease: false
+          files: |
+            alleral-loader-${{ steps.version.outputs.version }}.zip
+            loader.luau
+            bootstrap.luau
+            cfg/release.json
+            cfg/scripts_manifest.json
+            cfg/site.json
+            cfg/access.json
+            cfg/security.json
+            cfg/telemetry.json
+            cfg/weao.json
+          generate_release_notes: true
