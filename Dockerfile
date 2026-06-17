@@ -11,6 +11,7 @@ COPY relay/site/package.json relay/site/package-lock.json ./
 RUN npm install
 COPY cfg/site.json ./cfg/site.json
 COPY relay/site ./
+COPY cfg/site.json /cfg/site.json
 ENV SKIP_BACKEND_SYNC=1
 ENV ALLERAL_SITE_CONFIG=/site/cfg/site.json
 ENV NEXT_PUBLIC_ALLERAL_API=
