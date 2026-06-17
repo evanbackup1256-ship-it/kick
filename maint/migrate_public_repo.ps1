@@ -36,9 +36,9 @@ foreach ($relative in $files) {
   if ($content -match [regex]::Escape($SourceRepo)) {
     $content = $content -replace [regex]::Escape($SourceRepo), $TargetRepo
     Write-Utf8NoBom $path $content
-    Write-Host "Updated $relative: $SourceRepo → $TargetRepo"
+    Write-Host "Updated ${relative}: $SourceRepo → $TargetRepo"
   } else {
-    Write-Host "No changes needed in $relative"
+    Write-Host "No changes needed in ${relative}"
   }
 }
 

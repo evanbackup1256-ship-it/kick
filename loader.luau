@@ -86,7 +86,7 @@ local BOOTSTRAP_LOCAL_PATHS = {
 	"alleral_bootstrap.luau",
 }
 local BOOTSTRAP_LOADSTRING =
-	'loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?v='
+	'loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick-loader/main/bootstrap.luau?v='
 	.. BOOTSTRAP_VERSION
 	.. '&t=" .. tick(), true))()'
 local LEGACY_LOADER_MARKERS = {
@@ -124,7 +124,7 @@ local SCAN_DIRS = {
 	"scripts",
 	"kick",
 }
-local REPO = "evanbackup1256-ship-it/kick"
+local REPO = "evanbackup1256-ship-it/kick-loader"
 local BRANCH = "main"
 local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
 local GITHUB_WEB = "https://github.com/" .. REPO .. "/raw/" .. BRANCH
