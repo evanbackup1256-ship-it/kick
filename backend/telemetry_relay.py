@@ -2700,6 +2700,9 @@ def public_faq_feedback():
 
 @app.get("/admin")
 def admin_panel():
+    rendered = serve_html("admin/index.html")
+    if rendered:
+        return rendered
     rendered = serve_html("admin.html")
     if rendered:
         return rendered

@@ -60,7 +60,8 @@
 @layer utilities {
   .site-body {
     min-height: 100dvh;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .hub-shell {
@@ -586,6 +587,105 @@
 
     .site-hero-visual .site-terminal {
       bottom: 0;
+    }
+  }
+
+  .admin-login-card,
+  .admin-glass {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 8px;
+    background:
+      linear-gradient(150deg, rgba(18, 24, 36, 0.9), rgba(3, 6, 11, 0.82)),
+      rgba(8, 12, 20, 0.86);
+    box-shadow: 0 26px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(18px);
+  }
+
+  .admin-login-card::before,
+  .admin-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 232, 255, 0.5), rgba(83, 252, 18, 0.35), transparent);
+  }
+
+  .admin-lift {
+    transition:
+      transform 0.22s var(--ease-out),
+      border-color 0.22s var(--ease-out),
+      box-shadow 0.22s var(--ease-out);
+  }
+
+  .admin-lift:hover {
+    transform: translateY(-2px);
+    border-color: rgba(83, 252, 18, 0.24);
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.56), 0 0 30px rgba(83, 252, 18, 0.08);
+  }
+
+  .admin-input {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(1, 1, 2, 0.5);
+    padding: 0.9rem 1rem;
+    color: var(--color-text);
+    outline: none;
+    transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+  }
+
+  .admin-input:focus {
+    border-color: rgba(83, 252, 18, 0.45);
+    box-shadow: 0 0 0 3px rgba(83, 252, 18, 0.12);
+  }
+
+  .admin-shell-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background:
+      linear-gradient(120deg, rgba(83, 252, 18, 0.08), transparent 35%),
+      linear-gradient(260deg, rgba(0, 232, 255, 0.1), transparent 40%),
+      rgba(8, 12, 20, 0.72);
+    padding: 1.25rem;
+    backdrop-filter: blur(18px);
+  }
+
+  .admin-panel-scroll {
+    max-height: min(72rem, 82dvh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(83, 252, 18, 0.45) transparent;
+  }
+
+  .admin-feed-item {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background:
+      linear-gradient(90deg, rgba(83, 252, 18, 0.055), transparent 34%),
+      rgba(0, 0, 0, 0.22);
+    padding: 0.85rem;
+    transition: border-color 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+  }
+
+  .admin-feed-item:hover {
+    transform: translateX(2px);
+    border-color: rgba(0, 232, 255, 0.22);
+  }
+
+  @media (max-width: 767px) {
+    .admin-shell-head {
+      flex-direction: column;
+    }
+
+    .admin-shell-head .site-button {
+      width: 100%;
     }
   }
 
