@@ -41,6 +41,14 @@
   --shadow-glow-cyan: 0 0 40px rgba(0, 212, 255, 0.15);
   --shadow-glow-violet: 0 0 40px rgba(167, 139, 250, 0.15);
   --shadow-glow-strong: 0 0 60px rgba(0, 240, 200, 0.25), 0 0 120px rgba(0, 240, 200, 0.1);
+  --color-holo-1: rgba(0, 240, 200, 0.15);
+  --color-holo-2: rgba(0, 212, 255, 0.12);
+  --color-holo-3: rgba(167, 139, 250, 0.15);
+  --color-holo-4: rgba(244, 114, 182, 0.1);
+  --depth-float-1: 0 0 0 1px rgba(255, 255, 255, 0.03) inset, 0 4px 12px rgba(0, 0, 0, 0.3);
+  --depth-float-2: 0 0 0 1px rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.4);
+  --depth-float-3: 0 0 0 1px rgba(0, 240, 200, 0.06) inset, 0 16px 48px rgba(0, 0, 0, 0.5);
+  --depth-float-4: 0 0 0 1px rgba(0, 240, 200, 0.08) inset, 0 32px 80px rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
@@ -893,5 +901,286 @@
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     pointer-events: none;
+  }
+
+  /* ── Cursor glow ── */
+  .cursor-glow {
+    position: fixed;
+    inset: -50vh -50vw;
+    pointer-events: none;
+    z-index: 0;
+    background: radial-gradient(circle 400px at var(--cursor-x, 50%) var(--cursor-y, 50%), rgba(0, 240, 200, 0.06), transparent 70%);
+    transition: background 0.8s ease;
+  }
+  .cursor-glow-cyan {
+    background: radial-gradient(circle 400px at var(--cursor-x, 50%) var(--cursor-y, 50%), rgba(0, 212, 255, 0.06), transparent 70%);
+  }
+
+  /* ── Glass distortion (noise overlay) ── */
+  .glass-distortion {
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(18px) saturate(1.1);
+    -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  }
+  .glass-distortion::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 256px 256px;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── Animated gradient backgrounds ── */
+  .gradient-animate {
+    background: linear-gradient(135deg, var(--color-bg-0), var(--color-bg-2), var(--color-bg-1));
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+  }
+  .gradient-animate-accent {
+    background: linear-gradient(135deg, rgba(0, 240, 200, 0.04), rgba(0, 212, 255, 0.03), rgba(167, 139, 250, 0.04), rgba(0, 240, 200, 0.02));
+    background-size: 400% 400%;
+    animation: gradientShift 10s ease infinite;
+  }
+  .gradient-animate-fast {
+    background-size: 300% 300%;
+    animation: gradientShift 6s ease infinite;
+  }
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* ── Liquid hover ── */
+  .liquid-hover {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .liquid-hover::before {
+    content: "";
+    position: absolute;
+    inset: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0, 240, 200, 0.08), transparent 50%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  .liquid-hover:hover::before {
+    opacity: 1;
+  }
+
+  /* ── Holographic shimmer ── */
+  .holo-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .holo-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: -200% -200%;
+    width: 500%;
+    height: 500%;
+    background: conic-gradient(
+      from 0deg at 50% 50%,
+      transparent 0deg,
+      rgba(0, 240, 200, 0.04) 60deg,
+      transparent 120deg,
+      rgba(0, 212, 255, 0.03) 180deg,
+      transparent 240deg,
+      rgba(167, 139, 250, 0.04) 300deg,
+      transparent 360deg
+    );
+    animation: holoRotate 8s linear infinite;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+  @keyframes holoRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .holo-border {
+    position: relative;
+  }
+  .holo-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      rgba(0, 240, 200, 0.3),
+      rgba(0, 212, 255, 0.15),
+      rgba(167, 139, 250, 0.25),
+      rgba(244, 114, 182, 0.1),
+      rgba(0, 240, 200, 0.2)
+    );
+    background-size: 400% 400%;
+    animation: gradientShift 4s ease infinite;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* ── Dynamic shadows ── */
+  .shadow-dynamic {
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+  }
+  .shadow-dynamic:hover {
+    box-shadow:
+      0 0 0 1px rgba(0, 240, 200, 0.12) inset,
+      0 calc(var(--mouse-y-ratio, 0.5) * 20px + 8px) calc(var(--mouse-y-ratio, 0.5) * 40px + 16px) rgba(0, 0, 0, 0.5);
+  }
+
+  /* ── Mesh grid background ── */
+  .mesh-bg {
+    position: relative;
+  }
+  .mesh-bg::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 20%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── Floating depth layers ── */
+  .depth-layer-1 { transform: translateZ(8px); }
+  .depth-layer-2 { transform: translateZ(24px); }
+  .depth-layer-3 { transform: translateZ(48px); }
+  .depth-layer-4 { transform: translateZ(72px); }
+
+  .depth-float-1 { box-shadow: var(--depth-float-1); }
+  .depth-float-2 { box-shadow: var(--depth-float-2); }
+  .depth-float-3 { box-shadow: var(--depth-float-3); }
+  .depth-float-4 { box-shadow: var(--depth-float-4); }
+
+  .float-depth {
+    animation: floatDepth 6s ease-in-out infinite;
+  }
+  @keyframes floatDepth {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+
+  /* ── Parallax lighting ── */
+  .parallax-light {
+    position: relative;
+  }
+  .parallax-light::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle 300px at var(--parallax-x, 50%) var(--parallax-y, 0%),
+      rgba(0, 240, 200, 0.06),
+      transparent 70%
+    );
+    pointer-events: none;
+    transition: background 0.5s ease;
+  }
+
+  /* ── Panel morphing ── */
+  .panel-morph {
+    transition:
+      border-radius 0.5s var(--ease-out),
+      padding 0.5s var(--ease-out),
+      transform 0.5s var(--ease-out),
+      box-shadow 0.5s var(--ease-out),
+      background 0.5s var(--ease-out),
+      backdrop-filter 0.5s var(--ease-out);
+  }
+
+  /* ── Shared layout transitions ── */
+  .layout-morph-enter {
+    animation: layoutMorphIn 0.5s var(--ease-out) both;
+  }
+  .layout-morph-exit {
+    animation: layoutMorphOut 0.35s var(--ease-out) both;
+  }
+  @keyframes layoutMorphIn {
+    from { opacity: 0; transform: scale(0.96) translateY(12px); filter: blur(4px); }
+    to { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+  }
+  @keyframes layoutMorphOut {
+    from { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+    to { opacity: 0; transform: scale(0.96) translateY(-8px); filter: blur(4px); }
+  }
+
+  /* ── Inertia drag ── */
+  .drag-inertia {
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+  }
+  .drag-inertia:active {
+    cursor: grabbing;
+  }
+
+  /* ── Dynamic cursor glow utility ── */
+  .glow-follow {
+    position: relative;
+  }
+  .glow-follow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      600px circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+      rgba(0, 240, 200, 0.04),
+      transparent 60%
+    );
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  /* ── Scanline overlay ── */
+  .scanlines {
+    position: relative;
+  }
+  .scanlines::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 2px,
+      rgba(0, 0, 0, 0.03) 4px
+    );
+    pointer-events: none;
+  }
+
+  /* ── Ripple effect ── */
+  .ripple {
+    position: relative;
+    overflow: hidden;
+  }
+  .ripple::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(0, 240, 200, 0.15), transparent 50%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  .ripple:hover::after {
+    opacity: 1;
   }
 }

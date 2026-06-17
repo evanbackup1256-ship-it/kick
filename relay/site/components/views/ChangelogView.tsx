@@ -1,7 +1,5 @@
 "use client";
 
-
-
 import { Calendar, Sparkles } from "lucide-react";
 
 import { useMemo, useState } from "react";
@@ -9,6 +7,7 @@ import { useMemo, useState } from "react";
 import type { SitePayload } from "@/lib/types";
 
 import { Input } from "@/components/ui/Form";
+import { ViewTransition } from "@/components/effects/ViewTransition";
 
 
 
@@ -44,6 +43,7 @@ export function ChangelogView({ site }: { site: SitePayload }) {
 
   return (
 
+    <ViewTransition id="changelog">
     <div className="mx-auto max-w-3xl space-y-6">
 
       <div className="changelog-hero panel relative overflow-hidden p-6 md:p-8">
@@ -141,6 +141,7 @@ export function ChangelogView({ site }: { site: SitePayload }) {
       </ol>
 
     </div>
+    </ViewTransition>
 
   );
 

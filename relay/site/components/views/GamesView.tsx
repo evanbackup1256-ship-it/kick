@@ -19,6 +19,7 @@ import { StatusPill } from "@/components/observability/StatusPill";
 import { resolveGameStatus } from "@/lib/status/resolve";
 import { Input } from "@/components/ui/Form";
 import { Button } from "@/components/ui/Button";
+import { ViewTransition } from "@/components/effects/ViewTransition";
 
 const STATUSES = ["all", "working", "testing", "maintenance", "broken"] as const;
 const SORTS = ["status", "name", "version"] as const;
@@ -79,6 +80,7 @@ export function GamesView({ site }: { site: SitePayload }) {
   const workingCount = games.filter((g) => g.liveStatus === "working").length;
 
   return (
+    <ViewTransition id="games">
     <div className="space-y-4">
       <div className="panel flex flex-wrap items-center justify-between gap-3 !py-3">
         <FreshnessChip dataUpdatedAt={dataUpdatedAt} live />
@@ -133,6 +135,7 @@ export function GamesView({ site }: { site: SitePayload }) {
         />
       ) : null}
     </div>
+    </ViewTransition>
   );
 }
 
@@ -171,7 +174,7 @@ function GameModal({
   return (
     <div className="fixed inset-0 z-[120] grid place-items-center p-4">
       <button type="button" aria-label="Close" className="absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className="panel-raised view-enter relative max-h-[90vh] w-full max-w-lg overflow-auto">
+      <div className="panel-raised view-enter relative max-h-[90vh] w-full max-w-lg overflow-auto holo-border liquid-hover">
         <button type="button" onClick={onClose} className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-bg-1">
           ×
         </button>
@@ -278,7 +281,7 @@ function GameCard({
     <div className="game-card-3d">
       <div
         ref={cardRef}
-        className="game-card-3d-inner panel panel-hover overflow-hidden p-0"
+        className="game-card-3d-inner panel panel-hover overflow-hidden p-0 liquid-hover"
         onMouseMove={onMove}
         onMouseLeave={resetTilt}
       >

@@ -11,6 +11,9 @@ import { resolveRelayStatus, resolveSyncStatus } from "@/lib/status/resolve";
 import { resolveResourceUrl } from "@/lib/sanitize";
 import type { SitePayload } from "@/lib/types";
 import { usePlatformStore } from "@/lib/store/platform";
+import { GlassPanel } from "@/components/effects/GlassPanel";
+import { HolographicHighlight } from "@/components/effects/HolographicHighlight";
+import { ViewTransition } from "@/components/effects/ViewTransition";
 
 export function OverviewView({
   site,
@@ -36,6 +39,7 @@ export function OverviewView({
   const latestLog = (site.changelog || []).slice(0, 3);
 
   return (
+    <ViewTransition id="overview">
     <div className="bento-grid">
       <InViewReveal className="bento-hero panel relative overflow-hidden p-6 md:p-10">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(83,252,18,0.12),transparent_45%)]" />
@@ -110,7 +114,7 @@ export function OverviewView({
             { step: "2", title: "Join a game", desc: "Pick a Working game from the library." },
             { step: "3", title: "Let it run", desc: "Loader checks GitHub and updates on its own." },
           ].map((item) => (
-            <li key={item.step} className="rounded-xl border border-border bg-bg-1/50 px-4 py-3">
+            <li key={item.step} className="rounded-xl border border-border bg-bg-1/50 px-4 py-3 liquid-hover">
               <p className="font-mono text-xs text-accent">Step {item.step}</p>
               <p className="mt-1 font-medium">{item.title}</p>
               <p className="mt-1 text-sm text-muted">{item.desc}</p>
@@ -129,7 +133,7 @@ export function OverviewView({
           </div>
           <div className="space-y-3">
             {latestLog.map((entry) => (
-              <div key={`${entry.date}-${entry.title}`} className="rounded-xl border border-border/80 bg-bg-1/40 px-4 py-3">
+              <div key={`${entry.date}-${entry.title}`} className="rounded-xl border border-border/80 bg-bg-1/40 px-4 py-3 liquid-hover">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium">{entry.title}</p>
                   <span className="text-[10px] text-muted-2">{entry.date}</span>
@@ -154,7 +158,7 @@ export function OverviewView({
         </div>
         <ul className="grid gap-2 sm:grid-cols-2">
           {(site.features || []).slice(0, 8).map((f) => (
-            <li key={f} className="flex items-start gap-2 rounded-xl border border-border/80 bg-bg-1/50 px-3 py-2.5 text-sm text-muted">
+            <li key={f} className="flex items-start gap-2 rounded-xl border border-border/80 bg-bg-1/50 px-3 py-2.5 text-sm text-muted liquid-hover">
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
               <span>{f}</span>
             </li>
@@ -190,7 +194,7 @@ export function OverviewView({
               key={id}
               type="button"
               onClick={() => setView("games")}
-              className="panel panel-hover p-4 text-left"
+              className="panel panel-hover p-4 text-left liquid-hover"
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold">{game.name || id}</p>
@@ -207,7 +211,7 @@ export function OverviewView({
           <h3 className="obs-title-sm mb-4">FAQ</h3>
           <div className="grid gap-2 md:grid-cols-2">
             {site.faq!.map((item) => (
-              <details key={item.q} className="faq-item rounded-xl border border-border bg-bg-1/60 px-4 py-3">
+              <details key={item.q} className="faq-item rounded-xl border border-border bg-bg-1/60 px-4 py-3 liquid-hover">
                 <summary className="text-sm font-medium">{item.q}</summary>
                 <p className="mt-2 text-sm leading-relaxed text-muted">{item.a}</p>
               </details>
@@ -227,7 +231,7 @@ export function OverviewView({
                 href={href}
                 target={href.startsWith("http") ? "_blank" : undefined}
                 rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-                className="panel panel-hover flex items-start gap-3 p-4"
+                className="panel panel-hover flex items-start gap-3 p-4 liquid-hover"
               >
                 <ExternalLink className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
                 <div>
@@ -240,5 +244,6 @@ export function OverviewView({
         </InViewReveal>
       ) : null}
     </div>
+    </ViewTransition>
   );
 }

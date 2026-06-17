@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/Form";
 import { Input } from "@/components/ui/Form";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { MetricTile, Panel } from "@/components/ui/Panel";
+import { ViewTransition } from "@/components/effects/ViewTransition";
 
 const FILTERS = ["all", "working", "not_working", "recommended", "detected", "outdated", "free"] as const;
 
@@ -32,6 +33,7 @@ export function ToolsView({ site }: { site: SitePayload }) {
   const summary = data?.summary || {};
 
   return (
+    <ViewTransition id="tools">
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <MetricTile label="Tracked" value={<AnimatedNumber value={summary.total || 0} />} />
@@ -102,6 +104,7 @@ export function ToolsView({ site }: { site: SitePayload }) {
         </div>
       </Panel>
     </div>
+    </ViewTransition>
   );
 }
 
