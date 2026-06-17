@@ -3,14 +3,6 @@ name: Release
 on:
   push:
     branches: [main]
-    paths:
-      - "cfg/release.json"
-      - "loader.luau"
-      - "bootstrap.luau"
-      - "cfg/scripts_manifest.json"
-      - "hub/**"
-      - "ui/**"
-      - "cfg/**"
   workflow_dispatch:
 
 permissions:
@@ -41,7 +33,21 @@ jobs:
           echo "commit=$($release.commit)" >> $env:GITHUB_OUTPUT
           echo "updatedAt=$($release.updatedAt)" >> $env:GITHUB_OUTPUT
 
+      - name: Check if tag exists
+        id: tag_check
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.version.outputs.tag }}"
+          $existsStr = "false"
+          git fetch origin "refs/tags/$tag" 2>$null
+          git rev-parse -q --verify "refs/tags/$tag" 2>$null
+          if ($LASTEXITCODE -eq 0) { $existsStr = "true" }
+          echo "exists=$existsStr" >> $env:GITHUB_OUTPUT
+          if ($existsStr -eq "true") { Write-Host "Tag $tag already exists - skipping release" }
+          else { Write-Host "Tag $tag is new - will create release" }
+
       - name: Create release package
+        if: steps.tag_check.outputs.exists != 'true'
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
@@ -75,6 +81,7 @@ jobs:
           Write-Host "Created alleral-loader-$version.zip"
 
       - name: Create GitHub Release
+        if: steps.tag_check.outputs.exists != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
