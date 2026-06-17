@@ -33,7 +33,7 @@ local ONYX_REQUIRED_FN = "function MacLib:Window"
 local RAYFIELD_SOURCE_PATH = UI .. "/rayfield/source.luau"
 local IRIS_SOURCE_MIN_BYTES = 8000
 local RAYFIELD_VERSION_MARKER = "ALLERAL_RAYFIELD_VERSION"
-local IRIS_VERSION = 3
+local RAYFIELD_VERSION = 3
 local RAYFIELD_BUNDLE_MIN_BYTES = 250000
 local RAYFIELD_REQUIRED_FN = "function MacLib:Window"
 local MAX_RELAUNCHES = 3
@@ -169,7 +169,7 @@ end)
 
 local ENV = genv()
 ENV._Alleral_RequiredOnyxVersion = ONYX_VERSION
-ENV._Alleral_RequiredRayfieldVersion = IRIS_VERSION
+ENV._Alleral_RequiredRayfieldVersion = RAYFIELD_VERSION
 
 local function loaderRunEnv()
 	local env = genv()
@@ -1069,10 +1069,10 @@ do
 	local function requiredIrisVersion()
 		local expected = ENV._Alleral_ExpectedVersions
 		local remote = type(expected) == "table" and tonumber(expected.rayfieldVersion)
-		if remote and remote > IRIS_VERSION then
+		if remote and remote > RAYFIELD_VERSION then
 			return remote
 		end
-		return IRIS_VERSION
+		return RAYFIELD_VERSION
 	end
 
 	local function irisVersionFromSource(src)
@@ -3300,7 +3300,7 @@ fetchExpectedVersions = function(forceRefresh)
 		end
 		local remoteIris = tonumber(release.rayfieldVersion)
 		if remoteIris then
-			expected.rayfieldVersion = math.max(remoteIris, IRIS_VERSION, tonumber(RELEASE_FALLBACK.rayfieldVersion) or 0)
+			expected.rayfieldVersion = math.max(remoteIris, RAYFIELD_VERSION, tonumber(RELEASE_FALLBACK.rayfieldVersion) or 0)
 		end
 		if type(release.commit) == "string" and release.commit ~= "" and type(RELEASE_FALLBACK.commit) == "string" then
 			if release.commit ~= RELEASE_FALLBACK.commit then
@@ -3365,7 +3365,7 @@ local function buildUpdateFingerprint(expected, profile)
 		"weao=" .. tostring(expected.weao or ""),
 		"weaoCfg=" .. tostring((ENV.Alleral_WeaoConfig or {}).version or ""),
 		"onyxVersion=" .. tostring(expected.onyxVersion or ONYX_VERSION),
-		"irisVersion=" .. tostring(expected.rayfieldVersion or IRIS_VERSION),
+		"rayfieldVersion=" .. tostring(expected.rayfieldVersion or RAYFIELD_VERSION),
 	}
 	if profile and profile.id then
 		table.insert(parts, "game=" .. tostring(profile.id) .. "@" .. tostring(expected.games and expected.games[profile.id] or profile.version or ""))
@@ -3601,7 +3601,7 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 	elseif entry.extract == "onyx" then
 		expectedVersion = tostring(ONYX_VERSION)
 	elseif entry.extract == "rayfield" then
-		expectedVersion = tostring(IRIS_VERSION)
+		expectedVersion = tostring(RAYFIELD_VERSION)
 	else
 		expectedVersion = expected[entry.expectedKey]
 	end
@@ -3626,7 +3626,7 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 	if type(foundVersion) == "string" and foundVersion ~= "" and type(expectedVersion) == "string" and expectedVersion ~= "" then
 		if entry.extract == "onyx" or entry.extract == "rayfield" then
 			local foundNum = tonumber(foundVersion) or 0
-			local needVersion = tonumber(expectedVersion) or (entry.extract == "onyx" and ONYX_VERSION or IRIS_VERSION)
+			local needVersion = tonumber(expectedVersion) or (entry.extract == "onyx" and ONYX_VERSION or RAYFIELD_VERSION)
 			return foundNum < needVersion
 		end
 		return foundVersion ~= expectedVersion
@@ -4066,7 +4066,7 @@ local function checkForRemoteUpdate(profile, quiet)
 		reason = "loader v" .. tostring(expected.loader)
 	elseif expected.onyxVersion and not previous:find("onyxVersion=" .. tostring(expected.onyxVersion), 1, true) then
 		reason = "onyx v" .. tostring(expected.onyxVersion)
-	elseif expected.rayfieldVersion and not previous:find("irisVersion=" .. tostring(expected.rayfieldVersion), 1, true) then
+	elseif expected.rayfieldVersion and not previous:find("rayfieldVersion=" .. tostring(expected.rayfieldVersion), 1, true) then
 		reason = "rayfield v" .. tostring(expected.rayfieldVersion)
 	elseif profile and expected.games and expected.games[profile.id] then
 		reason = profile.name .. " v" .. tostring(expected.games[profile.id])
@@ -4360,11 +4360,11 @@ local function main()
 		end)
 		return
 	end
-	local needRayfieldVersion = tonumber(expectedVersions.rayfieldVersion) or IRIS_VERSION
-	if needRayfieldVersion > IRIS_VERSION then
+	local needRayfieldVersion = tonumber(expectedVersions.rayfieldVersion) or RAYFIELD_VERSION
+	if needRayfieldVersion > RAYFIELD_VERSION then
 		log(
 			"Embedded Rayfield v"
-				.. tostring(IRIS_VERSION)
+				.. tostring(RAYFIELD_VERSION)
 				.. " is behind release v"
 				.. tostring(needRayfieldVersion)
 				.. " Ã¢â‚¬â€ auto-updating via bootstrap"
