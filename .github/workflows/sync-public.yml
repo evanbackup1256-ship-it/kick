@@ -18,6 +18,9 @@ on:
 permissions:
   contents: read
 
+env:
+  SYNC_PAT: ${{ secrets.SYNC_PAT }}
+
 jobs:
   sync:
     runs-on: ubuntu-24.04
@@ -48,6 +51,7 @@ jobs:
           cp games/data/*.luau public_repo/games/data/ 2>/dev/null || true
 
       - name: Obfuscate scripts for public release
+        if: env.SYNC_PAT != ''
         shell: bash
         run: |
           bash maint/strip_comments.sh public_repo/hub/*.luau public_repo/games/*.luau public_repo/ui/*/source.luau 2>/dev/null || true
@@ -55,15 +59,16 @@ jobs:
           bash maint/strip_comments.sh public_repo/*.luau 2>/dev/null || true
 
       - name: Push to public repo
-        if: ${{ secrets.SYNC_PAT != '' }}
+        if: env.SYNC_PAT != ''
         shell: bash
         run: |
+          set -e
           cd public_repo
           git init
           git checkout -b main
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Sync from evanbackup1256-ship-it/kick@${{ github.sha }}"
-          git remote add origin https://x-access-token:${{ secrets.SYNC_PAT }}@github.com/evanbackup1256-ship-it/-kick-loader.git
-          git push -f origin main
+          git commit --allow-empty -m "Sync from ${{ github.repository }}@${{ github.sha }}"
+          git remote add origin https://x-access-token:${{ env.SYNC_PAT }}@github.com/evanbackup1256-ship-it/-kick-loader.git
+          git push -f origin main 2>&1
