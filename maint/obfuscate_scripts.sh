@@ -63,8 +63,10 @@ for f in "$@"; do
       my $jv3 = 1 + int(rand(998));
       my $js = $jv1 + $jv2 - $jv3;
       my $jn = "j" . int(rand(99999));
-      my $junk = "local $jn=$jv1+$jv2-$jv3;if$jn~=$js then return end;";
-      my $pos = int(rand(length($src) - 100)) + 50;
+      my $junk = "local $jn=$jv1+$jv2-$jv3;if $jn~=$js then return end;";
+      my $maxpos = length($src) - 100;
+      if ($maxpos < 10) { $maxpos = 10; }
+      my $pos = int(rand($maxpos)) + 5;
       substr($src, $pos, 0, $junk);
     }
 
