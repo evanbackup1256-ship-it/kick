@@ -73,7 +73,7 @@ function ChartInner({ width, height, data }: { width: number; height: number; da
   );
 }
 
-export const LiteLineChart = memo(function LiteLineChart({
+const LiteLineChart = memo(function LiteLineChart({
   series,
   className,
 }: {

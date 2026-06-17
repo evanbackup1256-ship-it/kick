@@ -3,7 +3,7 @@ import type { FaqItem, ResourceEntry, SitePayload } from "./types";
 
 const BAN_KEYWORDS = /\bban(?:s|ned|ning| evasion| api| list| system| check| issue)?\b/i;
 
-export function isBanRelatedText(text: string): boolean {
+function isBanRelatedText(text: string): boolean {
   return BAN_KEYWORDS.test(text);
 }
 

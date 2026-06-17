@@ -2,7 +2,7 @@ import { API_BASE, PUBLIC_URL } from "./config";
 import type { SitePayload } from "./types";
 
 /** Standalone admin site (separate static app on the relay host). */
-export const ADMIN_PANEL_URL = `${PUBLIC_URL.replace(/\/+$/, "")}/admin.html`;
+const ADMIN_PANEL_URL = `${PUBLIC_URL.replace(/\/+$/, "")}/admin.html`;
 
 export function resolveAdminUrl(site?: SitePayload | null): string {
   const raw = site?.links?.admin?.trim();

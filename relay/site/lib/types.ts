@@ -16,13 +16,13 @@ export interface FaqItem {
   a?: string;
 }
 
-export interface ChangelogEntry {
+interface ChangelogEntry {
   date?: string;
   title?: string;
   items?: string[];
 }
 
-export interface SiteLinks {
+interface SiteLinks {
   website?: string;
   mirror?: string;
   github?: string;
@@ -31,7 +31,7 @@ export interface SiteLinks {
   [key: string]: string | undefined;
 }
 
-export interface CreditMember {
+interface CreditMember {
   id?: string;
   displayName?: string;
   role?: string;
@@ -44,13 +44,13 @@ export interface CreditMember {
   links?: Record<string, string>;
 }
 
-export interface CreditTeam {
+interface CreditTeam {
   id?: string;
   title?: string;
   members?: CreditMember[];
 }
 
-export interface CreditsData {
+interface CreditsData {
   headline?: string;
   subheadline?: string;
   teams?: CreditTeam[];
@@ -117,7 +117,7 @@ export interface HubStatusPayload {
 }
 
 /** @deprecated Use HubStatusPayload — kept for legacy imports */
-export type LiveStatusPayload = HubStatusPayload;
+type LiveStatusPayload = HubStatusPayload;
 
 export interface WeaoExploit {
   slug?: string;

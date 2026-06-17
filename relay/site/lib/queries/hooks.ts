@@ -5,7 +5,7 @@ import { fetchLiveStatus, fetchSite } from "@/lib/api";
 import { SITE_SNAPSHOT } from "@/lib/site-snapshot";
 import type { PlatformView } from "@/lib/store/platform";
 
-export const siteQueryKey = ["site"] as const;
+const siteQueryKey = ["site"] as const;
 export const liveStatusQueryKey = ["live-status"] as const;
 
 const LIVE_VIEWS = new Set<PlatformView>(["overview", "status", "games"]);
@@ -32,7 +32,7 @@ export function useSiteQuery() {
   });
 }
 
-export function useLiveStatusQuery(activeView: PlatformView) {
+function useLiveStatusQuery(activeView: PlatformView) {
   const enabled = LIVE_VIEWS.has(activeView);
   return useQuery({
     queryKey: liveStatusQueryKey,

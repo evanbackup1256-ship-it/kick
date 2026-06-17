@@ -20,6 +20,6 @@ export function PageTransition({ children }: { children: ReactNode }) {
   return <div className="view-enter fade-rise">{children}</div>;
 }
 
-export function InViewReveal({ children, className }: { children: ReactNode; className?: string }) {
+function InViewReveal({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={clsx("view-enter fade-rise", className)}>{children}</div>;
 }

@@ -21,7 +21,7 @@ declare global {
 
 let loadPromise: Promise<void> | null = null;
 
-export async function loadTurnstileScript(): Promise<void> {
+async function loadTurnstileScript(): Promise<void> {
   if (typeof window === "undefined") return;
   if (window.turnstile) return;
 
@@ -52,7 +52,7 @@ export async function loadTurnstileScript(): Promise<void> {
   return loadPromise;
 }
 
-export async function resolveTurnstileSiteKey(): Promise<string> {
+async function resolveTurnstileSiteKey(): Promise<string> {
   const local = TURNSTILE_SITE_KEY.trim();
   if (local) return local;
 

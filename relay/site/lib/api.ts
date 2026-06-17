@@ -59,6 +59,6 @@ export async function postHubVisit(source = "load"): Promise<void> {
   }
 }
 
-export async function submitForm(path: string, body: Record<string, unknown>): Promise<void> {
+async function submitForm(path: string, body: Record<string, unknown>): Promise<void> {
   await fetchJson(path, { method: "POST", body: JSON.stringify(body), cache: "no-store" });
 }

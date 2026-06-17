@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { JetBrains_Mono, Space_Grotesk, Geist } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const space = Space_Grotesk({
   subsets: ["latin"],
@@ -31,7 +34,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${space.variable} ${jetbrains.variable}`}>
+    <html lang="en" className={cn(space.variable, jetbrains.variable, "font-sans", geist.variable)}>
       <body className="site-body hub-shell">
         {children}
         <Toaster
