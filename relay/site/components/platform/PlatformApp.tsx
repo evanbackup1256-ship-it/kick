@@ -86,7 +86,7 @@ function PlatformShell({ site, online, siteUpdatedAt, siteFetching, onRefreshSit
     }
   }, [site?.loadstring]);
 
-  const mainPad = workspace === "compact" ? "p-3 md:p-4" : workspace === "wide" ? "p-5 md:p-8" : "p-4 md:p-6";
+  const mainPad = workspace === "admin" ? "p-3 md:p-4" : workspace === "ops" ? "p-5 md:p-8" : "p-4 md:p-6";
 
   useEffect(() => {
     document.body.classList.toggle("mobile-drawer-open", mobileNavOpen);
@@ -112,7 +112,7 @@ function PlatformShell({ site, online, siteUpdatedAt, siteFetching, onRefreshSit
           />
           <MainScroll>
             <ScrollContent
-              className={`mx-auto w-full max-w-[1520px] ${mainPad} ${workspace === "wide" ? "max-w-[1680px]" : ""}`}
+              className={`mx-auto w-full max-w-[1520px] ${mainPad} ${workspace === "ops" ? "max-w-[1680px]" : ""}`}
             >
               <PageTransition key={activeView}>
                 {activeView === "overview" ? (

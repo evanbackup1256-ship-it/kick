@@ -10,7 +10,7 @@ export type PlatformView =
   | "support"
   | "credits";
 
-export type WorkspacePreset = "default" | "compact" | "wide";
+export type WorkspacePreset = "default" | "admin" | "ops";
 
 interface PlatformState {
   activeView: PlatformView;
@@ -40,7 +40,7 @@ export const usePlatformStore = create<PlatformState>()(
       setWorkspace: (workspace) => {
         const raw = String(workspace);
         const next: WorkspacePreset =
-          raw === "compact" || raw === "wide" ? raw : "default";
+          raw === "admin" || raw === "ops" ? raw : "default";
         set({ workspace: next });
       },
     }),

@@ -9,13 +9,21 @@ import { useSecondsSince } from "@/lib/hooks/useSecondsSince";
 import { FreshnessChip } from "@/components/observability/FreshnessChip";
 import { StatusPill } from "@/components/observability/StatusPill";
 import { Select } from "@/components/ui/Form";
-import { Button, Kbd } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 
-const WORKSPACE_OPTIONS: { value: WorkspacePreset; label: string }[] = [
-  { value: "default", label: "Default" },
-  { value: "compact", label: "Compact" },
-  { value: "wide", label: "Wide" },
+const WORKSPACE_OPTIONS = [
+  { label: "Default", value: "default" },
+  { label: "Admin", value: "admin" },
+  { label: "Ops", value: "ops" },
 ];
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="rounded-md border border-white/15 bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-white/70 shadow-sm">
+      {children}
+    </kbd>
+  );
+}
 
 export function TopBar({
   site,
