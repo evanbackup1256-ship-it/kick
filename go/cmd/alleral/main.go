@@ -41,8 +41,8 @@ func main() {
 		r.Handle("/gate/*", proxy)
 		r.Handle("/scripts", proxy)
 		r.Handle("/scripts/*", proxy)
-		r.Handle("/admin/bans", proxy)
-		r.Handle("/admin/bans/*", proxy)
+	r.Handle("/admin/bans", proxy)
+	r.Handle("/admin/bans/*", proxy)
 	} else {
 		r.Get("/health", srv.Health)
 		r.Route("/api", func(r chi.Router) {
