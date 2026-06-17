@@ -2,29 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity,
-  ArrowRight,
-  BadgeCheck,
-  ChevronRight,
-  Clipboard,
-  Cpu,
-  ExternalLink,
-  Gamepad2,
-  Gauge,
-  GitBranch,
-  Globe,
-  Layers,
-  Lock,
-  Monitor,
-  Network,
-  Rocket,
-  ScrollText,
-  Shield,
-  Sparkles,
-  Terminal,
-  Zap,
-  LogIn,
-  type LucideIcon,
+  Activity, ArrowRight, BadgeCheck, ChevronRight, Clipboard, Cpu, Gauge,
+  GitBranch, Globe, Layers, Lock, Monitor, Network, Rocket, ScrollText,
+  Shield, Sparkles, Terminal, Zap, LogIn, Headset, type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { postHubVisit } from "@/lib/api";
@@ -32,14 +12,27 @@ import type { GameEntry, SitePayload } from "@/lib/types";
 import { useLiveSyncMeta, useSiteQuery } from "@/lib/queries/hooks";
 import { formatFreshness, resolveRelayStatus } from "@/lib/status/resolve";
 import { useSecondsSince } from "@/lib/hooks/useSecondsSince";
+import { useCursorPosition } from "@/lib/hooks/useCursorPosition";
 import { CloudflareGate } from "@/components/gate/CloudflareGate";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { SITE_SNAPSHOT } from "@/lib/site-snapshot";
+import { ParticleField } from "@/components/effects/ParticleField";
+import { ScanLines } from "@/components/effects/ScanLines";
+import { StatusDot } from "@/components/effects/StatusDot";
+import { PipelineVisualizer } from "@/components/effects/PipelineVisualizer";
+import { TelemetryCharts } from "@/components/effects/TelemetryCharts";
+import { GlobalTopology } from "@/components/effects/GlobalTopology";
+import { Hero3D } from "@/components/effects/Hero3D";
+import { SupportForm } from "@/components/support/SupportForm";
+import { CloudflareLayer } from "@/components/cloudflare/CloudflareLayer";
 
 const navItems = [
   { label: "Signal", href: "#signal" },
+  { label: "Topology", href: "#topology" },
   { label: "Games", href: "#games" },
   { label: "Pipeline", href: "#pipeline" },
+  { label: "Cloudflare", href: "#cloudflare" },
+  { label: "Support", href: "#support" },
   { label: "Access", href: "#access" },
 ];
 
@@ -210,8 +203,12 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
           )}
         </header>
 
+        <ScanLines />
+        <ParticleField count={15} />
+
         {/* ── Hero ── */}
-        <section id="top" className="relative mx-auto grid min-h-[90dvh] max-w-7xl items-center gap-12 px-4 pb-24 pt-28 md:grid-cols-[1.1fr_0.9fr] md:px-6 md:pt-36">
+        <section id="top" className="relative mx-auto min-h-[90dvh] max-w-7xl items-center gap-12 px-4 pb-24 pt-28 md:grid-cols-[1.1fr_0.9fr] md:px-6 md:pt-36" style={{ display: "grid" }}>
+          <Hero3D />
           <div>
             <div className="kicker">
               <Sparkles className="h-3 w-3" />
@@ -308,6 +305,8 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
           </div>
         </section>
 
+        <GlobalTopology />
+
         {/* ── Games ── */}
         <section id="games" className="border-y border-white/6 bg-white/[0.015] px-4 py-24 md:px-6">
           <div className="mx-auto max-w-7xl">
@@ -350,26 +349,31 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
         {/* ── Pipeline ── */}
         <section id="pipeline" className="relative mx-auto max-w-7xl px-4 py-24 md:px-6">
           <div className="section-head">
-            <div className="kicker"><GitBranch className="h-3 w-3" /> Release pipeline</div>
-            <h2 className="heading-lg mt-4">Pin, bake, publish, repeat.</h2>
-            <p>The public site mirrors how the loader works: it makes the release path visible, legible, and trustworthy.</p>
+            <div className="kicker"><GitBranch className="h-3 w-3" /> Deployment Pipeline</div>
+            <h2 className="heading-lg mt-4">Every release flows through a verified runtime path.</h2>
+            <p>Fetch, verify, compose, and launch — each stage is validated before the next begins.</p>
           </div>
           <div className="mt-14 grid gap-10 lg:grid-cols-[0.95fr_1.05fr]">
-            <div className="card p-5 md:p-6 fade-in-up">
+            <div className="glass-premium rounded-xl p-5 md:p-6 fade-in-up">
               <CodePreview loadstring={site.loadstring} />
             </div>
-            <div className="space-y-10 fade-in-up fade-in-d2">
-              {pipelineSteps.map((step) => (
-                <div key={step.number} className="pipeline-step">
-                  <div className="pipeline-step-number">{step.number}</div>
-                  <div className="flex items-center gap-3">
-                    <IconBox icon={step.icon} variant="cyan" />
-                    <h3 className="text-lg font-semibold text-text">{step.title}</h3>
-                  </div>
-                  <p className="text-sm leading-7 text-muted">{step.body}</p>
-                </div>
-              ))}
+            <div className="fade-in-up fade-in-d2">
+              <PipelineVisualizer />
             </div>
+          </div>
+        </section>
+
+        <CloudflareLayer />
+
+        {/* ── Support ── */}
+        <section id="support" className="relative mx-auto max-w-5xl px-4 py-24 md:px-6">
+          <div className="section-head">
+            <div className="kicker"><Terminal className="h-3 w-3" /> Support</div>
+            <h2 className="heading-lg mt-4">Report issues directly to the command center.</h2>
+            <p>Submit a ticket and our operations team will respond within 24 hours through Discord.</p>
+          </div>
+          <div className="mt-10">
+            <SupportForm />
           </div>
         </section>
 
