@@ -1,4 +1,4 @@
-﻿return function(Core)
+return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
 	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "1.0.0-rayfield"

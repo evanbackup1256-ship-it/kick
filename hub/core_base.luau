@@ -1258,6 +1258,9 @@ function Core.applyUiLayer(source, label)
 	if type(source) ~= "string" or source == "" then
 		return false, "empty ui layer"
 	end
+	if #source >= 3 and string.byte(source, 1) == 0xEF and string.byte(source, 2) == 0xBB and string.byte(source, 3) == 0xBF then
+		source = source:sub(4)
+	end
 	local loadFn = Core.loadStringFn()
 	if not loadFn then
 		return false, "loadstring unavailable"

@@ -1,4 +1,4 @@
-﻿-- Back-compat redirect â€” bootstrap + loader merged into /bootstrap.luau at repo root.
+-- Back-compat redirect â€” bootstrap + loader merged into /bootstrap.luau at repo root.
 -- Old saved scripts that still hit hub/bootstrap.luau get forwarded in one fetch.
 
 local REDIRECT_VERSION = "2.0.1"
