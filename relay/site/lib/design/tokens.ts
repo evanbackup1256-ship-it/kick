@@ -10,7 +10,7 @@ export const status = {
 
 export type StatusKind = keyof typeof status;
 
-const chart = {
+export const chart = {
   grid: "rgba(255,255,255,0.04)",
   axis: "rgba(148,163,184,0.5)",
   linePrimary: "#22d3ee",
