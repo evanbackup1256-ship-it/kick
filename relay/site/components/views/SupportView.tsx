@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Form";
 import { Panel } from "@/components/ui/Panel";
 import { FormTurnstile } from "@/components/turnstile/FormTurnstile";
-import { ViewTransition } from "@/components/effects/ViewTransition";
 
 export function SupportView({ site }: { site: SitePayload }) {
   const [tab, setTab] = useState<"bug" | "feature" | "support">("bug");
@@ -59,7 +58,6 @@ export function SupportView({ site }: { site: SitePayload }) {
   };
 
   return (
-    <ViewTransition id="support">
     <div className="mx-auto max-w-xl space-y-4">
       <div className="flex flex-wrap gap-2">
         {(
@@ -118,7 +116,6 @@ export function SupportView({ site }: { site: SitePayload }) {
         </form>
       </Panel>
     </div>
-    </ViewTransition>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArrowRight,
@@ -8,6 +8,8 @@ import {
   ChevronRight,
   Clipboard,
   Cpu,
+  ExternalLink,
+  Gamepad2,
   Gauge,
   GitBranch,
   Globe,
@@ -21,6 +23,7 @@ import {
   Sparkles,
   Terminal,
   Zap,
+  LogIn,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,18 +32,9 @@ import type { GameEntry, SitePayload } from "@/lib/types";
 import { useLiveSyncMeta, useSiteQuery } from "@/lib/queries/hooks";
 import { formatFreshness, resolveRelayStatus } from "@/lib/status/resolve";
 import { useSecondsSince } from "@/lib/hooks/useSecondsSince";
-import { useMousePosition } from "@/lib/hooks/useMousePosition";
 import { CloudflareGate } from "@/components/gate/CloudflareGate";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { SITE_SNAPSHOT } from "@/lib/site-snapshot";
-import { MagneticButton } from "@/components/effects/MagneticButton";
-import { CursorGlow } from "@/components/effects/CursorGlow";
-import { GlassPanel } from "@/components/effects/GlassPanel";
-import { ParallaxLayer } from "@/components/effects/ParallaxLayer";
-import { AnimatedGradient } from "@/components/effects/AnimatedGradient";
-import { HolographicHighlight } from "@/components/effects/HolographicHighlight";
-import { MeshBackground } from "@/components/effects/MeshBackground";
-import { ViewTransition } from "@/components/effects/ViewTransition";
 
 const navItems = [
   { label: "Signal", href: "#signal" },
@@ -49,20 +43,11 @@ const navItems = [
   { label: "Access", href: "#access" },
 ];
 
-const operatorStats = [
+const stats = [
   { label: "Loader", value: "8.11.1", detail: "remote pinned" },
-  { label: "Runtime UI", value: "Iris", detail: "active layer" },
-  { label: "Resource kit", value: "Onyx", detail: "Fusion + Spring" },
-  { label: "Update loop", value: "~60s", detail: "release checks" },
-];
-
-const qualityMarks = [
-  "Iris-only visible UI",
-  "Onyx resources retained",
-  "Fusion stack available",
-  "Spring motion available",
-  "GitHub release pinning",
-  "Live site snapshot",
+  { label: "UI Runtime", value: "Iris", detail: "active layer" },
+  { label: "Resources", value: "Onyx", detail: "Fusion + Spring" },
+  { label: "Poll Loop", value: "~60s", detail: "release checks" },
 ];
 
 const pipelineSteps = [
@@ -78,64 +63,25 @@ function getGameEntries(site: SitePayload): GameEntry[] {
 
 function statusClass(status?: string) {
   const n = String(status || "").toLowerCase();
-  if (n.includes("work") || n.includes("online") || n.includes("stable")) return "status-badge-working";
-  if (n.includes("partial") || n.includes("testing")) return "status-badge-partial";
-  if (n.includes("down") || n.includes("broken")) return "status-badge-down";
-  return "status-badge-working";
+  if (n.includes("work") || n.includes("online") || n.includes("stable")) return "badge-green";
+  if (n.includes("partial") || n.includes("testing")) return "badge-yellow";
+  if (n.includes("down") || n.includes("broken")) return "badge-red";
+  return "badge-green";
 }
 
-function MiniButton({ children, href, onClick, variant = "primary" }: { children: React.ReactNode; href?: string; onClick?: () => void; variant?: "primary" | "quiet" }) {
-  const cls = variant === "primary"
-    ? "site-button site-button-primary"
-    : "site-button border-white/8 bg-white/[0.03] text-muted hover:border-cyan/30 hover:bg-cyan/8 hover:text-text";
-  const inner = href
-    ? <a className={cls} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">{children}</a>
-    : <button className={cls} onClick={onClick} type="button">{children}</button>;
-  return <MagneticButton strength={0.25}>{inner}</MagneticButton>;
-}
-
-function StatPill({ label, value, detail }: { label: string; value: string; detail: string }) {
+function IconBox({ icon: Icon, variant }: { icon: LucideIcon; variant?: string }) {
+  const m = variant === "cyan" ? "icon-box-cyan" : variant === "violet" ? "icon-box-violet" : "";
   return (
-    <div className="site-stat liquid-hover">
-      <p className="font-mono text-[10px] uppercase tracking-wider text-muted">{label}</p>
-      <div className="mt-2 flex items-end justify-between gap-2">
-        <strong className="text-xl font-semibold text-text">{value}</strong>
-        <span className="pb-[3px] font-mono text-[10px] text-muted-2">{detail}</span>
-      </div>
-    </div>
-  );
-}
-
-function IconBox({ icon: Icon, variant }: { icon: LucideIcon; variant?: "default" | "cyan" | "violet" | "pink" | "orange" }) {
-  const v = variant || "default";
-  const cls = v === "cyan" ? "site-icon-box-cyan" : v === "violet" ? "site-icon-box-violet" : v === "pink" ? "site-icon-box-pink" : v === "orange" ? "site-icon-box-orange" : "site-icon-box";
-  return (
-    <span className={cls}>
+    <span className={`icon-box ${m}`}>
       <Icon className="h-4 w-4" />
     </span>
-  );
-}
-
-function SignalCard({ icon: Icon, title, value, detail }: { icon: LucideIcon; title: string; value: string; detail: string }) {
-  return (
-    <HolographicHighlight border shimmer>
-      <GlassPanel hover depth={3} className="p-5" distortion>
-        <div className="flex items-center justify-between gap-3">
-          <IconBox icon={Icon} variant="cyan" />
-          <Activity className="h-4 w-4 text-accent" />
-        </div>
-        <p className="mt-6 text-sm font-medium text-muted">{title}</p>
-        <strong className="mt-2 block text-2xl font-bold tracking-tight text-text">{value}</strong>
-        <p className="mt-3 text-sm leading-6 text-muted">{detail}</p>
-      </GlassPanel>
-    </HolographicHighlight>
   );
 }
 
 function CodePreview({ loadstring }: { loadstring?: string }) {
   const display = loadstring || 'loadstring(game:HttpGet("https://raw.githubusercontent.com/.../loader.luau"))()';
   return (
-    <div className="site-terminal shadow-dynamic">
+    <div className="terminal">
       <div className="flex items-center justify-between border-b border-white/8 px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-red" />
@@ -158,31 +104,6 @@ function CodePreview({ loadstring }: { loadstring?: string }) {
   );
 }
 
-function GameTile({ game, index }: { game: GameEntry; index: number }) {
-  const features = (game.scriptFeatures || []).slice(0, 3);
-  return (
-    <HolographicHighlight border>
-      <GlassPanel hover depth={2} className={`p-5 depth-float-${Math.min(index + 1, 4)}`} distortion>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-2">{game.version || "live script"}</p>
-            <h3 className="mt-2 text-lg font-semibold text-text">{game.name || game.id || "Supported game"}</h3>
-          </div>
-          <span className={`status-badge ${statusClass(game.status)}`}>{game.status || "tracked"}</span>
-        </div>
-        <p className="mt-4 min-h-12 text-sm leading-6 text-muted">
-          {game.description || game.message || "Auto-selected by place ID with live release metadata and script health checks."}
-        </p>
-        <div className="mt-5 flex flex-wrap gap-2">
-          {(features.length ? features : [{ name: "Auto load" }, { name: "Config aware" }, { name: "Live pin" }]).map((f) => (
-            <span key={f.name} className="feature-chip">{f.name}</span>
-          ))}
-        </div>
-      </GlassPanel>
-    </HolographicHighlight>
-  );
-}
-
 function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSite }: { site: SitePayload; online?: boolean; siteUpdatedAt?: number; siteFetching?: boolean; onRefreshSite?: () => void }) {
   const live = useLiveSyncMeta("overview");
   const siteAge = useSecondsSince(siteUpdatedAt ?? null, 1000);
@@ -190,8 +111,16 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
   const relayKind = resolveRelayStatus(online);
   const latestChange = site.changelog?.[0];
   const [menuOpen, setMenuOpen] = useState(false);
+  const [adminPass, setAdminPass] = useState("");
+  const [adminAuthed, setAdminAuthed] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
 
-  useMousePosition();
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem("alleral_admin_auth");
+      if (stored === "true") setAdminAuthed(true);
+    }
+  }, []);
 
   const copyLoadstring = useCallback(async () => {
     if (!site.loadstring) { toast.error("Loader unavailable"); return; }
@@ -207,250 +136,325 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
     toast.message("Refreshing live signal");
   }, [live, onRefreshSite]);
 
-  return (
-    <ViewTransition id="landing">
-      <main className="min-h-dvh overflow-hidden bg-bg-0 text-text">
-        <CursorGlow />
-        <div className="hub-shell">
-          <div className="ambient-grid" />
-          <div className="ambient-orb ambient-orb-a" />
-          <div className="ambient-orb ambient-orb-b" />
-          <div className="ambient-orb ambient-orb-c" />
+  const handleAdminLogin = useCallback(() => {
+    if (adminPass === "sammy2026") {
+      sessionStorage.setItem("alleral_admin_auth", "true");
+      setAdminAuthed(true);
+      setShowAdminModal(false);
+      setAdminPass("");
+      toast.success("Admin authenticated");
+    } else {
+      toast.error("Invalid password");
+    }
+  }, [adminPass]);
 
-          <header className="fixed inset-x-0 top-0 z-50 border-b border-white/6 bg-bg-0/80 backdrop-blur-2xl">
-            <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
-              <a href="#top" className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent/30 bg-accent/8 text-accent">
-                  <Sparkles className="h-4 w-4" />
-                </span>
-                <span>
-                  <strong className="block text-sm font-semibold leading-none">{site.brand || "Alleral"}</strong>
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-2">Iris runtime</span>
-                </span>
-              </a>
-              <div className="hidden items-center gap-8 md:flex">
+  const openAdmin = useCallback(() => {
+    if (adminAuthed) {
+      window.open(site.links?.admin || site.links?.relay + "/admin.html", "_blank");
+    } else {
+      setShowAdminModal(true);
+    }
+  }, [adminAuthed, site.links]);
+
+  return (
+    <main className="min-h-dvh overflow-hidden bg-bg-0 text-text">
+      <div className="site-shell">
+        <div className="mesh-grid" />
+        <div className="orb orb-a" />
+        <div className="orb orb-b" />
+        <div className="orb orb-c" />
+
+        {/* ── Nav ── */}
+        <header className="fixed inset-x-0 top-0 z-50 border-b border-white/6 bg-bg-0/80 backdrop-blur-2xl">
+          <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
+            <a href="#top" className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent/30 bg-accent/8 text-accent">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <span className="hidden sm:block">
+                <strong className="block text-sm font-semibold leading-none">{site.brand || "Alleral"}</strong>
+                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-2">Iris runtime</span>
+              </span>
+            </a>
+            <div className="hidden items-center gap-8 md:flex">
+              {navItems.map((item) => (
+                <a key={item.href} href={item.href} className="nav-link">{item.label}</a>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="hidden rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-muted transition hover:border-accent/30 hover:text-text md:inline-flex"
+                onClick={refreshAll}
+              >
+                {siteFetching ? "Syncing" : formatFreshness(siteAge)}
+              </button>
+              <button className="btn btn-primary" onClick={copyLoadstring}>
+                <Clipboard className="h-4 w-4" /> Copy
+              </button>
+              <button className="rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-2 text-muted hover:text-text transition md:inline-flex hidden" onClick={openAdmin} title="Admin">
+                <Shield className="h-4 w-4" />
+              </button>
+              <button className="md:hidden p-2 text-muted hover:text-text" onClick={() => setMenuOpen(!menuOpen)}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h14M3 10h14M3 15h14"/></svg>
+              </button>
+            </div>
+          </nav>
+          {menuOpen && (
+            <div className="border-t border-white/6 bg-bg-0/95 backdrop-blur-2xl md:hidden">
+              <div className="flex flex-col gap-2 px-4 py-4">
                 {navItems.map((item) => (
-                  <a key={item.href} href={item.href} className="nav-link">{item.label}</a>
+                  <a key={item.href} href={item.href} className="py-2 text-sm text-muted hover:text-text" onClick={() => setMenuOpen(false)}>{item.label}</a>
                 ))}
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="hidden rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-muted transition hover:border-accent/30 hover:text-text md:inline-flex"
-                  type="button"
-                  onClick={refreshAll}
-                >
-                  {siteFetching ? "Syncing" : formatFreshness(siteAge)}
-                </button>
-                <MiniButton onClick={copyLoadstring}>
-                  <Clipboard className="h-4 w-4" />
-                  Copy
-                </MiniButton>
-                <button className="md:hidden p-2 text-muted hover:text-text" onClick={() => setMenuOpen(!menuOpen)} type="button">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h14M3 10h14M3 15h14"/></svg>
-                </button>
-              </div>
-            </nav>
-            {menuOpen && (
-              <div className="border-t border-white/6 bg-bg-0/95 backdrop-blur-2xl md:hidden">
-                <div className="flex flex-col gap-2 px-4 py-4">
-                  {navItems.map((item) => (
-                    <a key={item.href} href={item.href} className="py-2 text-sm text-muted hover:text-text" onClick={() => setMenuOpen(false)}>{item.label}</a>
-                  ))}
-                </div>
-              </div>
-            )}
-          </header>
-
-          <ParallaxLayer depth={1}>
-            <section id="top" className="relative mx-auto grid min-h-[90dvh] max-w-7xl items-center gap-12 px-4 pb-24 pt-28 md:grid-cols-[1.05fr_0.95fr] md:px-6 md:pt-36">
-              <ParallaxLayer depth={2}>
-                <div className="relative z-10">
-                  <div className="pill-kicker">
-                    <Sparkles className="h-3 w-3" />
-                    {relayKind === "online" ? "Relay live" : "Relay monitored"} &middot; {site.uiLibrary || "Iris"} active
-                  </div>
-                  <h1 className="mt-8 max-w-4xl text-5xl font-bold leading-[0.95] tracking-tight md:text-7xl">
-                    Roblox scripts with a <span className="hero-gradient-text">release system</span> that feels alive.
-                  </h1>
-                  <p className="mt-6 max-w-2xl text-lg leading-8 text-muted md:text-xl">
-                    {site.tagline || "One loader, live game routing, automatic release pins, and an Iris UI powered by Onyx resources, Fusion, and Spring."}
-                  </p>
-                  <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                    <MiniButton onClick={copyLoadstring}>
-                      <Rocket className="h-4 w-4" />
-                      Copy loader
-                      <ChevronRight className="h-4 w-4" />
-                    </MiniButton>
-                    <MiniButton href={site.links?.github || site.links?.loaderRaw || "#pipeline"} variant="quiet">
-                      <GitBranch className="h-4 w-4" />
-                      View source
-                      <ArrowRight className="h-4 w-4" />
-                    </MiniButton>
-                  </div>
-                  <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {operatorStats.map((stat) => (
-                      <StatPill key={stat.label} {...stat} />
-                    ))}
-                  </div>
-                </div>
-              </ParallaxLayer>
-
-              <ParallaxLayer depth={3}>
-                <div className="relative z-10">
-                  <HolographicHighlight border shimmer>
-                    <GlassPanel depth={4} className="p-6 float-depth" distortion>
-                      <div className="flex items-center justify-between">
-                        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-2">runtime profile</p>
-                        <span className="status-badge status-badge-working">stable</span>
-                      </div>
-                      <div className="mt-6 grid grid-cols-2 gap-3">
-                        <div className="rounded-lg border border-white/6 bg-white/[0.03] p-4 liquid-hover">
-                          <Monitor className="h-5 w-5 text-cyan" />
-                          <p className="mt-4 text-2xl font-bold">{site.uiLibrary || "Iris"}</p>
-                          <p className="text-xs text-muted">visible UI</p>
-                        </div>
-                        <div className="rounded-lg border border-white/6 bg-white/[0.03] p-4 liquid-hover">
-                          <Layers className="h-5 w-5 text-violet" />
-                          <p className="mt-4 text-2xl font-bold">Onyx</p>
-                          <p className="text-xs text-muted">resources</p>
-                        </div>
-                      </div>
-                      <div className="mt-4 space-y-2">
-                        {qualityMarks.slice(0, 4).map((mark) => (
-                          <div key={mark} className="flex items-center gap-3 rounded-lg bg-bg-0/50 px-3 py-2 liquid-hover">
-                            <BadgeCheck className="h-4 w-4 shrink-0 text-accent" />
-                            <span className="text-sm text-muted">{mark}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </GlassPanel>
-                  </HolographicHighlight>
-                  <div className="mt-4">
-                    <CodePreview loadstring={site.loadstring} />
-                  </div>
-                </div>
-              </ParallaxLayer>
-            </section>
-          </ParallaxLayer>
-
-          <AnimatedGradient accent>
-            <MeshBackground>
-              <section id="signal" className="relative mx-auto max-w-7xl px-4 py-24 md:px-6">
-                <ParallaxLayer depth={1}>
-                  <div className="section-header">
-                    <div className="kicker"><Activity className="h-3 w-3" /> Live signal</div>
-                    <h2>A command center without the dead weight.</h2>
-                    <p>The website now leads with the operational facts people actually need: what is live, what changed, what UI is active, and where the loader points.</p>
-                  </div>
-                  <div className="mt-14 grid gap-4 md:grid-cols-4">
-                    <SignalCard icon={Activity} title="Relay" value={relayKind} detail={live.error?.message || "Status comes from the live sync endpoint."} />
-                    <SignalCard icon={Gauge} title="Freshness" value={formatFreshness(siteAge)} detail="Site configuration snapshot baked into the static build." />
-                    <SignalCard icon={Cpu} title="Core" value={site.coreVersion || "2.9.10"} detail={`Loader ${site.loaderVersion || "8.11.1"} with release polling enabled.`} />
-                    <SignalCard icon={Shield} title="Guardrails" value="public" detail="Access and security modules load before the game script is selected." />
-                  </div>
-                </ParallaxLayer>
-              </section>
-            </MeshBackground>
-          </AnimatedGradient>
-
-          <section id="games" className="relative border-y border-white/6 bg-white/[0.015] px-4 py-24 md:px-6">
-            <MeshBackground>
-              <div className="mx-auto max-w-7xl">
-                <ParallaxLayer depth={1}>
-                  <div className="grid gap-8 md:grid-cols-[0.85fr_1.15fr] md:items-end">
-                    <div>
-                      <p className="font-mono text-[10px] uppercase tracking-wider text-accent-bright">Game routing</p>
-                      <h2 className="mt-4 text-3xl font-bold tracking-tight md:text-5xl">Scripts that know where they landed.</h2>
-                    </div>
-                    <p className="text-base leading-7 text-muted">
-                      Place IDs, release metadata, and script features are surfaced as a clean launch matrix instead of buried in a generic dashboard.
-                    </p>
-                  </div>
-                  <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {(games.length ? games : [{ name: "Auto-selected experience", status: "tracked" }]).map((game, index) => (
-                      <GameTile key={game.id || game.name || index} game={game} index={index} />
-                    ))}
-                  </div>
-                </ParallaxLayer>
-              </div>
-            </MeshBackground>
-          </section>
-
-          <AnimatedGradient accent fast>
-            <section id="pipeline" className="relative mx-auto max-w-7xl px-4 py-24 md:px-6">
-              <ParallaxLayer depth={1}>
-                <div className="section-header">
-                  <div className="kicker"><GitBranch className="h-3 w-3" /> Release pipeline</div>
-                  <h2>Pin, bake, publish, repeat.</h2>
-                  <p>The public site mirrors how the loader works: it makes the release path visible, legible, and trustworthy.</p>
-                </div>
-                <div className="mt-14 grid gap-10 lg:grid-cols-[0.95fr_1.05fr]">
-                  <HolographicHighlight border shimmer>
-                    <GlassPanel depth={3} className="p-5 md:p-6" distortion>
-                      <CodePreview loadstring={site.loadstring} />
-                    </GlassPanel>
-                  </HolographicHighlight>
-                  <div className="space-y-10">
-                    {pipelineSteps.map((step) => (
-                      <div key={step.number} className="pipeline-step">
-                        <div className="pipeline-step-number">{step.number}</div>
-                        <div className="flex items-center gap-3">
-                          <IconBox icon={step.icon} variant="cyan" />
-                          <h3 className="text-lg font-semibold text-text">{step.title}</h3>
-                        </div>
-                        <p className="text-sm leading-7 text-muted">{step.body}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </ParallaxLayer>
-            </section>
-          </AnimatedGradient>
-
-          <section id="access" className="relative px-4 pb-32 md:px-6">
-            <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-              <HolographicHighlight border shimmer>
-                <GlassPanel depth={3} className="overflow-hidden p-6 md:p-8" distortion>
-                  <div className="pill-kicker"><ScrollText className="h-3 w-3" /> What changed</div>
-                  <h2 className="mt-6 text-3xl font-bold tracking-tight md:text-5xl">
-                    {latestChange?.title || "Built for fast fixes and clear releases."}
-                  </h2>
-                  <div className="mt-8 grid gap-3 md:grid-cols-2">
-                    {(latestChange?.items || qualityMarks).slice(0, 6).map((item) => (
-                      <div key={item} className="flex gap-3 rounded-lg border border-white/6 bg-bg-2/60 p-3 liquid-hover">
-                        <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-                        <span className="text-sm leading-6 text-muted">{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </GlassPanel>
-              </HolographicHighlight>
-              <HolographicHighlight border>
-                <GlassPanel depth={3} className="flex flex-col justify-between p-6 md:p-8" distortion>
-                  <div>
-                    <IconBox icon={Terminal} variant="cyan" />
-                    <h3 className="mt-6 text-2xl font-bold">Launch with one command.</h3>
-                    <p className="mt-3 text-sm leading-7 text-muted">
-                      Copy the live loader, inject once, and let the release system choose the right game module and UI stack.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex flex-col gap-3">
-                    <MiniButton onClick={copyLoadstring}>
-                      <Clipboard className="h-4 w-4" />
-                      Copy loadstring
-                    </MiniButton>
-                    <MiniButton href={site.links?.mirror || site.links?.website || "#top"} variant="quiet">
-                      <Network className="h-4 w-4" />
-                      Open mirror
-                    </MiniButton>
-                  </div>
-                </GlassPanel>
-              </HolographicHighlight>
             </div>
-          </section>
+          )}
+        </header>
+
+        {/* ── Hero ── */}
+        <section id="top" className="relative mx-auto grid min-h-[90dvh] max-w-7xl items-center gap-12 px-4 pb-24 pt-28 md:grid-cols-[1.1fr_0.9fr] md:px-6 md:pt-36">
+          <div>
+            <div className="kicker">
+              <Sparkles className="h-3 w-3" />
+              {relayKind === "online" ? "Relay live" : "Relay monitored"} · {site.uiLibrary || "Iris"} active
+            </div>
+            <h1 className="heading-xl mt-8">
+              Scripts that <span className="gradient-text gradient-text-shimmer">stay fresh</span> without a second loadstring.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-muted md:text-xl">
+              {site.tagline || "One loader, live game routing, automatic release pins, and an Iris UI powered by Onyx resources, Fusion, and Spring."}
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <button className="btn btn-primary" onClick={copyLoadstring}>
+                <Rocket className="h-4 w-4" />
+                Copy loader
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <a className="btn btn-outline" href={site.links?.github || site.links?.loaderRaw || "#pipeline"} target="_blank" rel="noreferrer">
+                <GitBranch className="h-4 w-4" />
+                View source
+                <ArrowRight className="h-4 w-4" />
+              </a>
+            </div>
+            <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {stats.map((s) => (
+                <div key={s.label} className="stat-box fade-in-up">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-muted">{s.label}</p>
+                  <div className="mt-2 flex items-end justify-between gap-2">
+                    <strong className="text-xl font-semibold text-text">{s.value}</strong>
+                    <span className="pb-[3px] font-mono text-[10px] text-muted-2">{s.detail}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="card p-5 float fade-in-up fade-in-d2">
+              <div className="flex items-center justify-between mb-4">
+                <p className="font-mono text-[10px] uppercase tracking-wider text-muted-2">runtime profile</p>
+                <span className="badge badge-green">stable</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-white/6 bg-white/[0.03] p-4">
+                  <Monitor className="h-5 w-5 text-cyan" />
+                  <p className="mt-4 text-2xl font-bold">{site.uiLibrary || "Iris"}</p>
+                  <p className="text-xs text-muted">visible UI</p>
+                </div>
+                <div className="rounded-lg border border-white/6 bg-white/[0.03] p-4">
+                  <Layers className="h-5 w-5 text-violet" />
+                  <p className="mt-4 text-2xl font-bold">Onyx</p>
+                  <p className="text-xs text-muted">resources</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                {["Iris-only visible UI", "Onyx resources retained", "Fusion stack available", "Spring motion available"].map((m) => (
+                  <div key={m} className="flex items-center gap-3 rounded-lg bg-bg-0/50 px-3 py-2">
+                    <BadgeCheck className="h-4 w-4 shrink-0 text-accent" />
+                    <span className="text-sm text-muted">{m}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4">
+              <CodePreview loadstring={site.loadstring} />
+            </div>
+          </div>
+        </section>
+
+        {/* ── Signal ── */}
+        <section id="signal" className="relative mx-auto max-w-7xl px-4 py-24 md:px-6">
+          <div className="section-head">
+            <div className="kicker"><Activity className="h-3 w-3" /> Live signal</div>
+            <h2 className="heading-lg mt-4">A command center without the dead weight.</h2>
+            <p>The website leads with the operational facts people actually need: what is live, what changed, what UI is active, and where the loader points.</p>
+          </div>
+          <div className="mt-14 grid gap-4 md:grid-cols-4">
+            {[
+              { icon: Activity, title: "Relay", value: relayKind, detail: live.error?.message || "Status from live sync endpoint." },
+              { icon: Gauge, title: "Freshness", value: formatFreshness(siteAge), detail: "Site snapshot baked into the static build." },
+              { icon: Cpu, title: "Core", value: site.coreVersion || "2.9.10", detail: `Loader ${site.loaderVersion || "8.11.1"} with release polling.` },
+              { icon: Shield, title: "Guardrails", value: "public", detail: "Access and security modules load before the game script." },
+            ].map((s) => (
+              <div key={s.title} className="card card-hover p-5 fade-in-up">
+                <div className="flex items-center justify-between gap-3">
+                  <IconBox icon={s.icon} variant="cyan" />
+                  <Activity className="h-4 w-4 text-accent" />
+                </div>
+                <p className="mt-6 text-sm font-medium text-muted">{s.title}</p>
+                <strong className="mt-2 block text-2xl font-bold tracking-tight text-text">{s.value}</strong>
+                <p className="mt-3 text-sm leading-6 text-muted">{s.detail}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Games ── */}
+        <section id="games" className="border-y border-white/6 bg-white/[0.015] px-4 py-24 md:px-6">
+          <div className="mx-auto max-w-7xl">
+            <div className="grid gap-8 md:grid-cols-[0.85fr_1.15fr] md:items-end">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-wider text-accent-bright">Game routing</p>
+                <h2 className="heading-lg mt-4">Scripts that know where they landed.</h2>
+              </div>
+              <p className="text-base leading-7 text-muted">
+                Place IDs, release metadata, and script features are surfaced as a clean launch matrix instead of buried in a generic dashboard.
+              </p>
+            </div>
+            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {(games.length ? games : [{ name: "Auto-selected experience", status: "tracked" }]).map((game, i) => {
+                const features = (game.scriptFeatures || []).slice(0, 3);
+                return (
+                  <article key={game.id || game.name || i} className="card card-hover p-5 fade-in-up" style={{ animationDelay: `${i * 0.05}s` }}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-2">{game.version || "live script"}</p>
+                        <h3 className="mt-2 text-lg font-semibold text-text">{game.name || game.id || "Supported game"}</h3>
+                      </div>
+                      <span className={`badge ${statusClass(game.status)}`}>{game.status || "tracked"}</span>
+                    </div>
+                    <p className="mt-4 min-h-12 text-sm leading-6 text-muted">
+                      {game.description || game.message || "Auto-selected by place ID with live release metadata and script health checks."}
+                    </p>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {(features.length ? features : [{ name: "Auto load" }, { name: "Config aware" }, { name: "Live pin" }]).map((f) => (
+                        <span key={f.name} className="chip">{f.name}</span>
+                      ))}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Pipeline ── */}
+        <section id="pipeline" className="relative mx-auto max-w-7xl px-4 py-24 md:px-6">
+          <div className="section-head">
+            <div className="kicker"><GitBranch className="h-3 w-3" /> Release pipeline</div>
+            <h2 className="heading-lg mt-4">Pin, bake, publish, repeat.</h2>
+            <p>The public site mirrors how the loader works: it makes the release path visible, legible, and trustworthy.</p>
+          </div>
+          <div className="mt-14 grid gap-10 lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="card p-5 md:p-6 fade-in-up">
+              <CodePreview loadstring={site.loadstring} />
+            </div>
+            <div className="space-y-10 fade-in-up fade-in-d2">
+              {pipelineSteps.map((step) => (
+                <div key={step.number} className="pipeline-step">
+                  <div className="pipeline-step-number">{step.number}</div>
+                  <div className="flex items-center gap-3">
+                    <IconBox icon={step.icon} variant="cyan" />
+                    <h3 className="text-lg font-semibold text-text">{step.title}</h3>
+                  </div>
+                  <p className="text-sm leading-7 text-muted">{step.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Access ── */}
+        <section id="access" className="px-4 pb-32 md:px-6">
+          <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="card card-gradient overflow-hidden p-6 md:p-8 fade-in-up">
+              <div className="kicker"><ScrollText className="h-3 w-3" /> What changed</div>
+              <h2 className="heading-lg mt-6">{latestChange?.title || "Built for fast fixes and clear releases."}</h2>
+              <div className="mt-8 grid gap-3 md:grid-cols-2">
+                {(latestChange?.items || [
+                  "Iris-only visible UI", "Onyx resources retained",
+                  "Fusion stack available", "Spring motion available",
+                  "GitHub release pinning", "Live site snapshot",
+                ]).slice(0, 6).map((item: string) => (
+                  <div key={item} className="flex gap-3 rounded-lg border border-white/6 bg-bg-2/60 p-3">
+                    <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                    <span className="text-sm leading-6 text-muted">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="card flex flex-col justify-between p-6 md:p-8 fade-in-up fade-in-d2">
+              <div>
+                <IconBox icon={Terminal} variant="cyan" />
+                <h3 className="mt-6 text-2xl font-bold">Launch with one command.</h3>
+                <p className="mt-3 text-sm leading-7 text-muted">
+                  Copy the live loader, inject once, and let the release system choose the right game module and UI stack.
+                </p>
+              </div>
+              <div className="mt-6 flex flex-col gap-3">
+                <button className="btn btn-primary" onClick={copyLoadstring}>
+                  <Clipboard className="h-4 w-4" />
+                  Copy loadstring
+                </button>
+                <a className="btn btn-ghost" href={site.links?.mirror || site.links?.website || "#top"} target="_blank" rel="noreferrer">
+                  <Network className="h-4 w-4" />
+                  Open mirror
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Footer ── */}
+        <footer className="border-t border-white/6 px-4 py-8 md:px-6">
+          <div className="mx-auto flex max-w-7xl items-center justify-between">
+            <p className="text-xs text-muted-2">Alleral · {site.loaderVersion || "8.11.1"}</p>
+            <button className="text-xs text-muted-2 hover:text-muted transition" onClick={openAdmin}>
+              <Shield className="inline h-3 w-3 mr-1" />Admin
+            </button>
+          </div>
+        </footer>
+      </div>
+
+      {/* ── Admin Login Modal ── */}
+      {showAdminModal ? (
+        <div className="fixed inset-0 z-[200] grid place-items-center p-4">
+          <button className="absolute inset-0 bg-black/60" onClick={() => setShowAdminModal(false)} />
+          <div className="card relative z-10 w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-5">
+              <Shield className="h-5 w-5 text-accent" />
+              <h3 className="text-lg font-semibold">Admin access</h3>
+            </div>
+            <input
+              type="password"
+              value={adminPass}
+              onChange={(e) => setAdminPass(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAdminLogin(); }}
+              placeholder="Enter admin password"
+              className="w-full rounded-lg border border-white/10 bg-bg-0/80 px-4 py-2.5 text-sm text-text outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/20"
+              autoFocus
+            />
+            <div className="mt-4 flex gap-2">
+              <button className="btn btn-primary flex-1" onClick={handleAdminLogin}>
+                <LogIn className="h-4 w-4" /> Sign in
+              </button>
+              <button className="btn btn-ghost flex-1" onClick={() => setShowAdminModal(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
-      </main>
-    </ViewTransition>
+      ) : null}
+    </main>
   );
 }
 

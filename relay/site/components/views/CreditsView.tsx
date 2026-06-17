@@ -2,14 +2,12 @@
 
 import type { SitePayload } from "@/lib/types";
 import { Panel } from "@/components/ui/Panel";
-import { ViewTransition } from "@/components/effects/ViewTransition";
 
 export function CreditsView({ site }: { site: SitePayload }) {
   const credits = site.credits;
   if (!credits) return <p className="text-muted">Credits unavailable.</p>;
 
   return (
-    <ViewTransition id="credits">
     <div className="space-y-8">
       <Panel padding="md">
         <h2 className="text-xl font-semibold">{credits.headline || "Team"}</h2>
@@ -36,6 +34,5 @@ export function CreditsView({ site }: { site: SitePayload }) {
         </div>
       ))}
     </div>
-    </ViewTransition>
   );
 }
