@@ -64,11 +64,12 @@ return function(Core)
 		ENV.loadstring = ENV.loadstring or loadstring or load
 		if type(task) == "table" then
 			ENV.task = task
-			ENV.task.spawn = ENV.task.spawn or coroutine.wrap
-			ENV.task.delay = ENV.task.delay or function(t, f) task.spawn(function() task.wait(t); f() end) end
+			ENV.task.spawn = ENV.task.spawn or function(f) coroutine.wrap(f)() end
+			ENV.task.delay = ENV.task.delay or function(t, f) ENV.task.spawn(function() task.wait(t) f() end) end
 			ENV.task.wait = ENV.task.wait or task.wait
 			ENV.task.cancel = ENV.task.cancel or function() end
 		end
+		ENV.game = ENV.game or game
 
 		local src = fetchRayfieldSource()
 		if not src then return nil, "Rayfield source unavailable" end
