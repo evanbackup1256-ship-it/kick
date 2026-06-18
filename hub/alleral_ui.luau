@@ -53,6 +53,23 @@ return function(Core)
 			return ENV._AlleralRayfield
 		end
 
+		ENV.DISABLE_RAYFIELD_REQUESTS = true
+		if type(getgenv) == "function" then
+			local g = getgenv()
+			if type(g) == "table" then
+				g.DISABLE_RAYFIELD_REQUESTS = true
+			end
+		end
+
+		ENV.loadstring = ENV.loadstring or loadstring or load
+		if type(task) == "table" then
+			ENV.task = task
+			ENV.task.spawn = ENV.task.spawn or coroutine.wrap
+			ENV.task.delay = ENV.task.delay or function(t, f) task.spawn(function() task.wait(t); f() end) end
+			ENV.task.wait = ENV.task.wait or task.wait
+			ENV.task.cancel = ENV.task.cancel or function() end
+		end
+
 		local src = fetchRayfieldSource()
 		if not src then return nil, "Rayfield source unavailable" end
 
