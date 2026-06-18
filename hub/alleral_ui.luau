@@ -5,7 +5,7 @@ return function(Core)
 	Core.UI_LIBRARY = "Rayfield"
 
 	local RAYFIELD_SOURCE_PATH = "ui/rayfield/source.luau"
-	local RAYFIELD_SOURCE_URL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/source.lua"
+	local RAYFIELD_SOURCE_URL = "https://sirius.menu/rayfield"
 	local DEFAULT_ICON_ID = "18821914323"
 
 	local ENV = (function()
@@ -58,6 +58,11 @@ return function(Core)
 
 		local loadFn = Core.execFunction and Core.execFunction("loadstring") or loadstring or load
 		if type(loadFn) ~= "function" then return nil, "loadstring unavailable" end
+
+		ENV.loadstring = ENV.loadstring or loadstring or load
+		ENV.task = ENV.task or task
+		ENV.debug = ENV.debug or debug
+		ENV.coroutine = ENV.coroutine or coroutine
 
 		local chunk, err = loadFn(src, "@Rayfield/source")
 		if not chunk then return nil, "Rayfield compile: " .. tostring(err) end

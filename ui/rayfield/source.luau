@@ -1,6 +1,6 @@
 -- Alleral Rayfield -- Native Rayfield UI loader
 local ALLERAL_RAYFIELD_VERSION = 3
-local RAYFIELD_SOURCE_URL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/source.lua"
+local RAYFIELD_SOURCE_URL = "https://sirius.menu/rayfield"
 
 local ENV = (function()
 	local ok, env = pcall(function()
