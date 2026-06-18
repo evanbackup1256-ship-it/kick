@@ -108,9 +108,124 @@ return function(Core)
 		if type(task) == "table" then
 			ENV.task = task
 			ENV.task.spawn = ENV.task.spawn or function(f) coroutine.wrap(f)() end
-			ENV.task.delay = ENV.task.delay or function(t, f) ENV.task.spawn(function() task.wait(t) f() end) end
+			ENV.task.delay = ENV.task.delay or function(t, f) ENV.task.spawn(function() task.wait(t); f() end) end
 			ENV.task.wait = ENV.task.wait or task.wait
 			ENV.task.cancel = ENV.task.cancel or function() end
+		end
+
+		-- Inject GetObjects stub if executor blocks it (Rayfield needs this)
+		local realGame = game
+		if type(realGame) == "Instance" and type(realGame.GetObjects) ~= "function" then
+			local built = nil
+			local function patchedGetObjects()
+				if built then return built end
+				local s = Instance.new("ScreenGui")
+				s.Name = "Rayfield"
+				s.Enabled = false
+
+				local function i(cls, parent, name)
+					local obj = Instance.new(cls, parent)
+					if name then obj.Name = name end
+					return obj
+				end
+
+				local bv = i("NumberValue", s, "Build"); bv.Value = "UU2NX"
+
+				local sh = i("ImageLabel", s, "Shadow")
+				sh.BackgroundTransparency = 1
+				sh.Size = UDim2.new(1, 20, 1, 20); sh.Position = UDim2.new(0, -10, 0, -10)
+
+				local main = i("Frame", s, "Main")
+				main.Size = UDim2.new(0, 600, 0, 400); main.Position = UDim2.new(0.5, -300, 0.5, -200)
+				main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+				i("UIPageLayout", main)
+
+				local sh2 = i("ImageLabel", main, "Shadow"); sh2.BackgroundTransparency = 1
+
+				local top = i("Frame", main, "Topbar")
+				top.Size = UDim2.new(1, 0, 0, 36); top.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+				i("Frame", top, "CornerRepair").BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+				i("Frame", top, "Divider")
+				for _, nm in ipairs({"Hide","ChangeSize","Settings","Search"}) do i("ImageButton", top, nm) end
+				i("ImageLabel", top, "Icon")
+
+				local els = i("Frame", main, "Elements")
+				els.Size = UDim2.new(1, 0, 1, -36); els.Position = UDim2.new(0, 0, 0, 36)
+				els.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+				local uipl = i("UIPageLayout", els)
+				local tpl = i("Frame", els, "Template")
+				local tg = i("Frame", tpl, "Toggle")
+				local sw = i("Frame", tg, "Switch")
+				local swsh = i("ImageLabel", sw, "Shadow"); swsh.BackgroundTransparency = 1
+				local sl = i("Frame", tpl, "Slider")
+				local slm = i("Frame", sl, "Main")
+				local slms = i("ImageLabel", slm, "Shadow"); slms.BackgroundTransparency = 1
+				local dd = i("Frame", tpl, "Dropdown")
+				local ddt = i("ImageButton", dd, "Toggle")
+				local lb = i("Frame", tpl, "Label")
+				i("ImageLabel", lb, "Icon")
+				local cp = i("Frame", tpl, "ColorPicker")
+				local cpb = i("Frame", cp, "CPBackground")
+				local mcp = i("ImageLabel", cpb, "MainCP")
+				i("ImageLabel", mcp, "MainPoint")
+				local cs = i("Frame", cp, "ColorSlider")
+				i("ImageLabel", cs, "SliderPoint")
+
+				local tl = i("Frame", main, "TabList")
+				i("UIListLayout", tl)
+				-- Padding for tablist
+				local pad = i("UIPadding", tl)
+				local tlt = i("Frame", tl, "Template")
+				i("ImageLabel", tlt, "Image")
+				i("TextLabel", tlt, "Title")
+
+				local srch = i("Frame", main, "Search")
+				srch.Size = UDim2.new(1, -30, 0, 30); srch.Position = UDim2.new(0.5, 0, 0, 70)
+				srch.BackgroundColor3 = Color3.fromRGB(25, 25, 25); srch.Visible = false
+				i("ImageLabel", srch, "Search")
+				local srsh = i("ImageLabel", srch, "Shadow"); srsh.BackgroundTransparency = 1
+				local inp = i("TextBox", srch, "Input")
+				inp.Size = UDim2.new(1, -50, 1, 0); inp.Position = UDim2.new(0, 40, 0, 0)
+				inp.BackgroundTransparency = 1; inp.Text = ""; inp.ClearTextOnFocus = false
+				i("UIStroke", srch)
+
+				local lf = i("Frame", main, "LoadingFrame")
+				lf.Size = UDim2.new(1, 0, 1, 0); lf.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+				i("ImageLabel", lf, "Banner")
+				i("TextLabel", lf, "Version")
+
+				local nf = i("Frame", s, "Notifications")
+				i("UIListLayout", nf)
+				local nt = i("Frame", nf, "Template")
+				nt.Size = UDim2.new(1, -60, 0, 60)
+				i("TextLabel", nt, "Title")
+				i("TextLabel", nt, "Description")
+				i("ImageLabel", nt, "Icon")
+				local ntsh = i("ImageLabel", nt, "Shadow"); ntsh.BackgroundTransparency = 1
+				i("UIStroke", nt)
+
+				local drag = i("Frame", s, "Drag")
+				drag.Size = UDim2.new(1, 0, 0, 36); drag.Position = UDim2.new(0, 0, 0, 0)
+				drag.BackgroundTransparency = 1
+				i("Frame", drag, "Interact")
+				i("Frame", drag, "Drag")
+
+				built = { s }
+				return built
+			end
+			pcall(function() realGame.GetObjects = patchedGetObjects end)
+			if type(realGame.GetObjects) ~= "function" then
+				local origGame = ENV.game or realGame
+				ENV.game = setmetatable({}, {
+					__index = function(_, k)
+						if k == "GetObjects" then return patchedGetObjects end
+						if k == "GetService" then return function(_, n) return realGame:GetService(n) end end
+						if k == "HttpGet" then return function(_, u, ...) return realGame:HttpGet(realGame, u, ...) end end
+						local v = origGame[k]; if v ~= nil then return v end
+						return nil
+					end,
+				})
+			end
 		end
 
 		local src = fetchRayfieldSource()

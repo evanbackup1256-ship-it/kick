@@ -1,15 +1,18 @@
-﻿-- Alleral Bootstrap v2.0.4 â€” fetches commit-pinned loader.luau (one saved loadstring)
-local BOOTSTRAP_VERSION = "2.0.4"
-local LOADER_PIN_COMMIT = "ae81dd8"
+﻿-- Alleral Bootstrap v2.1.0 -- universal loadstring, never needs changing
+-- Fetches the latest loader.luau from multiple CDN sources. No hardcoded pins.
+local BOOTSTRAP_VERSION = "2.1.0"
 local REPO = "evanbackup1256-ship-it/-kick-loader"
 local BRANCH = "main"
 local LOADER_MIN_BYTES = 50000
-local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
-local JSDELIVR = "https://cdn.jsdelivr.net/gh/" .. REPO
-local CDN_BASE = "https://alleral-telemetry-production.up.railway.app"
-local RELEASE_PATH = "cfg/release.json"
 
-print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Startingâ€¦")
+-- CDN sources ordered by speed/priority
+local SOURCES = {
+	{ name = "jsDelivr",  base = "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH },
+	{ name = "GitHub",    base = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH },
+	{ name = "Railway",   base = "https://alleral-telemetry-production.up.railway.app" },
+}
+
+print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Starting...")
 
 local function genv()
 	local ok, env = pcall(function()
@@ -19,16 +22,10 @@ local function genv()
 end
 
 local function resolveGame()
-	if typeof(game) == "Instance" then
-		return game
-	end
-	if _G and typeof(_G.game) == "Instance" then
-		return _G.game
-	end
+	if typeof(game) == "Instance" then return game end
+	if _G and typeof(_G.game) == "Instance" then return _G.game end
 	local env = genv()
-	if typeof(env.game) == "Instance" then
-		return env.game
-	end
+	if typeof(env.game) == "Instance" then return env.game end
 	return nil
 end
 
@@ -48,166 +45,129 @@ end
 local function pickRequest()
 	for _, name in ipairs({ "request", "http_request", "httprequest", "syn_request" }) do
 		local fn = ENV[name] or (_G and _G[name])
-		if type(fn) == "function" then
-			return fn
-		end
+		if type(fn) == "function" then return fn end
 	end
-	if type(syn) == "table" and type(syn.request) == "function" then
-		return syn.request
-	end
-	if type(http) == "table" and type(http.request) == "function" then
-		return http.request
-	end
-	if type(ENV.Xeno) == "table" and type(ENV.Xeno.request) == "function" then
-		return ENV.Xeno.request
-	end
+	if type(syn) == "table" and type(syn.request) == "function" then return syn.request end
+	if type(http) == "table" and type(http.request) == "function" then return http.request end
+	if type(ENV.Xeno) == "table" and type(ENV.Xeno.request) == "function" then return ENV.Xeno.request end
 	return nil
 end
 
 local function fetchUrl(url, minBytes)
 	minBytes = minBytes or 0
+	local bust = (url:find("?") and "&" or "?") .. "v=" .. BOOTSTRAP_VERSION .. "&t=" .. tostring(tick())
+
 	local requestFn = pickRequest()
 	if requestFn then
 		local ok, res = pcall(requestFn, {
-			Url = url,
+			Url = url .. bust,
 			Method = "GET",
-			Headers = { ["Cache-Control"] = "no-cache, no-store", ["User-Agent"] = "Alleral-Bootstrap/" .. BOOTSTRAP_VERSION },
+			Headers = { ["Cache-Control"] = "no-cache", ["User-Agent"] = "Alleral-Bootstrap/" .. BOOTSTRAP_VERSION },
 		})
 		if ok and type(res) == "table" then
 			local body = res.Body or res.body
 			if type(body) == "string" and #body >= minBytes then
-				return body, "request"
+				return body
 			end
 		end
 	end
+
 	if type(game.HttpGet) == "function" then
-		local ok, body = pcall(game.HttpGet, game, url, true)
-		if ok and type(body) == "string" and #body >= minBytes then
-			return body, "httpget"
-		end
+		local ok, body = pcall(game.HttpGet, game, url .. bust, true)
+		if ok and type(body) == "string" and #body >= minBytes then return body end
+		ok, body = pcall(game.HttpGet, game, url .. bust)
+		if ok and type(body) == "string" and #body >= minBytes then return body end
 	end
-	return nil, "fetch failed"
+
+	if type(game.HttpGet) == "function" then
+		local ok, body = pcall(function() return game:HttpGet(url .. bust, true) end)
+		if ok and type(body) == "string" and #body >= minBytes then return body end
+		ok, body = pcall(function() return game:HttpGet(url .. bust) end)
+		if ok and type(body) == "string" and #body >= minBytes then return body end
+	end
+
+	return nil
 end
 
 local function stripUtf8Bom(text)
-	if type(text) ~= "string" or #text < 3 then
-		return text
-	end
+	if type(text) ~= "string" or #text < 3 then return text end
 	if string.byte(text, 1) == 0xEF and string.byte(text, 2) == 0xBB and string.byte(text, 3) == 0xBF then
 		return text:sub(4)
 	end
 	return text
 end
 
-local function parseRelease(body)
-	if type(body) ~= "string" then
-		return nil
-	end
-	local commit = body:match('"commit"%s*:%s*"([^"]+)"')
-	local loader = body:match('"loader"%s*:%s*"([^"]+)"')
-	if not commit and not loader then
-		return nil
-	end
-	return { commit = commit, loader = loader }
+local function parseJson(text)
+	if type(text) ~= "string" or #text < 2 then return nil end
+	local ok, data = pcall(function()
+		return game:GetService("HttpService"):JSONDecode(text)
+	end)
+	return ok and type(data) == "table" and data or nil
 end
 
-local function loaderVersionFromSource(body)
-	if type(body) ~= "string" then
-		return nil
-	end
-	return body:match('local%s+LOADER_VERSION%s*=%s*"([%d%.]+)"')
-		or body:match('LOADER_VERSION%s*=%s*"([%d%.]+)"')
+local function loaderVersion(src)
+	if type(src) ~= "string" then return nil end
+	return src:match('local%s+LOADER_VERSION%s*=%s*"([%d%.]+)"')
 end
 
-local function acceptLoader(body, expectedVersion)
-	if type(body) ~= "string" or not body:find("LOADER_VERSION", 1, true) then
-		return false
-	end
-	if #body < LOADER_MIN_BYTES then
-		return false
-	end
-	if type(expectedVersion) == "string" and expectedVersion ~= "" then
-		local ver = loaderVersionFromSource(body)
-		if ver and ver ~= expectedVersion then
-			return false
-		end
-	end
-	return true
+local function acceptLoader(src)
+	return type(src) == "string" and #src >= LOADER_MIN_BYTES and src:find("LOADER_VERSION", 1, true) ~= nil
 end
 
-local function fetchRelease()
-	local bust = "?v=" .. BOOTSTRAP_VERSION .. "&t=" .. tostring(tick())
-	return parseRelease(fetchUrl(GITHUB_RAW .. "/" .. RELEASE_PATH .. bust, 20))
-end
-
-local function fetchLoader()
-	local bust = "?v=" .. BOOTSTRAP_VERSION .. "&t=" .. tostring(tick())
-	local release = fetchRelease()
-	local commit = (release and release.commit) or LOADER_PIN_COMMIT
-	local expectedLoader = release and release.loader
-
-	local urls = {
-		GITHUB_RAW .. "/" .. commit .. "/loader.luau" .. bust,
-		JSDELIVR .. "@" .. commit .. "/loader.luau" .. bust,
-		GITHUB_RAW .. "/" .. LOADER_PIN_COMMIT .. "/loader.luau" .. bust,
-		JSDELIVR .. "@" .. LOADER_PIN_COMMIT .. "/loader.luau" .. bust,
-		CDN_BASE .. "/api/loader/file/loader.luau" .. bust,
-	}
-	if not expectedLoader then
-		table.insert(urls, GITHUB_RAW .. "/loader.luau" .. bust)
-		table.insert(urls, JSDELIVR .. "@" .. BRANCH .. "/loader.luau" .. bust)
-	end
-
-	for _, url in ipairs(urls) do
-		local body, via = fetchUrl(url, LOADER_MIN_BYTES)
-		if acceptLoader(body, expectedLoader) then
-			return body, via, commit, expectedLoader
-		end
-	end
-	return nil, "stale or unavailable", commit, expectedLoader
-end
-
-local function hashAttest(placeId, jobId, at, commit)
-	local text = "AlleralBootstrapGate-v5|" .. tostring(placeId) .. "|" .. tostring(jobId) .. "|" .. tostring(at) .. "|" .. tostring(commit or "")
-	local h1, h2 = 5381, 0
-	for i = 1, #text do
-		local byte = string.byte(text, i)
-		h1 = (h1 * 33 + byte) % 2147483647
-		h2 = (h2 * 31 + byte * (i % 7 + 1)) % 2147483647
-	end
-	return string.format("ab_%x_%x", h1, h2)
-end
-
-if ENV._Alleral_BootstrapRunning then
-	return
-end
+if ENV._Alleral_BootstrapRunning then return end
 ENV._Alleral_BootstrapRunning = true
 
-local src, via, pinCommit, expectedLoader = fetchLoader()
-if type(src) ~= "string" then
-	ENV._Alleral_BootstrapRunning = false
-	local detail = tostring(via)
-	if type(expectedLoader) == "string" and expectedLoader ~= "" then
-		detail = detail .. " (need loader " .. expectedLoader .. " @ " .. tostring(pinCommit) .. ")"
+-- Step 1: Fetch latest release.json to get the current loader version
+local release
+for _, source in ipairs(SOURCES) do
+	local url = source.base .. "/cfg/release.json"
+	local body = fetchUrl(url, 20)
+	if body then
+		release = parseJson(body)
+		if release and release.loader then break end
 	end
-	error("[Alleral Bootstrap] Could not download loader.luau (" .. detail .. "). Enable HTTP in your executor.")
 end
+
+-- Step 2: Fetch loader.luau from CDN sources
+local src, via
+local urls = {}
+for _, source in ipairs(SOURCES) do
+	if source.name == "Railway" then
+		table.insert(urls, { url = source.base .. "/api/loader/file/loader.luau", name = source.name })
+	else
+		table.insert(urls, { url = source.base .. "/loader.luau", name = source.name })
+	end
+end
+
+for _, entry in ipairs(urls) do
+	local body = fetchUrl(entry.url, LOADER_MIN_BYTES)
+	if acceptLoader(body) then
+		if release and release.loader then
+			local ver = loaderVersion(body)
+			if ver and ver ~= release.loader then
+				-- Try pinned commit version from CDN
+				local pinUrl = "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. (release.commit or "main") .. "/loader.luau"
+				body = fetchUrl(pinUrl, LOADER_MIN_BYTES)
+				if not acceptLoader(body) then body = nil end
+			end
+		end
+		if body then
+			src = body
+			via = entry.name
+			break
+		end
+	end
+end
+
+if not src then
+	ENV._Alleral_BootstrapRunning = false
+	error("[Alleral Bootstrap] Could not download loader.luau. Enable HTTP in your executor.")
+end
+
 src = stripUtf8Bom(src)
 
-local ver = loaderVersionFromSource(src) or "?"
-print(
-	"[Alleral Bootstrap v"
-		.. BOOTSTRAP_VERSION
-		.. "] Running loader v"
-		.. ver
-		.. " ("
-		.. tostring(#src)
-		.. "b via "
-		.. tostring(via)
-		.. ", pin "
-		.. tostring(pinCommit)
-		.. ")"
-)
+local ver = loaderVersion(src) or "?"
+print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Running loader v" .. ver .. " (" .. tostring(#src) .. "b via " .. tostring(via) .. ")")
 
 local fn, err = loadStringFn(src, "Alleral/loader@" .. ver)
 if not fn then
@@ -215,16 +175,14 @@ if not fn then
 	error("[Alleral Bootstrap] Loader compile failed: " .. tostring(err))
 end
 
-if setfenv then
-	pcall(setfenv, fn, ENV)
-end
+if setfenv then pcall(setfenv, fn, ENV) end
 
 local at = tick()
 ENV._Alleral_BootstrapVersion = BOOTSTRAP_VERSION
 ENV._Alleral_Bootstrapped = true
 ENV._Alleral_BootstrapAt = at
-ENV._Alleral_BootstrapCommit = pinCommit
-ENV._Alleral_BootstrapToken = hashAttest(game.PlaceId, game.JobId, at, pinCommit)
+ENV._Alleral_BootstrapCommit = release and release.commit or ""
+ENV._Alleral_BootstrapToken = string.format("ab_%x_%x", 0, 0)
 ENV._Alleral_BootstrapTokenAt = at
 
 local ok, runErr = pcall(fn)
