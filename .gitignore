@@ -26,3 +26,6 @@ runtime_secrets.json
 
 # Local obfuscated UI dumps (never commit)
 obfusctated_uilibrary.luau
+
+# Obfuscation content-hash cache
+.obfuscation_cache/

@@ -36,6 +36,9 @@ Dockerfile
 docker-compose*.yml
 railway.toml
 
+# Obfuscation cache
+.obfuscation_cache/
+
 # Large directories
 games/
 maint/

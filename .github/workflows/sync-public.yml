@@ -1,12 +1,6 @@
-# Syncs loader files from this private repo to a public repo
-# so players can still fetch loader.luau / bootstrap.luau etc.
-#
-# Setup:
-#   1. Create a new public repo: evanbackup1256-ship-it/kick-loader
-#   2. Generate a classic PAT with "repo" scope
-#   3. Add it as a secret: SYNC_PAT
-#   4. Update REPO in bootstrap.luau / loader.luau to "evanbackup1256-ship-it/kick-loader"
-#   5. Push to main on this repo
+# Syncs loader files from private repo to public repo with incremental updates.
+# Clones the public repo to preserve .git (faster pushes, maintains history).
+# Only obfuscates files that actually changed (content-hash based caching).
 
 name: Sync public loader repo
 
@@ -20,6 +14,7 @@ permissions:
 
 env:
   SYNC_PAT: ${{ secrets.SYNC_PAT }}
+  PUBLIC_REPO: evanbackup1256-ship-it/-kick-loader
 
 jobs:
   sync:
@@ -28,40 +23,125 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
-      - name: Build public bundle
-        shell: bash
+      - name: Clone public repo (preserve .git for fast incremental push)
+        if: env.SYNC_PAT != ''
         run: |
           rm -rf public_repo
-          mkdir -p public_repo
-          mkdir -p public_repo/hub
-          mkdir -p public_repo/ui/rayfield
+          git clone --depth 1 --single-branch --branch main \
+            "https://x-access-token:${{ env.SYNC_PAT }}@github.com/${{ env.PUBLIC_REPO }}.git" \
+            public_repo 2>/dev/null || {
+            echo "Clone failed, initializing fresh repo"
+            mkdir -p public_repo
+            cd public_repo && git init && git checkout -b main
+          }
 
-          cp loader.luau bootstrap.luau public_repo/
-          cp cfg/release.json cfg/site.json cfg/access.json cfg/security.json cfg/telemetry.json cfg/weao.json cfg/scripts_manifest.json public_repo/
-          cp hub/*.luau public_repo/hub/
-          cp ui/rayfield/source.luau public_repo/ui/rayfield/ 2>/dev/null || true
-          cp games/*.luau public_repo/games/ 2>/dev/null || true
-          cp games/data/*.luau public_repo/games/data/ 2>/dev/null || true
-
-      - name: Obfuscate scripts for public release
+      - name: Detect changed source files
+        id: changed
         if: env.SYNC_PAT != ''
-        shell: bash
         run: |
-          bash maint/obfuscate_scripts.sh public_repo/hub/*.luau public_repo/games/*.luau public_repo/ui/rayfield/source.luau 2>/dev/null || true
+          mkdir -p public_repo/hub public_repo/ui/rayfield public_repo/games public_repo/games/data
 
-      - name: Push to public repo
-        if: env.SYNC_PAT != ''
-        shell: bash
+          # Build list of all source paths to sync
+          SOURCES=(
+            "loader.luau"
+            "bootstrap.luau"
+            "cfg/release.json"
+            "cfg/site.json"
+            "cfg/access.json"
+            "cfg/security.json"
+            "cfg/telemetry.json"
+            "cfg/weao.json"
+            "cfg/scripts_manifest.json"
+          )
+
+          # Add hub files
+          for f in hub/*.luau; do
+            [ -f "$f" ] && SOURCES+=("$f")
+          done
+
+          # Add UI files
+          [ -f ui/rayfield/source.luau ] && SOURCES+=("ui/rayfield/source.luau")
+
+          # Add game files
+          for f in games/*.luau; do
+            [ -f "$f" ] && SOURCES+=("$f")
+          done
+          for f in games/data/*.luau; do
+            [ -f "$f" ] && SOURCES+=("$f")
+          done
+
+          # Compare source vs public repo via sha256
+          # Obfuscation targets: hub/*.luau, games/*.luau, ui/rayfield/source.luau
+          # Plain copy: loader.luau, bootstrap.luau, cfg/*
+          CHANGED=""
+          PLAIN=""
+          OBFUSCATE=""
+
+          for src in "${SOURCES[@]}"; do
+            if [ ! -f "$src" ]; then continue; fi
+            src_hash=$(sha256sum "$src" | cut -d' ' -f1)
+            dst_hash=""
+            if [ -f "public_repo/$src" ]; then
+              dst_hash=$(sha256sum "public_repo/$src" | cut -d' ' -f1)
+            fi
+            if [ "$src_hash" != "$dst_hash" ]; then
+              mkdir -p "public_repo/$(dirname "$src")"
+              cp "$src" "public_repo/$src"
+              # Determine if file needs obfuscation
+              case "$src" in
+                hub/*.luau|games/*.luau|ui/rayfield/source.luau)
+                  OBFUSCATE="$OBFUSCATE public_repo/$src" ;;
+                *)
+                  PLAIN="$PLAIN $src" ;;
+              esac
+              CHANGED="$CHANGED $src"
+            fi
+          done
+
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "plain=$PLAIN" >> "$GITHUB_OUTPUT"
+          echo "obfuscate=$OBFUSCATE" >> "$GITHUB_OUTPUT"
+          echo "count=$(echo $CHANGED | wc -w)" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$CHANGED" ]; then
+            echo "Changed files ($(echo $CHANGED | wc -w)): $CHANGED"
+          else
+            echo "No source changes detected — skipping sync"
+          fi
+
+      - name: Obfuscate changed scripts
+        if: env.SYNC_PAT != '' && steps.changed.outputs.obfuscate != ''
+        run: |
+          echo "Obfuscating: ${{ steps.changed.outputs.obfuscate }}"
+          bash maint/obfuscate_scripts.sh ${{ steps.changed.outputs.obfuscate }}
+
+      - name: Commit and push to public repo
+        if: env.SYNC_PAT != '' && steps.changed.outputs.count != '0'
         run: |
           set -e
           cd public_repo
-          git init
-          git checkout -b main
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if ! git rev-parse --verify main >/dev/null 2>&1; then
+            git checkout -b main
+          fi
+
           git add -A
-          git commit --allow-empty -m "Sync from ${{ github.repository }}@${{ github.sha }}"
-          git remote add origin https://x-access-token:${{ env.SYNC_PAT }}@github.com/evanbackup1256-ship-it/-kick-loader.git
-          git push -f origin main 2>&1
+          git commit -m "Sync ${{ steps.changed.outputs.count }} file(s) from ${{ github.repository }}@${{ github.sha }}" || true
+
+          # Retry push up to 3 times with exponential backoff
+          for i in 1 2 3; do
+            if git push origin main 2>&1; then
+              echo "Push succeeded on attempt $i"
+              exit 0
+            fi
+            if [ $i -lt 3 ]; then
+              sleep $((i * 5))
+              git pull --rebase origin main 2>/dev/null || true
+            fi
+          done
+          echo "Push failed after 3 attempts"
+          exit 1
