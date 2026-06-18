@@ -364,7 +364,7 @@ end
 local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Sell Lemons · v" .. VERSION,
 	Icon = "lemon",
-	Theme = "Linoria",
+	Theme = "Default",
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"

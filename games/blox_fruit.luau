@@ -105,7 +105,7 @@ notify(
 local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Blox Fruit · v" .. VERSION .. " · Maintenance",
 	Icon = "anchor",
-	Theme = "Obsidian",
+	Theme = "Default",
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"

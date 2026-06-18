@@ -631,7 +631,7 @@ end))
 local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Survive a Zombie Arena · v" .. VERSION,
 	Icon = "skull",
-	Theme = "Obsidian",
+	Theme = "Default",
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"

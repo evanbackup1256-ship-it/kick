@@ -1,872 +1,253 @@
 return function(Core)
-	local ALLERAL_UI_LAYER = "Alleral UI layer"
-	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "1.0.0-rayfield"
+	Core._AlleralUiLayer = "Alleral UI layer"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "2.0.0-rayfield"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Rayfield"
 
-	local ONYX_SOURCE_PATH = "ui/onyx/source.luau"
-	local ONYX_SOURCE_PATHS = {
-		"ui/onyx/source.luau",
-		".alleral/cache/ui/onyx/source.luau",
-		"kick/ui/onyx/source.luau",
-	}
-	local ONYX_VERSION_MARKER = "ALLERAL_ONYX_VERSION"
-	local ONYX_VERSION = 1
-	local ONYX_MIN_BYTES = 12000
-	local ONYX_REQUIRED_FN = "function MacLib:Window"
-	local ONYX_RAW_URLS = {
-		"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/ui/onyx/source.luau",
-	}
-
 	local RAYFIELD_SOURCE_PATH = "ui/rayfield/source.luau"
-	local RAYFIELD_SOURCE_PATHS = {
-		"ui/rayfield/source.luau",
-		".alleral/cache/ui/rayfield/source.luau",
-		"kick/ui/rayfield/source.luau",
-	}
-	local RAYFIELD_VERSION = 1
-	local RAYFIELD_MIN_BYTES = 1000
-	local RAYFIELD_REQUIRED_FN = "function MacLib:Window"
-	local RAYFIELD_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
-	local RAYFIELD_RAW_URLS = {
-		"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/ui/rayfield/source.luau",
-	}
+	local RAYFIELD_SOURCE_URL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/source.lua"
 	local DEFAULT_ICON_ID = "18821914323"
 
-	local function genv()
-		local ok, env = pcall(function()
-			return getgenv and getgenv() or getfenv()
-		end)
+	local ENV = (function()
+		local ok, env = pcall(function() return getgenv and getgenv() or getfenv() end)
 		return ok and env or {}
-	end
-	local ENV = genv()
-
-	local function extractIconId(icon)
-		if icon == nil or icon == "" then
-			return nil
-		end
-		if type(icon) == "number" then
-			return tostring(icon)
-		end
-		local text = tostring(icon)
-		local digits = text:match("(%d+)$")
-		if digits then
-			return digits
-		end
-		if type(Core.uiIcon) == "function" then
-			local numeric = Core.uiIcon(icon)
-			if type(numeric) == "string" and numeric ~= "" then
-				return numeric
-			end
-		end
-		if type(Core.windUiIcon) == "function" then
-			local mapped = Core.windUiIcon(icon)
-			if type(mapped) == "string" then
-				local fromMapped = mapped:match("(%d+)$")
-				if fromMapped then
-					return fromMapped
-				end
-			end
-		end
-		return nil
-	end
+	end)()
 
 	local function iconImage(icon)
-		return extractIconId(icon) or DEFAULT_ICON_ID
+		if icon == nil or icon == "" then return DEFAULT_ICON_ID end
+		if type(icon) == "number" then return tostring(icon) end
+		local digits = tostring(icon):match("(%d+)$")
+		if digits then return digits end
+		local fn = Core.windUiIcon or Core.uiIcon
+		if type(fn) == "function" then
+			local r = fn(icon)
+			if type(r) == "string" and r ~= "" then
+				local d = r:match("(%d+)$")
+				return d or r
+			end
+		end
+		return DEFAULT_ICON_ID
 	end
 
 	local function iconAsset(icon)
 		return "rbxassetid://" .. iconImage(icon)
 	end
 
-	local function rayfieldIoFn(name)
-		if type(Core.execFunction) == "function" then
-			return Core.execFunction(name)
+	local function fetchRayfieldSource()
+		if type(ENV._AlleralRayfieldBundle) == "string" and #ENV._AlleralRayfieldBundle > 1000 then
+			return ENV._AlleralRayfieldBundle
 		end
-		return nil
-	end
-
-	local function readRayfieldFileAt(path)
-		local readFile = rayfieldIoFn("readfile")
-		local isFile = rayfieldIoFn("isfile")
-		if type(readFile) ~= "function" or type(isFile) ~= "function" then
-			if type(Core.readFile) == "function" then
-				return Core.readFile(path)
-			end
-			return nil
-		end
-		local okExists, exists = pcall(isFile, path)
-		if not (okExists and exists) then
-			return nil
-		end
-		local okRead, src = pcall(readFile, path)
-		return okRead and src or nil
-	end
-
-	local function preferredUiEngine()
-		local expected = ENV._Alleral_ExpectedVersions
-		if type(expected) == "table" and type(expected.ui) == "string" and expected.ui ~= "" then
-			return expected.ui:lower()
-		end
-		return "rayfield"
-	end
-
-	local function requiredOnyxVersion()
-		local expected = ENV._Alleral_ExpectedVersions
-		if type(expected) == "table" then
-			local version = tonumber(expected.onyxVersion)
-			if version then
-				return version
-			end
-		end
-		local loaderNeed = tonumber(ENV._Alleral_RequiredOnyxVersion)
-		if loaderNeed then
-			return loaderNeed
-		end
-		return ONYX_VERSION
-	end
-
-	local function onyxVersionFromSource(src)
-		if type(src) ~= "string" then
-			return nil
-		end
-		return tonumber(src:match("\nlocal%s+ALLERAL_ONYX_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("^local%s+ALLERAL_ONYX_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
-	end
-
-	local function onyxSourceValid(src)
-		if type(src) ~= "string"
-			or #src < ONYX_MIN_BYTES
-			or src:find("<!DOCTYPE", 1, true)
-			or not src:find(ONYX_VERSION_MARKER, 1, true)
-			or not src:find(ONYX_REQUIRED_FN, 1, true)
-			or not src:find("__OnyxUi", 1, true) then
-			return false
-		end
-		local version = onyxVersionFromSource(src)
-		return type(version) == "number" and version == requiredOnyxVersion()
-	end
-
-	local function onyxBackendUrls()
-		local urls = {}
-		local base = ENV._Alleral_LoaderCdnBase
-		if type(base) == "string" and base ~= "" then
-			table.insert(urls, base:gsub("/+$", "") .. "/api/loader/file/ui/onyx/source.luau")
-		end
-		return urls
-	end
-
-	local function tryReadOnyxPath(relPath)
-		for _, root in ipairs(RAYFIELD_WORKSPACE_ROOTS) do
-			local full = root .. relPath
-			local src = readRayfieldFileAt(full)
-			if onyxSourceValid(src) then
-				return src, "local:" .. full
+		local httpGet = ENV.Alleral_HTTP and ENV.Alleral_HTTP.get
+		if type(httpGet) == "function" then
+			local src = httpGet(RAYFIELD_SOURCE_URL .. "?t=" .. tostring(tick()), 1000)
+			if type(src) == "string" and #src > 1000 then
+				ENV._AlleralRayfieldBundle = src
+				return src
 			end
 		end
 		return nil
 	end
 
-	local function readOnyxSource()
-		local need = requiredOnyxVersion()
-		local bestSrc, bestLabel, bestVersion = nil, nil, -1
-		local function consider(src, label)
-			if not onyxSourceValid(src) then
-				return
-			end
-			local version = onyxVersionFromSource(src) or 0
-			if version > bestVersion then
-				bestSrc, bestLabel, bestVersion = src, label, version
-			end
-		end
-
-		if type(ENV._AlleralOnyxSource) == "string" then
-			if onyxSourceValid(ENV._AlleralOnyxSource) then
-				consider(ENV._AlleralOnyxSource, ENV._AlleralOnyxSourceLabel or "memory:loader")
-			else
-				ENV._AlleralOnyxSource = nil
-				ENV._AlleralOnyxSourceReady = false
-			end
-		end
-
-		if type(ENV._AlleralMaclibSource) == "string" and onyxSourceValid(ENV._AlleralMaclibSource) then
-			consider(ENV._AlleralMaclibSource, ENV._AlleralMaclibSourceLabel or "memory:onyx-bridge")
-		end
-
-		for _, path in ipairs(ONYX_SOURCE_PATHS) do
-			local src, label = tryReadOnyxPath(path)
-			if src then
-				consider(src, label)
-			end
-		end
-
-		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
-			for _, baseUrl in ipairs(onyxBackendUrls()) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?onyx=" .. tostring(need) .. "&t=" .. tostring(tick()), ONYX_MIN_BYTES)
-				if type(src) == "string" then
-					consider(src, "backend:" .. baseUrl)
-				end
-			end
-			for _, baseUrl in ipairs(ONYX_RAW_URLS) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?onyx=" .. tostring(need) .. "&t=" .. tostring(tick()), ONYX_MIN_BYTES)
-				if type(src) == "string" then
-					consider(src, "remote:" .. baseUrl)
-				end
-			end
-		end
-
-		if not bestSrc or bestVersion ~= requiredOnyxVersion() then
-			return nil, "Onyx source missing (need v" .. tostring(requiredOnyxVersion()) .. ")"
-		end
-		return bestSrc, bestLabel
-	end
-
-local function loadOnyx()
-	return nil, "Onyx not available as primary UI"
-			local version = ENV._AlleralOnyx.__AlleralPatch
-			local need = requiredOnyxVersion()
-			if type(version) ~= "number" or version ~= need then
-				ENV._AlleralOnyx = nil
-				ENV._AlleralOnyxSourceKey = nil
-			else
-				return ENV._AlleralOnyx
-			end
-		end
-
-		local source, sourceLabel = readOnyxSource()
-		if not source then
-			return nil, sourceLabel or "Onyx source missing"
-		end
-
-		local sourceKey = tostring(#source) .. ":" .. source:sub(1, 64)
-		if ENV._AlleralOnyxSourceKey == sourceKey and type(ENV._AlleralOnyx) == "table" then
-			return ENV._AlleralOnyx
-		end
-
-		local loadFn = Core.execFunction and Core.execFunction("loadstring") or loadstring or load
-		if type(loadFn) ~= "function" then
-			return nil, "loadstring unavailable"
-		end
-
-		local chunk, err = loadFn(source, "@Onyx/source")
-		if not chunk then
-			return nil, tostring(err or "Onyx compile failed")
-		end
-
-		local ok, MacLib = pcall(chunk)
-		if not ok or type(MacLib) ~= "table" or type(MacLib.Window) ~= "function" then
-			return nil, tostring(MacLib or "Onyx runtime failed")
-		end
-
-		local patch = MacLib.__AlleralPatch
-		local need = requiredOnyxVersion()
-		if type(patch) ~= "number" or patch ~= need or MacLib.__OnyxUi ~= true then
-			return nil, "Onyx version outdated (have v" .. tostring(patch or "?") .. ", need v" .. tostring(need) .. ")"
-		end
-
-		ENV._AlleralOnyxSourceKey = sourceKey
-		ENV._AlleralOnyx = MacLib
-		ENV._AlleralOnyxSource = source
-		ENV._AlleralOnyxSourceLabel = sourceLabel
-		ENV._AlleralMaclib = MacLib
-		ENV._AlleralMaclibSource = source
-		ENV._AlleralMaclibSourceLabel = sourceLabel
-		if type(Core.say) == "function" then
-			Core.say(
-				"OnyxUI v"
-					.. tostring(MacLib.__AlleralPatch or "?")
-					.. " (Fusion "
-					.. tostring(MacLib.__AlleralVersion or "1.0.4")
-					.. ") from "
-					.. tostring(sourceLabel or "unknown")
-			)
-		end
-		return MacLib
-	end
-
-	local loadRayfield
-
-	local function bootRayfieldOverlay(mainEngine)
-		if ENV.Alleral_RayfieldOverlay == false then
-			return
-		end
-		local rayfield, err = loadRayfield()
-		if not rayfield then
-			if type(Core.logWarn) == "function" then
-				Core.logWarn("Rayfield overlay unavailable: " .. tostring(err))
-			end
-			return
-		end
-		ENV._AlleralRayfieldOverlay = rayfield
-		if type(mainEngine) == "table" and type(mainEngine.bootRayfieldOverlay) == "function" then
-			pcall(mainEngine.bootRayfieldOverlay, mainEngine, rayfield)
-		end
-		if type(Core.say) == "function" then
-			Core.say("Rayfield overlay ready (RightShift debug panel)")
-		end
-	end
-
-	local function requiredRayfieldVersion()
-		local expected = ENV._Alleral_ExpectedVersions
-		if type(expected) == "table" then
-			local version = tonumber(expected.rayfieldVersion)
-			if version then
-				return version
-			end
-		end
-		local loaderNeed = tonumber(ENV._Alleral_requiredRayfieldVersion)
-		if loaderNeed then
-			return loaderNeed
-		end
-		return RAYFIELD_VERSION
-	end
-
-	local function rayfieldVersionFromSource(src)
-		if type(src) ~= "string" then
-			return nil
-		end
-		return tonumber(src:match("\nlocal%s+ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("^local%s+ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
-	end
-
-	local function rayfieldSourceValid(src)
-		if type(src) ~= "string"
-			or #src < RAYFIELD_MIN_BYTES
-			or src:find("<!DOCTYPE", 1, true)
-			or not src:find(RAYFIELD_VERSION_MARKER, 1, true)
-			or not src:find(RAYFIELD_REQUIRED_FN, 1, true)
-			or not src:find("__RayfieldUi", 1, true) then
-			return false
-		end
-		local version = rayfieldVersionFromSource(src)
-		return type(version) == "number" and version == requiredRayfieldVersion()
-	end
-
-	local function rayfieldBackendUrls()
-		local urls = {}
-		local base = ENV._Alleral_LoaderCdnBase
-		if type(base) == "string" and base ~= "" then
-			table.insert(urls, base:gsub("/+$", "") .. "/api/loader/file/ui/rayfield/source.luau")
-		end
-		return urls
-	end
-
-	local function tryReadRayfieldPath(relPath)
-		for _, root in ipairs(RAYFIELD_WORKSPACE_ROOTS) do
-			local full = root .. relPath
-			local src = readRayfieldFileAt(full)
-			if rayfieldSourceValid(src) then
-				return src, "local:" .. full
-			end
-		end
-		return nil
-	end
-
-	local function readRayfieldSource()
-		local need = requiredRayfieldVersion()
-		local bestSrc, bestLabel, bestVersion = nil, nil, -1
-		local function consider(src, label)
-			if not rayfieldSourceValid(src) then
-				return
-			end
-			local version = rayfieldVersionFromSource(src) or 0
-			if version > bestVersion then
-				bestSrc, bestLabel, bestVersion = src, label, version
-			end
-		end
-
-		if type(ENV._AlleralRayfieldSource) == "string" then
-			if rayfieldSourceValid(ENV._AlleralRayfieldSource) then
-				consider(ENV._AlleralRayfieldSource, ENV._AlleralRayfieldSourceLabel or "memory:loader")
-			else
-				ENV._AlleralRayfieldSource = nil
-				ENV._AlleralRayfieldSourceReady = false
-			end
-		end
-
-		if type(ENV._AlleralMaclibSource) == "string" and rayfieldSourceValid(ENV._AlleralMaclibSource) then
-			consider(ENV._AlleralMaclibSource, ENV._AlleralMaclibSourceLabel or "memory:rayfield-bridge")
-		end
-
-		for _, path in ipairs(RAYFIELD_SOURCE_PATHS) do
-			local src, label = tryReadRayfieldPath(path)
-			if src then
-				consider(src, label)
-			end
-		end
-
-		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
-			for _, baseUrl in ipairs(rayfieldBackendUrls()) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?rayfield=" .. tostring(need) .. "&t=" .. tostring(tick()), RAYFIELD_MIN_BYTES)
-				if type(src) == "string" then
-					consider(src, "backend:" .. baseUrl)
-				end
-			end
-			for _, baseUrl in ipairs(RAYFIELD_RAW_URLS) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?rayfield=" .. tostring(need) .. "&t=" .. tostring(tick()), RAYFIELD_MIN_BYTES)
-				if type(src) == "string" then
-					consider(src, "remote:" .. baseUrl)
-				end
-			end
-		end
-
-		if not bestSrc or bestVersion ~= requiredRayfieldVersion() then
-			return nil, "Rayfield source missing (need v" .. tostring(requiredRayfieldVersion()) .. ")"
-		end
-		return bestSrc, bestLabel
-	end
-
-	loadRayfield = function()
-		if type(ENV._AlleralRayfield) == "table" then
-			local version = ENV._AlleralRayfield.__AlleralPatch
-			local need = requiredRayfieldVersion()
-			if type(version) ~= "number" or version ~= need then
-				ENV._AlleralRayfield = nil
-				ENV._AlleralRayfieldSourceKey = nil
-			else
-				return ENV._AlleralRayfield
-			end
-		end
-
-		if type(ENV._AlleralMaclib) == "table" and ENV._AlleralMaclib.__RayfieldUi == true then
-			local version = ENV._AlleralMaclib.__AlleralPatch
-			if type(version) == "number" and version == requiredRayfieldVersion() then
-				ENV._AlleralRayfield = ENV._AlleralMaclib
-				return ENV._AlleralMaclib
-			end
-		end
-
-		local source, sourceLabel = readRayfieldSource()
-		if not source then
-			return nil, sourceLabel or "Rayfield source missing"
-		end
-
-		local sourceKey = tostring(#source) .. ":" .. source:sub(1, 64)
-		if ENV._AlleralRayfieldSourceKey == sourceKey and type(ENV._AlleralRayfield) == "table" then
+	local function bootRayfield()
+		if type(ENV._AlleralRayfield) == "table" and type(ENV._AlleralRayfield.CreateWindow) == "function" then
 			return ENV._AlleralRayfield
 		end
 
+		local src = fetchRayfieldSource()
+		if not src then return nil, "Rayfield source unavailable" end
+
 		local loadFn = Core.execFunction and Core.execFunction("loadstring") or loadstring or load
-		if type(loadFn) ~= "function" then
-			return nil, "loadstring unavailable"
+		if type(loadFn) ~= "function" then return nil, "loadstring unavailable" end
+
+		local chunk, err = loadFn(src, "@Rayfield/source")
+		if not chunk then return nil, "Rayfield compile: " .. tostring(err) end
+
+		local ok, pkg = pcall(chunk)
+		if not ok or type(pkg) ~= "table" or type(pkg.CreateWindow) ~= "function" then
+			return nil, tostring(pkg or "Rayfield runtime failed")
 		end
 
-		local chunk, err = loadFn(source, "@Rayfield/source")
-		if not chunk then
-			return nil, tostring(err or "Rayfield compile failed")
-		end
-
-		local ok, MacLib = pcall(chunk)
-		if not ok or type(MacLib) ~= "table" or type(MacLib.Window) ~= "function" then
-			return nil, tostring(MacLib or "Rayfield runtime failed")
-		end
-
-		local patch = MacLib.__AlleralPatch
-		local need = requiredRayfieldVersion()
-		if type(patch) ~= "number" or patch ~= need or MacLib.__RayfieldUi ~= true then
-			return nil, "Rayfield version outdated (have v" .. tostring(patch or "?") .. ", need v" .. tostring(need) .. ")"
-		end
-
-		ENV._AlleralRayfieldSourceKey = sourceKey
-		ENV._AlleralRayfield = MacLib
-		ENV._AlleralRayfieldSource = source
-		ENV._AlleralRayfieldSourceLabel = sourceLabel
-		ENV._AlleralMaclib = MacLib
-		ENV._AlleralMaclibSource = source
-		ENV._AlleralMaclibSourceLabel = sourceLabel
-		if type(Core.say) == "function" then
-			Core.say(
-				"Rayfield v"
-					.. tostring(MacLib.__AlleralPatch or "?")
-					.. " ("
-					.. tostring(MacLib.__AlleralVersion or "2.0.4")
-					.. ") from "
-					.. tostring(sourceLabel or "unknown")
-			)
-		end
-		return MacLib
+		ENV._AlleralRayfield = pkg
+		return pkg
 	end
 
-	local function loadUiEngine()
-		local raylib, raylibErr = loadRayfield()
-		if raylib then
-			Core.UI_LIBRARY = "Rayfield"
-			local RayfieldSource = ENV._AlleralRayfieldSource
-			local RayfieldSourceLabel = ENV._AlleralRayfieldSourceLabel
-			local onyx, onyxErr = loadOnyx()
-			if onyx then
-				ENV._AlleralOnyxResource = onyx
-				ENV._AlleralUiResources = {
-					rayfield = rayfield,
-					Onyx = onyx,
-					Fusion = onyx.__FusionStack == true,
-					Spring = type(onyx.GetSpringMotion) == "function" and onyx:GetSpringMotion() or true,
-				}
-				ENV._AlleralMaclib = rayfield
-				ENV._AlleralMaclibSource = RayfieldSource
-				ENV._AlleralMaclibSourceLabel = RayfieldSourceLabel
-			elseif type(Core.logWarn) == "function" then
-				Core.logWarn("Onyx resource layer unavailable: " .. tostring(onyxErr))
-			end
-			return raylib
-		end
-
-		if false and type(Core.logWarn) == "function" then
-			Core.logWarn("Using Rayfield UI engine.")
-		end
-		return nil, raylibErr or "Rayfield UI engine missing"
-	end
-
-	local function wrapLibrary(MacLib)
-		local activeWindow = nil
-		local notificationsEnabled = true
-
+	local function createLibrary()
 		local Library = {
-			Maclib = MacLib,
-			Window = nil,
 			Version = Core.ALLERAL_UI_VERSION,
 			ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION,
 			_pendingNotifies = {},
-			CommandPalette = {
-				register = function() end,
-				toggle = function() end,
-			},
 		}
 
-		local function flushPendingNotifies()
-			while #Library._pendingNotifies > 0 do
-				local payload = table.remove(Library._pendingNotifies, 1)
-				if activeWindow and type(activeWindow.Notify) == "function" then
-					pcall(activeWindow.Notify, activeWindow, payload)
-				end
-			end
-		end
-
-		local function pushNotification(info)
-			info = type(info) == "table" and info or { Description = tostring(info) }
-			local payload = {
-				Title = info.Title or "Alleral",
-				Description = info.Description or info.Content or info.Text or "",
-				Lifetime = info.Lifetime or info.Duration or info.Time or 4,
-			}
-			if not notificationsEnabled then
-				return
-			end
-			if activeWindow and type(activeWindow.Notify) == "function" then
-				pcall(activeWindow.Notify, activeWindow, payload)
-				return
-			end
-			table.insert(Library._pendingNotifies, payload)
-		end
-
-		function Library:GetAlleralVersion()
-			return Core.ALLERAL_UI_VERSION
-		end
-
-		function Library:GetArrrelVersion()
-			return Core.ALLERAL_UI_VERSION
-		end
-
-		function Library:EnsureGuiRoot()
-			return true
-		end
+		function Library:GetAlleralVersion() return Core.ALLERAL_UI_VERSION end
+		function Library:GetArrrelVersion() return Core.ALLERAL_UI_VERSION end
+		function Library:EnsureGuiRoot() return true end
 
 		function Library:Notification(info)
-			pushNotification(info)
-		end
-
-		function Library:Notify(info)
-			pushNotification(info)
-		end
-
-		function Library:ClearNotifications()
-			Library._pendingNotifies = {}
-			return 0
-		end
-
-		function Library:SetNotificationLower(_enabled)
-			return true
-		end
-
-		function Library:RepairWindow(window)
-			window = window or activeWindow or Library.Window
-			if window and type(window.SetState) == "function" then
-				pcall(window.SetState, window, true)
-			end
-			return true
-		end
-
-		local function forwardMac(method)
-			return function(self, ...)
-				if MacLib and type(MacLib[method]) == "function" then
-					local ok, result = pcall(MacLib[method], MacLib, ...)
-					if ok then
-						return result
-					end
-				end
-				return true
+			info = type(info) == "table" and info or { Description = tostring(info) }
+			local rf = ENV._AlleralRayfield
+			if rf and type(rf.Notify) == "function" then
+				pcall(rf.Notify, rf, {
+					Title = info.Title or "Alleral",
+					Content = info.Description or info.Content or info.Text or "",
+					Duration = info.Lifetime or info.Duration or info.Time or 4,
+				})
 			end
 		end
 
-		Library.SetSpringMotion = forwardMac("SetSpringMotion")
-		Library.SetReducedMotion = forwardMac("SetReducedMotion")
-		Library.SetStartupEffect = forwardMac("SetStartupEffect")
-		Library.SetTouchFeedback = forwardMac("SetTouchFeedback")
-		Library.SetAmbientGlow = forwardMac("SetAmbientGlow")
-		Library.SetTabAurora = forwardMac("SetTabAurora")
-		Library.SetSectionLift = forwardMac("SetSectionLift")
-		Library.SetStrokeGlow = forwardMac("SetStrokeGlow")
-		Library.SetStrokeGlowIntensity = forwardMac("SetStrokeGlowIntensity")
-		Library.SetDropdownAnimations = forwardMac("SetDropdownAnimations")
-		Library.SetSliderAnimations = forwardMac("SetSliderAnimations")
-		Library.SetToggleAnimations = forwardMac("SetToggleAnimations")
-		Library.SetButtonHoverEffects = forwardMac("SetButtonHoverEffects")
-		Library.SetButtonClickEffects = forwardMac("SetButtonClickEffects")
-		Library.SetTabSwitchAnimation = forwardMac("SetTabSwitchAnimation")
-		Library.SetNotificationAnimations = forwardMac("SetNotificationAnimations")
-		Library.SetNotificationStyle = forwardMac("SetNotificationStyle")
-		Library.SetNotificationCompact = forwardMac("SetNotificationCompact")
-		Library.FlashAccent = forwardMac("FlashAccent")
-		Library.SetAutoResize = forwardMac("SetAutoResize")
-		Library.SetUiScale = forwardMac("SetUiScale")
-		Library.ApplyProfile = forwardMac("ApplyProfile")
-		Library.RegisterLayoutRefresh = forwardMac("RegisterLayoutRefresh")
-
-		function Library:GetAutoResize()
-			if MacLib and type(MacLib.GetAutoResize) == "function" then
-				return MacLib:GetAutoResize()
-			end
-			return ENV.Alleral_UiAutoResize ~= false
-		end
-
-		function Library:GetUiScale()
-			if MacLib and type(MacLib.GetUiScale) == "function" then
-				return MacLib:GetUiScale()
-			end
-			return tonumber(ENV.Alleral_UiScale) or 1
-		end
-
-		function Library:ListProfiles()
-			if MacLib and type(MacLib.ListProfiles) == "function" then
-				local ok, list = pcall(MacLib.ListProfiles, MacLib)
-				if ok and type(list) == "table" then
-					return list
-				end
-			end
-			return { "auto", "desktop", "mobile", "compact", "performance" }
-		end
-
-		function Library:GetLayoutInfo()
-			if MacLib and type(MacLib.GetLayoutInfo) == "function" then
-				local ok, info = pcall(MacLib.GetLayoutInfo, MacLib)
-				if ok then
-					return info
-				end
-			end
-			return nil
-		end
-
-		function Library:GetSpringMotion()
-			if MacLib and type(MacLib.GetEffect) == "function" then
-				return MacLib:GetEffect("springMotion") ~= false
-			end
-			return true
-		end
-
-		function Library:GetNotificationStyle()
-			if MacLib and type(MacLib.GetNotificationStyle) == "function" then
-				return MacLib:GetNotificationStyle()
-			end
-			return ENV.Alleral_NotificationStyle or "glass"
-		end
-
-		function Library:SetNotifyDedupe(_enabled)
-			return true
-		end
-
-		function Library:SetHaptics(_enabled)
-			return true
-		end
-
-		function Library:SetMotionProfile(_name)
-			return true
-		end
-
-		function Library:GetMotionProfile()
-			return "fluid"
-		end
-
-		function Library:ListMotionProfiles()
-			return { "fluid" }
-		end
-
-		function Library:GetGlassIntensity()
-			return 0.55
-		end
-
-		function Library:SetGlassIntensity(_value)
-			return true
-		end
-
-		function Library:SetChromeDepth(_value)
-			return true
-		end
-
-		function Library:GetTooltipStyle()
-			return "rich"
-		end
-
-		function Library:SetTooltipStyle(_style)
-			return true
-		end
-
-		function Library:ApplyAccentPreset(_name)
-			return true
-		end
-
-		function Library:ListThemeNames()
-			return { "Onyx", "Rayfield", "Default" }
-		end
-
-		function Library:SetTheme(_name)
-			return true
-		end
-
-		function Library:CycleTheme(_step)
-			return { Name = "Onyx" }
-		end
+		function Library:Notify(info) Library:Notification(info) end
+		function Library:ClearNotifications() return 0 end
+		function Library:SetNotificationLower() return true end
+		function Library:SetNotifyDedupe() return true end
+		function Library:SetHaptics() return true
+		function Library:ApplyAccentPreset() return true
+		function Library:SetTheme() return true
+		function Library:CycleTheme() return { Name = "Default" } end
+		function Library:ListThemeNames() return { "Default", "Ocean", "AmberGlow", "Light", "Amethyst", "Green", "Bloom", "DarkBlue", "Serenity" } end
+		function Library:GetAutoResize() return true end
+		function Library:GetUiScale() return tonumber(ENV.Alleral_UiScale) or 1 end
+		function Library:SetAutoResize() return true end
+		function Library:SetUiScale() return true end
+		function Library:ListProfiles() return { "auto", "desktop", "mobile", "compact" } end
+		function Library:ApplyProfile() return true end
+		function Library:GetLayoutInfo() return { profile = "rayfield", engine = "Rayfield", version = Core.ALLERAL_UI_VERSION } end
+		function Library:RepairWindow() return true end
+		function Library:SetMotionProfile() return true end
+		function Library:GetMotionProfile() return "fluid" end
+		function Library:ListMotionProfiles() return { "fluid" } end
+		function Library:GetGlassIntensity() return 0.55 end
+		function Library:SetGlassIntensity() return true end
+		function Library:GetTooltipStyle() return "rich" end
+		function Library:SetTooltipStyle() return true end
+		function Library:SetSpringMotion() return true end
+		function Library:SetReducedMotion() return true end
+		function Library:SetTouchFeedback() return true end
+		function Library:SetStartupEffect() return true end
+		function Library:SetNotificationAnimations() return true end
+		function Library:SetNotificationStyle() return true end
+		function Library:SetNotificationCompact() return true end
+		function Library:GetNotificationStyle() return "glass" end
+		function Library:GetSpringMotion() return true end
+		function Library:RegisterLayoutRefresh() return true end
 
 		function Library:CreateWindow(settings)
 			settings = type(settings) == "table" and settings or {}
-			local menuKey = settings.Keybind or ENV.Alleral_UiKeybind or Enum.KeyCode.RightControl
-			ENV.Alleral_UiKeybind = menuKey
-
-			local folder = settings.Folder
-			if not folder and type(settings.FileSettings) == "table" then
-				folder = settings.FileSettings.RootFolder or settings.FileSettings.ConfigFolder
-			end
-			if type(folder) == "string" and folder ~= "" then
-				pcall(MacLib.SetFolder, MacLib, folder)
-			else
-				pcall(MacLib.SetFolder, MacLib, "Alleral_Configs")
-			end
-
-			local macWindow = MacLib:Window({
-				Title = settings.Title or settings.Name or "Alleral",
-				Subtitle = settings.Subtitle or settings.SubName or settings.Author or "",
-				Size = settings.Size or UDim2.fromOffset(920, 680),
-				Keybind = menuKey,
-				AcrylicBlur = settings.AcrylicBlur == true,
-				ShowUserInfo = true,
-			})
-
-			if not macWindow then
+			local rf, err = bootRayfield()
+			if not rf then
+				Core.logWarn("Rayfield boot failed: " .. tostring(err))
 				return nil
 			end
 
-			local tabGroup = macWindow:TabGroup()
-			macWindow._macTabGroup = tabGroup
-			macWindow._alleralTabGroup = tabGroup
+			local folder = settings.Folder
+				or (type(settings.FileSettings) == "table" and (settings.FileSettings.RootFolder or settings.FileSettings.ConfigFolder))
+				or "Alleral_Configs"
 
-			activeWindow = macWindow
-			Library.Window = macWindow
-			if type(Library.ApplyProfile) == "function" then
-				pcall(Library.ApplyProfile, Library, ENV.Alleral_UiProfile or "auto")
+			local ok, rfWindow = pcall(function()
+				return rf:CreateWindow({
+					Name = settings.Title or settings.Name or "Alleral",
+					Subtitle = settings.Subtitle or settings.Author or "",
+					LoadingTitle = "Alleral",
+					LoadingSubtitle = "Loading...",
+					ConfigurationSaving = {
+						Enabled = true,
+						FolderName = folder,
+					},
+					Discord = { Enabled = false },
+					KeySystem = false,
+				})
+			end)
+
+			if not ok or not rfWindow then
+				Core.logWarn("Rayfield window creation failed: " .. tostring(rfWindow))
+				return nil
 			end
-			if ENV.Alleral_UiAutoResize ~= false and type(Library.SetAutoResize) == "function" then
-				pcall(Library.SetAutoResize, Library, true)
+
+			local window = {
+				_rfWindow = rfWindow,
+				_library = Library,
+				_initialized = false,
+				_rfTabs = {},
+				_alleralSettings = settings,
+				Windows = {},
+			}
+
+			function window:AddTab(name, icon)
+				local rfTab = rfWindow:CreateTab({ Name = name, Icon = icon or "" })
+				table.insert(window._rfTabs, rfTab)
+				return rfTab, window
 			end
-			flushPendingNotifies()
-			return macWindow
+
+			function window:Notify(payload)
+				payload = type(payload) == "table" and payload or {}
+				if rf and type(rf.Notify) == "function" then
+					rf:Notify({
+						Title = payload.Title or "Alleral",
+						Content = payload.Description or payload.Content or "",
+						Duration = payload.Lifetime or payload.Duration or 4,
+					})
+				end
+			end
+
+			function window:SetState(state)
+				if rfWindow.SetState then pcall(rfWindow.SetState, rfWindow, state) end
+			end
+
+			function window:GetState()
+				return true
+			end
+
+			function window:Unload()
+				if rfWindow.Destroy then pcall(rfWindow.Destroy, rfWindow) end
+			end
+
+			window._alleralTabGroup = window
+			window._macTabGroup = window
+
+			ENV.Alleral_UiWindow = window
+			return window
 		end
 
 		return Library
 	end
 
-	local function uiOk(bundle)
-		return type(bundle) == "table"
-			and type(bundle.Library) == "table"
-			and type(bundle.CreateWindow) == "function"
-	end
-
-	local function cacheUi(bundle)
-		ENV.Alleral_UI = bundle
-		if getgenv then
-			getgenv().Alleral_UI = bundle
-		end
-		return bundle
-	end
-
 	function Core.loadUi()
 		local cached = ENV.Alleral_UI
-		if uiOk(cached) then
-			return cacheUi(cached)
-		end
-		if cached then
-			ENV.Alleral_UI = nil
+		if type(cached) == "table" and type(cached.Library) == "table" and type(cached.CreateWindow) == "function" then
+			return cached
 		end
 
-		local MacLib, err = loadUiEngine()
-		if not MacLib then
-			Core.logWarn("Alleral UI load failed: " .. tostring(err or "UI missing"))
-			return nil, err or "UI missing"
-		end
-		if type(MacLib.ApplyEffectsFromEnv) == "function" then
-			pcall(MacLib.ApplyEffectsFromEnv, MacLib, ENV)
-		end
-
-		local Library = wrapLibrary(MacLib)
+		local Library = createLibrary()
 		ENV._AlleralUiLibrary = Library
-		Core.clearUiStateBindings()
 
 		local bundle = {
 			Library = Library,
 			Alleral = Library,
-			Maclib = MacLib,
-			CreateWindow = function(_, settings)
-				return Library:CreateWindow(settings)
-			end,
-			Notify = function(_, info)
-				Library:Notification(info)
-			end,
+			CreateWindow = function(_, s) return Library:CreateWindow(s) end,
+			Notify = function(_, i) Library:Notification(i) end,
 		}
-		Core.say("Alleral UI " .. tostring(Library:GetAlleralVersion()) .. " (" .. tostring(Core.UI_LIBRARY) .. ")")
-		return cacheUi(bundle)
+
+		ENV.Alleral_UI = bundle
+		if getgenv then getgenv().Alleral_UI = bundle end
+
+	if type(Core.say) == "function" then Core.say("Alleral UI " .. tostring(Library:GetAlleralVersion()) .. " (Rayfield native)") end
+	return bundle
 	end
 
 	function Core.preloadUi()
 		return Core.loadUi()
 	end
 
-	Core.releaseAlleralRuntime = function()
-		ENV._AlleralUiLibrary = nil
-		ENV._AlleralOnyx = nil
-		ENV._AlleralOnyxSourceKey = nil
-		ENV._AlleralOnyxSource = nil
-		ENV._AlleralRayfield = nil
-		ENV._AlleralRayfieldOverlay = nil
-		ENV._AlleralRayfieldSourceKey = nil
-		ENV._AlleralMaclib = nil
-		ENV._AlleralMaclibSourceKey = nil
-	end
-
 	function Core.uiLibrary(bundle)
-		if type(bundle) ~= "table" then
-			return nil
-		end
-		return bundle.Alleral or bundle.Library or bundle.Maclib
+		if type(bundle) ~= "table" then return nil end
+		return bundle.Alleral or bundle.Library
 	end
 
 	function Core.createWindUiGroupbox(section, _uiBundle)
-		section = section or {}
+		section = type(section) == "table" and section or {}
 		local serial = 0
 
 		local function nextFlag(name, explicit)
-			serial += 1
-			return explicit or Core.uiElementId(name) .. "_" .. serial
+			serial = serial + 1
+			return explicit or (Core.uiElementId and Core.uiElementId(name) or name) .. "_" .. serial
 		end
 
 		local function wrapElement(applySet, meta)
@@ -881,271 +262,257 @@ local function loadOnyx()
 					end
 				end,
 			}
-			if meta.bindKey then
+			if meta.bindKey and Core.bindUiState then
 				Core.bindUiState(meta.bindKey, wrapper, meta.kind or "toggle", meta.raw)
 			end
 			return wrapper
-		end
-
-		local function dropdownDefault(values, current, multi)
-			values = values or {}
-			if multi then
-				local selected = Core.normalizeMultiSelection(current)
-				if #selected > 0 then
-					return selected
-				end
-				return {}
-			end
-			if type(current) == "table" then
-				return Core.normalizeDropdownValue(current, values[1])
-			end
-			if current and current ~= "" then
-				return tostring(current)
-			end
-			return values[1]
 		end
 
 		local groupbox = {}
 
 		function groupbox:CreateToggle(settings, id)
 			local flag = nextFlag(settings.Name, id)
-			local handle = section:Toggle({
+			local element = section.CreateToggle and section:CreateToggle({
 				Name = settings.Name,
-				Default = settings.CurrentValue == true,
+				CurrentValue = settings.CurrentValue == true,
 				Callback = settings.Callback or function() end,
-			}, flag)
-			return wrapElement(function(nextSettings)
-				if nextSettings.CurrentValue == nil or not handle then
-					return
-				end
-				if type(handle.UpdateState) == "function" then
-					pcall(handle.UpdateState, handle, nextSettings.CurrentValue == true)
-				end
-			end, {
-				raw = handle,
-				bindKey = settings.BindKey or settings.StateKey,
-				kind = "toggle",
+				Flag = flag,
 			})
+			return wrapElement(function(next)
+				if element and element.Set and next.CurrentValue ~= nil then
+					pcall(element.Set, element, next.CurrentValue == true)
+				end
+			end, { raw = element, bindKey = settings.BindKey or settings.StateKey, kind = "toggle" })
 		end
 
 		function groupbox:CreateSlider(settings, id)
 			local range = settings.Range or { 0, 100 }
-			local minValue, maxValue = range[1], range[2]
 			local flag = nextFlag(settings.Name, id)
-			local handle = section:Slider({
+			local element = section.CreateSlider and section:CreateSlider({
 				Name = settings.Name,
-				Default = tonumber(settings.CurrentValue) or minValue,
-				Minimum = minValue,
-				Maximum = maxValue,
-				Precision = Core.sliderDisplayPrecision(minValue, maxValue, settings.Increment),
+				Min = range[1], Max = range[2],
+				Default = tonumber(settings.CurrentValue) or range[1],
+				Increment = tonumber(settings.Increment) or 1,
 				Callback = settings.Callback or function() end,
-			}, flag)
-			return wrapElement(function(nextSettings)
-				if nextSettings.CurrentValue == nil or not handle then
-					return
-				end
-				if type(handle.UpdateValue) == "function" then
-					pcall(handle.UpdateValue, handle, tonumber(nextSettings.CurrentValue))
-				end
-			end, {
-				raw = handle,
-				bindKey = settings.BindKey or settings.StateKey,
-				kind = "slider",
+				Flag = flag,
 			})
+			return wrapElement(function(next)
+				if element and element.Set and next.CurrentValue ~= nil then
+					pcall(element.Set, element, tonumber(next.CurrentValue))
+				end
+			end, { raw = element, bindKey = settings.BindKey or settings.StateKey, kind = "slider" })
 		end
 
 		function groupbox:CreateButton(settings, id)
-			local userCallback = settings.Callback or function() end
-			local handle = section:Button({
+			local element = section.CreateButton and section:CreateButton({
 				Name = settings.Name,
-				Callback = function()
-					userCallback()
-				end,
+				Callback = settings.Callback or function() end,
 			})
-			return wrapElement(function(nextSettings)
-				if type(nextSettings) == "table" and nextSettings.Callback then
-					userCallback = nextSettings.Callback
-				end
-			end, {
-				raw = handle,
-				kind = "button",
-			})
+			return wrapElement(function() end, { raw = element, kind = "button" })
 		end
 
 		function groupbox:CreateInput(settings, id)
 			local flag = nextFlag(settings.Name, id)
-			local handle = section:Input({
+			local element = section.CreateInput and section:CreateInput({
 				Name = settings.Name,
-				Placeholder = settings.PlaceholderText or settings.Placeholder or "",
+				PlaceholderText = settings.PlaceholderText or settings.Placeholder or "",
+				CurrentValue = settings.CurrentValue or settings.Default or "",
 				Callback = settings.Callback or function() end,
-				onChanged = settings.onChanged,
-			}, flag)
-			if settings.CurrentValue and type(handle.UpdateText) == "function" then
-				pcall(handle.UpdateText, handle, tostring(settings.CurrentValue))
-			end
-			return wrapElement(function(nextSettings)
-				if nextSettings.CurrentValue == nil or not handle then
-					return
-				end
-				if type(handle.UpdateText) == "function" then
-					pcall(handle.UpdateText, handle, tostring(nextSettings.CurrentValue))
-				end
-			end, {
-				raw = handle,
-				bindKey = settings.BindKey or settings.StateKey,
-				kind = "input",
+				Flag = flag,
 			})
+			return wrapElement(function(next)
+				if element and element.Set and next.CurrentValue ~= nil then
+					pcall(element.Set, element, tostring(next.CurrentValue))
+				end
+			end, { raw = element, bindKey = settings.BindKey or settings.StateKey, kind = "input" })
 		end
 
 		function groupbox:CreateDropdown(settings, id)
 			local values = settings.Options or settings.Values or {}
 			local multi = settings.MultipleOptions == true or settings.Multi == true
-			local current = dropdownDefault(values, settings.CurrentOption, multi)
+			local current = settings.CurrentOption or (multi and {} or (values[1] or ""))
 			local flag = nextFlag(settings.Name, id)
-			local default = current
-			if multi and type(current) == "table" then
-				default = current
-			elseif type(current) == "string" then
-				default = current
-			else
-				default = 1
-			end
-			local handle = section:Dropdown({
+			local element = section.CreateDropdown and section:CreateDropdown({
 				Name = settings.Name,
 				Options = values,
-				Multi = multi,
-				Default = default,
-				Search = settings.Search == true,
+				CurrentOption = multi and (current[1] or values[1] or "") or (current or values[1] or ""),
+				MultipleOptions = multi,
 				Callback = function(selection)
-					local userCallback = settings.Callback or function() end
+					local cb = settings.Callback or function() end
 					if multi then
-						userCallback(Core.normalizeMultiSelection(selection))
+						cb(Core.normalizeMultiSelection and Core.normalizeMultiSelection(selection) or selection)
 					else
-						userCallback(Core.normalizeDropdownValue(selection, values[1]))
+						cb(Core.normalizeDropdownValue and Core.normalizeDropdownValue(selection, values[1]) or selection)
 					end
 				end,
-			}, flag)
-			return wrapElement(function(nextSettings)
-				if not handle then
-					return
-				end
-				local nextValues = nextSettings.Options or nextSettings.Values
-				local pick = nextSettings.CurrentOption or nextSettings.CurrentOptions
-				if type(nextValues) == "table" and type(handle.InsertOptions) == "function" then
-					pcall(handle.ClearOptions, handle)
-					pcall(handle.InsertOptions, handle, nextValues)
-				end
-				if pick ~= nil and type(handle.UpdateSelection) == "function" then
-					pcall(handle.UpdateSelection, handle, pick)
-				end
-			end, {
-				raw = handle,
-				bindKey = settings.BindKey or settings.StateKey,
-				kind = "dropdown",
+				Flag = flag,
 			})
+			return wrapElement(function(next)
+				if not element then return end
+				local nextValues = next.Options or next.Values
+				local pick = next.CurrentOption or next.CurrentOptions
+				if type(nextValues) == "table" and element.Set then
+					pcall(element.Set, element, { Options = nextValues })
+				end
+				if pick ~= nil and element.Set then
+					pcall(element.Set, element, { CurrentOption = multi and pick[1] or tostring(pick) })
+				end
+			end, { raw = element, bindKey = settings.BindKey or settings.StateKey, kind = "dropdown" })
 		end
 
 		function groupbox:CreateLabel(settings, id)
 			local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
-			local handle = section:Label({ Text = text })
+			local element = section.CreateLabel and section:CreateLabel(text)
 			return {
 				Set = function(_, nextSettings)
-					local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text)
-						or tostring(nextSettings or "")
-					if handle and type(handle.UpdateName) == "function" then
-						pcall(handle.UpdateName, handle, nextText)
-					end
+					local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text) or tostring(nextSettings or "")
+					if element and element.Set then pcall(element.Set, element, nextText) end
 				end,
 				SetVisible = function(_, visible)
-					if handle and type(handle.SetVisibility) == "function" then
-						pcall(handle.SetVisibility, handle, visible == true)
-					end
+					if element and element.SetVisible then pcall(element.SetVisible, element, visible == true) end
 				end,
 			}
 		end
 
 		function groupbox:CreateStatus(label, fields)
-			local status = {
-				Labels = {},
-				LastValues = {},
-				Visible = true,
-			}
+			local status = { Labels = {}, LastValues = {}, Visible = true }
 			for key, value in pairs(fields or {}) do
 				status.LastValues[key] = tostring(value)
-				status.Labels[key] = groupbox:CreateLabel({
-					Name = tostring(key) .. ": " .. tostring(value),
-				}, nextFlag(label .. "_" .. tostring(key)))
+				status.Labels[key] = groupbox:CreateLabel({ Name = tostring(key) .. ": " .. tostring(value) }, nextFlag(label .. "_" .. tostring(key)))
 			end
 			status.Labels.Summary = groupbox:CreateLabel({ Name = "" }, nextFlag(label .. "_summary"))
 			function status:Update(key, value)
 				local rendered = tostring(value)
-				if self.LastValues[key] == rendered then
-					return
-				end
+				if self.LastValues[key] == rendered then return end
 				self.LastValues[key] = rendered
 				local row = self.Labels[key]
-				if row and row.Set then
-					row:Set({ Name = tostring(key) .. ": " .. rendered })
-				end
+				if row and row.Set then row:Set({ Name = tostring(key) .. ": " .. rendered }) end
 			end
 			function status:SetSummary(text)
 				local row = self.Labels.Summary
-				if row and row.Set then
-					row:Set({ Name = tostring(text or "") })
-				end
+				if row and row.Set then row:Set({ Name = tostring(text or "") }) end
 			end
-			function status:SetVisible(_visible)
-				self.Visible = _visible == true
-			end
+			function status:SetVisible(visible) self.Visible = visible == true end
 			return status
 		end
 
 		function groupbox:CreateDivider()
-			if type(section.Divider) == "function" then
-				pcall(section.Divider, section)
-			end
+			if section.CreateDivider then pcall(section.CreateDivider, section) end
 			return {}
 		end
 
 		return groupbox
 	end
 
+	Core.wrapUiGroup = function(groupbox, callbackWrapper)
+		local wrap = function(label, callback)
+			if type(callback) ~= "function" then return function() end end
+			if not callbackWrapper then return callback end
+			local guarded = function(...)
+				local ok, result = pcall(callback, ...)
+				if not ok and type(Core.pushErrorLog) == "function" then Core.pushErrorLog(label, result) end
+				return result
+			end
+			return function(...)
+				local ok, r1 = pcall(callbackWrapper, label, guarded, ...)
+				if ok then return r1 end
+				return callbackWrapper(guarded, ...)
+			end
+		end
+
+		local group = {}
+		function group:CreateToggle(name, default, tooltip, callback, bindKey)
+			return groupbox:CreateToggle({
+				Name = name, CurrentValue = default == true, Tooltip = tooltip,
+				Callback = wrap(name, callback), BindKey = bindKey,
+			}, bindKey)
+		end
+		function group:CreateSlider(name, min, max, default, callback, tooltip, increment, bindKey)
+			return groupbox:CreateSlider({
+				Name = name, Range = { min, max }, CurrentValue = default or min,
+				Tooltip = tooltip, Increment = increment,
+				Callback = wrap(name, callback), BindKey = bindKey,
+			}, bindKey)
+		end
+		function group:CreateButton(name, callback, tooltip)
+			return groupbox:CreateButton({ Name = name, Tooltip = tooltip, Callback = wrap(name, callback) })
+		end
+		function group:CreateInput(name, placeholder, arg3, arg4, arg5)
+			local icon, default, callback, tooltip = nil, "", nil, nil
+			if type(arg3) == "function" then callback, tooltip = arg3, arg4
+			elseif type(arg4) == "function" then icon, callback, tooltip = arg3, arg4, arg5
+			else
+				if type(arg3) == "string" or type(arg3) == "number" then default = arg3 end
+				if type(arg4) == "function" then callback = arg4 end
+				tooltip = arg5
+			end
+			return groupbox:CreateInput({
+				Name = name, Icon = icon, PlaceholderText = placeholder,
+				CurrentValue = default, Tooltip = tooltip,
+				Callback = wrap(name, callback),
+			})
+		end
+		function group:CreateDropdown(name, options, default, callback, tooltip, bindKey)
+			return groupbox:CreateDropdown({
+				Name = name, Options = options, CurrentOption = default,
+				Tooltip = tooltip, Callback = wrap(name, callback), BindKey = bindKey,
+			}, bindKey)
+		end
+		function group:AddDropdown(id, config)
+			config = type(config) == "table" and config or {}
+			return groupbox:CreateDropdown({
+				Name = config.Text or config.Name or id,
+				Options = config.Values or config.Options or {},
+				CurrentOption = config.Default or config.CurrentValue or config.CurrentOption,
+				MultipleOptions = config.Multi or config.MultiSelection,
+				Callback = config.Callback or function() end,
+			}, id)
+		end
+		function group:CreateLabel(text)
+			return groupbox:CreateLabel({ Name = text })
+		end
+		function group:CreateStatus(label, fields)
+			return groupbox:CreateStatus(label, fields or {})
+		end
+		function group:CreateDivider()
+			return groupbox:CreateDivider()
+		end
+		return group
+	end
+
 	function Core.wrapUiTab(rawTab, uiBundle, window)
 		local tab = {
 			_rawTab = rawTab,
-			_macTab = rawTab,
 			_ui = uiBundle,
 			_window = window,
 			_columnCount = 2,
+			_sectionIndex = 0,
 		}
-		table.insert(Core._UiTabRegistry, tab)
+		if type(Core._UiTabRegistry) == "table" then
+			table.insert(Core._UiTabRegistry, tab)
+		end
 
 		function tab:CreateGroupbox(settings)
 			settings = settings or {}
 			local name = settings.Name or "Group"
-			if not rawTab or type(rawTab.Section) ~= "function" then
-				Core.logWarn("CreateGroupbox skipped â€” tab missing for " .. tostring(name))
-				return Core.createStubUiGroup(name)
+			if not rawTab then
+			return type(Core.createStubUiGroup) == "function" and Core.createStubUiGroup(name) or {}
 			end
-			local col = tonumber(settings.Column) or 1
-			local side = col == 2 and "Right" or (col == 3 and "Center" or "Left")
-			local section = rawTab:Section({ Side = side })
-			if name ~= "" and type(section.Header) == "function" then
-				pcall(section.Header, section, { Name = name })
+			tab._sectionIndex = (tab._sectionIndex or 0) + 1
+			if rawTab.CreateSection then
+				pcall(rawTab.CreateSection, rawTab, name)
 			end
-			return Core.createWindUiGroupbox(section, uiBundle)
+			return Core.createWindUiGroupbox(rawTab, uiBundle)
+		end
+
+		function tab:Select()
+			if rawTab and rawTab.Select then pcall(rawTab.Select, rawTab) end
 		end
 
 		function tab:BuildThemeGroupbox(column)
 			local group = Core.buildUiGroup(tab, "Appearance", column or 1)
-			group:CreateLabel("Rayfield UI with Onyx resources, Fusion, and Spring is the active UI layer.")
+			group:CreateLabel("Rayfield native UI engine with Lucide icons and config saving.")
 			return group
-		end
-
-		function tab:Select()
-			if rawTab and type(rawTab.Select) == "function" then
-				pcall(rawTab.Select, rawTab)
-			end
 		end
 
 		return tab
@@ -1154,15 +521,11 @@ local function loadOnyx()
 	function Core.buildUiWindow(ui, settings)
 		settings = settings or {}
 		local lib = ui and ui.Library
-		if not lib or type(lib.CreateWindow) ~= "function" then
-			return nil
-		end
-		if not settings.Size then
-			settings.Size = UDim2.fromOffset(920, 680)
-		end
+		if not lib or type(lib.CreateWindow) ~= "function" then return nil end
+		if not settings.Size then settings.Size = UDim2.fromOffset(920, 680) end
 		local rawWindow = lib:CreateWindow(settings)
 		if not rawWindow then
-			Core.logWarn("MacLib window create failed")
+			Core.logWarn("Rayfield window creation failed")
 			return nil
 		end
 		local window = {
@@ -1170,11 +533,11 @@ local function loadOnyx()
 			_ui = ui,
 			_library = lib,
 			_initialized = false,
-			_tabGroup = rawWindow._macTabGroup or rawWindow._alleralTabGroup,
+			_tabGroup = rawWindow,
 			_alleralSettings = settings,
 		}
-		Core.registerUiWindow(window)
-		Core.flushPendingNotifications()
+		if type(Core.registerUiWindow) == "function" then Core.registerUiWindow(window) end
+		if type(Core.flushPendingNotifications) == "function" then Core.flushPendingNotifications() end
 		return window
 	end
 
@@ -1182,40 +545,28 @@ local function loadOnyx()
 		local resolve = Core.resolveUiWindow
 		local window = type(resolve) == "function" and resolve(section) or nil
 		if type(window) ~= "table" or not window._rawWindow then
-			Core.logWarn("buildUiTab skipped â€” window missing")
+			Core.logWarn("buildUiTab skipped -- window missing")
 			return Core.wrapUiTab(nil, type(section) == "table" and section._ui or nil, window)
 		end
-		local tabGroup = window._tabGroup
-		if not tabGroup or type(tabGroup.Tab) ~= "function" then
-			Core.logWarn("buildUiTab skipped â€” tab group missing")
+		local tabGroup = window._tabGroup or window
+		if not tabGroup or type(tabGroup.AddTab) ~= "function" then
+			Core.logWarn("buildUiTab skipped -- tab group missing")
 			return Core.wrapUiTab(nil, window._ui, window)
 		end
-		local rawTab = tabGroup:Tab({
-			Name = name,
-			Image = iconAsset(icon),
-		})
+		local rawTab, _ = tabGroup:AddTab(name, iconAsset(icon))
 		local wrapped = Core.wrapUiTab(rawTab, window._ui or (type(section) == "table" and section._ui) or nil, window)
 		wrapped._columnCount = math.max(1, tonumber(columns) or 2)
-		if not window._defaultTab then
-			window._defaultTab = rawTab
-		end
+		if not window._defaultTab then window._defaultTab = rawTab end
 		return wrapped
 	end
 
 	function Core.buildUiGroup(tab, name, column, callbackWrapper, icon, id)
 		name = tostring(name or "Group")
 		if type(tab) ~= "table" or type(tab.CreateGroupbox) ~= "function" then
-			return Core.createStubUiGroup(name)
+			return Core.createStubUiGroup and Core.createStubUiGroup(name) or {}
 		end
-		local groupbox = tab:CreateGroupbox({
-			Name = name,
-			Column = column or 1,
-			Icon = icon,
-		})
-		if callbackWrapper then
-			return Core.wrapUiGroup(groupbox, callbackWrapper)
-		end
-		return Core.wrapUiGroup(groupbox)
+		local groupbox = tab:CreateGroupbox({ Name = name, Column = column or 1, Icon = icon })
+		return Core.wrapUiGroup(groupbox, callbackWrapper)
 	end
 
 	function Core.finalizeGameUi(window, ui, options)
@@ -1225,47 +576,26 @@ local function loadOnyx()
 			task.defer(function()
 				pcall(function()
 					local rawWindow = window._rawWindow
-					if rawWindow and type(rawWindow.SetState) == "function" then
-						rawWindow:SetState(true)
-					end
+					if rawWindow and rawWindow.SetState then rawWindow:SetState(true) end
 					local defaultTab = window._defaultTab
-					if defaultTab and type(defaultTab.Select) == "function" then
-						defaultTab:Select()
-					end
-					if type(Core.refreshAllTabColumns) == "function" then
-						Core.refreshAllTabColumns()
-					end
+					if defaultTab and defaultTab.Select then defaultTab:Select() end
 				end)
 			end)
 		end
 		if type(Core.setupHubKeybinds) == "function" then
-			pcall(Core.setupHubKeybinds, {
-				window = window,
-				ui = ui or window._ui or ENV.Alleral_UI,
-				uiKey = ENV.Alleral_UiKeybind,
-			})
-		end
-		if type(Core.registerExploitCommandPalette) == "function" then
-			pcall(Core.registerExploitCommandPalette, window, ui)
+			pcall(Core.setupHubKeybinds, { window = window, ui = ui or window._ui or ENV.Alleral_UI, uiKey = ENV.Alleral_UiKeybind })
 		end
 		if options.notify ~= false then
-			Core.notifyBootReady({
-				Name = options.Name or "Alleral",
-				Subtitle = options.Subtitle,
-			})
+			Core.notifyBootReady({ Name = options.Name or "Alleral", Subtitle = options.Subtitle })
 		end
 		return window
 	end
 
 	function Core.repairUiWindow(window)
 		window = window or ENV.Alleral_UiWindow
-		if type(window) ~= "table" or not window._rawWindow then
-			return false
-		end
+		if type(window) ~= "table" or not window._rawWindow then return false end
 		local rawWindow = window._rawWindow
-		if type(rawWindow.SetState) == "function" then
-			pcall(rawWindow.SetState, rawWindow, true)
-		end
+		if rawWindow.SetState then pcall(rawWindow.SetState, rawWindow, true) end
 		return true
 	end
 
@@ -1275,8 +605,12 @@ local function loadOnyx()
 
 	Core.notifyWindUi = function(info)
 		local ui = ENV.Alleral_UI
-		if ui and type(ui.Notify) == "function" then
-			pcall(ui.Notify, ui, info)
-		end
+		if ui and type(ui.Notify) == "function" then pcall(ui.Notify, ui, info) end
+	end
+
+	Core.releaseAlleralRuntime = function()
+		ENV._AlleralUiLibrary = nil
+		ENV._AlleralRayfield = nil
+		ENV._AlleralRayfieldBundle = nil
 	end
 end

@@ -1,26 +1,7 @@
 return function(Core)
 	local HttpService = game:GetService("HttpService")
 	local StarterGui = game:GetService("StarterGui")
-	local function safeHex(hex, fallback)
-		fallback = fallback or Color3.fromRGB(83, 252, 24)
-		if Color3.fromHex then
-			local ok, color = pcall(Color3.fromHex, hex)
-			if ok and typeof(color) == "Color3" then
-				return color
-			end
-		end
-		local raw = tostring(hex or ""):gsub("#", "")
-		if #raw >= 6 then
-			return Color3.fromRGB(
-				tonumber(raw:sub(1, 2), 16) or 255,
-				tonumber(raw:sub(3, 4), 16) or 255,
-				tonumber(raw:sub(5, 6), 16) or 255
-			)
-		end
-		return fallback
-	end
-	local ALLERAL_ACCENT = safeHex("#53fc18")
-	local ALLERAL_ACCENT_ALT = safeHex("#30ff6a")
+
 	local function genv()
 		local ok, env = pcall(function()
 			return getgenv and getgenv() or getfenv()
@@ -29,2286 +10,305 @@ return function(Core)
 	end
 	local ENV = genv()
 
-	local function uiOk(bundle)
-		return type(bundle) == "table"
-			and type(bundle.Library) == "table"
-			and type(bundle.CreateWindow) == "function"
-	end
-
-	local function stampUi(bundle)
-		if type(bundle) ~= "table" then
-			return bundle
+	Core.httpGet = Core.httpGet or function(url)
+		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
+			return ENV.Alleral_HTTP.get(url)
 		end
-		bundle.InterfaceBuild = Core.UI_LIBRARY
-		bundle.UI_LIBRARY = Core.UI_LIBRARY
-		return bundle
+		return nil
 	end
 
-	local function cacheUi(bundle)
-		stampUi(bundle)
-		ENV.Alleral_UI = bundle
-		if getgenv then
-			local g = getgenv()
-			if type(g) == "table" then
-				g.Alleral_UI = bundle
+	local function signalBootFailure(msg)
+		ENV.Alleral_StartupFailed = msg
+	end
+
+	function Core.prepareGame(state)
+		state = state or ENV.Alleral_State
+		if not state then
+			local msg = "Alleral_State missing"
+			signalBootFailure(msg)
+			return nil, nil, msg
+		end
+		local security = ENV.Alleral_Security
+		if type(security) == "table" and type(security.enforce) == "function" then
+			local ok, reason = security.enforce({ stage = "prepareGame" })
+			if not ok then
+				local msg = tostring(reason or "Access denied")
+				signalBootFailure(msg)
+				return nil, nil, msg
 			end
 		end
-		return bundle
+		local core = Core.ensureCore and Core.ensureCore() or Core
+		if not core then
+			local msg = "Core not loaded"
+			signalBootFailure(msg)
+			return nil, nil, msg
+		end
+		for _, fnName in ipairs({ "buildUiWindow", "buildUiTab", "buildUiGroup", "wrapUiGroup", "createWindUiGroupbox" }) do
+			if type(core[fnName]) ~= "function" then
+				local msg = "Core outdated -- missing " .. fnName
+				signalBootFailure(msg)
+				return nil, nil, msg
+			end
+		end
+		state.HubRunning = true
+		if type(core.initAnalytics) == "function" then
+			core.initAnalytics()
+		end
+		if type(core.installErrorLogHook) == "function" then
+			core.installErrorLogHook()
+		end
+		if state.AntiAFK ~= false and type(core.setupAntiAfk) == "function" then
+			core.setupAntiAfk(game:GetService("Players").LocalPlayer)
+		end
+		local cachedUi = ENV.Alleral_UI
+		local uiLibrary = type(cachedUi) == "table" and type(cachedUi.Library) == "table" and cachedUi or nil
+		local err
+		if not uiLibrary then
+			uiLibrary, err = core.loadUi()
+		end
+		if not uiLibrary then
+			local msg = err or "UI unavailable"
+			signalBootFailure(msg)
+			return core, nil, msg
+		end
+		pcall(function()
+			if core.refreshLoaderCapabilities then
+				core.refreshLoaderCapabilities()
+			end
+			if core.fetchScriptManifest then
+				core.fetchScriptManifest(false)
+			end
+			if core.fetchWeaoExploits then
+				task.spawn(function()
+					core.fetchWeaoExploits(false)
+					if core.refreshLoaderCapabilities then
+						core.refreshLoaderCapabilities()
+					end
+				end)
+			end
+			if core.notifyExecutorCompat then
+				core.notifyExecutorCompat()
+			end
+		end)
+		if type(ENV._Alleral_EnsureTeleportWatch) == "function" then
+			pcall(ENV._Alleral_EnsureTeleportWatch)
+		end
+		return core, uiLibrary
 	end
 
-	local function applyAlleralTheme(bundle)
-		local lib = type(bundle) == "table" and (bundle.Library or bundle.Alleral)
-		if type(lib) == "table" and type(lib.SetTheme) == "function" then
-			pcall(function()
-				lib:SetTheme("Private")
-			end)
+	function Core.wireTeleportRelaunch(state)
+		state = state or ENV.Alleral_State
+		if state then
+			state.HubRunning = true
 		end
+		if type(ENV._Alleral_EnsureTeleportWatch) == "function" then
+			pcall(ENV._Alleral_EnsureTeleportWatch)
+		end
+	end
+
+	function Core.stopAutomation(state, connections, loopControllers, loops, onStop)
+		state.HubRunning = false
+		for name, controller in pairs(loopControllers or {}) do
+			if controller then
+				controller.enabled = false
+			end
+			loopControllers[name] = nil
+		end
+		for _, loopState in pairs(loops or {}) do
+			loopState.enabled = false
+		end
+		for key, connection in pairs(connections or {}) do
+			if connection and connection.Disconnect then
+				pcall(function() connection:Disconnect() end)
+			end
+			connections[key] = nil
+		end
+		if onStop then
+			pcall(onStop)
+		end
+		if type(Core.restorePerformanceSettings) == "function" then
+			pcall(Core.restorePerformanceSettings)
+		end
+	end
+
+	function Core.copyValue(value)
+		if type(value) ~= "table" then
+			return value
+		end
+		local output = {}
+		for key, item in pairs(value) do
+			output[key] = Core.copyValue(item)
+		end
+		return output
+	end
+
+	function Core.mergeDefaults(state, defaults)
+		for key, value in pairs(defaults or {}) do
+			if state[key] == nil then
+				state[key] = Core.copyValue(value)
+			end
+		end
+	end
+
+	function Core.buildSavedKeys(defaults, exclude)
+		exclude = exclude or { HubRunning = true }
+		local keys = {}
+		for key in pairs(defaults or {}) do
+			if not exclude[key] then
+				table.insert(keys, key)
+			end
+		end
+		table.sort(keys)
+		return keys
+	end
+
+	function Core.initSettings(state, defaults, filename, exclude)
+		if type(Core.mergePerformanceDefaults) == "function" then
+			Core.mergePerformanceDefaults(defaults)
+		end
+		Core.mergeDefaults(state, defaults)
+		local savedKeys = Core.buildSavedKeys(defaults, exclude)
+		if type(Core.loadSettings) == "function" then
+			Core.loadSettings(state, savedKeys, filename, defaults)
+		end
+		local function saveSettings()
+			if type(Core.saveSettings) == "function" then
+				return Core.saveSettings(state, savedKeys, filename)
+			end
+			return false
+		end
+		return saveSettings, savedKeys
+	end
+
+	function Core.gameUiSettings(options)
+		options = type(options) == "table" and options or {}
+		local fileSettings = type(options.FileSettings) == "table" and options.FileSettings or {}
+		return {
+			Name = options.Name or "Alleral",
+			Subtitle = options.Subtitle,
+			Icon = options.Icon or "sparkles",
+			FileSettings = {
+				RootFolder = fileSettings.RootFolder or "Alleral_Configs",
+				ConfigFolder = fileSettings.ConfigFolder or options.configFolder or "Interface",
+			},
+		}
+	end
+
+	function Core.settingsExtrasOptions(window, ui, state, savedKeys, saveFn, settingsFile, version, extra)
+		extra = type(extra) == "table" and extra or {}
+		return {
+			state = state,
+			savedKeys = savedKeys,
+			saveFn = saveFn,
+			settingsFile = settingsFile,
+			settingsPath = extra.settingsPath,
+			version = version,
+			window = window,
+			uiBundle = ui,
+			gameId = extra.gameId,
+			scriptId = extra.scriptId,
+			onApply = extra.onApply,
+			cloudOnlyTab = extra.cloudOnlyTab,
+			skipCloudConfig = extra.skipCloudConfig,
+			skipHubActions = extra.skipHubActions,
+			skipScriptStatus = extra.skipScriptStatus,
+		}
 	end
 
 	function Core.loadUi()
-		local cached = ENV.Alleral_UI
-		if uiOk(cached) then
-			return cacheUi(cached)
-		end
-		return nil, "Alleral UI layer missing — sync hub/alleral_ui.luau (MacLib integration)"
+		return nil, "Alleral UI layer not loaded -- apply hub/alleral_ui.luau"
 	end
 
 	function Core.preloadUi()
-		local cached = ENV.Alleral_UI
-		if uiOk(cached) then
-			return cacheUi(cached)
-		end
-		if ENV._AlleralUiPreloadRunning == true then
-			local started = tick()
-			while ENV._AlleralUiPreloadRunning == true and tick() - started < 15 do
-				task.wait()
-			end
-			cached = ENV.Alleral_UI
-			if uiOk(cached) then
-				return cacheUi(cached)
-			end
-		end
-		ENV._AlleralUiPreloadRunning = true
-		local bundle, err = Core.loadUi()
-		ENV._AlleralUiPreloadRunning = false
-		return bundle, err
+		return Core.loadUi()
 	end
 
-	function Core.httpGet(url)
-	if type(url) ~= "string" or url == "" then
-		return nil
-	end
-
-	local plain = url:gsub("%?.*$", "")
-	local urls = {
-		plain .. "?t=" .. tostring(tick()),
-		plain,
-		url,
-	}
-
-	local function accept(body)
-		if type(body) ~= "string" or body == "" then
-			return false
-		end
-		if #body <= 8192 and body:find("404: Not Found", 1, true) then
-			return false
-		end
-		if body:find("<!DOCTYPE html>", 1, true) or body:find("<html", 1, true) then
-			return body:find("function", 1, true) ~= nil or body:find("local ", 1, true) ~= nil
-		end
-		return true
-	end
-
-	local function extractBody(response)
-		if type(response) == "string" then
-			return response
-		end
-		if type(response) == "table" then
-			return response.Body or response.body or response.Data or response.data
-		end
-		return nil
-	end
-
-	local function tryRequest(fn, fetchUrl)
-		if type(fn) ~= "function" then
-			return nil
-		end
-		local ok, direct = pcall(fn, fetchUrl)
-		if ok and accept(direct) then
-			return direct
-		end
-		if ok and type(direct) == "table" then
-			local body = extractBody(direct)
-			if accept(body) then
-				return body
-			end
-		end
-		for _, spec in ipairs({
-			{
-				Url = fetchUrl,
-				Method = "GET",
-				Headers = { ["Cache-Control"] = "no-cache" },
-			},
-			{
-				url = fetchUrl,
-				method = "GET",
-				headers = { ["Cache-Control"] = "no-cache" },
-			},
-		}) do
-			local rok, response = pcall(fn, spec)
-			if rok then
-				local body = extractBody(response)
-				local status = type(response) == "table" and (response.StatusCode or response.status or response.Status or 200) or 200
-				if accept(body) and (status == 0 or (status >= 200 and status < 300)) then
-					return body
-				end
-			end
-		end
-		return nil
-	end
-
-	local function fetchOnce(fetchUrl)
-		if type(game.HttpGet) == "function" then
-			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
-			if ok and accept(body) then
-				return body
-			end
-			ok, body = pcall(game.HttpGet, game, fetchUrl)
-			if ok and accept(body) then
-				return body
-			end
-		end
-		local ok, body = pcall(function()
-			return game:HttpGet(fetchUrl, true)
-		end)
-		if ok and accept(body) then
-			return body
-		end
-		ok, body = pcall(function()
-			return game:HttpGet(fetchUrl)
-		end)
-		if ok and accept(body) then
-			return body
-		end
-		if type(HttpService.GetAsync) == "function" then
-			ok, body = pcall(function()
-				return HttpService:GetAsync(fetchUrl, true)
-			end)
-			if ok and accept(body) then
-				return body
-			end
-		end
-		return tryRequest(Core.requestFunction(), fetchUrl)
-	end
-
-	for _, fetchUrl in ipairs(urls) do
-		local body = fetchOnce(fetchUrl)
-		if body then
-			return body
-		end
-	end
-
-	return nil
-end
-
-function Core.httpGetJson(url)
-	local body = Core.httpGet(url)
-	if not body then
-		return nil, "HTTP unavailable"
-	end
-	local ok, decoded = pcall(function()
-		return HttpService:JSONDecode(body)
-	end)
-	if not ok or type(decoded) ~= "table" then
-		return nil, "Invalid JSON response"
-	end
-	return decoded
-end
-
-function Core.httpPostJson(url, payload, headers)
-	local sender = Core.requestFunction()
-	if not sender then
-		return nil, "HTTP unavailable"
-	end
-	local encoded = HttpService:JSONEncode(payload or {})
-	local ok, response = pcall(function()
-		return sender({
-			Url = url,
-			Method = "POST",
-			Headers = headers or { ["Content-Type"] = "application/json" },
-			Body = encoded,
-		})
-	end)
-	if not ok then
-		return nil, tostring(response)
-	end
-	local body = type(response) == "table" and (response.Body or response.body) or (type(response) == "string" and response)
-	if type(body) == "string" and body ~= "" then
-		local decodedOk, decoded = pcall(function()
-			return HttpService:JSONDecode(body)
-		end)
-		if decodedOk and type(decoded) == "table" then
-			return decoded
-		end
-	end
-	local code = type(response) == "table" and (response.StatusCode or response.Status or response.status_code) or nil
-	if type(code) == "number" and (code < 200 or code >= 300) then
-		return nil, "HTTP " .. tostring(code)
-	end
-	return { ok = true }, nil
-end
-
-function Core.resolveRelayBase()
-	local telemetry = ENV.Alleral_Telemetry
-	if type(telemetry) == "table" then
-		local cfg
-		if type(telemetry.GetConfig) == "function" then
-			local ok, resolved = pcall(function()
-				return telemetry:GetConfig()
-			end)
-			if ok then
-				cfg = resolved
-			end
-		end
-		cfg = cfg or telemetry._config
-		if type(cfg) == "table" and cfg.relayUrl and cfg.relayUrl ~= "" then
-			local base = tostring(cfg.relayUrl):gsub("/+$", ""):gsub("/ingest$", "")
-			return base
-		end
-	end
-	if ENV.Alleral_RelayUrl and tostring(ENV.Alleral_RelayUrl) ~= "" then
-		return tostring(ENV.Alleral_RelayUrl):gsub("/+$", ""):gsub("/ingest$", "")
-	end
-	return "https://alleral-telemetry-production.up.railway.app"
-end
-
-function Core.uiLibrary(bundle)
-	if type(bundle) ~= "table" then
-		return nil
-	end
-	return bundle.Alleral or bundle.Library or bundle.WindUI
-end
-
-function Core.setClipboard(text)
-	local clip = Core.execFunction("setclipboard") or Core.execFunction("toclipboard")
-	if clip then
-		pcall(clip, tostring(text or ""))
-		return true
-	end
-	return false
-end
-
-function Core.windUiIcon(icon)
-	if type(icon) == "number" then
-		return "rbxassetid://" .. tostring(icon)
-	end
-	local numeric = Core.uiIcon(icon)
-	if numeric ~= "" then
-		return "rbxassetid://" .. numeric
-	end
-	if type(icon) == "string" and icon ~= "" and not icon:find("rbxassetid", 1, true) then
-		return icon
-	end
-	return "circle"
-end
-
-local function windUiVisibilityTarget(label)
-	if type(label) ~= "table" then
-		return nil
-	end
-	local frame = label.ParagraphFrame or label
-	if type(frame.UIElements) == "table" and frame.UIElements.Main then
-		return frame.UIElements.Main
-	end
-	if label.Instance then
-		return label.Instance
-	end
-	return nil
-end
-
-local function fixWrappedLabels(root)
-	if not root then
-		return
-	end
-	for _, descendant in ipairs(root:GetDescendants()) do
-		if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
-			if descendant.TextWrapped then
-				descendant.AutomaticSize = Enum.AutomaticSize.Y
-				descendant.TextYAlignment = Enum.TextYAlignment.Top
-			end
-		end
-	end
-end
-
-function Core.createWindUiGroupbox(rawGroup, uiBundle)
-	rawGroup = rawGroup or {}
-	uiBundle = uiBundle or {}
-	local serial = 0
-	local windUi = Core.uiLibrary(uiBundle)
-
-	local function attachTooltip(handle, tooltip)
-		if type(handle) ~= "table" or not tooltip or tostring(tooltip) == "" then
-			return
-		end
-		if not handle.Desc and not handle.Description then
-			handle.Desc = tostring(tooltip)
-		end
-		if not handle.Tooltip then
-			handle.Tooltip = tostring(tooltip)
-		end
-		local function tryHook()
-			if windUi and type(windUi.HookElementTooltip) == "function" then
-				pcall(windUi.HookElementTooltip, windUi, handle)
-			end
-		end
-		tryHook()
-		task.spawn(function()
-			for _ = 1, 20 do
-				if handle._ArrrelTipHooked then
-					return
-				end
-				tryHook()
-				task.wait(0.05)
-			end
-		end)
-	end
-
-	local function nextFlag(name, explicit)
-		serial += 1
-		return explicit or Core.uiElementId(name) .. "_" .. serial
-	end
-
-	local function wrapElement(applySet, meta)
-		meta = type(meta) == "table" and meta or {}
-		local wrapper = {
-			_raw = meta.raw,
-			Set = function(_, settings)
-				if type(settings) == "table" then
-					applySet(settings)
-				else
-					applySet({ CurrentValue = settings })
-				end
-			end,
-		}
-		if meta.bindKey then
-			Core.bindUiState(meta.bindKey, wrapper, meta.kind or "toggle", meta.raw)
-		end
-		return wrapper
-	end
-
-	local function dropdownDefault(values, current, multi)
-		values = values or {}
-		if multi then
-			local selected = Core.normalizeMultiSelection(current)
-			if #selected > 0 then
-				return selected
-			end
-			return {}
-		end
-		if type(current) == "table" then
-			return Core.normalizeDropdownValue(current, values[1])
-		end
-		if current and current ~= "" then
-			return tostring(current)
-		end
-		return values[1]
-	end
-
-	local function labelVisibilityTarget(label)
-		return windUiVisibilityTarget(label)
-	end
-
-	local function setElementValue(element, value)
-		if not element then
-			return
-		end
-		if element.Select then
-			element:Select(value)
-		elseif element.Set then
-			element:Set(value)
-		elseif element.SetValue then
-			element:SetValue(value)
-		end
-	end
-
-	local groupbox = {}
-
-	function groupbox:CreateToggle(settings, id)
-		if type(rawGroup.Toggle) ~= "function" then
-			return wrapElement(function() end, { kind = "toggle" })
-		end
-		local handle
-		handle = rawGroup:Toggle({
-			Title = settings.Name,
-			Value = settings.CurrentValue == true,
-			Desc = settings.Tooltip,
-			Callback = settings.Callback or function() end,
-		})
-		attachTooltip(handle, settings.Tooltip)
-		task.defer(function()
-			if handle and handle.ToggleFrame and handle.ToggleFrame.UIElements and handle.ToggleFrame.UIElements.Main then
-				fixWrappedLabels(handle.ToggleFrame.UIElements.Main)
-			end
-		end)
-		return wrapElement(function(nextSettings)
-			if nextSettings.CurrentValue ~= nil then
-				setElementValue(handle, nextSettings.CurrentValue == true)
-			end
-		end, {
-			raw = handle,
-			bindKey = settings.BindKey or settings.StateKey,
-			kind = "toggle",
-		})
-	end
-
-	function groupbox:CreateSlider(settings, id)
-		if type(rawGroup.Slider) ~= "function" then
-			return wrapElement(function() end, { kind = "slider" })
-		end
-		local range = settings.Range or { 0, 100 }
-		local minValue, maxValue = range[1], range[2]
-		local defaultValue = tonumber(settings.CurrentValue) or minValue
-		local handle = rawGroup:Slider({
-			Title = settings.Name,
-			Desc = settings.Tooltip,
-			Step = Core.sliderIncrement(minValue, maxValue, settings.Increment),
-			Value = {
-				Min = minValue,
-				Max = maxValue,
-				Default = defaultValue,
-			},
-			Callback = settings.Callback or function() end,
-		})
-		attachTooltip(handle, settings.Tooltip)
-		return wrapElement(function(nextSettings)
-			if nextSettings.CurrentValue ~= nil then
-				setElementValue(handle, tonumber(nextSettings.CurrentValue) or minValue)
-			end
-		end, {
-			raw = handle,
-			bindKey = settings.BindKey or settings.StateKey,
-			kind = "slider",
-		})
-	end
-
-	function groupbox:CreateButton(settings, id)
-		local handle = rawGroup:Button({
-			Title = settings.Name,
-			Desc = settings.Tooltip,
-			Callback = settings.Callback or function() end,
-		})
-		attachTooltip(handle, settings.Tooltip)
-		return { Set = function() end }
-	end
-
-	function groupbox:CreateInput(settings, id)
-		local initialValue = tostring(settings.CurrentValue or settings.Default or "")
-		local userCallback = settings.Callback or function() end
-		local acceptInput = false
-		local handle = rawGroup:Input({
-			Title = settings.Name,
-			Value = initialValue,
-			Placeholder = settings.PlaceholderText or settings.Placeholder or "",
-			Desc = settings.Tooltip,
-			Callback = function(value)
-				if not acceptInput then
-					return
-				end
-				userCallback(value)
-			end,
-		})
-		acceptInput = true
-		attachTooltip(handle, settings.Tooltip)
-		return wrapElement(function(nextSettings)
-			if nextSettings.CurrentValue ~= nil then
-				setElementValue(handle, tostring(nextSettings.CurrentValue))
-			end
-		end, {
-			raw = handle,
-			bindKey = settings.BindKey or settings.StateKey,
-			kind = "input",
-		})
-	end
-
-	function groupbox:CreateDropdown(settings, id)
-		local values = settings.Options or settings.Values or {}
-		local multi = settings.MultipleOptions == true or settings.Multi == true
-		local current = dropdownDefault(values, settings.CurrentOption, multi)
-		local userCallback = settings.Callback or function() end
-		local handle = rawGroup:Dropdown({
-			Title = settings.Name,
-			Values = values,
-			Value = multi and current or current,
-			Multi = multi,
-			Desc = settings.Tooltip,
-			Callback = function(selection)
-				if multi then
-					userCallback(Core.normalizeMultiSelection(selection))
-				else
-					userCallback(Core.normalizeDropdownValue(selection, current))
-				end
-			end,
-		})
-		attachTooltip(handle, settings.Tooltip)
-		return wrapElement(function(nextSettings)
-			if not handle then
-				return
-			end
-			local nextValues = nextSettings.Options or nextSettings.Values
-			if nextValues and handle.Refresh then
-				handle:Refresh(nextValues)
-			elseif nextValues and handle.SetValues then
-				handle:SetValues(nextValues)
-			end
-			local pick = nextSettings.CurrentOption or nextSettings.CurrentOptions
-			if pick == nil then
-				return
-			end
-			if multi and type(pick) == "table" then
-				local selected = {}
-				for index, value in ipairs(pick) do
-					table.insert(selected, tostring(value))
-				end
-				for key, value in pairs(pick) do
-					if type(key) ~= "number" and value == true then
-						table.insert(selected, tostring(key))
-					end
-				end
-				setElementValue(handle, selected)
-			else
-				setElementValue(handle, type(pick) == "table" and pick[1] or pick)
-			end
-		end, {
-			raw = handle,
-			bindKey = settings.BindKey or settings.StateKey,
-			kind = "dropdown",
-		})
-	end
-
-	function groupbox:CreateLabel(settings, id)
-		local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
-		local label = rawGroup:Paragraph({
-			Title = text,
-		})
-		local visibleTarget = labelVisibilityTarget(label)
+	function Core.createStubUiGroup(name)
 		return {
-			Set = function(_, nextSettings)
-				local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text)
-					or tostring(nextSettings or "")
-				if label and label.SetTitle then
-					label:SetTitle(nextText)
-				elseif label and label.Set then
-					label:Set(nextText)
-				end
-			end,
-			_windLabel = label,
-			_visibleTarget = visibleTarget,
-			TextLabel = visibleTarget,
+			CreateToggle = function() return { Set = function() end } end,
+			CreateSlider = function() return { Set = function() end } end,
+			CreateButton = function() return { Set = function() end } end,
+			CreateInput = function() return { Set = function() end } end,
+			CreateDropdown = function() return { Set = function() end } end,
+			CreateLabel = function() return { Set = function() end, SetVisible = function() end } end,
+			CreateDivider = function() return {} end,
 		}
 	end
 
-	function groupbox:CreateDivider()
-		if rawGroup.Space then
-			rawGroup:Space()
+	function Core.resolveUiWindow(section)
+		if type(section) ~= "table" then return nil end
+		if section._window then return section._window end
+		if type(section._rawWindow) == "table" or type(section.AddTab) == "function" then
+			return section
 		end
-		return {}
-	end
-
-	return groupbox
-end
-
-function Core.createStubUiGroup(label)
-	label = tostring(label or "Group")
-	local stub = {
-		_stub = true,
-		_label = label,
-	}
-	local function noop()
-		return stub
-	end
-	stub.CreateToggle = noop
-	stub.CreateSlider = noop
-	stub.CreateButton = noop
-	stub.CreateDropdown = noop
-	stub.CreateInput = noop
-	stub.CreateLabel = noop
-	stub.CreateDivider = noop
-	stub.AddDropdown = noop
-	stub.CreateStatus = function(_, fields)
-		local status = { Labels = {}, LastValues = {}, Visible = true }
-		for key, value in pairs(fields or {}) do
-			status.LastValues[key] = tostring(value)
-		end
-		status.Update = function() end
-		status.SetVisible = function() end
-		return status
-	end
-	return stub
-end
-
-local COLUMN_GAP = 12
-Core._UiTabRegistry = Core._UiTabRegistry or {}
-
-local function refreshTabScrollCanvas(rawTab)
-	if not rawTab or not rawTab.UIElements then
-		return
-	end
-	local scroll = rawTab.UIElements.ContainerFrame
-	if not scroll or not scroll:IsA("ScrollingFrame") then
-		return
-	end
-	-- AutomaticCanvasSize takes an Enum.AutomaticSize value; guard it so an
-	-- unsupported property can never break the tab refresh.
-	pcall(function()
-		scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	end)
-	local columns = scroll:FindFirstChild("AlleralColumns")
-	if columns and columns:IsA("GuiObject") then
-		columns.Size = UDim2.new(1, 0, 0, 0)
-		columns.AutomaticSize = Enum.AutomaticSize.Y
-	end
-end
-
-local function resyncSectionLayout(rawSection)
-	if type(rawSection) ~= "table" then
-		return
-	end
-	local frame = rawSection.ElementFrame
-	if frame and frame:IsA("GuiObject") then
-		frame.AutomaticSize = Enum.AutomaticSize.None
-		frame.Size = UDim2.new(1, 0, frame.Size.Y.Scale, frame.Size.Y.Offset)
-	end
-	if type(rawSection.Open) == "function" then
-		pcall(function()
-			rawSection:Open(true)
-		end)
-	end
-end
-
-local function resyncTabSections(tab)
-	if type(tab) ~= "table" then
-		return
-	end
-	for _, section in ipairs(tab._sections or {}) do
-		resyncSectionLayout(section)
-	end
-end
-
-local function measureTabContentWidth(rawTab, window)
-	if rawTab and rawTab.UIElements and rawTab.UIElements.ContainerFrame then
-		local scroll = rawTab.UIElements.ContainerFrame
-		local width = scroll.AbsoluteSize.X
-		if width >= 64 then
-			local pad = scroll:FindFirstChildOfClass("UIPadding")
-			if pad then
-				width = width - pad.PaddingLeft.Offset - pad.PaddingRight.Offset
-			end
-			return math.max(width, 64)
-		end
-	end
-	local rawWindow = window and window._rawWindow
-	if rawWindow and rawWindow.UIElements then
-		local mainBar = rawWindow.UIElements.MainBar
-		if mainBar and mainBar.AbsoluteSize.X >= 64 then
-			local width = mainBar.AbsoluteSize.X
-			local pad = mainBar:FindFirstChildOfClass("UIPadding")
-			if pad then
-				width = width - pad.PaddingLeft.Offset - pad.PaddingRight.Offset
-			end
-			return math.max(width - 8, 64)
-		end
-		local main = rawWindow.UIElements.Main
-		local sidebar = rawWindow.UIElements.SideBar
-		if main and sidebar and main.AbsoluteSize.X >= 64 then
-			local contentWidth = main.AbsoluteSize.X - sidebar.AbsoluteSize.X
-			if contentWidth >= 64 then
-				return math.max(contentWidth - 40, 64)
-			end
-		end
-	end
-	return 0
-end
-
-local function relayoutTwoColumnFrames(tab)
-	local layout = tab._layout
-	if not layout or not layout.ready or not layout.row or not layout.left or not layout.right then
-		return false
-	end
-
-	local width = measureTabContentWidth(tab._rawTab, tab._window)
-	if width < 64 then
-		width = layout.row.AbsoluteSize.X
-	end
-	if width < 64 then
-		return false
-	end
-
-	layout.row.Size = UDim2.new(1, 0, 0, 0)
-	layout.row.AutomaticSize = Enum.AutomaticSize.Y
-
-	local halfGap = math.floor(COLUMN_GAP / 2)
-	local colSize = UDim2.new(0.5, -halfGap, 0, 0)
-
-	layout.left.Size = colSize
-	layout.left.AutomaticSize = Enum.AutomaticSize.Y
-	layout.right.Size = colSize
-	layout.right.AutomaticSize = Enum.AutomaticSize.Y
-
-	resyncTabSections(tab)
-	refreshTabScrollCanvas(tab._rawTab)
-	return true
-end
-
-local function bindColumnLayoutSignals(tab, layout, container)
-	if not layout or layout._layoutSignalsBound then
-		return
-	end
-	layout._layoutSignalsBound = true
-
-	local function bump()
-		task.defer(function()
-			relayoutTwoColumnFrames(tab)
-		end)
-	end
-
-	for _, node in ipairs({ layout.row, layout.left, layout.right }) do
-		if node then
-			local list = node:FindFirstChildOfClass("UIListLayout")
-			if list then
-				pcall(function()
-					list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(bump)
-				end)
-			end
-		end
-	end
-	if container then
-		pcall(function()
-			container:GetPropertyChangedSignal("AbsoluteSize"):Connect(bump)
-		end)
-	end
-end
-
-local function ensureTwoColumnLayout(tab, rawTab)
-	if not rawTab or tab._columnCount < 2 then
-		return false
-	end
-
-	tab._layout = tab._layout or {}
-	local layout = tab._layout
-	if layout.ready then
-		return true
-	end
-
-	local container = rawTab.UIElements and rawTab.UIElements.ContainerFrame
-	if not container then
-		return false
-	end
-
-	local row = Instance.new("Frame")
-	row.Name = "AlleralColumns"
-	row.BackgroundTransparency = 1
-	row.Size = UDim2.new(1, 0, 0, 0)
-	row.AutomaticSize = Enum.AutomaticSize.Y
-	row.LayoutOrder = -1000
-	row.Parent = container
-
-	local scrollLayout = container:FindFirstChildOfClass("UIListLayout")
-	if scrollLayout then
-		scrollLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-	end
-
-	local rowList = Instance.new("UIListLayout")
-	rowList.FillDirection = Enum.FillDirection.Horizontal
-	rowList.HorizontalAlignment = Enum.HorizontalAlignment.Left
-	rowList.VerticalAlignment = Enum.VerticalAlignment.Top
-	rowList.SortOrder = Enum.SortOrder.LayoutOrder
-	rowList.Padding = UDim.new(0, COLUMN_GAP)
-	rowList.Parent = row
-
-	local function makeColumn(name, order)
-		local col = Instance.new("Frame")
-		col.Name = name
-		col.BackgroundTransparency = 1
-		col.Size = UDim2.new(0.5, -math.floor(COLUMN_GAP / 2), 0, 0)
-		col.AutomaticSize = Enum.AutomaticSize.Y
-		col.LayoutOrder = order
-		col.Parent = row
-
-		local vlist = Instance.new("UIListLayout")
-		vlist.FillDirection = Enum.FillDirection.Vertical
-		vlist.SortOrder = Enum.SortOrder.LayoutOrder
-		vlist.Padding = UDim.new(0, 8)
-		vlist.Parent = col
-		return col
-	end
-
-	layout.row = row
-	layout.left = makeColumn("LeftColumn", 1)
-	layout.right = makeColumn("RightColumn", 2)
-	layout.leftOrder = 0
-	layout.rightOrder = 0
-	layout.ready = true
-
-	if not tab._columnRelayoutHooked then
-		tab._columnRelayoutHooked = true
-		pcall(function()
-			row:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-				if row.AbsoluteSize.X >= 64 then
-					relayoutTwoColumnFrames(tab)
-				end
-			end)
-		end)
-		pcall(function()
-			container:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-				if container.AbsoluteSize.X >= 64 then
-					relayoutTwoColumnFrames(tab)
-				end
-			end)
-		end)
-	end
-
-	relayoutTwoColumnFrames(tab)
-	bindColumnLayoutSignals(tab, layout, container)
-	return true
-end
-
-local function getColumnFrame(tab, column)
-	local layout = tab._layout
-	if not layout or not layout.ready then
 		return nil
 	end
-	return (column == 2) and layout.right or layout.left
-end
 
-local function scheduleTwoColumnRelayout(tab)
-	if type(tab) ~= "table" then
-		return
-	end
-
-	local function tryRelayout()
-		relayoutTwoColumnFrames(tab)
-	end
-
-	task.defer(tryRelayout)
-	task.delay(0.05, tryRelayout)
-	task.delay(0.15, tryRelayout)
-	task.delay(0.35, tryRelayout)
-end
-
-function Core.refreshAllTabColumns()
-	for _, tab in ipairs(Core._UiTabRegistry) do
-		if type(tab) == "table" then
-			relayoutTwoColumnFrames(tab)
-			resyncTabSections(tab)
-			refreshTabScrollCanvas(tab._rawTab)
+	Core.registerUiWindow = Core.registerUiWindow or function(window)
+		ENV.Alleral_UiWindow = window
+		if getgenv then
+			getgenv().Alleral_UiWindow = window
 		end
 	end
-	return true
-end
 
-local function registerUiScaleHooks(windUi)
-	if type(windUi) ~= "table" or Core._UiScaleHooksRegistered then
-		return
+	Core.flushPendingNotifications = Core.flushPendingNotifications or function()
+		local ui = ENV.Alleral_UI
+		if ui and type(ui.Notify) == "function" and type(ui.ClearNotifications) == "function" then
+			ui:ClearNotifications()
+		end
 	end
-	Core._UiScaleHooksRegistered = true
-	if type(windUi.RegisterLayoutRefresh) == "function" then
+
+	Core.notifyBootReady = Core.notifyBootReady or function(info)
+		info = type(info) == "table" and info or {}
 		pcall(function()
-			windUi:RegisterLayoutRefresh("core_columns", function()
-				Core.refreshAllTabColumns()
-			end)
-		end)
-	elseif windUi._AlleralScaleApi and type(windUi._AlleralScaleApi.registerLayoutRefresh) == "function" then
-		pcall(function()
-			windUi._AlleralScaleApi.registerLayoutRefresh("core_columns", function()
-				Core.refreshAllTabColumns()
-			end)
-		end)
-	end
-end
-
-function Core.wrapUiTab(rawTab, uiBundle, window)
-	local tab = {
-		_rawTab = rawTab,
-		_ui = uiBundle,
-		_window = window,
-		_columnCount = 1,
-		_sections = {},
-	}
-	table.insert(Core._UiTabRegistry, tab)
-
-	local function resolveColumn(column)
-		column = math.clamp(tonumber(column) or 1, 1, 2)
-		if tab._columnCount >= 2 and rawTab then
-			ensureTwoColumnLayout(tab, rawTab)
-		end
-		return column
-	end
-
-	function tab:CreateGroupbox(settings)
-		settings = settings or {}
-		local name = settings.Name or "Group"
-		if not rawTab then
-			Core.logWarn("CreateGroupbox skipped — tab missing for " .. tostring(name))
-			return Core.createWindUiGroupbox({}, uiBundle)
-		end
-		if type(rawTab.Section) ~= "function" then
-			Core.logWarn("CreateGroupbox skipped — Section unavailable for " .. tostring(name))
-			return Core.createWindUiGroupbox({}, uiBundle)
-		end
-
-		local column = resolveColumn(settings.Column or 1)
-		local ok, rawGroup = pcall(function()
-			return rawTab:Section({
-				Title = name,
-				Box = true,
-				BoxBorder = true,
-				Opened = true,
+			StarterGui:SetCore("SendNotification", {
+				Title = info.Name or "Alleral",
+				Text = (info.Subtitle and ("v" .. tostring(info.Subtitle)) or "Ready"),
+				Duration = 2,
 			})
 		end)
-		if not ok or not rawGroup then
-			Core.logWarn("CreateGroupbox Section failed for " .. tostring(name) .. ": " .. tostring(rawGroup))
-			return Core.createWindUiGroupbox({}, uiBundle)
-		end
-
-		local sectionFrame = rawGroup.ElementFrame
-
-		if tab._columnCount >= 2 then
-			local colFrame = getColumnFrame(tab, column)
-			if colFrame and sectionFrame and sectionFrame:IsA("GuiObject") then
-				local layout = tab._layout
-				if column == 2 then
-					layout.rightOrder = (layout.rightOrder or 0) + 1
-					sectionFrame.LayoutOrder = layout.rightOrder
-				else
-					layout.leftOrder = (layout.leftOrder or 0) + 1
-					sectionFrame.LayoutOrder = layout.leftOrder
-				end
-				sectionFrame.Parent = colFrame
-				sectionFrame.AutomaticSize = Enum.AutomaticSize.None
-				sectionFrame.Size = UDim2.new(1, 0, 0, sectionFrame.Size.Y.Offset)
-			end
-		end
-
-		table.insert(tab._sections, rawGroup)
-
-		task.defer(function()
-			scheduleTwoColumnRelayout(tab)
-			resyncSectionLayout(rawGroup)
-			refreshTabScrollCanvas(rawTab)
-		end)
-		return Core.createWindUiGroupbox(rawGroup, uiBundle)
 	end
 
-	function tab:BuildThemeGroupbox(column)
-		local group = Core.buildUiGroup(tab, "Appearance", column or 1)
-		local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
-		local themes = (uiBundle and uiBundle.ThemeNames) or {
-			"Arrrel",
-			"ArrrelNeon",
-			"ArrrelMidnight",
-			"ArrrelAurora",
-			"ArrrelObsidian",
-			"ArrrelSynth",
-			"ArrrelOcean",
-			"ArrrelEmber",
-			"ArrrelStealth",
-			"ArrrelPaper",
-			"ArrrelVoid",
-			"Dark",
-			"Light",
-		}
-		if windUi and type(windUi.ListThemeNames) == "function" then
-			local ok, listed = pcall(function()
-				return windUi:ListThemeNames()
-			end)
-			if ok and type(listed) == "table" and #listed > 0 then
-				themes = listed
-			end
-		end
-		local current = "Arrrel"
-		if windUi and type(windUi.GetCurrentTheme) == "function" then
-			local ok, theme = pcall(function()
-				return windUi:GetCurrentTheme()
-			end)
-			if ok and theme then
-				current = theme
-			end
-		end
-		group:CreateDropdown("Theme preset", themes, current, function(selected)
-			if windUi and type(windUi.SetTheme) == "function" then
-				pcall(function()
-					windUi:SetTheme(selected)
-					if type(windUi.FlashAccent) == "function" then
-						windUi:FlashAccent()
-					end
-				end)
-			end
-			Core.notify("Theme", "theme: " .. tostring(selected), 2, "success")
-		end, "Choose a color preset.")
-		group:CreateButton("Next theme", function()
-			if windUi and type(windUi.CycleTheme) == "function" then
-				local ok, nextTheme = pcall(function()
-					return windUi:CycleTheme(1)
-				end)
-				if ok and nextTheme and nextTheme.Name then
-					Core.notify("Theme", "Applied " .. tostring(nextTheme.Name), 2, "success")
-				end
-			end
-		end, "Cycles through available presets.")
-
-		local accentPresets = { "Mint", "Cyan", "Violet", "Rose", "Amber", "Ice", "Aurora", "Crimson", "Lime", "Sky", "Gold", "Plum", "Teal", "Blaze", "Mono" }
-		group:CreateDropdown("Accent color", accentPresets, "Mint", function(selected)
-			if windUi and type(windUi.ApplyAccentPreset) == "function" then
-				pcall(function()
-					windUi:ApplyAccentPreset(selected)
-					if type(windUi.FlashAccent) == "function" then
-						windUi:FlashAccent()
-					end
-				end)
-			elseif windUi and type(windUi.SetAccentColor) == "function" then
-				local hex = ({
-					Mint = "#53fc18",
-					Cyan = "#22d3ee",
-					Violet = "#a78bfa",
-					Rose = "#fb7185",
-					Amber = "#fbbf24",
-					Ice = "#93c5fd",
-					Aurora = "#7cf7ff",
-				})[selected] or "#53fc18"
-				pcall(function()
-					windUi:SetAccentColor(Color3.fromHex(hex))
-					if type(windUi.FlashAccent) == "function" then
-						windUi:FlashAccent()
-					end
-				end)
-			end
-		end, "Accent for toggles and highlights.")
-
-		local profileNames = { "auto", "desktop", "mobile", "compact", "performance" }
-		local profileLabels = {
-			auto = "Auto",
-			desktop = "Desktop",
-			mobile = "Mobile",
-			compact = "Compact",
-			performance = "Performance",
-		}
-		local currentProfile = ENV.Alleral_UiProfile or "auto"
-		group:CreateToggle("Smart auto resize", ENV.Alleral_UiAutoResize ~= false, "Fits the menu to your screen size and rotation.", function(value)
-			ENV.Alleral_UiAutoResize = value ~= false
-			if windUi and type(windUi.SetAutoResize) == "function" then
-				pcall(function()
-					windUi:SetAutoResize(value ~= false)
-				end)
-			end
-		end)
-
-		group:CreateDropdown("Layout profile", profileNames, currentProfile, function(selected)
-			ENV.Alleral_UiProfile = selected
-			if windUi and type(windUi.ApplyProfile) == "function" then
-				pcall(function()
-					windUi:ApplyProfile(selected)
-				end)
-			end
-			Core.notify("UI", "Profile: " .. tostring(profileLabels[selected] or selected), 2, "info")
-		end, "Auto picks mobile or desktop from your device.")
-
-		group:CreateSlider("UI scale", 0.85, 1.1, tonumber(ENV.Alleral_UiScale) or 1, function(value)
-			ENV.Alleral_UiScale = value
-			if windUi and type(windUi.SetUiScale) == "function" then
-				pcall(function()
-					windUi:SetUiScale(value)
-				end)
-			end
-		end, "Multiplier on top of smart auto resize.")
-
-		group:CreateButton("Recalculate layout", function()
-			if windUi and type(windUi.ApplyProfile) == "function" then
-				pcall(function()
-					windUi:ApplyProfile(ENV.Alleral_UiProfile or "auto")
-				end)
-				Core.notify("UI", "Layout recalculated for your screen.", 2, "info")
-			end
-		end, "Re-run smart fit now.")
-
-		group:CreateToggle("Reduced motion", ENV.Alleral_UiReducedMotion == true, "Disables animations.", function(value)
-			ENV.Alleral_UiReducedMotion = value == true
-			if windUi and type(windUi.SetReducedMotion) == "function" then
-				pcall(function()
-					windUi:SetReducedMotion(value == true)
-				end)
-			end
-		end)
-
-		group:CreateToggle("Spring motion", ENV.Alleral_UiSpringMotion ~= false, "Springs on menus and controls.", function(value)
-			ENV.Alleral_UiSpringMotion = value ~= false
-			if windUi and type(windUi.SetSpringMotion) == "function" then
-				pcall(function()
-					windUi:SetSpringMotion(value ~= false)
-				end)
-			end
-		end)
-
-		group:CreateToggle("Startup animation", ENV.Alleral_UiStartup ~= false, "Opening sweep when the menu loads.", function(value)
-			ENV.Alleral_UiStartup = value ~= false
-			if windUi and type(windUi.SetStartupEffect) == "function" then
-				pcall(function()
-					windUi:SetStartupEffect(value ~= false)
-				end)
-			end
-		end)
-
-		group:CreateToggle("Compact notifications", ENV.Alleral_NotifyCompact == true, "Tighter toast stack.", function(value)
-			ENV.Alleral_NotifyCompact = value == true
-			if windUi and type(windUi.SetNotificationCompact) == "function" then
-				pcall(function()
-					windUi:SetNotificationCompact(value == true)
-				end)
-			end
-		end)
-
-		group:CreateToggle("Touch feedback", ENV.Alleral_UiTouchFeedback ~= false, "Button press scale on click.", function(value)
-			ENV.Alleral_UiTouchFeedback = value ~= false
-			if windUi and type(windUi.SetTouchFeedback) == "function" then
-				pcall(function()
-					windUi:SetTouchFeedback(value ~= false)
-				end)
-			end
-		end)
-
-		group:CreateToggle("Haptics", ENV.Alleral_UiHaptics == true, "Light vibration on toggles (mobile).", function(value)
-			ENV.Alleral_UiHaptics = value == true
-			if windUi and type(windUi.SetHaptics) == "function" then
-				pcall(function()
-					windUi:SetHaptics(value == true)
-				end)
-			end
-		end)
-
-		group:CreateToggle("Dedupe notifications", ENV.Alleral_NotifyDedupe ~= false, "Skip identical toasts within 2s.", function(value)
-			ENV.Alleral_NotifyDedupe = value ~= false
-			if windUi and type(windUi.SetNotifyDedupe) == "function" then
-				pcall(function()
-					windUi:SetNotifyDedupe(value ~= false)
-				end)
-			end
-		end)
-
-		return group
+	Core.uiIcon = Core.uiIcon or function(icon)
+		return icon
 	end
 
-	return tab
-end
-
-
-function Core.ensureCore()
-	if ENV.Alleral_Core then
-		return ENV.Alleral_Core
-	end
-	local loadStringFn = Core.loadStringFn()
-	local isFile = ENV.isfile
-	local readFile = ENV.readfile
-	if type(loadStringFn) ~= "function" or type(isFile) ~= "function" or type(readFile) ~= "function" then
-		return nil
-	end
-	for _, path in ipairs({ "hub/core_base.luau", "hub/core.luau", "core/alleral_core.luau", "src/alleral_core.luau", "alleral_core.luau" }) do
-		if isFile(path) then
-			local ok = pcall(function()
-				loadStringFn(readFile(path), "Alleral/core")()
-			end)
-			if ok and ENV.Alleral_Core then
-				return ENV.Alleral_Core
-			end
-		end
-	end
-	return nil
-end
-
-local function signalBootFailure(message)
-	ENV.Alleral_StartupFailed = message
-	if ENV.Alleral_State then
-		ENV.Alleral_State.StartupFailed = message
-	end
-	pcall(function()
-		if shared then
-			shared.Alleral_StartupFailed = message
-		end
-	end)
-	local report = ENV.Alleral_ReportError
-	if type(report) == "function" then
-		pcall(report, "boot", message)
-	end
-end
-
-function Core.prepareGame(state)
-	state = state or ENV.Alleral_State
-	if not state then
-		local msg = "Alleral_State missing"
-		signalBootFailure(msg)
-		return nil, nil, msg
-	end
-	local security = ENV.Alleral_Security
-	if type(security) == "table" and type(security.enforce) == "function" then
-		local ok, reason = security.enforce({ stage = "prepareGame" })
-		if not ok then
-			local msg = tostring(reason or "Access denied")
-			signalBootFailure(msg)
-			return nil, nil, msg
-		end
-	end
-	local core = Core.ensureCore()
-	if not core then
-		local msg = "Core not loaded"
-		signalBootFailure(msg)
-		return nil, nil, msg
-	end
-	for _, fnName in ipairs({ "buildUiWindow", "buildUiTab", "buildUiGroup", "wrapUiGroup", "createWindUiGroupbox" }) do
-		if type(core[fnName]) ~= "function" then
-			local msg = "Core outdated — missing " .. fnName
-			signalBootFailure(msg)
-			return nil, nil, msg
-		end
-	end
-	state.HubRunning = true
-	core.initAnalytics()
-	core.installErrorLogHook()
-	if state.AntiAFK ~= false then
-		core.setupAntiAfk(game:GetService("Players").LocalPlayer)
-	end
-	local cachedUi = ENV.Alleral_UI
-	local uiLibrary = type(cachedUi) == "table" and type(cachedUi.Library) == "table" and cachedUi or nil
-	local err
-	if not uiLibrary then
-		uiLibrary, err = core.loadUi()
-	end
-	if not uiLibrary then
-		local msg = err or "UI unavailable"
-		signalBootFailure(msg)
-		return core, nil, msg
-	end
-	pcall(function()
-		if core.refreshLoaderCapabilities then
-			core.refreshLoaderCapabilities()
-		end
-		if core.fetchScriptManifest then
-			core.fetchScriptManifest(false)
-		end
-		if core.fetchWeaoExploits then
-			task.spawn(function()
-				core.fetchWeaoExploits(false)
-				if core.refreshLoaderCapabilities then
-					core.refreshLoaderCapabilities()
-				end
-			end)
-		end
-		if core.notifyExecutorCompat then
-			core.notifyExecutorCompat()
-		end
-	end)
-	if type(ENV._Alleral_EnsureTeleportWatch) == "function" then
-		pcall(ENV._Alleral_EnsureTeleportWatch)
-	end
-	return core, uiLibrary
-end
-
-function Core.wireTeleportRelaunch(state)
-	state = state or ENV.Alleral_State
-	if state then
-		state.HubRunning = true
-	end
-	if type(ENV._Alleral_EnsureTeleportWatch) == "function" then
-		pcall(ENV._Alleral_EnsureTeleportWatch)
-	end
-end
-
-function Core.stopAutomation(state, connections, loopControllers, loops, onStop)
-	state.HubRunning = false
-	for name, controller in pairs(loopControllers) do
-		if controller then
-			controller.enabled = false
-		end
-		loopControllers[name] = nil
-	end
-	for _, loopState in pairs(loops) do
-		loopState.enabled = false
-	end
-	for key, connection in pairs(connections) do
-		if connection and connection.Disconnect then
-			pcall(function()
-				connection:Disconnect()
-			end)
-		end
-		connections[key] = nil
-	end
-	if onStop then
-		pcall(onStop)
-	end
-	if type(Core.restorePerformanceSettings) == "function" then
-		pcall(Core.restorePerformanceSettings)
-	end
-end
-
-function Core.copyValue(value)
-	if type(value) ~= "table" then
-		return value
-	end
-	local output = {}
-	for key, item in pairs(value) do
-		output[key] = Core.copyValue(item)
-	end
-	return output
-end
-
-function Core.mergeDefaults(state, defaults)
-	for key, value in pairs(defaults or {}) do
-		if state[key] == nil then
-			state[key] = Core.copyValue(value)
-		end
-	end
-end
-
-function Core.buildSavedKeys(defaults, exclude)
-	exclude = exclude or { HubRunning = true }
-	local keys = {}
-	for key in pairs(defaults or {}) do
-		if not exclude[key] then
-			table.insert(keys, key)
-		end
-	end
-	table.sort(keys)
-	return keys
-end
-
-function Core.initSettings(state, defaults, filename, exclude)
-	if type(Core.mergePerformanceDefaults) == "function" then
-		Core.mergePerformanceDefaults(defaults)
-	end
-	Core.mergeDefaults(state, defaults)
-	local savedKeys = Core.buildSavedKeys(defaults, exclude)
-	Core.loadSettings(state, savedKeys, filename, defaults)
-	local function saveSettings()
-		return Core.saveSettings(state, savedKeys, filename)
-	end
-	return saveSettings, savedKeys
-end
-
-function Core.saveSettings(state, keys, filename)
-	local payload = {}
-	for _, key in ipairs(keys) do
-		payload[key] = state[key]
-	end
-	local encodeOk, json = pcall(function()
-		return HttpService:JSONEncode(payload)
-	end)
-	if not encodeOk or type(json) ~= "string" or json == "" then
-		Core.notify("Alleral", "Couldn't encode settings — nothing saved.", 5)
-		return false
-	end
-	Core.backupSettings(filename, json)
-	local target = "Alleral_Configs/" .. filename
-	local previous = Core.readFile(target)
-	local ok = Core.writeFile(target, json)
-	if not ok and previous then
-		pcall(function()
-			Core.writeFile(target, previous)
-		end)
-		Core.notify("Alleral", "Save failed — restored previous settings file.", 5)
-		return false
-	end
-	if not ok then
-		Core.notify("Alleral", "Couldn't save settings. Your executor may not support writefile.", 5)
-	end
-	return ok
-end
-
-function Core.loadSettings(state, keys, filename, defaults)
-	local target = "Alleral_Configs/" .. filename
-	local raw = Core.readFile(target)
-	if not raw then
-		return false
-	end
-	local ok, decoded = pcall(function()
-		return HttpService:JSONDecode(raw)
-	end)
-	if not ok or type(decoded) ~= "table" then
-		if Core.restoreSettingsFromBackup(filename, state, keys, defaults) then
-			Core.notify("Alleral", "settings were busted — loaded a backup", 5)
-			return true
-		end
-		return false
-	end
-	for _, key in ipairs(keys) do
-		if decoded[key] ~= nil then
-			state[key] = Core.copyValue(decoded[key])
-		end
-	end
-	return true
-end
-
-function Core.wrapUiGroup(groupbox, callbackWrapper)
-	local group = {}
-	local serial = 0
-	local MAX_RENDERED_DROPDOWN_OPTIONS = 50
-
-	local function nextId(name)
-		serial += 1
-		return tostring(name) .. "_" .. HttpService:GenerateGUID(false):sub(1, 8) .. "_" .. serial
+	Core.windUiIcon = Core.windUiIcon or function(icon)
+		return icon
 	end
 
-	local function wrap(label, callback)
-		callback = callback or function() end
-		local function guarded(...)
-			local ok, err = pcall(callback, ...)
-			if not ok then
-				Core.pushErrorLog("UI:" .. tostring(label), err)
-				Core.reportError("UI:" .. tostring(label), err)
-				warn("[Alleral UI:" .. tostring(label) .. "] " .. tostring(err))
-			end
-		end
-		if not callbackWrapper then
-			return guarded
-		end
-		for _, args in ipairs({ { label, guarded }, { guarded } }) do
-			local ok, wrapped = pcall(callbackWrapper, table.unpack(args))
-			if ok and type(wrapped) == "function" then
-				return function(...)
-					local innerOk, innerErr = pcall(wrapped, ...)
-					if not innerOk then
-						Core.pushErrorLog("UI:" .. tostring(label), innerErr)
-						Core.reportError("UI:" .. tostring(label), innerErr)
-					end
-				end
-			end
-		end
-		return guarded
+	Core.uiElementId = Core.uiElementId or function(name)
+		return tostring(name):gsub("[^%w]", "_"):lower()
 	end
 
-	local function normalizeOptions(values)
-		local output = {}
-		local seen = {}
-		for _, value in ipairs(values or {}) do
-			local text = tostring(value)
-			if text ~= "" and not seen[text] then
-				seen[text] = true
-				table.insert(output, text)
-			end
-		end
-		return output
-	end
-
-	local function currentSelection(default, multi)
-		if type(default) == "table" then
-			local copy = {}
-			for i, v in ipairs(default) do
-				copy[i] = v
-			end
-			for k, v in pairs(default) do
-				if type(k) ~= "number" then
-					copy[k] = v
-				end
-			end
-			return copy
-		end
-		if multi then
-			return default and { tostring(default) } or {}
-		end
-		return tostring(default or "")
-	end
-
-	local function compactOptions(values, selected, limit)
-		values = normalizeOptions(values)
-		limit = limit or MAX_RENDERED_DROPDOWN_OPTIONS
-		if #values <= limit then
-			return values
-		end
-		local output = {}
-		local seen = {}
-		local selectedList = type(selected) == "table" and selected or { selected }
-		for _, value in ipairs(selectedList) do
-			local text = tostring(value)
-			if text ~= "" and not seen[text] then
-				seen[text] = true
-				table.insert(output, text)
-			end
-		end
-		for _, value in ipairs(values) do
-			if #output >= limit then
-				break
-			end
-			if not seen[value] then
-				table.insert(output, value)
-			end
-		end
-		return output
-	end
-
-	local function instanceHasChild(parent, childName)
-		if type(parent) ~= "table" then
-			return false
-		end
-		local ok, child = pcall(function()
-			return parent:FindFirstChild(childName)
-		end)
-		return ok and child ~= nil
-	end
-
-	local function waitForElement(element, timeout)
-		local started = tick()
-		repeat
-			if element and (element._visibleTarget or element.TextLabel or element._windLabel) then
-				return true
-			end
-			task.wait()
-		until tick() - started >= (timeout or 3)
-		return element and (element._visibleTarget or element.TextLabel or element._windLabel) ~= nil
-	end
-
-	local function setVisible(element, visible)
-		if not element then
-			return
-		end
-		local target = element._visibleTarget or element.TextLabel
-		if target and target.Visible ~= nil then
-			target.Visible = visible
-			return
-		end
-		if element._windLabel then
-			local fallback = windUiVisibilityTarget(element._windLabel)
-			if fallback and fallback.Visible ~= nil then
-				fallback.Visible = visible
-			end
-		end
-	end
-
-	function group:CreateToggle(name, default, tooltip, callback, bindKey)
-		return groupbox:CreateToggle({
-			Name = name,
-			CurrentValue = default == true,
-			Tooltip = tooltip,
-			Callback = wrap(name, callback),
-			BindKey = bindKey,
-		}, nextId(name))
-	end
-
-	function group:CreateSlider(name, min, max, default, callback, tooltip, increment, bindKey)
-		return groupbox:CreateSlider({
-			Name = name,
-			Range = { min, max },
-			Increment = increment,
-			CurrentValue = tonumber(default) or min,
-			Tooltip = tooltip,
-			Callback = wrap(name, callback),
-			BindKey = bindKey,
-		}, nextId(name))
-	end
-
-	function group:CreateButton(name, callback, tooltip)
-		return groupbox:CreateButton({
-			Name = name,
-			Tooltip = tooltip,
-			Callback = wrap(name, callback),
-		}, nextId(name))
-	end
-
-	function group:CreateInput(name, placeholder, arg3, arg4, arg5)
-		local icon, default, callback, tip
-		local function isIcon(value)
-			local text = tostring(value or "")
-			return text:find("rbxassetid") ~= nil or text:match("^%d+$") ~= nil
-		end
-		if type(arg3) == "function" then
-			callback = arg3
-			tip = arg4
-		elseif type(arg4) == "function" and isIcon(arg3) then
-			icon = Core.uiIcon(arg3)
-			callback = arg4
-			tip = arg5
-		elseif type(arg4) == "function" then
-			default = tostring(arg3 or "")
-			callback = arg4
-			tip = arg5
-		else
-			icon = Core.uiIcon(arg3)
-			callback = arg4
-			tip = arg5
-		end
-		return groupbox:CreateInput({
-			Name = name,
-			Icon = icon,
-			Placeholder = placeholder,
-			PlaceholderText = placeholder,
-			CurrentValue = default or "",
-			RemoveTextOnFocus = false,
-			Tooltip = tip,
-			Callback = wrap(name, callback),
-		}, nextId(name))
-	end
-
-	function group:CreateDropdown(name, options, default, callback, tooltip, bindKey)
-		return groupbox:CreateDropdown({
-			Name = name,
-			Options = normalizeOptions(options),
-			CurrentOption = default,
-			Tooltip = tooltip,
-			Callback = wrap(name, callback),
-			BindKey = bindKey,
-		}, nextId(name))
-	end
-
-	function group:AddDropdown(id, config)
-		config = config or {}
-		local multi = config.Multi == true or config.MultiSelection == true
-		local values = normalizeOptions(config.Values or config.Options)
-		local current = currentSelection(config.Default or config.CurrentValue or config.CurrentOption, multi)
-		local handle = {
-			Values = values,
-			Selection = current,
-			Dropdown = nil,
-			LastSearch = "",
-		}
-		local function safeCallback(selection)
-			local normalized = multi and Core.normalizeMultiSelection(selection)
-				or Core.normalizeDropdownValue(selection, current)
-			handle.Selection = multi and normalized or currentSelection(normalized, false)
-			wrap(config.Text or config.Name or id, config.Callback or function() end)(normalized)
-		end
-		local function rebuild(currentValues)
-			local nextValues = currentValues or handle.Values
-			if handle.Dropdown and handle.Dropdown.Set then
-				handle.Dropdown:Set({
-					Options = nextValues,
-					Values = nextValues,
-					CurrentOption = handle.Selection,
-					CurrentOptions = type(handle.Selection) == "table" and handle.Selection or nil,
-					MultipleOptions = multi,
-					Placeholder = config.Placeholder or "--",
-					Callback = safeCallback,
-				})
-			end
-		end
-		local renderedValues = values
-		local dropdown = groupbox:CreateDropdown({
-			Name = config.Text or config.Name or id,
-			Options = renderedValues,
-			Values = renderedValues,
-			CurrentOption = current,
-			MultipleOptions = multi,
-			Search = config.Searchable == true,
-			Callback = safeCallback,
-		}, nextId(id .. "_dd"))
-		handle.Dropdown = dropdown
-		function handle:SetValues(newValues, newDefault)
-			self.Values = normalizeOptions(newValues)
-			self.Selection = currentSelection(newDefault or self.Selection, multi)
-			rebuild(self.Values)
-		end
-		function handle:Refresh(newValues, newDefault)
-			self:SetValues(newValues, newDefault)
-		end
-		function handle:Search(query)
-			self.LastSearch = tostring(query or "")
-			if self.Dropdown and self.Dropdown.SetSearch then
-				self.Dropdown:SetSearch(self.LastSearch)
-				return
-			end
-			local filtered = self.LastSearch == "" and self.Values
-				or compactOptions(Core.filterDropdownOptions(self.Values, self.LastSearch), self.Selection)
-			rebuild(filtered)
-		end
-		return handle
-	end
-
-	function group:CreateLabel(text)
-		return groupbox:CreateLabel({
-			Name = text,
-		}, nextId("label"))
-	end
-
-	function group:CreateStatus(label, fields)
-		local status = {
-			Labels = {},
-			LastValues = {},
-			Visible = true,
-		}
-		for key, value in pairs(fields or {}) do
-			local rendered = tostring(value)
-			status.LastValues[key] = rendered
-			status.Labels[key] = groupbox:CreateLabel({
-				Name = tostring(key) .. ": " .. rendered,
-			}, nextId(label .. "_" .. tostring(key)))
-		end
-		status.Labels.Summary = groupbox:CreateLabel({
-			Name = "",
-		}, nextId(label .. "_summary"))
-		function status:Update(key, value)
-			local rendered = tostring(value)
-			if self.LastValues[key] == rendered then
-				return
-			end
-			self.LastValues[key] = rendered
-			local row = self.Labels[key]
-			if row and row.Set then
-				row:Set({ Name = tostring(key) .. ": " .. rendered })
-			end
-		end
-		function status:SetSummary(text)
-			local row = self.Labels.Summary
-			if row and row.Set then
-				row:Set({ Name = tostring(text or "") })
-			end
-		end
-		function status:SetVisible(visible)
-			self.Visible = visible
-			for _, row in pairs(self.Labels) do
-				setVisible(row, visible)
-			end
-		end
-		return status
-	end
-
-	function group:CreateDivider()
-		if type(groupbox.CreateDivider) == "function" then
-			return groupbox:CreateDivider()
-		end
+	Core.normalizeMultiSelection = Core.normalizeMultiSelection or function(selection)
+		if type(selection) == "table" then return selection end
+		if type(selection) == "string" and selection ~= "" then return { selection } end
 		return {}
 	end
 
-	return group
-end
+	Core.normalizeDropdownValue = Core.normalizeDropdownValue or function(selection, fallback)
+		if type(selection) == "table" then return selection[1] or fallback or "" end
+		if type(selection) == "string" and selection ~= "" then return selection end
+		return fallback or ""
+	end
 
-function Core.dropdownEntryText(value)
-	if type(value) == "table" then
-		return tostring(value.Title or value.Name or value.Text or value[1] or "")
+	Core.sliderDisplayPrecision = Core.sliderDisplayPrecision or function(minValue, maxValue, increment)
+		local step = tonumber(increment)
+		if step and step >= 1 then return 0 end
+		local range = math.abs((maxValue or 100) - (minValue or 0))
+		if range <= 1 then return 3 end
+		if range <= 10 then return 2 end
+		return 1
 	end
-	return tostring(value or "")
-end
 
-function Core.normalizeMultiSelection(selection)
-	local picked = {}
-	if type(selection) == "string" then
-		if selection ~= "" then
-			table.insert(picked, selection)
-		end
-		return picked
-	end
-	if type(selection) ~= "table" then
-		return picked
-	end
-	local hasBooleanMap = false
-	for key, value in pairs(selection) do
-		if type(key) ~= "number" and type(value) == "boolean" then
-			hasBooleanMap = true
-			break
-		end
-	end
-	if hasBooleanMap then
-		for item, enabled in pairs(selection) do
-			if type(item) == "number" then
-				if enabled ~= nil and enabled ~= false then
-					local text = Core.dropdownEntryText(enabled)
-					if text ~= "" then
-						table.insert(picked, text)
-					end
-				end
-			elseif enabled then
-				local text = Core.dropdownEntryText(item)
-				if text ~= "" then
-					table.insert(picked, text)
-				end
-			end
-		end
-		return picked
-	end
-	for _, value in ipairs(selection) do
-		local text = Core.dropdownEntryText(value)
-		if text ~= "" then
-			table.insert(picked, text)
-		end
-	end
-	if #picked == 0 then
-		for key, value in pairs(selection) do
-			if type(key) ~= "number" and value == true then
-				local text = Core.dropdownEntryText(key)
-				if text ~= "" then
-					table.insert(picked, text)
-				end
-			end
-		end
-	end
-	return picked
-end
+	Core.bindUiState = Core.bindUiState or function(key, wrapper, kind, raw) end
 
-function Core.normalizeDropdownValue(selection, fallback)
-	if type(selection) == "table" then
-		local text = Core.dropdownEntryText(selection)
-		if text ~= "" then
-			return text
-		end
-		if selection[1] ~= nil then
-			return Core.normalizeDropdownValue(selection[1], fallback)
-		end
-	elseif type(selection) == "string" or type(selection) == "number" or type(selection) == "boolean" then
-		return tostring(selection)
-	end
-	return fallback
-end
+	Core.clearUiStateBindings = Core.clearUiStateBindings or function() end
 
-function Core.selectionFirst(selection, fallback)
-	local items = Core.normalizeMultiSelection(selection)
-	if items[1] and items[1] ~= "" then
-		return items[1]
-	end
-	return fallback or ""
-end
+	Core._UiTabRegistry = Core._UiTabRegistry or {}
 
-function Core.listContains(selection, value)
-	local list = Core.normalizeMultiSelection(selection)
-	if #list == 0 then
-		return false
-	end
-	return table.find(list, value) ~= nil
-end
+	Core.setupHubKeybinds = Core.setupHubKeybinds or function() end
 
-function Core.listMatches(selection, value)
-	local list = Core.normalizeMultiSelection(selection)
-	if #list == 0 then
-		return true
-	end
-	if Core.listContains(list, "Any") or Core.listContains(list, "All") or Core.listContains(list, "any") then
-		return true
-	end
-	return Core.listContains(list, value)
-end
-
-function Core.uiIcon(icon)
-	return tostring(icon or ""):match("%d+$") or ""
-end
-
-function Core.uiElementId(text)
-	return (tostring(text or "Element"):gsub("[^%w_]", "_"))
-end
-
-function Core.hasPremiumAccess()
-	if getgenv().JD_IS_PREMIUM == true then
-		return true
-	end
-	local access = ENV.Alleral_Access
-	if type(access) == "table" and type(access.isPremium) == "function" then
-		return access.isPremium() == true
-	end
-	return true
-end
-
-function Core.accessMode()
-	local access = ENV.Alleral_Access
-	if type(access) == "table" and type(access.mode) == "function" then
-		return access.mode()
-	end
-	return "public"
-end
-
-function Core.gameUiSettings(options)
-	options = type(options) == "table" and options or {}
-	local fileSettings = type(options.FileSettings) == "table" and options.FileSettings or {}
-	return {
-		Name = options.Name or "Alleral",
-		Subtitle = options.Subtitle,
-		Icon = options.Icon or "sparkles",
-		FileSettings = {
-			RootFolder = fileSettings.RootFolder or "Alleral_Configs",
-			ConfigFolder = fileSettings.ConfigFolder or options.configFolder or "Interface",
-		},
-	}
-end
-
-function Core.settingsExtrasOptions(window, ui, state, savedKeys, saveFn, settingsFile, version, extra)
-	extra = type(extra) == "table" and extra or {}
-	return {
-		state = state,
-		savedKeys = savedKeys,
-		saveFn = saveFn,
-		settingsFile = settingsFile,
-		settingsPath = extra.settingsPath,
-		version = version,
-		window = window,
-		uiBundle = ui,
-		gameId = extra.gameId,
-		scriptId = extra.scriptId,
-		onApply = extra.onApply,
-		cloudOnlyTab = extra.cloudOnlyTab,
-		skipCloudConfig = extra.skipCloudConfig,
-		skipHubActions = extra.skipHubActions,
-		skipScriptStatus = extra.skipScriptStatus,
-	}
-end
-
-function Core.finalizeGameUi(window, ui, options)
-	options = type(options) == "table" and options or {}
-	if type(window) == "table" and window._rawWindow then
-		Core.registerUiWindow(window)
-		task.defer(function()
-			Core.repairUiWindow(window)
-			local windUi = ui and (ui.WindUI or ui.Library)
-			if type(ENV.Alleral_UiCustomization) == "table" and windUi and type(windUi.ImportCustomization) == "function" then
-				pcall(function()
-					windUi:ImportCustomization(ENV.Alleral_UiCustomization)
-				end)
-			end
-		end)
-	end
-	if options.notify ~= false then
-		Core.notifyBootReady({
-			Name = options.Name or "Alleral",
-			Subtitle = options.Subtitle,
-		})
-	end
-	return window
-end
-
-function Core.buildUiWindow(ui, settings)
-	settings = settings or {}
-	local lib = ui and (ui.WindUI or ui.Library)
-	if not lib then
-		return nil
-	end
-	local Players = game:GetService("Players")
-	local lp = Players.LocalPlayer
-	local playerLabel = lp and ((lp.DisplayName ~= "" and lp.DisplayName) or lp.Name) or ""
-	local windowSettings = {
-		Title = settings.Name or "Alleral",
-		Author = settings.Subtitle or playerLabel,
-		Folder = (settings.FileSettings or {}).RootFolder or (settings.FileSettings or {}).ConfigFolder or "Alleral_Configs",
-		Icon = Core.windUiIcon(settings.Icon or "sparkles"),
-		Theme = "Arrrel",
-		NewElements = true,
-		HideSearchBar = false,
-		AutoScale = true,
-		Size = UDim2.fromOffset(868, 650),
-		MinSize = Vector2.new(680, 420),
-		MaxSize = Vector2.new(1200, 900),
-		UICorner = 12,
-		UIPadding = 24,
-		SideBarWidth = 260,
-		ElementPadding = 16,
-		Resizable = true,
-		OpenButton = {
-			Title = "Alleral",
-			Enabled = true,
-			Draggable = true,
-			OnlyMobile = false,
-			Color = ColorSequence.new(ALLERAL_ACCENT, ALLERAL_ACCENT_ALT),
-		},
-	}
-	local rawWindow = lib:CreateWindow(windowSettings)
-	if not rawWindow and type(lib.ReleaseWindow) == "function" then
-		pcall(function()
-			lib:ReleaseWindow(lib.Window)
-		end)
-		task.wait(0.05)
-		rawWindow = lib:CreateWindow(windowSettings)
-	end
-	if not rawWindow then
-		Core.logWarn("Alleral window create failed")
-		return nil
-	end
-	applyAlleralTheme(ui)
-	local window = {
-		_rawWindow = rawWindow,
-		_ui = ui,
-		_library = lib,
-		_windSection = nil,
-	}
-	Core.registerUiWindow(window)
-	Core.flushPendingNotifications()
-	registerUiScaleHooks(lib)
-	task.defer(function()
-		Core.repairUiWindow(window)
-		if type(lib.RefreshViewportScale) == "function" then
-			pcall(function()
-				lib:RefreshViewportScale(window._rawWindow)
-			end)
-		end
-	end)
-	function window:AddTab(name, icon)
-		if not self._rawWindow or type(self._rawWindow.Tab) ~= "function" then
-			Core.logWarn("AddTab skipped — window missing")
-			return nil
-		end
-		return self._rawWindow:Tab({
-			Title = name,
-			Icon = Core.windUiIcon(icon),
-			Border = true,
-		})
-	end
-	window._ui = ui
-	window._library = lib
-	return window
-end
-
-function Core.resolveUiWindow(section)
-	if type(section) ~= "table" then
-		return nil
-	end
-	local window = section._window or section
-	if type(window) == "table" and window._rawWindow then
-		return window
-	end
-	if type(section._rawWindow) == "table" then
-		if type(section._window) == "table" then
-			return section._window
-		end
-		return {
-			_rawWindow = section._rawWindow,
-			_ui = section._ui,
-			AddTab = section.AddTab,
-		}
-	end
-	return nil
-end
-
-function Core.buildUiSection(window)
-	if type(window) ~= "table" then
-		return { _window = window, _ui = nil, _rawWindow = nil }
-	end
-	return {
-		_window = window,
-		_ui = window._ui,
-		_rawWindow = window._rawWindow,
-	}
-end
-
-function Core.buildUiTab(section, name, icon, columns, id)
-	local window = Core.resolveUiWindow(section)
-	if not window or not window._rawWindow then
-		Core.logWarn("buildUiTab skipped — window missing")
-		return Core.wrapUiTab(nil, type(section) == "table" and section._ui or nil, window)
-	end
-	local iconArg = nil
-	if icon then
-		local numeric = tonumber(Core.uiIcon(icon))
-		if numeric then
-			iconArg = numeric
-		elseif type(icon) == "string" and icon ~= "" and not icon:find("rbxassetid", 1, true) then
-			iconArg = icon
-		end
-	end
-	local rawTab
-	if iconArg then
-		rawTab = window:AddTab(name, iconArg)
-	else
-		rawTab = window:AddTab(name)
-	end
-	if not rawTab then
-		Core.logWarn("buildUiTab AddTab failed for " .. tostring(name))
-	end
-	local wrapped = Core.wrapUiTab(rawTab, window._ui or section._ui, window)
-	local requested = math.max(1, tonumber(columns) or 1)
-	if requested >= 2 then
-		local camera = workspace.CurrentCamera
-		if camera then
-			local shortSide = math.min(camera.ViewportSize.X, camera.ViewportSize.Y)
-			if shortSide <= 900 then
-				requested = 1
-			end
-		end
-	end
-	wrapped._columnCount = requested
-	return wrapped
-end
-
-function Core.onUiSave(saveFn)
-	return function(_, callback)
-		return function(...)
-			local result = callback(...)
-			if type(saveFn) == "function" then
-				saveFn()
-			end
-			return result
-		end
-	end
-end
-
-function Core.buildUiGroup(tab, name, column, callbackWrapper, icon, id)
-	name = tostring(name or "Group")
-	if type(tab) ~= "table" or type(tab.CreateGroupbox) ~= "function" then
-		Core.logWarn("buildUiGroup skipped — tab missing for " .. name)
-		return Core.createStubUiGroup(name)
-	end
-	local ok, groupbox = pcall(function()
-		return tab:CreateGroupbox({
-			Name = name,
-			Column = column or 1,
-			Icon = icon and Core.uiIcon(icon) or nil,
-		}, id or Core.uiElementId(name))
-	end)
-	if not ok or not groupbox then
-		Core.logWarn("buildUiGroup CreateGroupbox failed for " .. name .. ": " .. tostring(groupbox))
-		return Core.createStubUiGroup(name)
-	end
-	if type(Core.wrapUiGroup) ~= "function" then
-		Core.logWarn("wrapUiGroup missing — returning stub for " .. name)
-		return Core.createStubUiGroup(name)
-	end
-	if callbackWrapper then
-		return Core.wrapUiGroup(groupbox, callbackWrapper)
-	end
-	return Core.wrapUiGroup(groupbox)
-end
-
-function Core.filterDropdownOptions(values, query)
-	query = tostring(query or ""):lower()
-	if query == "" then
-		return values
-	end
-	local filtered = {}
-	for _, value in ipairs(values or {}) do
-		if tostring(value):lower():find(query, 1, true) then
-			table.insert(filtered, value)
-		end
-	end
-	return filtered
-end
-
-function Core.makeSupervisor(state, loops, controllers, name, interval, callback)
-	if controllers[name] then
-		controllers[name].enabled = false
-		controllers[name] = nil
-	end
-	local loopState = {
-		enabled = true,
-		token = HttpService:GenerateGUID(false),
-	}
-	loops[name] = loopState
-	controllers[name] = loopState
-	task.spawn(function()
-		local token = loopState.token
-		while state.HubRunning and loopState.enabled and controllers[name] == loopState and loopState.token == token do
-			local ok, err = pcall(callback)
-			if not ok then
-				Core.reportError("Loop:" .. name, err)
-				warn("[Alleral:" .. name .. "] " .. tostring(err))
-				task.wait(math.min(5, interval * 2))
-			else
-				task.wait(interval)
-			end
-		end
-	end)
-end
-
-function Core.clearAntiAfk()
-	if ENV._AlleralAntiAfkIdledConn and ENV._AlleralAntiAfkIdledConn.Disconnect then
-		pcall(function()
-			ENV._AlleralAntiAfkIdledConn:Disconnect()
-		end)
-	end
-	ENV._AlleralAntiAfkIdledConn = nil
-	ENV._AlleralAntiAfkLoopToken = (ENV._AlleralAntiAfkLoopToken or 0) + 1
-end
-
-function Core.setupAntiAfk(player)
-	if not player then
-		return
-	end
-	Core.clearAntiAfk()
-	local getConnections = ENV.getconnections or ENV.get_signal_cons
-	if getConnections then
-		for _, connection in ipairs(getConnections(player.Idled)) do
-			if connection.Disable then
-				connection:Disable()
-			elseif connection.Disconnect then
-				connection:Disconnect()
-			end
-		end
-	else
-		local VirtualUser = game:GetService("VirtualUser")
-		ENV._AlleralAntiAfkIdledConn = player.Idled:Connect(function()
-			pcall(function()
-				VirtualUser:CaptureController()
-				VirtualUser:ClickButton2(Vector2.new(0, 0))
-			end)
-		end)
-	end
-	ENV._AlleralAntiAfkLoopToken = (ENV._AlleralAntiAfkLoopToken or 0) + 1
-	local loopToken = ENV._AlleralAntiAfkLoopToken
-	task.spawn(function()
-		local VirtualUser = game:GetService("VirtualUser")
-		while player.Parent and ENV._AlleralAntiAfkLoopToken == loopToken do
-			task.wait(120)
-			pcall(function()
-				local camera = workspace.CurrentCamera
-				if not camera then
-					return
-				end
-				VirtualUser:Button2Down(Vector2.new(100, 100), camera.CFrame)
-				task.wait(0.2)
-				VirtualUser:Button2Up(Vector2.new(100, 100), camera.CFrame)
-			end)
-		end
-	end)
-end
-
-function Core.bindToggle(state, saveSettings, group, label, key, options)
-	options = type(options) == "table" and options or {}
-	if not group or type(group.CreateToggle) ~= "function" then
-		return
-	end
-	group:CreateToggle(label, state[key], options.tooltip, function(value)
-		state[key] = value
-		if type(options.onChange) == "function" then
-			pcall(options.onChange, value)
-		end
-		if type(saveSettings) == "function" then
-			saveSettings()
-		end
-	end)
-end
-
-function Core.bindSlider(state, saveSettings, group, label, minVal, maxVal, key, options)
-	options = type(options) == "table" and options or {}
-	if not group or type(group.CreateSlider) ~= "function" then
-		return
-	end
-	group:CreateSlider(label, minVal, maxVal, state[key], function(value)
-		state[key] = value
-		if type(options.onChange) == "function" then
-			pcall(options.onChange, value)
-		end
-		if type(saveSettings) == "function" then
-			saveSettings()
-		end
-	end, options.tooltip, options.increment)
-end
-
-function Core.waitChild(parent, name, timeout)
-	local gameHelpers = ENV.Alleral_GameHelpers
-	if type(gameHelpers) == "table" and type(gameHelpers.waitChild) == "function" then
-		return gameHelpers.waitChild(parent, name, timeout)
-	end
-	if not parent then
-		return nil
-	end
-	return parent:WaitForChild(name, timeout or 5)
-end
-
-function Core.initAnalytics()
-	local tracker = ENV.Alleral_Analytics
-	if tracker and tracker.Track then
-		tracker:Track()
-	end
-	return tracker
-end
-
-function Core.reportError(scope, err, details)
-	local reporter = ENV.Alleral_ReportError
-	if type(reporter) == "function" then
-		pcall(reporter, scope, err, details)
-	end
-end
-
-function Core.logEvent(category, message, data)
-	local logger = ENV.Alleral_LogEvent
-	if type(logger) == "function" then
-		pcall(logger, category, message, data)
-	end
-end
-
+	Core.registerExploitCommandPalette = Core.registerExploitCommandPalette or function() end
 end

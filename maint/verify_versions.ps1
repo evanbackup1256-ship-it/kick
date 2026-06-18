@@ -77,69 +77,28 @@ if ($loader -match 'LOADER_VERSION = "([^"]+)"')
     Fail "loader.luau missing LOADER_VERSION"
 }
 
-if ($release.onyxVersion)
+if ($release.rayfieldVersion)
 {
-    if ($loader -match 'local ONYX_VERSION = (\d+)')
+    if ($loader -match 'local RAYFIELD_VERSION = (\d+)')
     {
-        $onyxVersion = [int]$Matches[1]
-        if ($onyxVersion -ne [int]$release.onyxVersion)
+        $rayfieldVersion = [int]$Matches[1]
+        if ($rayfieldVersion -ne [int]$release.rayfieldVersion)
         {
-            Fail "loader ONYX_VERSION ($onyxVersion) != release.json ($($release.onyxVersion))"
+            Fail "loader RAYFIELD_VERSION ($rayfieldVersion) != release.json ($($release.rayfieldVersion))"
         } else
         {
-            Pass "loader onyx version $onyxVersion"
+            Pass "loader rayfield version $rayfieldVersion"
         }
     } else
     {
-        Fail "loader.luau missing ONYX_VERSION"
+        Fail "loader.luau missing RAYFIELD_VERSION"
     }
 
-    $onyxSourcePath = Join-Path $root "ui/onyx/source.luau"
-    if (Test-Path $onyxSourcePath)
+    $rayfieldSourcePath = Join-Path $root "ui/rayfield/source.luau"
+    if (Test-Path $rayfieldSourcePath)
     {
-        $onyxSource = Get-Content $onyxSourcePath -Raw
-        if ($onyxSource -match 'local ALLERAL_ONYX_VERSION = (\d+)')
-        {
-            $sourceVersion = [int]$Matches[1]
-            if ($sourceVersion -ne [int]$release.onyxVersion)
-            {
-                Fail "ui/onyx/source.luau ALLERAL_ONYX_VERSION ($sourceVersion) != release.json ($($release.onyxVersion))"
-            } else
-            {
-                Pass "onyx source version $sourceVersion"
-            }
-        } else
-        {
-            Fail "ui/onyx/source.luau missing ALLERAL_ONYX_VERSION"
-        }
-    } else
-    {
-        Fail "ui/onyx/source.luau missing"
-    }
-}
-
-if ($release.irisVersion)
-{
-    if ($loader -match 'local IRIS_VERSION = (\d+)')
-    {
-        $irisVersion = [int]$Matches[1]
-        if ($irisVersion -ne [int]$release.irisVersion)
-        {
-            Fail "loader IRIS_VERSION ($irisVersion) != release.json ($($release.irisVersion))"
-        } else
-        {
-            Pass "loader iris version $irisVersion"
-        }
-    } else
-    {
-        Fail "loader.luau missing IRIS_VERSION"
-    }
-
-    $irisSourcePath = Join-Path $root "ui/rayfield/source.luau"
-    if (Test-Path $irisSourcePath)
-    {
-        $irisSource = Get-Content $irisSourcePath -Raw
-        if ($irisSource -match 'local ALLERAL_RAYFIELD_VERSION = (\d+)')
+        $rayfieldSource = Get-Content $rayfieldSourcePath -Raw
+        if ($rayfieldSource -match 'local ALLERAL_RAYFIELD_VERSION = (\d+)')
         {
             $sourceVersion = [int]$Matches[1]
             if ($sourceVersion -ne [int]$release.rayfieldVersion)
@@ -344,19 +303,12 @@ if ($site.coreVersion -ne $release.core)
 {
     Pass "site coreVersion $($site.coreVersion)"
 }
-if ($release.onyxVersion -and $site.onyxVersion -ne $release.onyxVersion)
+if ($release.rayfieldVersion -and $site.rayfieldVersion -ne $release.rayfieldVersion)
 {
-    Fail "site.json onyxVersion ($($site.onyxVersion)) != release.json ($($release.onyxVersion))"
-} elseif ($release.onyxVersion)
+    Fail "site.json rayfieldVersion ($($site.rayfieldVersion)) != release.json ($($release.rayfieldVersion))"
+} elseif ($release.rayfieldVersion)
 {
-    Pass "site onyxVersion $($site.onyxVersion)"
-}
-if ($release.irisVersion -and $site.irisVersion -ne $release.irisVersion)
-{
-    Fail "site.json irisVersion ($($site.irisVersion)) != release.json ($($release.irisVersion))"
-} elseif ($release.irisVersion)
-{
-    Pass "site irisVersion $($site.irisVersion)"
+    Pass "site rayfieldVersion $($site.rayfieldVersion)"
 }
 
 $analyticsPath = Join-Path $root "hub/analytics.luau"

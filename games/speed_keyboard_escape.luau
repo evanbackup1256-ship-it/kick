@@ -835,7 +835,7 @@ end)
 local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Speed Keyboard Escape · v" .. VERSION,
 	Icon = "keyboard",
-	Theme = "Linoria",
+	Theme = "Default",
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"

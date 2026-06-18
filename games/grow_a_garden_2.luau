@@ -265,7 +265,7 @@ if state.AntiAFK ~= false then Core.setupAntiAfk(LocalPlayer) end
 local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Grow a Garden 2 · v" .. VERSION,
 	Icon = "seedling",
-	Theme = "Linoria",
+	Theme = "Default",
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"

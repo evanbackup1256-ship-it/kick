@@ -1,8 +1,8 @@
 local Core = {}
 Core.VERSION = "2.9.10"
 Core._CORE_ARTIFACT = "base"
-Core.UI_LIBRARY = "Alleral"
-Core.ALLERAL_UI_VERSION = "5.3.0-maclib"
+Core.UI_LIBRARY = "Rayfield"
+Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "2.0.0-rayfield"
 Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")
@@ -164,7 +164,7 @@ function Core.safeCall(scope, fn, ...)
 			message = tostring(err or "?"),
 		})
 	end
-	Core.reportError(tostring(scope or "Core"), err)
+	if type(Core.reportError) == "function" then Core.reportError(tostring(scope or "Core"), err) end
 	Core.logWarn(tostring(scope or "Core") .. ": " .. tostring(err))
 	return nil
 end
@@ -301,17 +301,13 @@ end
 
 function Core.getWindUi()
 	local ui = ENV.Alleral_UI
-	if type(ui) ~= "table" then
-		return nil
-	end
+	if type(ui) ~= "table" then return nil end
 	return ui.Library or ui.Alleral
 end
 
 function Core.notifyWindUi(payload)
 	local windUi = Core.getWindUi()
-	if not windUi then
-		return false
-	end
+	if not windUi then return false end
 	local notifyPayload = type(payload) == "table" and payload or { Description = tostring(payload) }
 	if notifyPayload.Content and not notifyPayload.Description then
 		notifyPayload.Description = notifyPayload.Content
@@ -319,14 +315,13 @@ function Core.notifyWindUi(payload)
 	if notifyPayload.Duration and not notifyPayload.Lifetime then
 		notifyPayload.Lifetime = notifyPayload.Duration
 	end
-	local ok = false
+	if type(windUi.Notification) == "function" then
+		return pcall(windUi.Notification, windUi, notifyPayload)
+	end
 	if type(windUi.Notify) == "function" then
-		ok = pcall(windUi.Notify, windUi, notifyPayload)
+		return pcall(windUi.Notify, windUi, notifyPayload)
 	end
-	if not ok and type(windUi.Notification) == "function" then
-		ok = pcall(windUi.Notification, windUi, notifyPayload)
-	end
-	return ok == true
+	return false
 end
 
 function Core.queueNotification(payload)

@@ -41,10 +41,10 @@ $loaderPath = Join-Path $root "loader.luau"
 $loaderRaw = Get-Content $loaderPath -Raw -Encoding UTF8
 $loaderRaw = [regex]::Replace($loaderRaw, 'local LOADER_VERSION = "[^"]+"', ('local LOADER_VERSION = "' + $release.loader + '"'))
 $loaderRaw = [regex]::Replace($loaderRaw, '(?m)^\tloader = "[^"]+"', ("`tloader = `"$($release.loader)`""), 1)
-if ($null -ne $release.maclibVersion) {
-    $maclibVersionVal = [int]$release.maclibVersion
-    $loaderRaw = [regex]::Replace($loaderRaw, 'local MACLIB_VERSION = \d+', ('local MACLIB_VERSION = ' + $maclibVersionVal))
-    $loaderRaw = [regex]::Replace($loaderRaw, 'maclibVersion = \d+,', ('maclibVersion = ' + $maclibVersionVal + ','))
+if ($null -ne $release.rayfieldVersion) {
+    $rayfieldVersionVal = [int]$release.rayfieldVersion
+    $loaderRaw = [regex]::Replace($loaderRaw, 'local RAYFIELD_VERSION = \d+', ('local RAYFIELD_VERSION = ' + $rayfieldVersionVal))
+    $loaderRaw = [regex]::Replace($loaderRaw, 'rayfieldVersion = \d+,', ('rayfieldVersion = ' + $rayfieldVersionVal + ','))
 }
 $fallbackFields = @(
     @{ Key = "core"; Prop = "core" },
@@ -93,22 +93,21 @@ $siteRaw = Get-Content $siteSrc -Raw -Encoding UTF8
 $siteRaw = [regex]::Replace($siteRaw, '"loaderVersion"\s*:\s*"[^"]*"', ('"loaderVersion": "' + $release.loader + '"'))
 $siteRaw = [regex]::Replace($siteRaw, 'bootstrap\.luau\?v=[^"&]+', ('bootstrap.luau?v=2.0.4'))
 $siteRaw = [regex]::Replace($siteRaw, '"coreVersion"\s*:\s*"[^"]*"', ('"coreVersion": "' + $release.core + '"'))
-$uiLibrary = if ($release.ui) { $release.ui } else { "Maclib" }
+$uiLibrary = if ($release.ui) { $release.ui } else { "Rayfield" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiLibrary"\s*:\s*"[^"]*"', ('"uiLibrary": "' + $uiLibrary + '"'))
-$uiVersion = if ($release.alleral) { $release.alleral } elseif ($release.windui) { $release.windui } else { "5.3.0-maclib" }
+$uiVersion = if ($release.alleral) { $release.alleral } elseif ($release.windui) { $release.windui } else { "2.0.0-rayfield" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiVersion"\s*:\s*"[^"]*"', ('"uiVersion": "' + $uiVersion + '"'))
-if ($null -ne $release.maclibVersion) {
-    $maclibVersionVal = [int]$release.maclibVersion
-    if ($siteRaw -match '"maclibVersion"\s*:\s*\d+') {
-        $siteRaw = [regex]::Replace($siteRaw, '"maclibVersion"\s*:\s*\d+', ('"maclibVersion": ' + $maclibVersionVal))
+if ($null -ne $release.rayfieldVersion) {
+    $rayfieldVersionVal = [int]$release.rayfieldVersion
+    if ($siteRaw -match '"rayfieldVersion"\s*:\s*\d+') {
+        $siteRaw = [regex]::Replace($siteRaw, '"rayfieldVersion"\s*:\s*\d+', ('"rayfieldVersion": ' + $rayfieldVersionVal))
     } else {
         $siteRaw = [regex]::Replace(
             $siteRaw,
             '("uiVersion"\s*:\s*"[^"]*"\s*,)',
-            ('$1' + "`n  ""maclibVersion"": " + $maclibVersionVal + ",")
+            ('$1' + "`n  ""rayfieldVersion"": " + $rayfieldVersionVal + ",")
         )
     }
-    $siteRaw = [regex]::Replace($siteRaw, '"rayfieldVersion"\s*:\s*\d+\s*,?\s*\r?\n?', '')
 }
 if ($hashBumpNeeded) {
     $siteRaw = [regex]::Replace($siteRaw, '"updatedAt"\s*:\s*"[^"]*"', ('"updatedAt": "' + $updatedAt + '"'))

@@ -16,6 +16,5 @@
     "helpers":  "1.8",
     "security":  "1.3",
     "access":  "1.1",
-    "onyxVersion":  1,
-    "rayfieldVersion":  1
+    "rayfieldVersion":  3
 }

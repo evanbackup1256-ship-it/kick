@@ -423,14 +423,12 @@ function Core.releaseUiWindow()
 		end)
 	end
 	local ui = ENV.Alleral_UI
-	local lib = ui and (ui.Library or ui.Alleral or ui.Maclib)
+	local lib = ui and (ui.Library or ui.Alleral)
 	if type(window) == "table" and window._rawWindow and type(window._rawWindow.Unload) == "function" then
 		pcall(function()
 			window._rawWindow:Unload()
 		end)
 	end
-	ENV._AlleralMaclib = nil
-	ENV._AlleralMaclibSourceKey = nil
 	ENV._AlleralUiLibrary = nil
 	ENV.Alleral_UiWindow = nil
 	getgenv().Alleral_UiWindow = nil
@@ -1189,7 +1187,7 @@ function Core.buildQuickTogglesGroup(tab, options)
 	if state.AntiAFK ~= nil then
 		group:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Prevents idle kick.", function(value)
 			state.AntiAFK = value
-			if value then
+			if value and type(Core.setupAntiAfk) == "function" then
 				Core.setupAntiAfk(game:GetService("Players").LocalPlayer)
 			end
 			if type(saveFn) == "function" then
@@ -1329,7 +1327,7 @@ function Core.setupHubKeybinds(options)
 	local panicKey = options.panicKey or Enum.KeyCode.Delete
 	local uiKey = options.uiKey or Enum.KeyCode.RightControl
 	local insertKey = options.insertKey or Enum.KeyCode.Insert
-	local libraryHandlesUiKeybind = Core.UI_LIBRARY == "Maclib"
+	local libraryHandlesUiKeybind = Core.UI_LIBRARY == "Rayfield"
 	ENV._Alleral_KeybindConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or input.UserInputType ~= Enum.UserInputType.Keyboard then
 			return
@@ -1549,7 +1547,7 @@ function Core.buildThemeStudioGroup(tab, options)
 		end
 	end, "How bright the accent reads.", 1)
 
-	local themeNames = { "Private", "Obsidian", "Linoria", "Fluent", "Graphite", "Midnight" }
+	local themeNames = { "Default", "Ocean", "AmberGlow", "Light", "Amethyst", "Green", "Bloom", "DarkBlue", "Serenity" }
 	group:CreateDropdown("Hub theme", themeNames, ENV.Alleral_UiThemePreset or "Private", function(value)
 		ENV.Alleral_UiThemePreset = value
 		local win = options.window
@@ -1594,7 +1592,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	local group = Core.buildUiGroup(tab, "Customization V2", column, nil, nil, "CustomizationV2")
 
 	if not windUi or type(windUi.SetMotionProfile) ~= "function" then
-		group:CreateLabel("MacLib UI layer unavailable — re-run the loader.")
+		group:CreateLabel("Rayfield UI layer active -- manage appearance below.")
 		return group
 	end
 
@@ -2263,9 +2261,6 @@ function Core.uiWindowSettings(options)
 	options = type(options) == "table" and options or {}
 	local base = Core.gameUiSettings(options)
 	local theme = options.Theme or "Default"
-	if theme == "Private" then
-		theme = "Maclib"
-	end
 	base.Theme = theme
 	base.Size = options.Size or UDim2.fromOffset(920, 680)
 	base.Acrylic = options.Acrylic ~= false

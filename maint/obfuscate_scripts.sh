@@ -19,7 +19,7 @@ for f in "$@"; do
     # ── Collect all local declarations ──
     while ($src =~ /^\s*local\s+([a-zA-Z_]\w*)/gm) {
       my $v = $1;
-      next if $v =~ /^(Iris|MacLib|game|workspace|Players|RunService|UserInputService|StarterGui|ENV|_G|script|Instance|Vector[23]|Color3|UDim2?|CFrame|Ray|Region3|NumberRange|NumberSequence|ColorSequence|BrickColor|TweenInfo|Random|Rect|DateTime|tick|time|wait|spawn|delay|pcall|xpcall|print|warn|error|assert|type|typeof|tostring|tonumber|next|pairs|ipairs|select|unpack|setmetatable|getmetatable|rawget|rawset|rawlen|string|table|math|coroutine|debug|os|io|bit32|buffer|utf8|require|loadstring|load|getfenv|setfenv|getgenv|getrenv|getreg|hookfunction|clonefunction|checkcaller|newcclosure|iscclosure|islclosure|syn|crypt|Drawing|WebSocket|HttpService|TweenService|ContentProvider|InsertService|ScriptContext|LogService|NetworkClient|TeleportService|VirtualUser|VRService)$/;
+      next if $v =~ /^(Rayfield|game|workspace|Players|RunService|UserInputService|StarterGui|ENV|_G|script|Instance|Vector[23]|Color3|UDim2?|CFrame|Ray|Region3|NumberRange|NumberSequence|ColorSequence|BrickColor|TweenInfo|Random|Rect|DateTime|tick|time|wait|spawn|delay|pcall|xpcall|print|warn|error|assert|type|typeof|tostring|tonumber|next|pairs|ipairs|select|unpack|setmetatable|getmetatable|rawget|rawset|rawlen|string|table|math|coroutine|debug|os|io|bit32|buffer|utf8|require|loadstring|load|getfenv|setfenv|getgenv|getrenv|getreg|hookfunction|clonefunction|checkcaller|newcclosure|iscclosure|islclosure|syn|crypt|Drawing|WebSocket|HttpService|TweenService|ContentProvider|InsertService|ScriptContext|LogService|NetworkClient|TeleportService|VirtualUser|VRService)$/;
       next if length($v) <= 2;
       next if exists $rename{$v};
 
