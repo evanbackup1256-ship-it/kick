@@ -38,6 +38,11 @@ return function(Core)
 			return ENV._AlleralRayfieldBundle
 		end
 
+		if type(ENV._AlleralRayfieldSource) == "string" and #ENV._AlleralRayfieldSource > 1000 then
+			ENV._AlleralRayfieldBundle = ENV._AlleralRayfieldSource
+			return ENV._AlleralRayfieldBundle
+		end
+
 		if type(ENV._AlleralIrisBundle) == "string" and #ENV._AlleralIrisBundle > 1000 then
 			ENV._AlleralRayfieldBundle = ENV._AlleralIrisBundle
 			return ENV._AlleralRayfieldBundle
@@ -103,7 +108,12 @@ return function(Core)
 			end
 		end
 
-		ENV.loadstring = ENV.loadstring or loadstring or load
+		local loadStringFn = ENV.loadstring or loadstring or load
+		if type(loadStringFn) ~= "function" then
+			return nil, "loadstring not available in this executor"
+		end
+		ENV.loadstring = loadStringFn
+
 		ENV.game = ENV.game or game
 		if type(task) == "table" then
 			ENV.task = task
@@ -173,7 +183,6 @@ return function(Core)
 
 				local tl = i("Frame", main, "TabList")
 				i("UIListLayout", tl)
-				-- Padding for tablist
 				local pad = i("UIPadding", tl)
 				local tlt = i("Frame", tl, "Template")
 				i("ImageLabel", tlt, "Image")
@@ -229,10 +238,14 @@ return function(Core)
 		end
 
 		local src = fetchRayfieldSource()
-		if not src then return nil, "Rayfield source unavailable" end
+		if type(src) ~= "string" or #src <= 100 then
+			return nil, "Rayfield source download empty (HTTP blocked or URL unreachable)"
+		end
 
-		local chunk, err = ENV.loadstring(src, "@Rayfield/source")
-		if not chunk then return nil, "Rayfield compile: " .. tostring(err) end
+		local chunk, err = loadStringFn(src, "@Rayfield/source")
+		if type(chunk) ~= "function" then
+			return nil, "Rayfield compile: " .. tostring(err)
+		end
 
 		if setfenv then pcall(setfenv, chunk, ENV) end
 
@@ -242,9 +255,11 @@ return function(Core)
 			if type(Core.logWarn) == "function" then Core.logWarn("Rayfield runtime: " .. errMsg) end
 			return nil, "Rayfield runtime: " .. errMsg
 		end
-		if type(pkg) ~= "table" or type(pkg.CreateWindow) ~= "function" then
-			if type(Core.logWarn) == "function" then Core.logWarn("Rayfield returned: " .. type(pkg)) end
-			return nil, "Rayfield returned non-window: " .. type(pkg)
+		if type(pkg) ~= "table" then
+			return nil, "Rayfield returned non-table: " .. type(pkg)
+		end
+		if type(pkg.CreateWindow) ~= "function" then
+			return nil, "Rayfield.CreateWindow is missing (got " .. type(pkg.CreateWindow) .. ")"
 		end
 
 		ENV._AlleralRayfield = pkg
@@ -313,7 +328,11 @@ return function(Core)
 			settings = type(settings) == "table" and settings or {}
 			local rf, err = bootRayfield()
 			if not rf then
-				Core.logWarn("Rayfield boot failed: " .. tostring(err))
+				local msg = "Rayfield boot failed: " .. tostring(err)
+				Core.logWarn(msg)
+				if type(Core.pushErrorLog) == "function" then
+					Core.pushErrorLog("Rayfield", msg)
+				end
 				return nil
 			end
 
@@ -321,23 +340,21 @@ return function(Core)
 				or (type(settings.FileSettings) == "table" and (settings.FileSettings.RootFolder or settings.FileSettings.ConfigFolder))
 				or "Alleral_Configs"
 
-			local ok, rfWindow = pcall(function()
-				return rf:CreateWindow({
-					Name = settings.Title or settings.Name or "Alleral",
-					Subtitle = settings.Subtitle or settings.Author or "",
-					LoadingTitle = "Alleral",
-					LoadingSubtitle = "Loading...",
-					ConfigurationSaving = {
-						Enabled = true,
-						FolderName = folder,
-					},
-					Discord = { Enabled = false },
-					KeySystem = false,
-				})
-			end)
-
-			if not ok or not rfWindow then
-				Core.logWarn("Rayfield window creation failed: " .. tostring(rfWindow))
+			local rfWindow = rf:CreateWindow({
+				Name = settings.Title or settings.Name or "Alleral",
+				Subtitle = settings.Subtitle or settings.Author or "",
+				LoadingTitle = "Alleral",
+				LoadingSubtitle = "Loading...",
+				ConfigurationSaving = {
+					Enabled = true,
+					FolderName = folder,
+				},
+				Discord = { Enabled = false },
+				KeySystem = false,
+			})
+			if not rfWindow then
+				local msg = "Rayfield:CreateWindow returned nil"
+				Core.logWarn(msg)
 				return nil
 			end
 
@@ -701,11 +718,18 @@ return function(Core)
 	function Core.buildUiWindow(ui, settings)
 		settings = settings or {}
 		local lib = ui and ui.Library
-		if not lib or type(lib.CreateWindow) ~= "function" then return nil end
+		if not lib then
+			if type(Core.logWarn) == "function" then Core.logWarn("buildUiWindow: ui.Library is nil") end
+			return nil
+		end
+		if type(lib.CreateWindow) ~= "function" then
+			if type(Core.logWarn) == "function" then Core.logWarn("buildUiWindow: ui.Library.CreateWindow is not a function") end
+			return nil
+		end
 		if not settings.Size then settings.Size = UDim2.fromOffset(920, 680) end
 		local rawWindow = lib:CreateWindow(settings)
 		if not rawWindow then
-			Core.logWarn("Rayfield window creation failed")
+			if type(Core.logWarn) == "function" then Core.logWarn("buildUiWindow: Library:CreateWindow returned nil") end
 			return nil
 		end
 		local window = {
