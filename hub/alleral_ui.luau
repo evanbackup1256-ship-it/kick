@@ -762,6 +762,16 @@ return function(Core)
 		return Core.wrapUiGroup(groupbox, callbackWrapper)
 	end
 
+	function Core.buildUiSection(window)
+		if type(window) == "table" and window._alleralTabGroup then
+			return window._alleralTabGroup
+		end
+		if type(window) == "table" and window._rawWindow then
+			return window
+		end
+		return window
+	end
+
 	function Core.finalizeGameUi(window, ui, options)
 		options = type(options) == "table" and options or {}
 		if type(window) == "table" and window._rawWindow and not window._initialized then

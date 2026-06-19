@@ -3078,4 +3078,179 @@ function Core.postWebhook(url, payload)
 	end
 	return true, nil
 end
+
+function Core.ensureCore()
+	if type(ENV.Alleral_Core) == "table" then
+		return ENV.Alleral_Core
+	end
+	local ok, core = pcall(function()
+		return getgenv and getgenv().Alleral_Core
+	end)
+	return ok and type(core) == "table" and core or nil
+end
+
+function Core.setupAntiAfk(player)
+	if not player or not player:IsA("Player") then
+		return false
+	end
+	if ENV._Alleral_AntiAfkActive then
+		return true
+	end
+	ENV._Alleral_AntiAfkActive = true
+	local VirtualUser = game:GetService("VirtualUser")
+	local conn = game:GetService("RunService").Heartbeat:Connect(function()
+		pcall(function()
+			VirtualUser:ClickButton2(Vector2.new())
+		end)
+	end)
+	Core.track({}, conn)
+	return true
+end
+
+function Core.track(connections, connection)
+	if type(connections) ~= "table" then return connection end
+	if connection and type(connection.Disconnect) == "function" then
+		table.insert(connections, connection)
+	end
+	return connection
+end
+
+function Core.makeSupervisor(state, loops, loopControllers, name, interval, callback)
+	if type(state) ~= "table" or type(name) ~= "string" or type(callback) ~= "function" then
+		return nil
+	end
+	interval = tonumber(interval) or 0.1
+	loops = loops or {}
+	loopControllers = loopControllers or {}
+	local controller = { enabled = false }
+	loopControllers[name] = controller
+	local function tick()
+		while state.HubRunning == true and controller.enabled do
+			local ok, err = pcall(callback)
+			if not ok and type(Core.pushErrorLog) == "function" then
+				Core.pushErrorLog(name, err)
+			end
+			task.wait(interval)
+		end
+		loops[name] = nil
+	end
+	loops[name] = { enabled = true, controller = controller }
+	controller.enabled = true
+	task.spawn(tick)
+	return controller
+end
+
+function Core.onUiSave(saveFn)
+	if type(saveFn) ~= "function" then return nil end
+	return function(_, __, fn, ...)
+		local result = fn(...)
+		pcall(saveFn)
+		return result
+	end
+end
+
+function Core.bindToggle(state, saveSettings, group, label, key, opts)
+	if type(state) ~= "table" or type(key) ~= "string" or type(group) ~= "table" then
+		return nil
+	end
+	opts = type(opts) == "table" and opts or {}
+	local default = opts.default or state[key]
+	local tooltip = opts.tooltip or ""
+	return group:CreateToggle(label, default == true, tooltip, function(value)
+		state[key] = value
+		if type(saveSettings) == "function" then
+			pcall(saveSettings)
+		end
+		if type(opts.callback) == "function" then
+			opts.callback(value)
+		end
+	end, key)
+end
+
+function Core.bindSlider(state, saveSettings, group, label, minVal, maxVal, key, opts)
+	if type(state) ~= "table" or type(key) ~= "string" or type(group) ~= "table" then
+		return nil
+	end
+	opts = type(opts) == "table" and opts or {}
+	local default = tonumber(state[key]) or opts.default or minVal
+	local tooltip = opts.tooltip or ""
+	local increment = opts.increment or 1
+	return group:CreateSlider(label, minVal, maxVal, default, function(value)
+		state[key] = value
+		if type(saveSettings) == "function" then
+			pcall(saveSettings)
+		end
+		if type(opts.callback) == "function" then
+			opts.callback(value)
+		end
+	end, tooltip, increment, key)
+end
+
+function Core.loadSettings(state, savedKeys, filename, defaults)
+	if type(state) ~= "table" or type(savedKeys) ~= "table" then
+		return false
+	end
+	local readFile = Core.execFunction("readfile")
+	local isFile = Core.execFunction("isfile")
+	if type(readFile) ~= "function" or type(isFile) ~= "function" then
+		return false
+	end
+	local path = Core.settingsFilePath({ settingsFile = filename or "settings.json" })
+	local okExists, exists = pcall(isFile, path)
+	if not okExists or not exists then
+		if type(defaults) == "table" then
+			for _, key in ipairs(savedKeys) do
+				if state[key] == nil and defaults[key] ~= nil then
+					state[key] = defaults[key]
+				end
+			end
+		end
+		return false
+	end
+	local ok, raw = pcall(readFile, path)
+	if not ok or type(raw) ~= "string" then
+		return false
+	end
+	local okDecode, decoded = pcall(function()
+		return game:GetService("HttpService"):JSONDecode(raw)
+	end)
+	if not okDecode or type(decoded) ~= "table" then
+		Core.restoreSettingsFromBackup(filename, state, savedKeys, defaults)
+		return false
+	end
+	for _, key in ipairs(savedKeys) do
+		if decoded[key] ~= nil then
+			state[key] = decoded[key]
+		elseif type(defaults) == "table" and defaults[key] ~= nil and state[key] == nil then
+			state[key] = defaults[key]
+		end
+	end
+	return true
+end
+
+function Core.saveSettings(state, savedKeys, filename)
+	if type(state) ~= "table" or type(savedKeys) ~= "table" then
+		return false
+	end
+	local writeFile = Core.execFunction("writefile")
+	local makeFolder = Core.execFunction("makefolder")
+	if type(writeFile) ~= "function" then
+		return false
+	end
+	local output = {}
+	for _, key in ipairs(savedKeys) do
+		output[key] = state[key]
+	end
+	local json = game:GetService("HttpService"):JSONEncode(output)
+	local path = Core.settingsFilePath({ settingsFile = filename or "settings.json" })
+	if type(makeFolder) == "function" then
+		pcall(makeFolder, "Alleral_Configs")
+	end
+	pcall(function()
+		Core.backupSettings(filename, json)
+	end)
+	local ok, err = pcall(writeFile, path, json)
+	return ok == true
+end
+
 end

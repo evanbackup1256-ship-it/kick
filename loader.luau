@@ -2976,7 +2976,7 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.updatedAt = release.updatedAt or expected.updatedAt
 		local remoteRayfield = tonumber(release.rayfieldVersion)
 		if remoteRayfield then
-			expected.rayfieldVersion = math.max(remoteRayfield, RAYFIELD_VERSION, tonumber(RELEASE_FALLBACK.rayfieldVersion) or 0)
+			expected.rayfieldVersion = math.max(remoteRayfield, tonumber(RELEASE_FALLBACK.rayfieldVersion) or 0, tonumber(FLUENT_VERSION) or 0)
 		end
 		if type(release.commit) == "string" and release.commit ~= "" and type(RELEASE_FALLBACK.commit) == "string" then
 			if release.commit ~= RELEASE_FALLBACK.commit then

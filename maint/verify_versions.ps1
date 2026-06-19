@@ -77,40 +77,40 @@ if ($loader -match 'LOADER_VERSION = "([^"]+)"')
     Fail "loader.luau missing LOADER_VERSION"
 }
 
-if ($release.rayfieldVersion)
+if ($release.fluentVersion)
 {
-    if ($loader -match 'local RAYFIELD_VERSION = (\d+)')
+    if ($loader -match 'local FLUENT_VERSION = (\d+)')
     {
-        $rayfieldVersion = [int]$Matches[1]
-        if ($rayfieldVersion -ne [int]$release.rayfieldVersion)
+        $fluentVersion = [int]$Matches[1]
+        if ($fluentVersion -ne [int]$release.fluentVersion)
         {
-            Fail "loader RAYFIELD_VERSION ($rayfieldVersion) != release.json ($($release.rayfieldVersion))"
+            Fail "loader FLUENT_VERSION ($fluentVersion) != release.json ($($release.fluentVersion))"
         } else
         {
-            Pass "loader rayfield version $rayfieldVersion"
+            Pass "loader fluent version $fluentVersion"
         }
     } else
     {
-        Fail "loader.luau missing RAYFIELD_VERSION"
+        Fail "loader.luau missing FLUENT_VERSION"
     }
 
-    $rayfieldSourcePath = Join-Path $root "ui/rayfield/source.luau"
-    if (Test-Path $rayfieldSourcePath)
+    $fluentSourcePath = Join-Path $root "ui/fluent/source.luau"
+    if (Test-Path $fluentSourcePath)
     {
-        $rayfieldSource = Get-Content $rayfieldSourcePath -Raw
-        if ($rayfieldSource -match 'local ALLERAL_RAYFIELD_VERSION = (\d+)')
+        $fluentSource = Get-Content $fluentSourcePath -Raw
+        if ($fluentSource -match 'local ALLERAL_FLUENT_VERSION = (\d+)')
         {
             $sourceVersion = [int]$Matches[1]
-            if ($sourceVersion -ne [int]$release.rayfieldVersion)
+            if ($sourceVersion -ne [int]$release.fluentVersion)
             {
-                Fail "ui/rayfield/source.luau ALLERAL_RAYFIELD_VERSION ($sourceVersion) != release.json ($($release.rayfieldVersion))"
+                Fail "ui/fluent/source.luau ALLERAL_FLUENT_VERSION ($sourceVersion) != release.json ($($release.fluentVersion))"
             } else
             {
-                Pass "rayfield source version $sourceVersion"
+                Pass "fluent source version $sourceVersion"
             }
         } else
         {
-            Fail "ui/rayfield/source.luau missing ALLERAL_RAYFIELD_VERSION"
+            Fail "ui/fluent/source.luau missing ALLERAL_FLUENT_VERSION"
         }
     } else
     {
