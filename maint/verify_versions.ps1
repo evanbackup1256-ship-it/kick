@@ -114,7 +114,7 @@ if ($release.fluentVersion)
         }
     } else
     {
-        Fail "ui/rayfield/source.luau missing"
+        Fail "ui/fluent/source.luau missing"
     }
 }
 

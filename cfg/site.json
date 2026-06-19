@@ -5,7 +5,7 @@
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
   "loaderVersion": "8.11.1",
   "coreVersion": "2.9.10",
-  "uiLibrary": "Rayfield",
+  "uiLibrary": "Fluent",
   "uiVersion": "1.0.0-rayfield",
   "rayfieldVersion": 1,
   "announcement": "",

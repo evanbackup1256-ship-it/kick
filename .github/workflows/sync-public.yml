@@ -62,7 +62,7 @@ jobs:
           done
 
           # Add UI files
-          [ -f ui/rayfield/source.luau ] && SOURCES+=("ui/rayfield/source.luau")
+          [ -f ui/fluent/source.luau ] && SOURCES+=("ui/fluent/source.luau")
 
           # Add game files
           for f in games/*.luau; do
@@ -73,7 +73,7 @@ jobs:
           done
 
           # Compare source vs public repo via sha256
-          # Obfuscation targets: hub/*.luau, games/*.luau, ui/rayfield/source.luau
+          # Obfuscation targets: hub/*.luau, games/*.luau, ui/fluent/source.luau
           # Plain copy: loader.luau, bootstrap.luau, cfg/*
           CHANGED=""
           PLAIN=""
@@ -91,7 +91,7 @@ jobs:
               cp "$src" "public_repo/$src"
               # Determine if file needs obfuscation
               case "$src" in
-                hub/*.luau|games/*.luau|ui/rayfield/source.luau)
+                hub/*.luau|games/*.luau|ui/fluent/source.luau)
                   OBFUSCATE="$OBFUSCATE public_repo/$src" ;;
                 *)
                   PLAIN="$PLAIN $src" ;;
