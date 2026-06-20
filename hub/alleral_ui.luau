@@ -107,8 +107,8 @@ return function(Core)
 				sourceLabel = "loader cache"
 			else
 				local urls = {
-					{ url = "https://sirius.menu/rayfield", name = "primary" },
-					{ url = "https://raw.githubusercontent.com/jensonhirst/Rayfield/main/source", name = "github" },
+					{ url = "https://raw.githubusercontent.com/jensonhirst/Rayfield/main/source", name = "jensonhirst" },
+					{ url = "https://sirius.menu/rayfield", name = "sirius" },
 				}
 				for _, entry in ipairs(urls) do
 					local bust = "?t=" .. tostring(tick()) .. "&attempt=" .. tostring(attempt)
