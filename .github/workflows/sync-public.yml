@@ -73,8 +73,8 @@ jobs:
           done
 
           # Compare source vs public repo via sha256
-          # Obfuscation targets: games/*.luau, ui/fluent/source.luau
-          # Plain copy: loader.luau, bootstrap.luau, hub/*.luau, cfg/*
+          # Obfuscation targets: games/*.luau
+          # Plain copy: loader.luau, bootstrap.luau, hub/*.luau, ui/fluent/source.luau, cfg/*
           CHANGED=""
           PLAIN=""
           OBFUSCATE=""
@@ -91,7 +91,7 @@ jobs:
               cp "$src" "public_repo/$src"
               # Determine if file needs obfuscation
               case "$src" in
-                games/*.luau|ui/fluent/source.luau)
+                games/*.luau)
                   OBFUSCATE="$OBFUSCATE public_repo/$src" ;;
                 *)
                   PLAIN="$PLAIN $src" ;;
