@@ -8,7 +8,7 @@ local COMPILE_VALIDATE_CACHE = {}
 local CORE_BASE_MIN_BYTES = 30000
 local CORE_BASE_MAX_BYTES = 45000
 local CORE_UI_MIN_BYTES = 8000
-local CORE_HUB_UI_MIN_BYTES = 60000
+local CORE_HUB_UI_MIN_BYTES = 75000
 local CORE_ALLERAL_UI_MIN_BYTES = 16000
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
@@ -1650,6 +1650,9 @@ local function coreHubUiValid(src)
 		return false
 	end
 	if not src:find("buildStandardSettingsExtras", 1, true) then
+		return false
+	end
+	if not src:find("Linoria-only builders", 1, true) then
 		return false
 	end
 	return compileCoreSource(src, "Alleral/core_hub_ui")

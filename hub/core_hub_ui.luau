@@ -1,4 +1,5 @@
 return function(Core)
+	-- Alleral CoreHubUI v5.1.0-ga — Linoria-only builders
 	local HttpService = game:GetService("HttpService")
 	local function genv()
 		local ok, env = pcall(function()
