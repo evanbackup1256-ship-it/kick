@@ -107,6 +107,7 @@ return function(Core)
 				sourceLabel = "loader cache"
 			else
 				local urls = {
+					{ url = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source", name = "siriussoftware" },
 					{ url = "https://raw.githubusercontent.com/jensonhirst/Rayfield/main/source", name = "jensonhirst" },
 					{ url = "https://sirius.menu/rayfield", name = "sirius" },
 				}
