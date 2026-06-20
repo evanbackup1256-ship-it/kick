@@ -25,9 +25,67 @@ except ImportError:
 SyncNotifyFn = Callable[[dict[str, Any]], None]
 
 VALID_STATUSES = frozenset({"working", "detected", "broken", "maintenance", "testing"})
-VERSION_RE = re.compile(r'local\s+VERSION\s*=\s*"([^"]+)"', re.IGNORECASE)
+VERSION_MARKER_RE = re.compile(r"ALLERAL_VERSION:\s*([\d.\-]+)", re.IGNORECASE)
+VERSION_LITERAL_RE = re.compile(
+    r"""(?:local\s+VERSION|Alleral_ActiveScriptVersion)\s*=\s*["']([^"']+)["']""",
+    re.IGNORECASE,
+)
+DIRECT_STRING_CHAR_RE = re.compile(
+    r"Alleral_ActiveScriptVersion\s*=\s*string\.char\(([^)]*)\)",
+    re.IGNORECASE,
+)
+ACTIVE_VERSION_VAR_RE = re.compile(
+    r"Alleral_ActiveScriptVersion\s*=\s*([A-Za-z_]\w*)",
+    re.IGNORECASE,
+)
+VERSION_STRING_CHAR_RE = re.compile(r"local\s+VERSION\s*=\s*string\.char\(([^)]*)\)", re.IGNORECASE)
 SUBTITLE_RE = re.compile(r'Subtitle\s*=\s*"([^"·]+)', re.IGNORECASE)
 FETCH_TIMEOUT = 5
+
+
+def _parse_obfuscated_number(text: str) -> int | None:
+    clean = re.sub(r"\s+", "", text or "")
+    if re.fullmatch(r"0[xX][0-9a-fA-F]+|\d+", clean):
+        return int(clean, 0)
+    match = re.fullmatch(r"(0[xX][0-9a-fA-F]+|\d+)([+-])(0[xX][0-9a-fA-F]+|\d+)", clean)
+    if not match:
+        return None
+    left = int(match.group(1), 0)
+    right = int(match.group(3), 0)
+    return left + right if match.group(2) == "+" else left - right
+
+
+def _decode_string_char_args(args: str) -> str | None:
+    chars: list[str] = []
+    for part in args.split(","):
+        value = _parse_obfuscated_number(part)
+        if value is None or value < 0 or value > 255:
+            return None
+        chars.append(chr(value))
+    return "".join(chars) or None
+
+
+def extract_game_version(text: str) -> str | None:
+    for regex in (VERSION_MARKER_RE, VERSION_LITERAL_RE):
+        match = regex.search(text)
+        if match:
+            return match.group(1)
+    for regex in (DIRECT_STRING_CHAR_RE, VERSION_STRING_CHAR_RE):
+        match = regex.search(text)
+        if match:
+            decoded = _decode_string_char_args(match.group(1))
+            if decoded:
+                return decoded
+    active = ACTIVE_VERSION_VAR_RE.search(text)
+    if active:
+        assignment = re.search(
+            rf"local\s+{re.escape(active.group(1))}\s*=\s*string\.char\(([^)]*)\)",
+            text,
+            re.IGNORECASE,
+        )
+        if assignment:
+            return _decode_string_char_args(assignment.group(1))
+    return None
 
 
 def utc_iso() -> str:
@@ -801,9 +859,7 @@ class AutoSyncEngine:
             return {"name": humanize_id(script_id), "version": "?", "existsOnGitHub": False}
         version = "?"
         subtitle = humanize_id(script_id)
-        match = VERSION_RE.search(text)
-        if match:
-            version = match.group(1)
+        version = extract_game_version(text) or version
         sub = SUBTITLE_RE.search(text)
         if sub:
             subtitle = sub.group(1).strip()

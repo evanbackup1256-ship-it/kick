@@ -42,6 +42,7 @@ for f in "${OBFUSCATE_FILES[@]}"; do
     use strict; use warnings;
     my $src = $_;
     return if length($src) < 50;
+    my ($version_marker) = $src =~ /local\s+VERSION\s*=\s*"([^"]+)"/;
 
     my %rename; my %used;
 
@@ -106,6 +107,10 @@ for f in "${OBFUSCATE_FILES[@]}"; do
     $src =~ s/\(\s*/\(/g;
     $src =~ s/\s*\)/\)/g;
     $src =~ s/\s*\.\.\s*/\.\./g;
+
+    if (defined $version_marker && $version_marker ne "") {
+      $src = "-- ALLERAL_VERSION: $version_marker\n" . $src;
+    }
 
     $_ = $src;
   ' "$f"

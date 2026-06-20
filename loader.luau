@@ -1111,6 +1111,90 @@ local function gameScriptExpectedVersion(profile, expectedVersion)
 	return profile.version
 end
 
+local function parseObfuscatedNumber(text)
+	text = tostring(text or ""):gsub("%s+", "")
+	if text == "" then
+		return nil
+	end
+	if text:match("^0[xX]%x+$") then
+		return tonumber(text:sub(3), 16)
+	end
+	if text:match("^%d+$") then
+		return tonumber(text)
+	end
+	local left, op, right = text:match("^([%da-fA-FxX]+)([%+%-])([%da-fA-FxX]+)$")
+	if left and op and right then
+		left = parseObfuscatedNumber(left)
+		right = parseObfuscatedNumber(right)
+		if left and right then
+			if op == "+" then
+				return left + right
+			end
+			return left - right
+		end
+	end
+	return nil
+end
+
+local function decodeStringCharExpression(expr)
+	if type(expr) ~= "string" then
+		return nil
+	end
+	local args = expr:match("string%.char%s*(%b())")
+	if not args then
+		return nil
+	end
+	args = args:sub(2, -2)
+	local bytes = {}
+	for part in args:gmatch("[^,]+") do
+		local n = parseObfuscatedNumber(part)
+		if not n or n < 0 or n > 255 then
+			return nil
+		end
+		table.insert(bytes, n)
+	end
+	if #bytes == 0 then
+		return nil
+	end
+	return string.char(table.unpack(bytes))
+end
+
+local function extractGameScriptVersion(body)
+	if type(body) ~= "string" then
+		return nil
+	end
+	local version = body:match("ALLERAL_VERSION:%s*([%d%.%-]+)")
+		or body:match('local%s+VERSION%s*=%s*"([^"]+)"')
+		or body:match("local%s+VERSION%s*=%s*'([^']+)'")
+		or body:match('Alleral_ActiveScriptVersion%s*=%s*"([^"]+)"')
+		or body:match("Alleral_ActiveScriptVersion%s*=%s*'([^']+)'")
+	if version then
+		return version
+	end
+	local directExpr = body:match("Alleral_ActiveScriptVersion%s*=%s*(string%.char%s*%b())")
+	if directExpr then
+		version = decodeStringCharExpression(directExpr)
+		if version then
+			return version
+		end
+	end
+	local activeVar = body:match("Alleral_ActiveScriptVersion%s*=%s*([%a_][%w_]*)")
+	if activeVar then
+		local assignedExpr = body:match("local%s+" .. activeVar .. "%s*=%s*(string%.char%s*%b())")
+		if assignedExpr then
+			version = decodeStringCharExpression(assignedExpr)
+			if version then
+				return version
+			end
+		end
+	end
+	local versionExpr = body:match("local%s+VERSION%s*=%s*(string%.char%s*%b())")
+	if versionExpr then
+		return decodeStringCharExpression(versionExpr)
+	end
+	return nil
+end
+
 local function gameScriptValid(body, profile, expectedVersion)
 	if type(body) ~= "string" then
 		return false
@@ -1129,7 +1213,7 @@ local function gameScriptValid(body, profile, expectedVersion)
 	if profile.sourceMarker and not body:find(profile.sourceMarker, 1, true) then
 		return false
 	end
-	if version and not body:find('local VERSION = "' .. version .. '"', 1, true) then
+	if version and extractGameScriptVersion(body) ~= version then
 		return false
 	end
 	return true
@@ -1153,8 +1237,14 @@ local function gameScriptRejectReason(body, profile, expectedVersion)
 	if profile.sourceMarker and not body:find(profile.sourceMarker, 1, true) then
 		return "missing " .. profile.sourceMarker
 	end
-	if version and not body:find('local VERSION = "' .. version .. '"', 1, true) then
-		return "missing VERSION " .. version
+	if version then
+		local foundVersion = extractGameScriptVersion(body)
+		if foundVersion ~= version then
+			if foundVersion then
+				return "VERSION " .. tostring(foundVersion) .. " != " .. tostring(version)
+			end
+			return "missing VERSION " .. version
+		end
 	end
 	return "unknown"
 end
@@ -1813,6 +1903,9 @@ local function extractFileVersion(src, kind)
 	if kind == "bootstrap" then
 		return src:match('BOOTSTRAP_VERSION%s*=%s*"([%d%.]+)"')
 			or src:match("Alleral Bootstrap v([%d%.]+)")
+	end
+	if kind == "game" then
+		return extractGameScriptVersion(src)
 	end
 	local pattern = VERSION_PATTERNS[kind]
 	if not pattern then
