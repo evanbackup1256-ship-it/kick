@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alleral Dev</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/style.css" />
+  <link rel="stylesheet" href="/assets/animations.css" />
+  <script src="/assets/config.js"></script>
+</head>
+<body class="admin-page dev-page">
+  <div class="aurora" aria-hidden="true"></div>
+
+  <header class="nav-shell admin-nav">
+    <nav class="nav-bar wrap">
+      <a class="nav-logo" href="/dev">Alleral Dev</a>
+      <div class="nav-links">
+        <a href="/">Public Site</a>
+        <a href="/admin">Admin</a>
+        <a href="/health" target="_blank" rel="noopener">Health</a>
+      </div>
+      <div class="nav-actions">
+        <span id="devStatusPill" class="status-pill"><span class="status-dot"></span>Locked</span>
+      </div>
+    </nav>
+  </header>
+
+  <main class="admin-main wrap">
+    <header class="admin-hero reveal visible">
+      <p class="section-label">Developer Access</p>
+      <h1>Private portal</h1>
+      <p class="section-desc admin-desc">Unlisted login for maintainers. Your key never leaves this session.</p>
+    </header>
+
+    <section id="devLoginPanel" class="panel admin-key-panel reveal visible">
+      <form class="form admin-key-form" id="devLoginForm" onsubmit="return false">
+        <label>Dev access key
+          <input id="devKeyInput" class="field-input" type="password" placeholder="DEV_ACCESS_KEY from Railway" autocomplete="off" />
+        </label>
+        <div class="admin-key-actions">
+          <button id="devLoginBtn" class="btn btn-fill" type="submit">Sign in</button>
+        </div>
+      </form>
+      <div id="devLoginError" class="form-error"></div>
+    </section>
+
+    <section id="devDashboard" class="hidden">
+      <div class="admin-split">
+        <div class="panel admin-card reveal visible">
+          <h3>Session</h3>
+          <p class="admin-card-lead">Authenticated dev session. Cloudflare gate is bypassed on the public site while this token is valid.</p>
+          <dl class="dev-kv">
+            <div><dt>Expires</dt><dd id="devExpires">—</dd></div>
+            <div><dt>Version</dt><dd id="devVersion">—</dd></div>
+            <div><dt>GitHub commit</dt><dd id="devCommit"><code>—</code></dd></div>
+            <div><dt>Auto sync</dt><dd id="devSync">—</dd></div>
+            <div><dt>Active bans</dt><dd id="devBans">—</dd></div>
+          </dl>
+          <div class="admin-key-actions">
+            <button id="devRefreshBtn" class="btn btn-outline" type="button">Refresh</button>
+            <button id="devLogoutBtn" class="btn btn-outline" type="button">Sign out</button>
+            <a class="btn btn-fill" href="/">Open hub</a>
+          </div>
+        </div>
+
+        <div class="panel admin-card reveal visible">
+          <h3>Quick links</h3>
+          <ul class="dev-links">
+            <li><a href="/admin">Admin panel</a></li>
+            <li><a href="/api/sync/status" target="_blank" rel="noopener">Sync status JSON</a></li>
+            <li><a href="/health" target="_blank" rel="noopener">Health check</a></li>
+          </ul>
+          <p class="muted-inline dev-note">Set <code>DEV_ACCESS_KEY</code> in Railway — at least 32 characters. Not stored in the repo.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/assets/dev.js" defer></script>
+</body>
+</html>

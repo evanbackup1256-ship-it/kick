@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alleral Manage</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/style.css" />
+  <link rel="stylesheet" href="/assets/animations.css" />
+  <script src="/assets/config.js"></script>
+</head>
+<body class="admin-page">
+  <div class="aurora" aria-hidden="true"></div>
+  <header class="nav-shell admin-nav">
+    <nav class="nav-bar wrap">
+      <a class="nav-logo" href="/manage">Alleral Manage</a>
+      <div class="nav-links">
+        <a href="/">Hub</a>
+        <a href="/admin">Admin</a>
+        <a href="/dev">Dev</a>
+      </div>
+      <div class="nav-actions">
+        <span id="manageStatusPill" class="status-pill"><span class="status-dot"></span>Loading</span>
+      </div>
+    </nav>
+  </header>
+
+  <main class="admin-main wrap">
+    <header class="admin-hero reveal visible">
+      <p class="section-label">Management</p>
+      <h1>Operations center</h1>
+      <p class="section-desc admin-desc">Railway relay + optional Supabase audit backend for bans, sync, and admin actions.</p>
+    </header>
+
+    <div class="panel admin-key-panel reveal visible">
+      <form class="form admin-key-form" onsubmit="return false">
+        <label>Admin API Key
+          <input id="manageAdminKey" class="field-input" type="password" placeholder="ADMIN_API_KEY" autocomplete="off" />
+        </label>
+        <div class="admin-key-actions">
+          <button id="manageSignIn" class="btn btn-fill" type="button">Sign In</button>
+          <button id="manageTestSupabase" class="btn btn-outline" type="button">Test Supabase</button>
+          <button id="manageSyncSupabase" class="btn btn-outline" type="button">Sync to Supabase</button>
+        </div>
+      </form>
+      <p class="admin-auto-note">First time? Run <code>.\scripts\setup_supabase.ps1</code> in the repo, then redeploy Railway with the printed env vars.</p>
+      <div id="manageError" class="form-error"></div>
+    </div>
+
+    <div id="manageStats" class="stats-grid"></div>
+
+    <section class="panel admin-card reveal visible">
+      <h3>Audit log</h3>
+      <p class="admin-card-lead">Local SQLite on Railway. Optionally mirrors to Supabase when <code>SUPABASE_URL</code> + <code>SUPABASE_SERVICE_KEY</code> are set.</p>
+      <label>Search
+        <input id="auditSearch" class="field-input" placeholder="ban.add, admin.login…" />
+      </label>
+      <div id="auditList" class="manage-audit-list"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="/assets/effects.js"></script>
+  <script src="/assets/manage.js"></script>
+</body>
+</html>
