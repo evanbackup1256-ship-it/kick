@@ -9,7 +9,7 @@
   "uiVersion": "5.1.0",
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/bootstrap.luau?t=\" .. tick(), true))()",
-  "repo": "evanbackup1256-ship-it/kick",
+  "repo": "evanbackup1256-ship-it/-kick-loader",
   "branch": "main",
   "features": [
     "Picks the right game script when you inject",
@@ -1058,7 +1058,7 @@
   "links": {
     "website": "https://alleral-telemetry-production.up.railway.app/",
     "mirror": "https://evanbackup1256-ship-it.github.io/kick/",
-    "github": "https://github.com/evanbackup1256-ship-it/kick",
+    "github": "https://github.com/evanbackup1256-ship-it/-kick-loader",
     "loaderRaw": "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/loader.luau",
     "relay": "https://alleral-telemetry-production.up.railway.app",
     "admin": "https://alleral-telemetry-production.up.railway.app/admin.html"
