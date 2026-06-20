@@ -41,7 +41,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "f30e8b8",
+	commit = "7a6c129",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -1637,7 +1637,7 @@ local function alleralUiValid(src)
 	if not src:find("createUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
 		return false
 	end
-	if not src:find("Alleral UI layer", 1, true) then
+	if not src:find("Alleral UI layer", 1, true) and not src:find("Alleral Fluent UI layer", 1, true) then
 		return false
 	end
 	if not src:find("Fluent", 1, true) then
@@ -1760,7 +1760,7 @@ local function alleralUiRejectReason(src)
 	if not src:find("createUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
 		return "missing Alleral UI helpers"
 	end
-	if not src:find("Alleral UI layer", 1, true) then
+	if not src:find("Alleral UI layer", 1, true) and not src:find("Alleral Fluent UI layer", 1, true) then
 		return "missing Alleral UI layer marker"
 	end
 	if not src:find("Fluent", 1, true) then
