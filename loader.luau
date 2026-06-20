@@ -41,7 +41,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "70ae59f",
+	commit = "71241eb",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -1195,6 +1195,20 @@ local function extractGameScriptVersion(body)
 	return nil
 end
 
+local function gameScriptCompileError(body, profile)
+	if not loadStringFn then
+		return nil
+	end
+	local ok, chunk, err = pcall(loadStringFn, body, "Alleral/" .. tostring(profile and profile.id or "game") .. "-check")
+	if not ok then
+		return tostring(chunk)
+	end
+	if type(chunk) ~= "function" then
+		return tostring(err or "chunk is not a function")
+	end
+	return nil
+end
+
 local function gameScriptValid(body, profile, expectedVersion)
 	if type(body) ~= "string" then
 		return false
@@ -1214,6 +1228,9 @@ local function gameScriptValid(body, profile, expectedVersion)
 		return false
 	end
 	if version and extractGameScriptVersion(body) ~= version then
+		return false
+	end
+	if gameScriptCompileError(body, profile) then
 		return false
 	end
 	return true
@@ -1245,6 +1262,10 @@ local function gameScriptRejectReason(body, profile, expectedVersion)
 			end
 			return "missing VERSION " .. version
 		end
+	end
+	local compileErr = gameScriptCompileError(body, profile)
+	if compileErr then
+		return "compile failed: " .. tostring(compileErr)
 	end
 	return "unknown"
 end
