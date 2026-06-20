@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-20T00:45:00Z",
+  "updatedAt": "2026-06-20T01:00:59Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
   "loaderVersion": "8.11.1",
@@ -46,6 +46,17 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-16",
+      "title": "Grow A Garden 2 2.2.0 + Speed Keyboard 1.5.2 — LuxyHub v5.1 parity",
+      "items": [
+        "Grow A Garden 2: added blacklist seed, mutation, and rarity filters plus auto blacklist/all/best modes",
+        "Grow A Garden 2: added pet buying, pet selection, auto sell filters, auto sell all seeds, and sell delay",
+        "Grow A Garden 2: added gold/rainbow/all drop collection, auto steal fruits, return-after slider, and predictors",
+        "Grow A Garden 2: refreshed seed/gear dropdowns and safer plant/sprinkler/water/buy-gear/rejoin paths",
+        "+1 Speed Keyboard Escape: added World 2 Wins 60M and Wins 100M targets"
+      ]
+    },
     {
       "date": "2026-06-16",
       "title": "All Games — Performance & Stability Pass",
@@ -530,7 +541,7 @@
         95204935687527
       ],
       "robloxUrl": "https://www.roblox.com/games/95204935687527",
-      "description": "Full garden automation — plant, water, sprinkler systems, and shop buying.",
+      "description": "Expanded garden automation with blacklist filters, pet buying, selling, drop collection, steal tools, predictors, and shop fixes.",
       "uiTabs": [
         "Farm",
         "Water",
@@ -597,6 +608,101 @@
           "name": "Config profiles",
           "category": "Settings",
           "desc": "Save, load, and delete named setups."
+        },
+        {
+          "name": "Blacklist seed filter",
+          "category": "Blacklist",
+          "desc": "Filters unwanted seeds before automation keeps them."
+        },
+        {
+          "name": "Blacklist mutation filter",
+          "category": "Blacklist",
+          "desc": "Filters unwanted mutations during blacklist passes."
+        },
+        {
+          "name": "Blacklist rarity filter",
+          "category": "Blacklist",
+          "desc": "Filters unwanted rarities during blacklist passes."
+        },
+        {
+          "name": "Auto blacklist",
+          "category": "Blacklist",
+          "desc": "Runs blacklist actions for selected seed, mutation, and rarity filters."
+        },
+        {
+          "name": "Auto blacklist all",
+          "category": "Blacklist",
+          "desc": "Runs the game blacklist-all action when available."
+        },
+        {
+          "name": "Auto blacklist best",
+          "category": "Blacklist",
+          "desc": "Runs the best-item blacklist action when available."
+        },
+        {
+          "name": "Auto buy pet",
+          "category": "Shop",
+          "desc": "Purchases selected pets or eggs from the pet shop."
+        },
+        {
+          "name": "Pet purchase selection",
+          "category": "Shop",
+          "desc": "Dropdown filter for pet purchases."
+        },
+        {
+          "name": "Auto sell selected fruits",
+          "category": "Sell",
+          "desc": "Sells fruits matching seed, rarity, and mutation filters."
+        },
+        {
+          "name": "Auto sell all seeds",
+          "category": "Sell",
+          "desc": "Runs the sell-all seeds action when available."
+        },
+        {
+          "name": "Auto collect gold seeds",
+          "category": "Drops",
+          "desc": "Prioritizes gold seed drops."
+        },
+        {
+          "name": "Auto collect rainbow seeds",
+          "category": "Drops",
+          "desc": "Prioritizes rainbow seed drops."
+        },
+        {
+          "name": "Auto collect all drops",
+          "category": "Drops",
+          "desc": "Collects visible seed and item drops."
+        },
+        {
+          "name": "Auto steal fruits",
+          "category": "Steal",
+          "desc": "Attempts public steal remotes and nearby fruit pickups."
+        },
+        {
+          "name": "Return after steal",
+          "category": "Steal",
+          "desc": "Returns to the saved position after stealing."
+        },
+        {
+          "name": "Weather predictor",
+          "category": "Predictors",
+          "desc": "Pings weather predictor remotes when present."
+        },
+        {
+          "name": "Seed predictor",
+          "category": "Predictors",
+          "desc": "Pings seed predictor remotes when present."
+        },
+        {
+          "name": "Gear predictor",
+          "category": "Predictors",
+          "desc": "Pings gear predictor remotes when present."
+        },
+        {
+          "name": "Auto rejoin",
+          "category": "Utility",
+          "desc": "Queues a same-server rejoin for update recovery."
         }
       ]
     },
@@ -660,6 +766,16 @@
           "name": "Anti AFK",
           "category": "Misc",
           "desc": "Prevents idle kicks while farming."
+        },
+        {
+          "name": "World 2 60M route",
+          "category": "Auto",
+          "desc": "Adds a 60M win target for World 2 win farming."
+        },
+        {
+          "name": "World 2 100M route",
+          "category": "Auto",
+          "desc": "Adds a 100M win target for World 2 win farming."
         }
       ]
     },

@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.5.1"
+local VERSION = "1.5.2"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -241,6 +241,8 @@ local WIN_CONFIG_WORLD2 = {
 	["Win 1M"] = { RouteIndex = 23, BlockName = "WinBlock19", MinTime = 15 },
 	["Win 1.5M"] = { RouteIndex = 27, BlockName = "WinBlock20", MinTime = 20 },
 	["Win 2.5M"] = { RouteIndex = 47, BlockName = "WinBlock21", MinTime = 30 },
+	["Win 60M"] = { RouteIndex = 47, BlockName = "WinBlock22", Label = "60M", MinTime = 35 },
+	["Win 100M"] = { RouteIndex = 47, BlockName = "WinBlock23", Label = "100M", MinTime = 40 },
 }
 
 local ITEM_PRICES = {
@@ -585,6 +587,60 @@ local function waitForRoutePoint(position)
 	setAnchored(false)
 end
 
+local function blockPosition(inst)
+	if not inst then
+		return nil
+	end
+	if inst:IsA("BasePart") then
+		return inst.Position
+	end
+	if inst:IsA("Model") then
+		local part = inst.PrimaryPart or inst:FindFirstChildWhichIsA("BasePart")
+		return part and part.Position or nil
+	end
+	return nil
+end
+
+local function resolveWinBlock(config, targetName)
+	local direct = config.BlockName and workspace:FindFirstChild(config.BlockName, true)
+	if direct then
+		return direct
+	end
+	local label = tostring(config.Label or targetName or ""):lower():gsub("%s+", "")
+	if label == "" then
+		return nil
+	end
+	local scanned = 0
+	for _, inst in ipairs(workspace:GetDescendants()) do
+		scanned += 1
+		if scanned > 1200 then
+			break
+		end
+		if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
+			local cleaned = tostring(inst.Text or ""):lower():gsub("%s+", "")
+			if cleaned:find(label, 1, true) then
+				local ancestor = inst:FindFirstAncestorOfClass("Model")
+				if ancestor then
+					local part = ancestor.PrimaryPart or ancestor:FindFirstChildWhichIsA("BasePart")
+					if part then
+						return part
+					end
+				end
+				local partAncestor = inst:FindFirstAncestorWhichIsA("BasePart")
+				if partAncestor then
+					return partAncestor
+				end
+			end
+		elseif inst:IsA("BasePart") then
+			local cleanedName = inst.Name:lower():gsub("%s+", "")
+			if cleanedName:find(label, 1, true) then
+				return inst
+			end
+		end
+	end
+	return nil
+end
+
 local function runWinFarmCycle()
 	local targetName = state.SelectedWinTarget
 	local config = state.CurrentConfig[targetName]
@@ -637,9 +693,10 @@ local function runWinFarmCycle()
 		task.wait(config.MinTime - elapsed)
 	end
 
-	local winBlock = workspace:FindFirstChild(config.BlockName, true)
-	if winBlock and isAlive() then
-		tweenTo(winBlock.Position + Vector3.new(0, 3, 0))
+	local winBlock = resolveWinBlock(config, targetName)
+	local winPosition = blockPosition(winBlock)
+	if winPosition and isAlive() then
+		tweenTo(winPosition + Vector3.new(0, 3, 0))
 		task.wait(3)
 	end
 end
@@ -891,7 +948,7 @@ local shop = Core.buildUiGroup(shopTab, "Shop", 1, saveWrap, nil, "shop_items")
 local util = Core.buildUiGroup(miscTab, "Extras", 1, saveWrap, nil, "utils")
 
 local winTargetsW1 = { "Win 1", "Win 3", "Win 10", "Win 20", "Win 50", "Win 100", "Win 150", "Win 300", "Win 500", "Win 1000", "Win 2500" }
-local winTargetsW2 = { "Win 250k", "Win 400k", "Win 600k", "Win 1M", "Win 1.5M", "Win 2.5M" }
+local winTargetsW2 = { "Win 250k", "Win 400k", "Win 600k", "Win 1M", "Win 1.5M", "Win 2.5M", "Win 60M", "Win 100M" }
 
 farm:CreateToggle("Step farm", state.AutoStepFarm, "Hits the purple step popup for you.", function(enabled)
 	state.AutoStepFarm = enabled

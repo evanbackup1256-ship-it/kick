@@ -1,139 +1,70 @@
 {
-
   "version": 1,
-
-  "updatedAt": "2026-06-16T02:30:00+00:00",
-
+  "updatedAt": "2026-06-20T01:00:47Z",
   "scripts": {
-
     "kick_a_lucky_block": {
-
       "name": "Kick a Lucky Block",
-
       "status": "working",
-
       "version": "7.3.2",
-
       "message": "Mobile UI layout with stacked columns and fullscreen sizing.",
-
       "updatedAt": "2026-06-16T03:05:00+00:00",
-
       "updatedBy": "system"
-
     },
-
     "sell_lemons": {
-
       "name": "Sell Lemons",
-
       "status": "working",
-
       "version": "2.1.0",
-
       "message": "Shared FPS boost, RTX mod, and black screen mode in Settings.",
-
       "updatedAt": "2026-06-16T02:30:00+00:00",
-
       "updatedBy": "system"
-
     },
-
     "grow_a_garden_2": {
-
       "name": "Grow a Garden 2",
-
       "status": "working",
-
-      "version": "2.1.0",
-
-      "message": "Shared FPS boost, RTX mod, and black screen mode in Settings.",
-
-      "updatedAt": "2026-06-16T02:30:00+00:00",
-
-      "updatedBy": "system"
-
+      "version": "2.2.0",
+      "message": "LuxyHub v5.1 parity: blacklist filters, pet buying, selling, drops, steal, predictors, and rejoin fixes.",
+      "updatedAt": "2026-06-20T01:00:47Z",
+      "updatedBy": "codex"
     },
-
     "speed_keyboard_escape": {
-
       "name": "Speed Keyboard Escape",
-
       "status": "working",
-
-      "version": "1.5.1",
-
-      "message": "Shared FPS boost, RTX mod, and black screen mode in Settings.",
-
-      "updatedAt": "2026-06-16T02:30:00+00:00",
-
-      "updatedBy": "system"
-
-    },
-
-    "slime_rng": {
-
-      "name": "Slime RNG",
-
-      "status": "broken",
-
       "version": "1.5.2",
-
+      "message": "Added World 2 60M and 100M win targets.",
+      "updatedAt": "2026-06-20T01:00:47Z",
+      "updatedBy": "codex"
+    },
+    "slime_rng": {
+      "name": "Slime RNG",
+      "status": "broken",
+      "version": "1.5.2",
       "message": "Unified Core performance toggles (FPS/RTX/black screen); remotes still need rebuild after game update.",
-
       "updatedAt": "2026-06-16T02:30:00+00:00",
-
       "updatedBy": "system"
-
     },
-
     "build_a_ring_farm": {
-
       "name": "Build A Ring Farm",
-
       "status": "broken",
-
       "version": "1.4.2",
-
       "message": "Shared FPS boost, RTX mod, and black screen mode in Settings.",
-
       "updatedAt": "2026-06-16T02:30:00+00:00",
-
       "updatedBy": "system"
-
     },
-
     "blox_fruit": {
-
       "name": "Blox Fruit",
-
       "status": "broken",
-
       "version": "0.1.1",
-
       "message": "Maintenance shell with shared performance toggles in Settings.",
-
       "updatedAt": "2026-06-16T02:30:00+00:00",
-
       "updatedBy": "system"
-
     },
-
     "survive_a_zombie_arena": {
-
       "name": "Survive a Zombie Arena",
-
       "status": "broken",
-
       "version": "2.3.2",
-
       "message": "Shared FPS boost, RTX mod, and black screen mode in Settings.",
-
       "updatedAt": "2026-06-16T02:30:00+00:00",
-
       "updatedBy": "system"
-
     }
-
   }
-
 }

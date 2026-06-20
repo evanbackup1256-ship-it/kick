@@ -41,7 +41,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "6571093",
+	commit = "d552f71",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -2813,7 +2813,7 @@ local GAMES = {
 	{
 		id = "grow_a_garden_2",
 		name = "Grow a Garden 2",
-		version = "2.1.0",
+		version = "2.2.0",
 		placeIds = { 95204935687527 },
 		scriptFiles = { "games/grow_a_garden_2.luau", "grow_a_garden_2.luau" },
 		scriptUrl = "games/grow_a_garden_2.luau",
