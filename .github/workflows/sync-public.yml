@@ -75,7 +75,7 @@ jobs:
           # Stamp public release metadata with the commit that triggered this sync.
           # Local release files are committed before the final SHA exists, so the
           # public loader repo must be corrected here to avoid one-release-behind pins.
-          RELEASE_COMMIT="${GITHUB_SHA::7}"
+          export RELEASE_COMMIT="${GITHUB_SHA::7}"
           python - <<'PY'
           import json
           import os
