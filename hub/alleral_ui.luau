@@ -445,6 +445,53 @@ return function(Core)
 		section = type(section) == "table" and section or {}
 		local serial = 0
 
+		local _lookup = nil
+		local _probed = false
+		local function resolveMethod(names)
+			if _lookup == nil then
+				_lookup = {}
+				local function scan(t)
+					if type(t) ~= "table" then return end
+					for k, v in pairs(t) do
+						if type(v) == "function" then _lookup[k] = v end
+					end
+					local mt = getrawmetatable and getrawmetatable(t)
+					if type(mt) == "table" then
+						if type(mt.__index) == "table" then scan(mt.__index)
+						elseif type(mt.__index) == "function" then
+							local ok, idx = pcall(mt.__index, t, "__alleral_probe__")
+							if ok and type(idx) == "table" then scan(idx) end
+						end
+					end
+				end
+				if type(section) == "table" then scan(section) end
+				if not _probed and type(Core.say) == "function" then
+					_probed = true
+					local methodNames = {}
+					for k in pairs(_lookup) do table.insert(methodNames, k) end
+					table.sort(methodNames)
+					Core.say("[UI] Tab provides " .. tostring(#methodNames) .. " methods: " .. table.concat(methodNames, ", "):sub(1, 300))
+				end
+			end
+			for _, name in ipairs(names) do
+				if _lookup[name] then return _lookup[name], name end
+			end
+			return nil, nil
+		end
+
+		local function safeCreate(name, names, fn)
+			local method, found = resolveMethod(names)
+			if not method then
+				if type(Core.logWarn) == "function" then
+					Core.logWarn("[UI] Tab missing methods: " .. table.concat(names, ", ") .. " for " .. name)
+				end
+				return nil
+			end
+			return safeCall(name, function()
+				return fn(method)
+			end)
+		end
+
 		local function nextFlag(name, explicit)
 			serial = serial + 1
 			return explicit or (Core.uiElementId and Core.uiElementId(name) or name) .. "_" .. serial
@@ -471,18 +518,16 @@ return function(Core)
 		local groupbox = {}
 
 		function groupbox:CreateSection(name)
-			if section.CreateSection then
-				pcall(section.CreateSection, section, name)
-			end
+			local method = resolveMethod({ "CreateSection", "AddSection", "NewSection", "Section" })
+			if method then pcall(method, section, name) end
 			return groupbox
 		end
 
 		function groupbox:CreateToggle(settings, id)
 			local flag = nextFlag(settings.Name, id)
-			local raw
 			local currentVal = settings.Default or settings.CurrentValue or settings.Value
-			raw = safeCall("CreateToggle " .. tostring(settings.Name), function()
-				return section:CreateToggle({
+			local raw = safeCreate("CreateToggle " .. tostring(settings.Name), { "CreateToggle", "AddToggle", "NewToggle", "Toggle" }, function(method)
+				return method(section, {
 					Name = settings.Name or settings.Title or "Toggle",
 					Description = settings.Tooltip or settings.Description or "",
 					CurrentValue = currentVal == true,
@@ -501,11 +546,10 @@ return function(Core)
 		end
 
 		function groupbox:CreateButton(settings, id)
-			local raw
 			local name = settings.Name or settings.Title or settings.Text or "Button"
 			local desc = settings.Tooltip or settings.Description or ""
-			raw = safeCall("CreateButton " .. tostring(name), function()
-				return section:CreateButton({
+			local raw = safeCreate("CreateButton " .. tostring(name), { "CreateButton", "AddButton", "NewButton", "Button" }, function(method)
+				return method(section, {
 					Name = name,
 					Description = desc,
 					Callback = settings.Callback or function() end,
@@ -518,9 +562,8 @@ return function(Core)
 			local range = settings.Range or { 0, 100 }
 			local flag = nextFlag(settings.Name, id)
 			local currentVal = tonumber(settings.Default) or tonumber(settings.CurrentValue) or tonumber(settings.Value) or range[1]
-			local raw
-			raw = safeCall("CreateSlider " .. tostring(settings.Name), function()
-				return section:CreateSlider({
+			local raw = safeCreate("CreateSlider " .. tostring(settings.Name), { "CreateSlider", "AddSlider", "NewSlider", "Slider" }, function(method)
+				return method(section, {
 					Name = settings.Name or settings.Title or "Slider",
 					Description = settings.Tooltip or settings.Description or "",
 					Range = { range[1] or 0, range[2] or 100 },
@@ -545,9 +588,8 @@ return function(Core)
 		function groupbox:CreateInput(settings, id)
 			local flag = nextFlag(settings.Name, id)
 			local currentVal = tostring(settings.CurrentValue or settings.Default or settings.Value or "")
-			local raw
-			raw = safeCall("CreateInput " .. tostring(settings.Name), function()
-				return section:CreateInput({
+			local raw = safeCreate("CreateInput " .. tostring(settings.Name), { "CreateInput", "AddInput", "NewInput", "Input", "TextBox" }, function(method)
+				return method(section, {
 					Name = settings.Name or settings.Title or "Input",
 					Description = settings.Tooltip or settings.Description or "",
 					CurrentValue = currentVal,
@@ -572,9 +614,8 @@ return function(Core)
 			local multi = settings.MultipleOptions == true or settings.Multi == true
 			local current = settings.CurrentOption or (multi and {} or (values[1] or ""))
 			local flag = nextFlag(settings.Name, id)
-			local raw
-			raw = safeCall("CreateDropdown " .. tostring(settings.Name), function()
-				return section:CreateDropdown({
+			local raw = safeCreate("CreateDropdown " .. tostring(settings.Name), { "CreateDropdown", "AddDropdown", "NewDropdown", "Dropdown" }, function(method)
+				return method(section, {
 					Name = settings.Name or settings.Title or "Dropdown",
 					Description = settings.Tooltip or settings.Description or "",
 					Options = values,
