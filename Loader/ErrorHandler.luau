@@ -1,3 +1,4 @@
+-- Alleral_ErrorHandler
 local ErrorHandler = { VERSION = "1.0.0" }
 
 function ErrorHandler.safeCall(name, fn, ...)
@@ -45,4 +46,5 @@ function ErrorHandler.assertExists(value, name)
 	return true
 end
 
+if getgenv then getgenv().Alleral_ErrorHandler = ErrorHandler end
 return ErrorHandler

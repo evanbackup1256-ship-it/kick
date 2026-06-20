@@ -1,3 +1,4 @@
+-- Alleral_FeatureRegistry
 local FeatureRegistry = { VERSION = "1.0.0", _features = {}, _loaded = {} }
 
 function FeatureRegistry.register(name, loaderFn)
@@ -64,4 +65,5 @@ function FeatureRegistry.unloadAll()
 	FeatureRegistry._loaded = {}
 end
 
+if getgenv then getgenv().Alleral_FeatureRegistry = FeatureRegistry end
 return FeatureRegistry

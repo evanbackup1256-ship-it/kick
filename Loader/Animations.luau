@@ -1,3 +1,4 @@
+-- Alleral_Animations
 local Animations = { VERSION = "1.0.0" }
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -158,4 +159,5 @@ function Animations.notificationSlide(guiObject, from, to, duration)
 	return Animations.create(guiObject, { Position = to }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, duration)
 end
 
+if getgenv then getgenv().Alleral_Animations = Animations end
 return Animations

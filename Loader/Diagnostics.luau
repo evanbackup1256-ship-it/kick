@@ -1,3 +1,4 @@
+-- Alleral_Diagnostics
 local Diagnostics = { VERSION = "1.0.0" }
 Diagnostics.Metrics = { startup = {}, errors = {}, modules = {} }
 
@@ -45,4 +46,5 @@ function Diagnostics.report()
 	return table.concat(lines, "\n")
 end
 
+if getgenv then getgenv().Alleral_Diagnostics = Diagnostics end
 return Diagnostics

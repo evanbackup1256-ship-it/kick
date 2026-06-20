@@ -12,9 +12,9 @@ return function(Core)
 	end)()
 
 	local _linoriaInstance = nil
-	local _windowRegistry = {}
-	local _tabRegistry = {}
-	local _featureCount = 0
+	local _tabCount = 0
+	local _groupboxCount = 0
+	local _controlCount = 0
 	local _missingBindings = {}
 
 	local function log(msg) if type(Core.say) == "function" then Core.say("[UI] " .. msg) end end
@@ -68,17 +68,10 @@ return function(Core)
 
 	local function tryWriteLocal(path, data)
 		local fn = ENV.writefile
+		local mkfn = ENV.makefolder
 		if type(fn) ~= "function" then return false end
+		if mkfn then pcall(mkfn, ".alleral/cache") end
 		return pcall(fn, path, data)
-	end
-
-	local function tryDeleteLocal(path)
-		local fn = ENV.delfile
-		local isFileFn = ENV.isfile
-		if type(fn) ~= "function" or type(isFileFn) ~= "function" then return false end
-		local ok, exists = pcall(isFileFn, path)
-		if not ok or not exists then return false end
-		return pcall(fn, path)
 	end
 
 	local function fetchUrl(url)
@@ -115,7 +108,6 @@ return function(Core)
 		local body
 		local urls = {
 			"https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua",
-			"https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua",
 		}
 
 		for attempt = 1, 3 do
@@ -138,9 +130,7 @@ return function(Core)
 				return nil, "Linoria unavailable after 3 attempts (no cache)"
 			end
 		else
-			local cachePath = ".alleral/cache/linoria.lua"
-			tryWriteLocal(cachePath, body)
-			if ENV.makefolder then pcall(ENV.makefolder, ".alleral/cache") end
+			tryWriteLocal(".alleral/cache/linoria.lua", body)
 		end
 
 		body = body:gsub("^%s+", ""):gsub("%s+$", "")
@@ -166,7 +156,7 @@ return function(Core)
 
 		_linoriaInstance = pkg
 		ENV._AlleralUI = pkg
-		log("Linoria booted")
+		log("Linoria booted successfully")
 		return pkg
 	end
 
@@ -194,12 +184,11 @@ return function(Core)
 
 			local li = loadLinoriaSource()
 			if not li then
-				warn("Linoria boot failed: " .. tostring(_linoriaInstance and "unknown" or "see above"))
+				warn("Linoria boot failed")
 				return nil
 			end
 
 			local title = settings.Title or settings.Name or "Alleral"
-			local subtitle = settings.Subtitle or settings.Author or ""
 
 			local liWindow
 			local okW, errW = pcall(function()
@@ -222,13 +211,14 @@ return function(Core)
 			}
 
 			function window:AddTab(name, icon)
+				_tabCount = _tabCount + 1
 				local tabOk, liTab = pcall(function() return liWindow:AddTab(name) end)
 				if tabOk and liTab then
 					table.insert(window._tabs, liTab)
-					_featureCount = _featureCount + 1
-					log("Tab: " .. tostring(name))
+					log("Tab created: " .. tostring(name))
 				else
-					warn("Tab " .. tostring(name) .. " failed")
+					warn("Tab failed: " .. tostring(name))
+					table.insert(_missingBindings, "Tab:" .. tostring(name))
 				end
 				return liTab, window
 			end
@@ -287,7 +277,7 @@ return function(Core)
 		ENV.Alleral_UI = bundle
 		if getgenv then getgenv().Alleral_UI = bundle end
 
-		log("Alleral UI " .. tostring(Library:GetArrrelVersion()))
+		log("Alleral UI " .. tostring(Library:GetArrrelVersion()) .. " loaded")
 		return bundle
 	end
 
@@ -343,6 +333,8 @@ return function(Core)
 					Callback = settings.Callback or function() end,
 				})
 			end)
+			_controlCount = _controlCount + 1
+			if not raw then table.insert(_missingBindings, "Toggle:" .. tostring(settings.Name)) end
 			return wrapElement(function(next)
 				if not raw then return end
 				local v = next.CurrentValue; if v == nil then v = next.Value end; if v == nil then v = next end
@@ -355,6 +347,8 @@ return function(Core)
 			local raw = safeCall("Button " .. tostring(name), function()
 				return section:AddButton({ Text = name, Func = settings.Callback or function() end })
 			end)
+			_controlCount = _controlCount + 1
+			if not raw then table.insert(_missingBindings, "Button:" .. tostring(name)) end
 			return wrapElement(function() end, { raw = raw, kind = "button" })
 		end
 
@@ -374,6 +368,8 @@ return function(Core)
 					Callback = settings.Callback or function() end,
 				})
 			end)
+			_controlCount = _controlCount + 1
+			if not raw then table.insert(_missingBindings, "Slider:" .. tostring(settings.Name)) end
 			return wrapElement(function(next)
 				if not raw then return end
 				local v = tonumber(next.CurrentValue); if v == nil then v = tonumber(next.Value) end; if v == nil then v = tonumber(next) end; if v == nil then return end
@@ -392,6 +388,8 @@ return function(Core)
 					Callback = settings.Callback or function() end,
 				})
 			end)
+			_controlCount = _controlCount + 1
+			if not raw then table.insert(_missingBindings, "Input:" .. tostring(settings.Name)) end
 			return wrapElement(function(next)
 				if not raw then return end
 				local v = next.CurrentValue; if v == nil then v = next.Value end; if v == nil then v = tostring(next) end
@@ -417,6 +415,8 @@ return function(Core)
 					end,
 				})
 			end)
+			_controlCount = _controlCount + 1
+			if not raw then table.insert(_missingBindings, "Dropdown:" .. tostring(settings.Name)) end
 			return wrapElement(function(next)
 				if not raw then return end
 				local nextValues = next.Options or next.Values
@@ -431,6 +431,7 @@ return function(Core)
 		function groupbox:CreateLabel(settings, id)
 			local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
 			local raw = safeCall("Label", function() return section:AddLabel(text) end)
+			_controlCount = _controlCount + 1
 			return {
 				Set = function(_, nextSettings)
 					local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text) or tostring(nextSettings or "")
@@ -442,7 +443,8 @@ return function(Core)
 		end
 
 		function groupbox:CreateDivider()
-			local raw = safeCall("Divider", function() return section:AddDivider() end)
+			safeCall("Divider", function() return section:AddDivider() end)
+			_controlCount = _controlCount + 1
 			return {}
 		end
 
@@ -450,9 +452,11 @@ return function(Core)
 			local status = { Labels = {}, LastValues = {}, Visible = true }
 			for key, value in pairs(fields or {}) do
 				status.LastValues[key] = tostring(value)
-				status.Labels[key] = groupbox:CreateLabel({ Name = tostring(key) .. ": " .. tostring(value) }, nextFlag(label .. "_" .. tostring(key)))
+				local lbl = groupbox:CreateLabel({ Name = tostring(key) .. ": " .. tostring(value) }, nextFlag(label .. "_" .. tostring(key)))
+				if lbl then status.Labels[key] = lbl end
 			end
-			status.Labels.Summary = groupbox:CreateLabel({ Name = "" }, nextFlag(label .. "_summary"))
+			local sum = groupbox:CreateLabel({ Name = "" }, nextFlag(label .. "_summary"))
+			if sum then status.Labels.Summary = sum end
 			function status:Update(key, value)
 				local rendered = tostring(value)
 				if self.LastValues[key] == rendered then return end
@@ -518,10 +522,30 @@ return function(Core)
 
 		function tab:CreateGroupbox(settings)
 			settings = settings or {}
-			local name = settings.Name or "Group"
-			if not rawTab then return type(Core.createStubUiGroup) == "function" and Core.createStubUiGroup(name) or {} end
-			local groupboxHolder = safeCall("Groupbox " .. name, function() return rawTab:AddGroupbox(name) end)
-			if not groupboxHolder then return Core.createStubUiGroup and Core.createStubUiGroup(name) or {} end
+			local name = settings.Name or settings.Group or "Group"
+			_groupboxCount = _groupboxCount + 1
+			if not rawTab then
+				warn("Groupbox '" .. name .. "' — no tab (window missing)")
+				table.insert(_missingBindings, "Groupbox:" .. name .. "(no tab)")
+				return type(Core.createStubUiGroup) == "function" and Core.createStubUiGroup(name) or {}
+			end
+			local groupboxHolder = safeCall("Groupbox " .. name, function()
+				local col = tonumber(settings.Column) or 1
+				if col == 2 and rawTab.AddRightGroupbox then
+					return rawTab:AddRightGroupbox(name)
+				elseif rawTab.AddLeftGroupbox then
+					return rawTab:AddLeftGroupbox(name)
+				elseif rawTab.AddGroupbox then
+					return rawTab:AddGroupbox(name)
+				else
+					return nil, "no AddGroupbox method on tab"
+				end
+			end)
+			if not groupboxHolder then
+				warn("Groupbox '" .. name .. "' creation failed")
+				table.insert(_missingBindings, "Groupbox:" .. name .. "(failed)")
+				return Core.createStubUiGroup and Core.createStubUiGroup(name) or {}
+			end
 			tab._sectionIndex = (tab._sectionIndex or 0) + 1
 			return Core.createUiGroupbox(groupboxHolder, uiBundle)
 		end
@@ -552,15 +576,17 @@ return function(Core)
 		local resolve = Core.resolveUiWindow
 		local window = type(resolve) == "function" and resolve(section) or nil
 		if type(window) ~= "table" or not window._rawWindow then
-			warn("buildUiTab: no window")
+			warn("buildUiTab: no window for '" .. tostring(name) .. "'")
 			return Core.wrapUiTab(nil, type(section) == "table" and section._ui or nil, window)
 		end
 		local tabGroup = window._tabGroup or window
 		if not tabGroup or type(tabGroup.AddTab) ~= "function" then
-			warn("buildUiTab: no tab group")
+			warn("buildUiTab: no tab group for '" .. tostring(name) .. "'")
 			return Core.wrapUiTab(nil, window._ui, window)
 		end
 		local rawTab = tabGroup:AddTab(name, icon)
+		_tabCount = _tabCount + 1
+		log("Tab: " .. tostring(name))
 		local wrapped = Core.wrapUiTab(rawTab, window._ui or (type(section) == "table" and section._ui) or nil, window)
 		wrapped._columnCount = math.max(1, tonumber(columns) or 2)
 		if not window._defaultTab then window._defaultTab = rawTab end
@@ -569,7 +595,10 @@ return function(Core)
 
 	function Core.buildUiGroup(tab, name, column, callbackWrapper, icon, id)
 		name = tostring(name or "Group")
-		if type(tab) ~= "table" or type(tab.CreateGroupbox) ~= "function" then return Core.createStubUiGroup and Core.createStubUiGroup(name) or {} end
+		if type(tab) ~= "table" or type(tab.CreateGroupbox) ~= "function" then
+			warn("buildUiGroup: invalid tab for '" .. name .. "'")
+			return Core.createStubUiGroup and Core.createStubUiGroup(name) or {}
+		end
 		local groupbox = tab:CreateGroupbox({ Name = name, Column = column or 1, Icon = icon })
 		return Core.wrapUiGroup(groupbox, callbackWrapper)
 	end
@@ -593,6 +622,25 @@ return function(Core)
 		end
 		if type(Core.setupHubKeybinds) == "function" then pcall(Core.setupHubKeybinds, { window = window, ui = ui or window._ui or ENV.Alleral_UI }) end
 		if options.notify ~= false then Core.notifyBootReady({ Name = options.Name or "Alleral", Subtitle = options.Subtitle }) end
+
+		-- Startup validation — runs AFTER UI is fully built
+		local linoriaOk = type(_linoriaInstance) == "table" and type(_linoriaInstance.CreateWindow) == "function"
+		local profileId = ENV.Alleral_ActiveScriptId or "none"
+		log("=== UI Validation ===")
+		log("Linoria loaded: " .. tostring(linoriaOk))
+		log("Tabs created: " .. tostring(_tabCount))
+		log("Groupboxes created: " .. tostring(_groupboxCount))
+		log("Controls created: " .. tostring(_controlCount))
+		if #_missingBindings > 0 then
+			log("Missing bindings: " .. tostring(#_missingBindings))
+			for _, b in ipairs(_missingBindings) do
+				log("  - " .. b)
+			end
+		else
+			log("Missing bindings: none")
+		end
+		log("====================")
+
 		return window
 	end
 
@@ -615,33 +663,4 @@ return function(Core)
 		ENV.Alleral_UiWindow = nil
 		_linoriaInstance = nil
 	end
-
-	local function validateStartup()
-		local uiFile = "hub/alleral_ui.luau"
-		local profileId = ENV.Alleral_ActiveScriptId or "none"
-		local profileName = "unknown"
-		for _, g in ipairs({ { id = "kick_a_lucky_block", name = "Kick a Lucky Block" }, { id = "speed_keyboard_escape", name = "Speed Keyboard Escape" }, { id = "slime_rng", name = "Slime RNG" }, { id = "sell_lemons", name = "Sell Lemons" }, { id = "grow_a_garden_2", name = "Grow a Garden 2" }, { id = "build_a_ring_farm", name = "Build A Ring Farm" }, { id = "survive_a_zombie_arena", name = "Survive a Zombie Arena" }, { id = "blox_fruit", name = "Blox Fruit" } }) do
-			if g.id == profileId then profileName = g.name; break end
-		end
-
-		local linoriaOk = type(_linoriaInstance) == "table" and type(_linoriaInstance.CreateWindow) == "function"
-
-		local tabCount = #_tabRegistry
-		local totalFeatures = _featureCount
-
-		log("=== Startup Validation ===")
-		log("Linoria loaded: " .. tostring(linoriaOk))
-		log("UI file: " .. uiFile)
-		log("Game profile: " .. profileName .. " (" .. profileId .. ")")
-		log("Tabs registered: " .. tostring(tabCount))
-		log("Features registered: " .. tostring(totalFeatures))
-		if #_missingBindings > 0 then
-			log("Missing bindings: " .. table.concat(_missingBindings, ", "))
-		else
-			log("Missing bindings: none")
-		end
-		log("========================")
-	end
-
-	task.defer(validateStartup)
 end

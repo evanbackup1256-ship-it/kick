@@ -232,6 +232,14 @@ return function(Core)
 			CreateDropdown = function() return { Set = function() end } end,
 			CreateLabel = function() return { Set = function() end, SetVisible = function() end } end,
 			CreateDivider = function() return {} end,
+			CreateStatus = function(_, fields)
+				local s = { Labels = {}, LastValues = {}, Visible = true }
+				for k, v in pairs(fields or {}) do s.LastValues[k] = tostring(v) end
+				s.Update = function() end
+				s.SetSummary = function() end
+				s.SetVisible = function() end
+				return s
+			end,
 		}
 	end
 

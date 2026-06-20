@@ -1,3 +1,4 @@
+-- Alleral_Validation
 local Validation = { VERSION = "1.0.0" }
 
 function Validation.isType(value, typeName, name)
@@ -48,4 +49,5 @@ function Validation.isInstance(value, name)
 	return true
 end
 
+if getgenv then getgenv().Alleral_Validation = Validation end
 return Validation
