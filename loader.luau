@@ -41,7 +41,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "961876f",
+	commit = "6571093",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -67,9 +67,7 @@ local BOOTSTRAP_LOCAL_PATHS = {
 	"alleral_bootstrap.luau",
 }
 local BOOTSTRAP_LOADSTRING =
-	'loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/bootstrap.luau?v='
-	.. BOOTSTRAP_VERSION
-	.. '&t=" .. tick(), true))()'
+	'loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/bootstrap.luau?t=" .. tick(), true))()'
 local LEGACY_LOADER_MARKERS = {
 	"[Alleral Loader v",
 	"Alleral loader 3.",

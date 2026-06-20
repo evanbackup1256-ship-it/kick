@@ -95,9 +95,7 @@ local function relaunchViaBootstrap(reason)
 	if type(src) ~= "string" or #src < 200 then
 		return false, "bootstrap fetch failed (" .. tostring(via) .. ")"
 	end
-	ENV._Alleral_BootstrapSkipAutoRun = true
 	local ok, err = compileAndRun(src, "Alleral/bootstrap", loaderRunEnv())
-	ENV._Alleral_BootstrapSkipAutoRun = nil
 	return ok == true, err
 end
 

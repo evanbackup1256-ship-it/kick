@@ -1,11 +1,10 @@
 -- Back-compat redirect — bootstrap + loader merged into /bootstrap.luau at repo root.
 -- Old saved scripts that still hit hub/bootstrap.luau get forwarded in one fetch.
 
-local REDIRECT_VERSION = "2.0.2"
 local REPO = "evanbackup1256-ship-it/-kick-loader"
 local MERGED_URLS = {
-	"https://raw.githubusercontent.com/" .. REPO .. "/main/bootstrap.luau?v=" .. REDIRECT_VERSION,
-	"https://cdn.jsdelivr.net/gh/" .. REPO .. "@main/bootstrap.luau?v=" .. REDIRECT_VERSION,
+	"https://raw.githubusercontent.com/" .. REPO .. "/main/bootstrap.luau",
+	"https://cdn.jsdelivr.net/gh/" .. REPO .. "@main/bootstrap.luau",
 }
 
 local function genv()
@@ -49,7 +48,7 @@ end
 local function fetchMerged()
 	local requestFn = pickRequest()
 	for _, baseUrl in ipairs(MERGED_URLS) do
-		local url = baseUrl .. "&t=" .. tostring(tick())
+		local url = baseUrl .. "?t=" .. tostring(tick())
 		if requestFn then
 			local body = safeCall("request fetch " .. baseUrl, function()
 				local res = requestFn({
@@ -87,7 +86,7 @@ local function fetchMerged()
 	return nil
 end
 
-print("[Alleral Bootstrap redirect v" .. REDIRECT_VERSION .. "] Loading merged bootstrap...")
+print("[Alleral Bootstrap redirect] Loading merged bootstrap...")
 local src = fetchMerged()
 if not src then
 	error("[Alleral Bootstrap redirect] Could not download merged bootstrap.luau — HTTP blocked or all sources unreachable.")
