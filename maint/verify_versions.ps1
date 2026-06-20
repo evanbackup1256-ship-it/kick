@@ -225,27 +225,6 @@ function Same-FileText($a, $b)
     return ((Get-FileHash $a -Algorithm SHA256).Hash -eq (Get-FileHash $b -Algorithm SHA256).Hash)
 }
 
-$deployCopies = @(
-    @{ Name = "scripts_manifest.json"; Cfg = "cfg/scripts_manifest.json"; Relay = "relay/scripts_manifest.json"; Backend = "backend/scripts_manifest.json" },
-    @{ Name = "site.json"; Cfg = "cfg/site.json"; Relay = "relay/site.json"; Backend = "backend/site.json" }
-)
-foreach ($item in $deployCopies)
-{
-    $cfgPath = Join-Path $root $item.Cfg
-    $relayPath = Join-Path $root $item.Relay
-    $backendPath = Join-Path $root $item.Backend
-    if (-not (Same-FileText $cfgPath $relayPath))
-    {
-        Fail "$($item.Name) drift: cfg vs relay (run maint/sync_repo.ps1)"
-    } elseif (-not (Same-FileText $cfgPath $backendPath))
-    {
-        Fail "$($item.Name) drift: cfg vs backend (run maint/sync_repo.ps1)"
-    } else
-    {
-        Pass "$($item.Name) copies match cfg"
-    }
-}
-
 $sitePath = Join-Path $root "cfg/site.json"
 $site = Get-Content $sitePath -Raw | ConvertFrom-Json
 if ($site.loaderVersion -ne $release.loader)
@@ -301,31 +280,6 @@ foreach ($pair in @(
     {
         Fail "$($pair.File) missing version constant"
     }
-}
-
-$relayPy = Get-ChildItem (Join-Path $root "relay") -Filter "*.py" -File | ForEach-Object { $_.Name } | Sort-Object
-$backendPy = Get-ChildItem (Join-Path $root "backend") -Filter "*.py" -File | ForEach-Object { $_.Name } | Sort-Object
-$missingInBackend = Compare-Object $relayPy $backendPy | Where-Object { $_.SideIndicator -eq "<=" } | ForEach-Object { $_.InputObject }
-if ($missingInBackend)
-{
-    Fail "backend missing relay python files: $($missingInBackend -join ', ')"
-} else
-{
-    Pass "backend python files match relay"
-}
-
-foreach ($pyName in $relayPy)
-{
-    $relayFile = Join-Path $root "relay/$pyName"
-    $backendFile = Join-Path $root "backend/$pyName"
-    if (-not (Same-FileText $relayFile $backendFile))
-    {
-        Fail "python drift: relay/$pyName != backend/$pyName (run maint/sync_repo.ps1)"
-    }
-}
-if ($relayPy.Count -gt 0)
-{
-    Pass "relay/backend python copies identical"
 }
 
 $forbiddenFiles = @(

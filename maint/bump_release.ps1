@@ -97,50 +97,13 @@ if ($hashBumpNeeded) {
 }
 Write-Utf8NoBom $siteSrc $siteRaw
 
-Copy-IfChanged $manifestSrc (Join-Path $root "relay/scripts_manifest.json")
-Copy-IfChanged $siteSrc (Join-Path $root "relay/site.json")
-
-$relayDir = Join-Path $root "relay"
-$backendDir = Join-Path $root "backend"
-New-Item -ItemType Directory -Force -Path $backendDir | Out-Null
-
-foreach ($name in @("requirements.txt", "Dockerfile", "scripts_manifest.json", "site.json")) {
-    Copy-IfChanged (Join-Path $relayDir $name) (Join-Path $backendDir $name)
-}
-
-Get-ChildItem -Path $relayDir -Filter "*.py" -File | ForEach-Object {
-    Copy-IfChanged $_.FullName (Join-Path $backendDir $_.Name)
-}
-
-function Sync-Tree($src, $dest) {
-    if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
-    Copy-Item $src $dest -Recurse -Force
-}
-
-$siteDir = Join-Path $relayDir "site"
+$siteDir = Join-Path $root "relay" "site"
 Push-Location $siteDir
 try {
-    $env:SKIP_BACKEND_SYNC = "1"
     npm run build | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "relay/site build failed" }
 } finally {
     Pop-Location
 }
-Sync-Tree (Join-Path $siteDir "out") (Join-Path $backendDir "site")
 
-if ($hashBumpNeeded) {
-    $generatedMarker = @"
-GENERATED - do not edit files in backend/ directly.
-Edit relay/ and cfg/, then run: maint/sync_repo.ps1
-Synced at: $updatedAt
-Commit: $commit
-"@
-    Write-Utf8NoBom (Join-Path $backendDir "GENERATED.txt") ($generatedMarker + "`n")
-}
-
-$rootRailway = Join-Path $root "railway.toml"
-if (Test-Path $rootRailway) {
-    Copy-IfChanged $rootRailway (Join-Path $backendDir "railway.toml")
-}
-
-Write-Host "cfg + relay + backend deploy bundle synced"
+Write-Host "release bumped and site built"

@@ -24,8 +24,4 @@ runtime_secrets.json
 # Cursor IDE — local debug logs, agent sessions, temp dumps (never commit)
 .cursor/
 
-# Local obfuscated UI dumps (never commit)
-obfusctated_uilibrary.luau
-
-# Obfuscation content-hash cache
-.obfuscation_cache/
+# Single public repo — no obfuscation

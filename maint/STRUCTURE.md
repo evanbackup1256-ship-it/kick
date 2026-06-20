@@ -3,11 +3,11 @@
 | Path | What it is |
 |------|------------|
 | `loader.luau` | Entry point — boot, updates, game routing |
-| `hub/bootstrap.luau` | Small stable loadstring entry (pulls `loader.luau` from GitHub) |
+| `bootstrap.luau` | Stable loadstring entry (pulls `loader.luau` from GitHub) |
 | `hub/` | Core runtime (`core_base`, `core_ui`, `alleral_ui`, telemetry, security, …) |
-| `games/` | Per-game scripts |
+| `games/` | Per-game scripts (public, no obfuscation) |
 | `cfg/` | Versions, manifests, site copy, telemetry/security JSON |
-| `relay/` | Source for the Railway API + public site (edit here, not `backend/`) |
+| `relay/` | Railway API + Next.js site (single source of truth) |
 | `maint/` | Sync and verify scripts |
 
 ## Before you push
@@ -16,14 +16,14 @@
 ./maint/sync_repo.ps1 -AutoCommit -Push
 ```
 
-That bumps the release stamp (once per code change — re-runs are idempotent), copies `cfg/` → `relay/` → `backend/`, verifies versions, then commits and pushes sync files when `-AutoCommit` is set.
+Bumps the release stamp, builds the Next.js site, verifies versions, then commits and pushes.
 
 ## Deploy
 
-- **Railway** — root `Dockerfile` + `railway.toml` (builds from synced `backend/`)
+- **Railway** — root `Dockerfile` + `railway.toml`
 - **GitHub Pages** — `.github/workflows/deploy-site.yml` publishes `relay/site`
 
 ## Rules
 
+- Single public repo — no dual-repo sync, no obfuscation
 - Only one root `.luau` file: `loader.luau`
-- Don't hand-edit `backend/` — change `relay/` and sync

@@ -28,16 +28,11 @@ backend/data/
 # Local artifacts
 .alleral/
 runtime_secrets.json
-obfusctated_uilibrary.luau
-
 # Docker
 Dockerfile
 .dockerignore
 docker-compose*.yml
 railway.toml
-
-# Obfuscation cache
-.obfuscation_cache/
 
 # Large directories
 games/

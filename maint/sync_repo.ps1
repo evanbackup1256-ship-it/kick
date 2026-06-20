@@ -10,13 +10,13 @@ $root = Split-Path -Parent $here
 Write-Host "=== bump_release ===" -ForegroundColor Cyan
 & (Join-Path $here "bump_release.ps1")
 if ($LASTEXITCODE -ne 0)
-{ exit $LASTEXITCODE 
+{ exit $LASTEXITCODE
 }
 
 Write-Host "`n=== verify_versions ===" -ForegroundColor Cyan
 & (Join-Path $here "verify_versions.ps1")
 if ($LASTEXITCODE -ne 0)
-{ exit $LASTEXITCODE 
+{ exit $LASTEXITCODE
 }
 
 if ($AutoCommit)
@@ -25,26 +25,9 @@ if ($AutoCommit)
     if ($dirty)
     {
         $release = Get-Content (Join-Path $root "cfg/release.json") -Raw | ConvertFrom-Json
-        $syncPaths = @(
-            "cfg/release.json",
-            "cfg/site.json",
-            "loader.luau",
-            "relay/site.json",
-            "relay/scripts_manifest.json",
-            "backend/GENERATED.txt",
-            "backend/site.json",
-            "backend/scripts_manifest.json"
-        )
-        foreach ($rel in $syncPaths)
-        {
-            $full = Join-Path $root $rel
-            if (Test-Path $full)
-            {
-                git -C $root add $rel
-            }
-        }
-        git -C $root add backend/
-        $msg = "Update release commit hash after version sync (v$($release.loader))."
+        git -C $root add cfg/release.json cfg/site.json loader.luau
+        git -C $root add relay/site.json relay/scripts_manifest.json 2>$null
+        $msg = "Sync release v$($release.loader)"
         git -C $root commit -m $msg
         Write-Host "Committed sync changes." -ForegroundColor Green
 
