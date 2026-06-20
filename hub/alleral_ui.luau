@@ -76,8 +76,8 @@ return function(Core)
 			body = ENV._AlleralFluentBundle
 		else
 			local urls = {
+				"https://github.com/dawid-scripts/Fluent/releases/download/1.1.0/main.lua",
 				"https://raw.githubusercontent.com/dawid-scripts/Fluent/main/Built.lua",
-				"https://raw.githubusercontent.com/dawid-scripts/Fluent/refs/heads/main/Built.lua",
 			}
 			for _, url in ipairs(urls) do
 				if type(game) == "Instance" and type(game.HttpGet) == "function" then

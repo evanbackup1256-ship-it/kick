@@ -1,5 +1,8 @@
 local ALLERAL_FLUENT_VERSION = 1
-local FLUENT_SOURCE_URL = "https://raw.githubusercontent.com/dawid-scripts/Fluent/main/Built.lua"
+local FLUENT_SOURCE_URL = "https://github.com/dawid-scripts/Fluent/releases/download/1.1.0/main.lua"
+local FLUENT_FALLBACK_URLS = {
+	"https://raw.githubusercontent.com/dawid-scripts/Fluent/main/Built.lua",
+}
 
 local ENV = (function()
 	local ok, env = pcall(function()
@@ -25,17 +28,28 @@ local function fetchFluentSource()
 		end)
 	end
 
-	if type(body) ~= "string" or #body <= 1000 then
-		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
-			body = ENV.Alleral_HTTP.get(FLUENT_SOURCE_URL .. "?t=" .. tostring(tick()), 5000)
-		end
+	local urls = { FLUENT_SOURCE_URL }
+	for _, url in ipairs(FLUENT_FALLBACK_URLS) do
+		table.insert(urls, url)
 	end
 
-	if type(body) ~= "string" or #body <= 1000 then
-		if type(game) == "Instance" and type(game.HttpGet) == "function" then
-			pcall(function()
-				body = game:HttpGet(FLUENT_SOURCE_URL .. "?t=" .. tostring(tick()))
-			end)
+	for _, url in ipairs(urls) do
+		if type(body) ~= "string" or #body <= 1000 then
+			if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
+				body = ENV.Alleral_HTTP.get(url .. "?t=" .. tostring(tick()), 5000)
+			end
+		end
+
+		if type(body) ~= "string" or #body <= 1000 then
+			if type(game) == "Instance" and type(game.HttpGet) == "function" then
+				pcall(function()
+					body = game:HttpGet(url .. "?t=" .. tostring(tick()))
+				end)
+			end
+		end
+
+		if type(body) == "string" and #body > 1000 then
+			break
 		end
 	end
 

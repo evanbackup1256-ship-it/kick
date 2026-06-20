@@ -7,7 +7,7 @@ local EXPECTED_VERSIONS_CACHE_SECONDS = 300
 local COMPILE_VALIDATE_CACHE = {}
 local CORE_BASE_MIN_BYTES = 30000
 local CORE_BASE_MAX_BYTES = 45000
-local CORE_UI_MIN_BYTES = 50000
+local CORE_UI_MIN_BYTES = 8000
 local CORE_HUB_UI_MIN_BYTES = 60000
 local CORE_ALLERAL_UI_MIN_BYTES = 12000
 local CORE_MONOLITH_MIN_BYTES = 130000
@@ -41,7 +41,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "6ec4230",
+	commit = "e79d4f7",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
