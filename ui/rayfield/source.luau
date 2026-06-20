@@ -25,13 +25,6 @@ local function deepClone(value, seen)
 end
 
 local function fetchRayfieldSource()
-	if type(ENV._AlleralRayfieldBundle) == "string" and #ENV._AlleralRayfieldBundle > 1000 then
-		return ENV._AlleralRayfieldBundle, "cached bundle"
-	end
-	if type(ENV._AlleralRayfieldSource) == "string" and #ENV._AlleralRayfieldSource > 1000 then
-		return ENV._AlleralRayfieldSource, "loader cache"
-	end
-
 	for attempt = 1, 3 do
 		local urls = { RAYFIELD_SOURCE_URL }
 		for _, url in ipairs(RAYFIELD_FALLBACK_URLS) do
@@ -73,6 +66,13 @@ local function fetchRayfieldSource()
 		end
 
 		if attempt < 3 then task.wait(0.5 * attempt) end
+	end
+
+	if type(ENV._AlleralRayfieldBundle) == "string" and #ENV._AlleralRayfieldBundle > 1000 then
+		return ENV._AlleralRayfieldBundle, "cached bundle"
+	end
+	if type(ENV._AlleralRayfieldSource) == "string" and #ENV._AlleralRayfieldSource > 1000 then
+		return ENV._AlleralRayfieldSource, "loader cache"
 	end
 
 	return nil

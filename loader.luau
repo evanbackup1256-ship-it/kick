@@ -975,6 +975,7 @@ do
 	end
 
 	ensureRayfieldSource = function()
+		ENV._AlleralRayfieldSource = nil
 		if ENV._AlleralRayfieldSourceReady then
 			return true, ENV._AlleralRayfieldSourceLabel or "already ready"
 		end

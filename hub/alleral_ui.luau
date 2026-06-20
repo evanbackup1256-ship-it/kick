@@ -102,48 +102,50 @@ return function(Core)
 		local maxRetries = 3
 
 		for attempt = 1, maxRetries do
-			if type(ENV._AlleralRayfieldBundle) == "string" and #ENV._AlleralRayfieldBundle > 1000 then
-				body = ENV._AlleralRayfieldBundle
-				sourceLabel = "cached bundle"
-			elseif type(ENV._AlleralRayfieldSource) == "string" and #ENV._AlleralRayfieldSource > 1000 then
-				body = ENV._AlleralRayfieldSource
-				sourceLabel = "loader cache"
-			else
-				local urls = {
-					{ url = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua", name = "SiriusRayfield" },
-				}
-				for _, entry in ipairs(urls) do
-					local bust = "?t=" .. tostring(tick()) .. "&attempt=" .. tostring(attempt)
-					if type(game) == "Instance" and type(game.HttpGet) == "function" then
-						body = safeCall("HttpGet " .. entry.name, function()
-							local ok, b = pcall(game.HttpGet, game, entry.url .. bust, true)
-							if ok and type(b) == "string" and #b > 1000 then return b end
-							ok, b = pcall(game.HttpGet, game, entry.url .. bust)
-							if ok and type(b) == "string" and #b > 1000 then return b end
-							return nil
-						end)
-						if body then sourceLabel = entry.name; break end
-					end
-					if not body and ENV.Alleral_HTTP and type(ENV.Alleral_HTTP.get) == "function" then
-						body = safeCall("Alleral_HTTP " .. entry.name, function()
-							return ENV.Alleral_HTTP.get(entry.url .. bust, 5000)
-						end)
-						if body then sourceLabel = entry.name .. "-http"; break end
-					end
-					if not body and not ENV._Alleral_InLoaderHttpGet and type(Core.httpGet) == "function" then
-						body = safeCall("Core.httpGet " .. entry.name, function()
-							return Core.httpGet(entry.url .. bust)
-						end)
-						if body then sourceLabel = entry.name .. "-core"; break end
-					end
+			local urls = {
+				{ url = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua", name = "SiriusRayfield" },
+			}
+			for _, entry in ipairs(urls) do
+				local bust = "?t=" .. tostring(tick()) .. "&attempt=" .. tostring(attempt)
+				if type(game) == "Instance" and type(game.HttpGet) == "function" then
+					body = safeCall("HttpGet " .. entry.name, function()
+						local ok, b = pcall(game.HttpGet, game, entry.url .. bust, true)
+						if ok and type(b) == "string" and #b > 1000 then return b end
+						ok, b = pcall(game.HttpGet, game, entry.url .. bust)
+						if ok and type(b) == "string" and #b > 1000 then return b end
+						return nil
+					end)
+					if body then sourceLabel = entry.name; break end
+				end
+				if not body and ENV.Alleral_HTTP and type(ENV.Alleral_HTTP.get) == "function" then
+					body = safeCall("Alleral_HTTP " .. entry.name, function()
+						return ENV.Alleral_HTTP.get(entry.url .. bust, 5000)
+					end)
+					if body then sourceLabel = entry.name .. "-http"; break end
+				end
+				if not body and not ENV._Alleral_InLoaderHttpGet and type(Core.httpGet) == "function" then
+					body = safeCall("Core.httpGet " .. entry.name, function()
+						return Core.httpGet(entry.url .. bust)
+					end)
+					if body then sourceLabel = entry.name .. "-core"; break end
 				end
 			end
 
 			if type(body) == "string" and #body > 1000 then break end
 
-			if ENV._AlleralRayfieldBundle then ENV._AlleralRayfieldBundle = nil end
-			if ENV._AlleralRayfieldSource then ENV._AlleralRayfieldSource = nil end
 			if attempt < maxRetries then task.wait(0.5 * attempt) end
+		end
+
+		-- Fallback: try cached sources if HTTP failed
+		if type(body) ~= "string" or #body <= 1000 then
+			if type(ENV._AlleralRayfieldBundle) == "string" and #ENV._AlleralRayfieldBundle > 1000 then
+				body = ENV._AlleralRayfieldBundle
+				sourceLabel = "cached bundle (fallback)"
+			elseif type(ENV._AlleralRayfieldSource) == "string" and #ENV._AlleralRayfieldSource > 1000 then
+				ENV._AlleralRayfieldBundle = ENV._AlleralRayfieldSource
+				body = ENV._AlleralRayfieldBundle
+				sourceLabel = "loader cache (fallback)"
+			end
 		end
 
 		if type(body) ~= "string" or #body <= 100 then
@@ -348,11 +350,7 @@ return function(Core)
 			function window:AddTab(name, icon)
 				local iconId = rayfieldIcon(icon)
 				local tabOk, rfTab = pcall(function()
-					if iconId then
-						return rfWindow:CreateTab(name, iconId)
-					else
-						return rfWindow:CreateTab(name)
-					end
+					return rfWindow:CreateTab(name, iconId or 0, false)
 				end)
 				if tabOk and rfTab then
 					table.insert(window._fTabs, rfTab)
