@@ -1,5 +1,5 @@
 local ALLERAL_RAYFIELD_VERSION = 1
-local RAYFIELD_SOURCE_URL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source"
+local RAYFIELD_SOURCE_URL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua"
 local RAYFIELD_FALLBACK_URLS = {}
 
 local ENV = (function()

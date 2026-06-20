@@ -62,14 +62,17 @@ return function(Core)
 	end
 
 	local function rayfieldIcon(icon)
-		if icon == nil or icon == "" then return nil end
+		if icon == nil or icon == "" then return 0 end
 		local s = tostring(icon)
 		local digits = s:match("^(%d+)$")
-		if digits then return nil end
-		if s:find("^rbxassetid://") then return nil end
+		if digits then return tonumber(digits) end
+		if s:find("^rbxassetid://") then
+			local id = s:match("(%d+)")
+			return id and tonumber(id) or 0
+		end
 		if s:match("^[%a_%-]+$") then return s end
-		if s:match("^rbxthumb://") or s:match("^rbxthumbid://") then return nil end
-		return nil
+		if s:find("^rbxthumb://") then return 0 end
+		return 0
 	end
 
 	local function mapTheme(name)
@@ -107,7 +110,7 @@ return function(Core)
 				sourceLabel = "loader cache"
 			else
 				local urls = {
-					{ url = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source", name = "SiriusRayfield" },
+					{ url = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua", name = "SiriusRayfield" },
 				}
 				for _, entry in ipairs(urls) do
 					local bust = "?t=" .. tostring(tick()) .. "&attempt=" .. tostring(attempt)
@@ -840,14 +843,10 @@ return function(Core)
 				return type(Core.createStubUiGroup) == "function" and Core.createStubUiGroup(name) or {}
 			end
 			tab._sectionIndex = (tab._sectionIndex or 0) + 1
-			local sectionObj = rawTab
 			if rawTab.CreateSection then
-				local ok, created = pcall(rawTab.CreateSection, rawTab, name)
-				if ok and type(created) == "table" then
-					sectionObj = created
-				end
+				pcall(rawTab.CreateSection, rawTab, name)
 			end
-			return Core.createUiGroupbox(sectionObj, uiBundle)
+			return Core.createUiGroupbox(rawTab, uiBundle)
 		end
 
 		function tab:Select()
