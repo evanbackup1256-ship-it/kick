@@ -7,6 +7,27 @@ return function(Core)
 		return ok and env or {}
 	end
 	local ENV = genv()
+
+function Core.buildStatusDisplay(group, label, fields)
+	local s = { Labels = {}, LastValues = {}, Summary = nil }
+	for k, v in pairs(fields or {}) do
+		s.LastValues[k] = tostring(v)
+		s.Labels[k] = group:CreateLabel(tostring(k) .. ": " .. tostring(v))
+	end
+	s.Summary = group:CreateLabel("")
+	function s:Update(key, value)
+		local rendered = tostring(value)
+		if self.LastValues[key] == rendered then return end
+		self.LastValues[key] = rendered
+		local row = self.Labels[key]
+		if row and row.Set then row:Set({ Name = tostring(key) .. ": " .. rendered }) end
+	end
+	function s:SetSummary(text)
+		if self.Summary and self.Summary.Set then self.Summary:Set({ Name = tostring(text or "") }) end
+	end
+	return s
+end
+
 function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 	scriptId = scriptId or ENV.Alleral_ActiveScriptId
 	local evaluation = Core.evaluateScriptStatus(scriptId, profileVersion)
@@ -28,7 +49,7 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 	addRow("Script", status.name)
 	addRow("Version", status.version)
 	addRow("Executor", (Core.executorProfile().displayName))
-	addRow("Access", "Public · no key required")
+	addRow("Access", "Public Â· no key required")
 	local weao = Core.fetchWeaoExecutorStatus()
 	if weao then
 		addRow("WEAO", Core.weaoStatusLabel(weao))
@@ -51,7 +72,7 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 			Callback = function(value)
 				ENV.Alleral_ForceLoad = value == true
 				getgenv().Alleral_ForceLoad = value == true
-				Core.notify("Alleral", value and "force load on — reload to use it" or "force load off", 4)
+				Core.notify("Alleral", value and "force load on â€” reload to use it" or "force load off", 4)
 			end,
 		}, "ForceLoadToggle")
 	end
@@ -100,7 +121,7 @@ function Core.buildHubActionsGroup(tab, column)
 			Core.notify("Alleral", "reloading...", 3)
 			task.defer(reload)
 		else
-			Core.notify("Alleral", "can't reload here — use getgenv().Alleral_Reload()", 5)
+			Core.notify("Alleral", "can't reload here â€” use getgenv().Alleral_Reload()", 5)
 		end
 	end, "Runs getgenv().Alleral_Reload().")
 
@@ -768,7 +789,7 @@ function Core.buildPerformanceControls(group, options)
 	local saveFn = options.saveFn or options.saveSettings
 	Core.mergePerformanceDefaults(state)
 
-	group:CreateToggle("FPS boost", state.AFPSBoost == true, "Lowest quality, no shadows — best for weak PCs.", function(value)
+	group:CreateToggle("FPS boost", state.AFPSBoost == true, "Lowest quality, no shadows â€” best for weak PCs.", function(value)
 		state.AFPSBoost = value
 		if value then
 			state.ARTXMod = false
@@ -792,7 +813,7 @@ function Core.buildPerformanceControls(group, options)
 		end
 	end, "ARTXMod")
 
-	group:CreateToggle("Black screen mode", state.ABlackScreen == true, "Hides the 3D world with a black overlay — UI stays visible.", function(value)
+	group:CreateToggle("Black screen mode", state.ABlackScreen == true, "Hides the 3D world with a black overlay â€” UI stays visible.", function(value)
 		state.ABlackScreen = value
 		pcall(Core.setBlackScreen, value)
 		if type(saveFn) == "function" then
@@ -1049,7 +1070,7 @@ function Core.syncWeaoConfigNow()
 		)
 		return ok
 	end
-	Core.notify("Alleral", "WEAO sync unavailable — reload the loader.", 5)
+	Core.notify("Alleral", "WEAO sync unavailable â€” reload the loader.", 5)
 	return false
 end
 
@@ -1105,7 +1126,7 @@ function Core.buildSessionStatsGroup(tab, column)
 		frameCount += 1
 	end)
 	local group = Core.buildUiGroup(tab, "Session stats", column or 1, nil, nil, "SessionStats")
-	local status = group:CreateStatus("Live", {
+	local status = Core.buildStatusDisplay(group, "Live", {
 		FPS = "--",
 		Ping = "--",
 		Players = "--",
@@ -1219,7 +1240,7 @@ end
 function Core.buildErrorLogGroup(tab, column)
 	local group = Core.buildUiGroup(tab, "Error log", column or 2, nil, nil, "ErrorLog")
 	Core.installErrorLogHook()
-	local status = group:CreateStatus("Errors", {
+	local status = Core.buildStatusDisplay(group, "Errors", {
 		Count = tostring(#(ENV.Alleral_ErrorLog or {})),
 		Latest = "None",
 	})
@@ -1299,7 +1320,7 @@ function Core.buildSettingsBackupGroup(tab, options)
 		end
 		local raw = readFile(backupPath)
 		pcall(writeFile, settingsPath, raw)
-		Core.notify("Alleral", "Backup restored — reload the script.", 5)
+		Core.notify("Alleral", "Backup restored â€” reload the script.", 5)
 	end, "Overwrites your current settings file.")
 
 	group:CreateButton("Backup now", function()
@@ -1426,7 +1447,7 @@ function Core.buildAutomationStatusGroup(tab, options)
 	}
 
 	local group = Core.buildUiGroup(tab, "Automation", column, nil, nil, "AutomationStatus")
-	local status = group:CreateStatus("Live loops", {
+	local status = Core.buildStatusDisplay(group, "Live loops", {
 		Active = "0",
 		Total = tostring(#flags),
 		Hub = state.HubRunning ~= false and "running" or "stopped",
@@ -1441,7 +1462,7 @@ function Core.buildAutomationStatusGroup(tab, options)
 				active += 1
 			end
 			local loopState = loops[entry.key] or loops[entry.label]
-			local pulse = on and (loopState and loopState.enabled ~= false and "●" or "○") or "·"
+			local pulse = on and (loopState and loopState.enabled ~= false and "â—" or "â—‹") or "Â·"
 			table.insert(lines, pulse .. " " .. entry.label)
 		end
 		status:Update("Active", tostring(active))
@@ -1592,7 +1613,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	local group = Core.buildUiGroup(tab, "Customization V2", column, nil, nil, "CustomizationV2")
 
 	if not uiRuntime or type(uiRuntime.SetMotionProfile) ~= "function" then
-		group:CreateLabel("Linoria UI engine — standard configuration.")
+		group:CreateLabel("Linoria UI engine â€” standard configuration.")
 		return group
 	end
 
@@ -1664,7 +1685,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 		end
 		local info = type(uiRuntime.GetLayoutInfo) == "function" and uiRuntime:GetLayoutInfo() or nil
 		if info and info.profile then
-			Core.notify("Alleral", "Fit: " .. tostring(info.profile) .. " · " .. string.format("%.0f%%", (info.scale or 1) * 100), 2, "info")
+			Core.notify("Alleral", "Fit: " .. tostring(info.profile) .. " Â· " .. string.format("%.0f%%", (info.scale or 1) * 100), 2, "info")
 		end
 	end)
 
@@ -1686,7 +1707,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 			if ok and info then
 				Core.notify(
 					"Alleral",
-					string.format("%s · %dx%d · scale %.0f%%", tostring(profile or info.profile), info.viewport.X, info.viewport.Y, (info.scale or 1) * 100),
+					string.format("%s Â· %dx%d Â· scale %.0f%%", tostring(profile or info.profile), info.viewport.X, info.viewport.Y, (info.scale or 1) * 100),
 					3,
 					"success"
 				)
@@ -1864,7 +1885,7 @@ function Core.buildSystemPanelGroup(tab, options)
 		Player = lp and lp.Name or "--",
 		Display = lp and lp.DisplayName or "--",
 	}
-	local status = group:CreateStatus("Runtime", stats)
+	local status = Core.buildStatusDisplay(group, "Runtime", stats)
 	group:CreateButton("Refresh system info", function()
 		status:Update("Hub", Core.UI_LIBRARY or "Alleral")
 		status:Update("UI", Core.ALLERAL_UI_VERSION or "--")
@@ -1920,16 +1941,16 @@ function Core.buildExecutorIntelGroup(tab, column)
 	local group = Core.buildUiGroup(tab, "Executor intel", column or 1, nil, nil, "ExecutorIntel")
 	local profile = type(Core.executorProfile) == "function" and Core.executorProfile() or {}
 	local execName = profile.displayName or Core.getExecutorDisplayName()
-	group:CreateLabel("Executor · " .. execName)
+	group:CreateLabel("Executor Â· " .. execName)
 	if profile.tier then
-		group:CreateLabel("Tier · " .. tostring(profile.tier))
+		group:CreateLabel("Tier Â· " .. tostring(profile.tier))
 	end
 	if profile.layoutMode then
-		group:CreateLabel("UI layout · " .. tostring(profile.layoutMode))
+		group:CreateLabel("UI layout Â· " .. tostring(profile.layoutMode))
 	end
-	group:CreateLabel("PlaceId · " .. tostring(game.PlaceId))
-	group:CreateLabel("JobId · " .. tostring(game.JobId):sub(1, 20) .. "...")
-	group:CreateLabel("UserId · " .. tostring(game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.UserId or "?"))
+	group:CreateLabel("PlaceId Â· " .. tostring(game.PlaceId))
+	group:CreateLabel("JobId Â· " .. tostring(game.JobId):sub(1, 20) .. "...")
+	group:CreateLabel("UserId Â· " .. tostring(game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.UserId or "?"))
 	local caps = {}
 	for key, label in pairs({
 		hasClipboard = "clipboard",
@@ -1944,7 +1965,7 @@ function Core.buildExecutorIntelGroup(tab, column)
 			table.insert(caps, label)
 		end
 	end
-	group:CreateLabel("Caps · " .. (#caps > 0 and table.concat(caps, ", ") or "sandboxed"))
+	group:CreateLabel("Caps Â· " .. (#caps > 0 and table.concat(caps, ", ") or "sandboxed"))
 	group:CreateButton("Copy JobId", Core.copyJobId, "Copy this server's JobId.")
 	group:CreateButton("Copy join link", Core.copyPlaceJoinLink, "Roblox app join link.")
 	return group
@@ -2071,7 +2092,7 @@ function Core.buildRemoteToolsGroup(tab, column, options)
 	options = type(options) == "table" and options or {}
 	local group = Core.buildUiGroup(tab, "Remote tools", column or 2, nil, nil, "RemoteTools")
 	local indexed = 0
-	local status = group:CreateStatus("Remotes", {
+	local status = Core.buildStatusDisplay(group, "Remotes", {
 		Indexed = "0",
 		LastScan = "never",
 	})
@@ -2241,7 +2262,7 @@ function Core.registerExploitCommandPalette(window, ui)
 		{ Name = "Copy join link", Callback = Core.copyPlaceJoinLink },
 		{ Name = "Rejoin server", Callback = Core.rejoinServer },
 		{ Name = "Server hop (low pop)", Callback = function()
-			Core.notify("Alleral", "Use Settings → Server tools for hop controls.", 4)
+			Core.notify("Alleral", "Use Settings â†’ Server tools for hop controls.", 4)
 		end },
 	}
 	for _, cmd in ipairs(cmds) do
@@ -2289,7 +2310,7 @@ function Core.buildExploitHub(section, options)
 
 	if type(options.gameStats) == "table" then
 		local telemetry = Core.buildUiGroup(hub.dashboardTab, "Game telemetry", 1, nil, nil, "GameTelemetry")
-		hub.gameStatus = telemetry:CreateStatus(options.gameName or "Script", options.gameStats)
+		hub.gameStatus = Core.buildStatusDisplay(telemetry, options.gameName or "Script", options.gameStats)
 		if type(options.statsTick) == "function" then
 			local tickGen = ENV._AlleralStatsTickGen or 0
 			task.spawn(function()
@@ -2580,7 +2601,7 @@ function Core.buildConfigProfileGroup(tab, options)
 			return
 		end
 		pcall(setClipboard, HttpService:JSONEncode(collectSnapshot()))
-		Core.notify("Alleral", "Profile copied — paste to share.", 4)
+		Core.notify("Alleral", "Profile copied â€” paste to share.", 4)
 	end)
 
 	group:CreateButton("Paste from clipboard", function()
@@ -2683,7 +2704,7 @@ function Core.buildCloudConfigStudio(tab, options)
 
 	local function formatBrowseLabel(entry)
 		return string.format(
-			"[%s] %s · %s · %s dl",
+			"[%s] %s Â· %s Â· %s dl",
 			tostring(entry.code or "??????"),
 			tostring(entry.name or "Untitled"),
 			tostring(entry.author or "?"),
@@ -2694,7 +2715,7 @@ function Core.buildCloudConfigStudio(tab, options)
 	local library = Core.buildUiGroup(tab, "Cloud library", libraryColumn, nil, nil, "CloudLibrary")
 	local community = Core.buildUiGroup(tab, "Community browser", communityColumn, nil, nil, "CloudCommunity")
 
-	local cloudStatus = library:CreateStatus("Cloud", {
+	local cloudStatus = Core.buildStatusDisplay(library, "Cloud", {
 		Code = shareCode ~= "" and shareCode or "--",
 		Setup = state.Alleral_CloudConfigName or "My setup",
 		DNA = "--",
@@ -2727,7 +2748,7 @@ function Core.buildCloudConfigStudio(tab, options)
 		cloudStatus:Update("Downloads", tostring(decoded.downloads or 0))
 		cloudStatus:SetSummary(
 			string.format(
-				"%s by %s · v%s · DNA %s · %s keys would change",
+				"%s by %s Â· v%s Â· DNA %s Â· %s keys would change",
 				tostring(decoded.name or "Untitled"),
 				tostring(decoded.author or "?"),
 				tostring(decoded.scriptVersion or "?"),
@@ -2797,7 +2818,7 @@ function Core.buildCloudConfigStudio(tab, options)
 		cloudStatus:Update("Code", shareCode)
 		cloudStatus:Update("DNA", tostring(decoded.dna or "?"))
 		cloudStatus:Update("Diff", "0 keys")
-		cloudStatus:SetSummary("Uploaded " .. shareCode .. " · DNA " .. tostring(decoded.dna or "?"))
+		cloudStatus:SetSummary("Uploaded " .. shareCode .. " Â· DNA " .. tostring(decoded.dna or "?"))
 		setStatus("Uploaded " .. shareCode, "success")
 		if Core.setClipboard then
 			pcall(Core.setClipboard, shareCode)
@@ -2849,7 +2870,7 @@ function Core.buildCloudConfigStudio(tab, options)
 		end
 	end, "Applies the previewed cloud config to this session.")
 
-	local communityStatus = community:CreateStatus("Browse", {
+	local communityStatus = Core.buildStatusDisplay(community, "Browse", {
 		Game = gameId,
 		Listed = "0",
 		Selected = shareCode ~= "" and shareCode or "--",
@@ -3034,7 +3055,7 @@ end
 function Core.discordField(name, value, inline)
 	local text = trimText(value)
 	if text == "" then
-		text = "—"
+		text = "â€”"
 	end
 	if #text > 1024 then
 		text = text:sub(1, 1021) .. "..."
@@ -3049,7 +3070,7 @@ end
 function Core.discordLinkField(name, label, url, inline)
 	url = trimText(url)
 	if url == "" then
-		return Core.discordField(name, "—", inline)
+		return Core.discordField(name, "â€”", inline)
 	end
 	return {
 		name = tostring(name or "Link"),

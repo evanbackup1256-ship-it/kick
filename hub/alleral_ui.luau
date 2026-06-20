@@ -448,26 +448,6 @@ return function(Core)
 			return {}
 		end
 
-		function groupbox:CreateStatus(label, fields)
-			local status = { Labels = {}, LastValues = {}, Visible = true }
-			for key, value in pairs(fields or {}) do
-				status.LastValues[key] = tostring(value)
-				local lbl = groupbox:CreateLabel({ Name = tostring(key) .. ": " .. tostring(value) }, nextFlag(label .. "_" .. tostring(key)))
-				if lbl then status.Labels[key] = lbl end
-			end
-			local sum = groupbox:CreateLabel({ Name = "" }, nextFlag(label .. "_summary"))
-			if sum then status.Labels.Summary = sum end
-			function status:Update(key, value)
-				local rendered = tostring(value)
-				if self.LastValues[key] == rendered then return end
-				self.LastValues[key] = rendered
-				local row = self.Labels[key]
-				if row and row.Set then row:Set({ Name = tostring(key) .. ": " .. rendered }) end
-			end
-			function status:SetSummary(text) local row = self.Labels.Summary; if row and row.Set then row:Set({ Name = tostring(text or "") }) end end
-			function status:SetVisible(visible) self.Visible = visible == true end
-			return status
-		end
 		return groupbox
 	end
 
@@ -511,7 +491,6 @@ return function(Core)
 			return groupbox:CreateDropdown({ Name = config.Text or config.Name or id, Options = config.Values or config.Options or {}, CurrentOption = config.Default or config.CurrentValue or config.CurrentOption, MultipleOptions = config.Multi or config.MultiSelection, Callback = config.Callback or function() end }, id)
 		end
 		function group:CreateLabel(text) return groupbox:CreateLabel({ Name = text }) end
-		function group:CreateStatus(label, fields) return groupbox:CreateStatus(label, fields or {}) end
 		function group:CreateDivider() return groupbox:CreateDivider() end
 		return group
 	end

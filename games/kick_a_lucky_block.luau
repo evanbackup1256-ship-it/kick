@@ -3405,14 +3405,14 @@ local function loggedCallback(label, callback)
 end
 
 local uiWindow = Core.buildUiWindow(ui, Core.uiWindowSettings({
-	Subtitle = "Kick a Lucky Block · v" .. VERSION,
+	Subtitle = "Kick a Lucky Block Â· v" .. VERSION,
 	Icon = "zap",
 	Theme = "Default",
 	Size = UDim2.fromOffset(960, 660),
 }))
 if not uiWindow or not uiWindow._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"
-	Core.logWarn("UI window failed — aborting")
+	Core.logWarn("UI window failed â€” aborting")
 	return
 end
 local uiSection = Core.buildUiSection(uiWindow)
@@ -3488,7 +3488,7 @@ Core.buildStandardSettingsExtras(configTab, Core.settingsExtrasOptions(uiWindow,
 local protectedDropdown
 local upgradeDropdown
 
-local diagnosticsStatus = diagnosticsGroup:CreateStatus("Live stats", {
+local diagnosticsStatus = Core.buildStatusDisplay(diagnosticsGroup, "Live stats", {
 	Executor    = "checking...",
 	FPS         = "--",
 	Perf        = "--",
@@ -4184,7 +4184,7 @@ kickGroup:CreateToggle(
 	end,
 	"APredict"
 )
-predictionStatus = kickGroup:CreateStatus("Live roll", {
+predictionStatus = Core.buildStatusDisplay(kickGroup, "Live roll", {
 	Roll       = "--",
 	Rarity     = "--",
 	Mutation   = "--",
@@ -4192,7 +4192,7 @@ predictionStatus = kickGroup:CreateStatus("Live roll", {
 	["vs plot"]  = "--",
 	Result     = "--",
 })
-local sessionStatus = kickGroup:CreateStatus("This session", {
+local sessionStatus = Core.buildStatusDisplay(kickGroup, "This session", {
 	Runtime    = "0:00",
 	Kicks      = "0",
 	["Per min"]  = "0",
@@ -4598,7 +4598,7 @@ registerGameDataDropdown(favoriteGroup:AddDropdown("FavoriteBrainrot", {
 	Default = state.TSSellBrainrot,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Matches name → gets a star.",
+	Tooltip = "Matches name â†’ gets a star.",
 	Callback = function(selection)
 		state.TSSellBrainrot = selectedDropdownKeys(selection)
 		if state.AAutoFav then
@@ -4613,7 +4613,7 @@ registerGameDataDropdown(favoriteGroup:AddDropdown("FavoriteRarity", {
 	Default = state.TSSellRarity,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Matches rarity → gets a star.",
+	Tooltip = "Matches rarity â†’ gets a star.",
 	Callback = function(selection)
 		state.TSSellRarity = selectedDropdownKeys(selection)
 		if state.AAutoFav then
@@ -4628,7 +4628,7 @@ registerGameDataDropdown(favoriteGroup:AddDropdown("FavoriteMutation", {
 	Default = state.TSSellMutation,
 	Multi = true,
 	Searchable = true,
-	Tooltip = "Matches mutation → gets a star.",
+	Tooltip = "Matches mutation â†’ gets a star.",
 	Callback = function(selection)
 		state.TSSellMutation = selectedDropdownKeys(selection)
 		if state.AAutoFav then
@@ -4718,7 +4718,7 @@ local updateMasteryStatus
 masteryGroup:CreateToggle(
 	"Mastery farm",
 	state.AAutoMastery,
-	"Kick → reset → repeat at your power %. Turn off auto kick first.",
+	"Kick â†’ reset â†’ repeat at your power %. Turn off auto kick first.",
 	function(value)
 		state.AAutoMastery = value
 		if not value and updateMasteryStatus then
@@ -4751,7 +4751,7 @@ masteryGroup:CreateDropdown(
 		saveSettings()
 	end
 )
-masteryStatus = masteryGroup:CreateStatus("Mastery", {
+masteryStatus = Core.buildStatusDisplay(masteryGroup, "Mastery", {
 	Status     = "Off",
 	["Reset"]  = state.MasteryResetMethod,
 	["Last"]   = "--",
@@ -4816,7 +4816,7 @@ Core.buildJoinServerControls(serverGroup, {
 performanceGroup:CreateToggle(
 	"FPS boost",
 	state.AFPSBoost,
-	"Lowest quality, no shadows — best for weak PCs and executors.",
+	"Lowest quality, no shadows â€” best for weak PCs and executors.",
 	function(value)
 		state.AFPSBoost = value
 		if value then
@@ -4854,7 +4854,7 @@ performanceGroup:CreateToggle(
 performanceGroup:CreateToggle(
 	"Black screen mode",
 	state.ABlackScreen,
-	"Hides the 3D world with a black overlay — UI stays visible.",
+	"Hides the 3D world with a black overlay â€” UI stays visible.",
 	function(value)
 		state.ABlackScreen = value
 		if Core.setBlackScreen then
@@ -5119,7 +5119,7 @@ task.spawn(function()
 			local build = runtime.gameBuild
 			ui.diagnosticsStatus:Update(
 				"Build",
-				build and ((build.Changed and "Updated" or "Same") .. " · v" .. tostring(build.PlaceVersion or "--")) or "--"
+				build and ((build.Changed and "Updated" or "Same") .. " Â· v" .. tostring(build.PlaceVersion or "--")) or "--"
 			)
 			ui.diagnosticsStatus:Update("Updated", build and formatRobloxTimestamp(build.Updated) or "--")
 			ui.diagnosticsStatus:Update("Errors", tostring(totalLoggedErrors()))
@@ -5426,7 +5426,7 @@ makeSupervisor("Prediction", 1, function()
 		if weakestCps < math.huge then
 			local diff = cps1 - weakestCps
 			if hasEmpty then
-				netGainStr = "+" .. formatNumber(cps1) .. " · open slot"
+				netGainStr = "+" .. formatNumber(cps1) .. " Â· open slot"
 			else
 				netGainStr = (diff >= 0 and "+" or "") .. formatNumber(diff) .. "/s"
 			end
@@ -5446,7 +5446,7 @@ makeSupervisor("Prediction", 1, function()
 		local signature = name .. "\0" .. mutation .. "\0" .. rarity
 		if runtime.lastRareNotify ~= signature then
 			runtime.lastRareNotify = signature
-			notify("Rare!", name .. " · " .. rarity .. " · " .. mutation, 6)
+			notify("Rare!", name .. " Â· " .. rarity .. " Â· " .. mutation, 6)
 		end
 	end
 	if ui.predictionStatus then
@@ -5510,7 +5510,7 @@ makeSupervisor("AutoKick", 0.3, function()
 			local signature = notifyName .. "\0" .. notifyMutation .. "\0" .. notifyRarity
 			if runtime.lastRareNotify ~= signature then
 				runtime.lastRareNotify = signature
-				notify("Rare!", notifyName .. " · " .. notifyRarity .. " · " .. notifyMutation, 6)
+				notify("Rare!", notifyName .. " Â· " .. notifyRarity .. " Â· " .. notifyMutation, 6)
 			end
 		end
 	end
@@ -6232,7 +6232,7 @@ task.defer(function()
 end)
 
 Core.finalizeGameUi(uiHandles.window, ui, {
-	Subtitle = "Kick a Lucky Block · v" .. VERSION,
+	Subtitle = "Kick a Lucky Block Â· v" .. VERSION,
 })
 end
 
