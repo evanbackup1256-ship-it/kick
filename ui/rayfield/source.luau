@@ -1,9 +1,6 @@
 local ALLERAL_RAYFIELD_VERSION = 1
 local RAYFIELD_SOURCE_URL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source"
-local RAYFIELD_FALLBACK_URLS = {
-	"https://raw.githubusercontent.com/jensonhirst/Rayfield/main/source",
-	"https://sirius.menu/rayfield",
-}
+local RAYFIELD_FALLBACK_URLS = {}
 
 local ENV = (function()
 	local ok, env = pcall(function()
