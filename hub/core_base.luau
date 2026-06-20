@@ -1,8 +1,8 @@
 local Core = {}
 Core.VERSION = "2.9.10"
 Core._CORE_ARTIFACT = "base"
-Core.UI_LIBRARY = "Fluent"
-Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.0-fluent"
+Core.UI_LIBRARY = "Rayfield"
+Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "4.0.0-rayfield"
 Core.UI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")

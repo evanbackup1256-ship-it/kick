@@ -41,10 +41,10 @@ $loaderPath = Join-Path $root "loader.luau"
 $loaderRaw = Get-Content $loaderPath -Raw -Encoding UTF8
 $loaderRaw = [regex]::Replace($loaderRaw, 'local LOADER_VERSION = "[^"]+"', ('local LOADER_VERSION = "' + $release.loader + '"'))
 $loaderRaw = [regex]::Replace($loaderRaw, '(?m)^\tloader = "[^"]+"', ("`tloader = `"$($release.loader)`""), 1)
-if ($null -ne $release.fluentVersion) {
-    $fluentVersionVal = [int]$release.fluentVersion
-    $loaderRaw = [regex]::Replace($loaderRaw, 'local FLUENT_VERSION = \d+', ('local FLUENT_VERSION = ' + $fluentVersionVal))
-    $loaderRaw = [regex]::Replace($loaderRaw, 'fluentVersion = \d+,', ('fluentVersion = ' + $fluentVersionVal + ','))
+if ($null -ne $release.rayfieldVersion) {
+    $rayfieldVersionVal = [int]$release.rayfieldVersion
+    $loaderRaw = [regex]::Replace($loaderRaw, 'local RAYFIELD_VERSION = \d+', ('local RAYFIELD_VERSION = ' + $rayfieldVersionVal))
+    $loaderRaw = [regex]::Replace($loaderRaw, 'rayfieldVersion = \d+,', ('rayfieldVersion = ' + $rayfieldVersionVal + ','))
 }
 $fallbackFields = @(
     @{ Key = "core"; Prop = "core" },
@@ -93,9 +93,9 @@ $siteRaw = [regex]::Replace($siteRaw, '"loaderVersion"\s*:\s*"[^"]*"', ('"loader
 $siteRaw = [regex]::Replace($siteRaw, 'bootstrap\.luau\?v=[^"&]+&t=', 'bootstrap.luau?t=')
 $siteRaw = [regex]::Replace($siteRaw, 'bootstrap\.luau\?v=[^"&]+', 'bootstrap.luau')
 $siteRaw = [regex]::Replace($siteRaw, '"coreVersion"\s*:\s*"[^"]*"', ('"coreVersion": "' + $release.core + '"'))
-$uiLibrary = if ($release.ui) { $release.ui } else { "Fluent" }
+$uiLibrary = if ($release.ui) { $release.ui } else { "Rayfield" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiLibrary"\s*:\s*"[^"]*"', ('"uiLibrary": "' + $uiLibrary + '"'))
-$uiVersion = if ($release.uiVersion) { $release.uiVersion } else { "3.0.0-fluent" }
+$uiVersion = if ($release.uiVersion) { $release.uiVersion } else { "4.0.0-rayfield" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiVersion"\s*:\s*"[^"]*"', ('"uiVersion": "' + $uiVersion + '"'))
 if ($hashBumpNeeded) {
     $siteRaw = [regex]::Replace($siteRaw, '"updatedAt"\s*:\s*"[^"]*"', ('"updatedAt": "' + $updatedAt + '"'))

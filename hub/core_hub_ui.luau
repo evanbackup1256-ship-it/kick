@@ -1327,7 +1327,7 @@ function Core.setupHubKeybinds(options)
 	local panicKey = options.panicKey or Enum.KeyCode.Delete
 	local uiKey = options.uiKey or Enum.KeyCode.RightControl
 	local insertKey = options.insertKey or Enum.KeyCode.Insert
-	local libraryHandlesUiKeybind = Core.UI_LIBRARY == "Fluent"
+	local libraryHandlesUiKeybind = Core.UI_LIBRARY == "Rayfield"
 	ENV._Alleral_KeybindConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or input.UserInputType ~= Enum.UserInputType.Keyboard then
 			return
@@ -1592,7 +1592,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	local group = Core.buildUiGroup(tab, "Customization V2", column, nil, nil, "CustomizationV2")
 
 	if not uiRuntime or type(uiRuntime.SetMotionProfile) ~= "function" then
-		group:CreateLabel("Fluent native UI engine with config saving.")
+		group:CreateLabel("Rayfield native UI engine with config saving.")
 		return group
 	end
 

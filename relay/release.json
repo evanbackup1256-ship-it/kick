@@ -2,7 +2,7 @@
   "loader": "8.11.1",
   "core": "2.9.10",
   "weao": "1.1",
-  "ui": "Fluent",
+  "ui": "Rayfield",
   "commit": "626bd14",
   "updatedAt": "2026-06-19T23:24:58Z",
   "updatePollSeconds": 120,
@@ -14,6 +14,6 @@
   "helpers": "1.8",
   "security": "1.3",
   "access": "1.1",
-  "uiVersion": "3.0.0-fluent",
-  "fluentVersion": 1
+  "uiVersion": "4.0.0-rayfield",
+  "rayfieldVersion": 1
 }

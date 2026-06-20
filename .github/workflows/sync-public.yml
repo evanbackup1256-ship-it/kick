@@ -62,7 +62,7 @@ jobs:
           done
 
           # Add UI files
-          [ -f ui/fluent/source.luau ] && SOURCES+=("ui/fluent/source.luau")
+          [ -f ui/rayfield/source.luau ] && SOURCES+=("ui/rayfield/source.luau")
 
           # Add game files
           for f in games/*.luau; do
@@ -101,7 +101,7 @@ jobs:
 
           # Compare source vs public repo via sha256
           # Obfuscation targets: games/*.luau
-          # Plain copy: loader.luau, bootstrap.luau, hub/*.luau, ui/fluent/source.luau, cfg/*
+          # Plain copy: loader.luau, bootstrap.luau, hub/*.luau, ui/rayfield/source.luau, cfg/*
           CHANGED=""
           PLAIN=""
           OBFUSCATE=""

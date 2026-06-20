@@ -13,7 +13,7 @@ from typing import Any
 
 BOM = b"\xef\xbb\xbf"
 
-# Core boot chain + Fluent UI runtime
+# Core boot chain + Rayfield UI runtime
 LOADER_MODULES = (
     "bootstrap.luau",
     "loader.luau",
@@ -21,7 +21,7 @@ LOADER_MODULES = (
     "hub/core_ui.luau",
     "hub/alleral_ui.luau",
     "hub/core_hub_ui.luau",
-    "ui/fluent/source.luau",
+    "ui/rayfield/source.luau",
     "cfg/release.json",
 )
 
@@ -70,7 +70,7 @@ def parse_release(root: Path | None = None) -> dict[str, Any]:
 
 def module_version_marker(text: str) -> int | None:
     for pattern in (
-        r"local\s+ALLERAL_FLUENT_VERSION\s*=\s*(\d+)",
+        r"local\s+ALLERAL_RAYFIELD_VERSION\s*=\s*(\d+)",
         r"Version\s*=\s*(\d+)",
     ):
         match = re.search(pattern, text)
@@ -104,9 +104,9 @@ def build_manifest(root: Path | None = None) -> dict[str, Any]:
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "release": release,
         "loader": release.get("loader"),
-        "ui": release.get("ui", "Fluent"),
+        "ui": release.get("ui", "Rayfield"),
         "uiVersion": release.get("uiVersion"),
-        "fluentVersion": release.get("fluentVersion"),
+        "rayfieldVersion": release.get("rayfieldVersion"),
         "commit": release.get("commit"),
         "modules": modules,
     }
