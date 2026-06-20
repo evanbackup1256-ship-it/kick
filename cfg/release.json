@@ -3,7 +3,7 @@
   "core": "2.9.10",
   "weao": "1.1",
   "ui": "Fluent",
-  "commit": "36ea055",
+  "commit": "35a5853",
   "updatedAt": "2026-06-20T01:05:17Z",
   "updatePollSeconds": 120,
   "autoUpdate": true,
