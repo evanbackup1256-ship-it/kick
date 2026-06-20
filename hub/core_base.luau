@@ -1281,6 +1281,37 @@ function Core.applyUiLayer(source, label)
 	return true
 end
 
+function Core.resolveRelayBase()
+	local env = ENV
+	if type(env._Alleral_RelayBase) == "string" and env._Alleral_RelayBase ~= "" then
+		return env._Alleral_RelayBase:gsub("/+$", "")
+	end
+	if type(env.RailwayPublicDomain) == "string" and env.RailwayPublicDomain ~= "" then
+		return "https://" .. env.RailwayPublicDomain:gsub("/+$", "")
+	end
+	return nil
+end
+
+function Core.httpGetJson(url)
+	if type(url) ~= "string" or url == "" then return nil, "no url" end
+	local HttpService = game:GetService("HttpService")
+	if not pcall(function() return HttpService end) then return nil, "no httpservice" end
+	local ok, body = pcall(function()
+		return HttpService:GetAsync(url, true)
+	end)
+	if not ok or type(body) ~= "string" or body == "" then
+		return nil, "http fetch failed"
+	end
+	if body:find("404", 1, true) then return nil, "404" end
+	local okJ, decoded = pcall(function()
+		return HttpService:JSONDecode(body)
+	end)
+	if not okJ or type(decoded) ~= "table" then
+		return nil, "json parse failed"
+	end
+	return decoded, nil
+end
+
 Core.installResilience()
 
 ENV.Alleral_Core = Core

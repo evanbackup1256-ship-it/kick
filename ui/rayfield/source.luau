@@ -115,6 +115,22 @@ local function bootRayfield()
 		return nil, "Rayfield runtime failed: " .. tostring(pkg)
 	end
 
+	if type(pkg) ~= "table" or type(pkg.CreateWindow) ~= "function" then
+		local candidates = { rawget(ENV, "Rayfield"), rawget(ENV, "RayfieldLibrary") }
+		if typeof(shared) == "table" then
+			table.insert(candidates, rawget(shared, "Rayfield"))
+		end
+		for _, c in ipairs({ rawget(_G, "Rayfield") }) do
+			table.insert(candidates, c)
+		end
+		for _, candidate in ipairs(candidates) do
+			if type(candidate) == "table" and type(candidate.CreateWindow) == "function" then
+				pkg = candidate
+				break
+			end
+		end
+	end
+
 	if type(pkg) ~= "table" then
 		return nil, "Rayfield returned non-table: " .. type(pkg)
 	end

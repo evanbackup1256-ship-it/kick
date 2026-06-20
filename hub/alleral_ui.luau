@@ -172,14 +172,39 @@ return function(Core)
 			end
 			return nil, "Rayfield runtime: " .. tostring(pkg)
 		end
+
+		if type(pkg) ~= "table" or type(pkg.CreateWindow) ~= "function" then
+			if type(Core.say) == "function" then
+				Core.say("[UI] Rayfield not returned directly (type=" .. type(pkg) .. "), checking globals...")
+			end
+			local candidates = { rawget(ENV, "Rayfield"), rawget(ENV, "RayfieldLibrary") }
+			if typeof(shared) == "table" then
+				table.insert(candidates, rawget(shared, "Rayfield"))
+			end
+			for _, c in ipairs({ rawget(_G, "Rayfield") }) do
+				table.insert(candidates, c)
+			end
+			for _, candidate in ipairs(candidates) do
+				if type(candidate) == "table" and type(candidate.CreateWindow) == "function" then
+					pkg = candidate
+					if type(Core.say) == "function" then Core.say("[UI] Found Rayfield in global scope") end
+					break
+				end
+			end
+		end
+
 		if type(pkg) ~= "table" then
 			return nil, "Rayfield returned non-table: " .. type(pkg)
 		end
-		if type(pkg.CreateWindow) ~= "function" then
-			return nil, "Rayfield missing CreateWindow (got " .. type(pkg.CreateWindow) .. ")"
+
+		local required = { "CreateWindow", "Notify" }
+		for _, m in ipairs(required) do
+			if type(pkg[m]) ~= "function" then
+				return nil, "Rayfield module missing critical: " .. m
+			end
 		end
 
-		if type(Core.say) == "function" then Core.say("[UI] Rayfield module booted") end
+		if type(Core.say) == "function" then Core.say("[UI] Rayfield module booted (v" .. tostring(pkg.Version or "?") .. ")") end
 
 		ENV._AlleralRayfield = pkg
 		ENV._AlleralRayfieldBooted = true
@@ -444,11 +469,12 @@ return function(Core)
 		function groupbox:CreateToggle(settings, id)
 			local flag = nextFlag(settings.Name, id)
 			local raw
+			local currentVal = settings.Default or settings.CurrentValue or settings.Value
 			raw = safeCall("CreateToggle " .. tostring(settings.Name), function()
 				return section:CreateToggle({
 					Name = settings.Name or settings.Title or "Toggle",
 					Description = settings.Tooltip or settings.Description or "",
-					CurrentValue = settings.Default == true or settings.CurrentValue == true,
+					CurrentValue = currentVal == true,
 					Callback = settings.Callback or function() end,
 					Flag = flag,
 				})
@@ -456,6 +482,7 @@ return function(Core)
 			return wrapElement(function(next)
 				if not raw then return end
 				local v = next.CurrentValue
+				if v == nil then v = next.Value end
 				if v == nil then v = next end
 				if raw.Set then pcall(raw.Set, raw, v == true) end
 				if raw.SetValue then pcall(raw.SetValue, raw, v == true) end
@@ -464,10 +491,12 @@ return function(Core)
 
 		function groupbox:CreateButton(settings, id)
 			local raw
-			raw = safeCall("CreateButton " .. tostring(settings.Name or "Button"), function()
+			local name = settings.Name or settings.Title or settings.Text or "Button"
+			local desc = settings.Tooltip or settings.Description or ""
+			raw = safeCall("CreateButton " .. tostring(name), function()
 				return section:CreateButton({
-					Name = settings.Name or settings.Title or "Button",
-					Description = settings.Tooltip or settings.Description or "",
+					Name = name,
+					Description = desc,
 					Callback = settings.Callback or function() end,
 				})
 			end)
@@ -477,6 +506,7 @@ return function(Core)
 		function groupbox:CreateSlider(settings, id)
 			local range = settings.Range or { 0, 100 }
 			local flag = nextFlag(settings.Name, id)
+			local currentVal = tonumber(settings.Default) or tonumber(settings.CurrentValue) or tonumber(settings.Value) or range[1]
 			local raw
 			raw = safeCall("CreateSlider " .. tostring(settings.Name), function()
 				return section:CreateSlider({
@@ -485,7 +515,7 @@ return function(Core)
 					Range = { range[1] or 0, range[2] or 100 },
 					Increment = tonumber(settings.Increment) or 1,
 					Suffix = settings.Suffix or "",
-					CurrentValue = tonumber(settings.Default) or tonumber(settings.CurrentValue) or range[1],
+					CurrentValue = currentVal,
 					Callback = settings.Callback or function() end,
 					Flag = flag,
 				})
@@ -493,6 +523,7 @@ return function(Core)
 			return wrapElement(function(next)
 				if not raw then return end
 				local v = tonumber(next.CurrentValue)
+				if v == nil then v = tonumber(next.Value) end
 				if v == nil then v = tonumber(next) end
 				if v == nil then return end
 				if raw.Set then pcall(raw.Set, raw, v) end
@@ -502,12 +533,13 @@ return function(Core)
 
 		function groupbox:CreateInput(settings, id)
 			local flag = nextFlag(settings.Name, id)
+			local currentVal = tostring(settings.CurrentValue or settings.Default or settings.Value or "")
 			local raw
 			raw = safeCall("CreateInput " .. tostring(settings.Name), function()
 				return section:CreateInput({
 					Name = settings.Name or settings.Title or "Input",
 					Description = settings.Tooltip or settings.Description or "",
-					CurrentValue = tostring(settings.CurrentValue or settings.Default or ""),
+					CurrentValue = currentVal,
 					PlaceholderText = settings.PlaceholderText or settings.Placeholder or "Enter text...",
 					RemoveTextAfterFocusLost = false,
 					Callback = settings.Callback or function() end,
@@ -517,6 +549,7 @@ return function(Core)
 			return wrapElement(function(next)
 				if not raw then return end
 				local v = next.CurrentValue
+				if v == nil then v = next.Value end
 				if v == nil then v = tostring(next) end
 				if raw.Set then pcall(raw.Set, raw, tostring(v)) end
 				if raw.SetValue then pcall(raw.SetValue, raw, tostring(v)) end
@@ -567,10 +600,17 @@ return function(Core)
 
 		function groupbox:CreateLabel(settings, id)
 			local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
-			local raw
-			raw = safeCall("CreateLabel", function()
-				return section:CreateLabel(text)
-			end)
+			local raw = nil
+			if section and type(section.CreateLabel) == "function" then
+				raw = safeCall("CreateLabel", function()
+					return section:CreateLabel(text)
+				end)
+			end
+			if not raw and section and type(section.CreateParagraph) == "function" then
+				raw = safeCall("CreateParagraph", function()
+					return section:CreateParagraph({ Title = "", Content = text })
+				end)
+			end
 			return {
 				Set = function(_, nextSettings)
 					local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text) or tostring(nextSettings or "")
