@@ -1,2 +1,2 @@
 Edit Python, site, and deploy files here.
-Run maint/sync_repo.ps1 before committing — backend/ is generated from this folder.
+Run maint/bump_release.ps1 before committing — backend/ is generated from this folder.

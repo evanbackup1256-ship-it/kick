@@ -5,7 +5,7 @@ export const PUBLIC_URL =
   process.env.NEXT_PUBLIC_PUBLIC_URL || "https://alleral-telemetry-production.up.railway.app/";
 
 const MIRROR_URL =
-  process.env.NEXT_PUBLIC_MIRROR_URL || "https://evanbackup1256-ship-it.github.io/kick/";
+  process.env.NEXT_PUBLIC_MIRROR_URL || "https://evanbackup1256-ship-it.github.io/-kick-loader/";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 

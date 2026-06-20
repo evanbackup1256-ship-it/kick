@@ -1,4 +1,4 @@
 GENERATED - do not edit files in backend/ directly.
-Edit relay/ and cfg/, then run: maint/sync_repo.ps1
+Edit relay/ and cfg/, then run: maint/bump_release.ps1
 Synced at: 2026-06-20T01:05:17Z
 Commit: 36ea055

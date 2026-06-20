@@ -1,4 +1,4 @@
-module github.com/evanbackup1256-ship-it/kick/go
+module github.com/evanbackup1256-ship-it/-kick-loader/go
 
 go 1.23
 

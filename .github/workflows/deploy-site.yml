@@ -37,7 +37,7 @@ jobs:
       - name: Build Next.js site (GitHub Pages mirror)
         working-directory: relay/site
         env:
-          NEXT_PUBLIC_BASE_PATH: /kick
+          NEXT_PUBLIC_BASE_PATH: /-kick-loader
           NEXT_PUBLIC_ALLERAL_API: https://alleral-telemetry-production.up.railway.app
           SKIP_BACKEND_SYNC: "1"
         run: |

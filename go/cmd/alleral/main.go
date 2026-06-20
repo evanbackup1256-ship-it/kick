@@ -8,8 +8,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
-	"github.com/evanbackup1256-ship-it/kick/go/internal/api"
-	"github.com/evanbackup1256-ship-it/kick/go/internal/config"
+	"github.com/evanbackup1256-ship-it/-kick-loader/go/internal/api"
+	"github.com/evanbackup1256-ship-it/-kick-loader/go/internal/config"
 )
 
 func main() {

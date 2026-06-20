@@ -43,7 +43,7 @@ if ($release.commit -eq $head)
     Pass "release commit $parent matches HEAD~1 (hash bump on $head)"
 } else
 {
-    Fail "release.json commit ($($release.commit)) out of sync with HEAD ($head) - run maint/sync_repo.ps1"
+    Fail "release.json commit ($($release.commit)) out of sync with HEAD ($head) - run maint/bump_release.ps1"
 }
 
 $commitMatch = [regex]::Match($loader, '(?m)^\tcommit = "([^"]+)"')

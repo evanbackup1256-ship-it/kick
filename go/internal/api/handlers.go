@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/evanbackup1256-ship-it/kick/go/internal/config"
+	"github.com/evanbackup1256-ship-it/-kick-loader/go/internal/config"
 )
 
 type Server struct {
