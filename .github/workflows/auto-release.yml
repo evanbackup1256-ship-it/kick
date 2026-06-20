@@ -78,7 +78,7 @@ jobs:
           body: |
             ## Auto Release
 
-            **Repository:** evanbackup1256-ship-it/kick  
+            **Repository:** evanbackup1256-ship-it/-kick-loader  
             **Branch:** main  
             **Commit:** `${{ github.sha }}`  
             **Short SHA:** `${{ steps.meta.outputs.short_sha }}`  
