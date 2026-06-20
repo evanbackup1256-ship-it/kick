@@ -148,10 +148,10 @@ return function(Core)
 		function Library:EnsureGuiRoot() return true end
 		function Library:ClearNotifications() return 0 end
 		function Library:SetNotificationLower() return true end
-		function Library:SetNotifyDedupe() return true
-		function Library:SetHaptics() return true
-		function Library:ApplyAccentPreset() return true
-		function Library:SetTheme() return true
+		function Library:SetNotifyDedupe() return true end
+		function Library:SetHaptics() return true end
+		function Library:ApplyAccentPreset() return true end
+		function Library:SetTheme() return true end
 		function Library:CycleTheme() return { Name = "Default" } end
 		function Library:ListThemeNames() return { "Default", "Ocean", "AmberGlow", "Light", "Amethyst", "Green", "Bloom", "DarkBlue", "Serenity" } end
 		function Library:GetAutoResize() return true end
@@ -178,7 +178,7 @@ return function(Core)
 		function Library:SetNotificationCompact() return true end
 		function Library:GetNotificationStyle() return "glass" end
 		function Library:GetSpringMotion() return true end
-		function Library:RegisterLayoutRefresh() return true
+		function Library:RegisterLayoutRefresh() return true end
 
 		function Library:Notification(info)
 			info = type(info) == "table" and info or { Description = tostring(info) }

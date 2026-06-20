@@ -14,6 +14,14 @@ if ($alleralUi -match 'function Core\.buildUiTab') { Pass "alleral_ui defines bu
 if ($alleralUi -match 'function Core\.buildUiGroup') { Pass "alleral_ui defines buildUiGroup" } else { Fail "alleral_ui missing buildUiGroup" }
 if ($alleralUi -match 'Core\.wrapUiGroup\s*=') { Pass "alleral_ui defines wrapUiGroup" } else { Fail "alleral_ui missing wrapUiGroup" }
 if ($alleralUi -match 'function Core\.buildUiSection') { Pass "alleral_ui defines buildUiSection" } else { Fail "alleral_ui missing buildUiSection" }
+$unclosedInlineFunctions = Select-String -Path (Join-Path $root "hub/alleral_ui.luau") -Pattern 'function .*return ' | Where-Object { $_.Line -notmatch '\bend\s*$' }
+if ($unclosedInlineFunctions) {
+    foreach ($match in $unclosedInlineFunctions) {
+        Fail "alleral_ui inline function missing end at line $($match.LineNumber)"
+    }
+} else {
+    Pass "alleral_ui inline return functions close with end"
+}
 
 $fluentSource = Join-Path $root "ui/fluent/source.luau"
 if (Test-Path $fluentSource) {
