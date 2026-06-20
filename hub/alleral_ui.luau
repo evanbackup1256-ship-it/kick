@@ -61,6 +61,17 @@ return function(Core)
 		return "rbxassetid://" .. iconImage(icon)
 	end
 
+	local function rayfieldIcon(icon)
+		if icon == nil or icon == "" then return nil end
+		local s = tostring(icon)
+		local digits = s:match("^(%d+)$")
+		if digits then return nil end
+		if s:find("^rbxassetid://") then return nil end
+		if s:match("^[%a_%-]+$") then return s end
+		if s:match("^rbxthumb://") or s:match("^rbxthumbid://") then return nil end
+		return nil
+	end
+
 	local function mapTheme(name)
 		local n = tostring(name or "Default"):lower()
 		for _, theme in ipairs(ALLERAL_THEMES) do
@@ -284,7 +295,7 @@ return function(Core)
 
 			local title = settings.Title or settings.Name or "Alleral"
 			local subtitle = settings.Subtitle or settings.Author or ""
-			local icon = iconImage(settings.Icon)
+			local icon = rayfieldIcon(settings.Icon)
 			local theme = mapTheme(settings.Theme or "Default")
 			local configFolder = settings.FileSettings and settings.FileSettings.RootFolder or "Alleral_Configs"
 			local configName = settings.FileSettings and settings.FileSettings.ConfigFolder or "Interface"
@@ -325,7 +336,7 @@ return function(Core)
 			}
 
 			function window:AddTab(name, icon)
-				local iconId = iconImage(icon or "")
+				local iconId = rayfieldIcon(icon)
 				local tabOk, rfTab = pcall(function()
 					return rfWindow:CreateTab(name, iconId)
 				end)
